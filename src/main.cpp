@@ -363,8 +363,222 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    #include "core/Config/Config.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "brain/Brain.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "environment/Environment.hpp"
+#include "experiments/ExperimentRunner.hpp"
+
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
+#include <unordered_map>
+#include <functional>
+
+using namespace nlm;
+
+void printWelcome() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 6: Final Integration                                ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Real LIF neuron dynamics                                ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║     - Memory systems integration                             ║
+    ║     - Neuromodulation integration                            ║
+    ║     - Development integration                                 ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "\n=== NLM Usage ===" << std::endl;
+    std::cout << "nlm [options]" << std::endl;
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version                     Show version information" << std::endl;
+    std::cout << "  --config=FILE                 Load configuration from file" << std::endl;
+    std::cout << "  --output=FILE                 Save brain state to file" << std::endl;
+    stdcout << "  --load=FILE                   Load brain state from file" << std::endl;
+    std::cout << "  --phase=PHASE                 Specify NLM phase (2, 3, 4, 6)" << std::endl;
+    std::cout << "  --neurons=NUMBER              Set number of neurons" << std::endl;
+    std::cout << "  --steps=NUMBER                Number of simulation steps" << std::endl;
+    std::cout << "  --regions=NUMBER              Number of brain regions" << std::endl;
+    std::cout << "  --random-seed=SEED            Random seed for reproducibility" << std::endl;
+    std::cout << "  --timestep=VALUE              Simulation timestep in seconds" << std::endl;
+    std::cout << "  --connection-prob=VALUE       Connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --enable-feature=NAME         Enable specific feature" << std::endl;
+    std::cout << "  --disable-feature=NAME        Disable specific feature" << std::endl;
+    std::cout << "  --enable-plasticity           Enable synaptic plasticity" << std::endl;
+    std::cout << "  --enable-development          Enable developmental processes" << std::endl;
+    std::cout << "  --enable-curiosity            Enable curiosity-driven exploration" << std::endl;
+    std::cout << "  --enable-reward               Enable reward-based learning" << std::endl;
+    std::cout << "  --enable-visualization        Enable visualization" << std::endl;
+    std::cout << "  --enable-checkpointing        Enable checkpoint saving" << std::endl;
+    std::cout << "  --checkpoint-interval=NUMBER   Checkpoint save interval" << std::endl;
+    std::cout << "  --replay-interval=NUMBER      Memory replay interval" << std::endl;
+    std::cout << "  --verbose, -v                 Enable verbose logging" << std::endl;
+    std::cout << "  --quiet                       Suppress most output" << std::endl;
+    std::cout << "  --debug                       Enable debug logging" << std::endl;
+    std::cout << "  --experiment=TYPE             Run specific experiment (basic, learning, plasticity)" << std::endl;
+    std::cout << "  --memory-capacity=NUMBER      Working memory capacity" << std::endl;
+    std::cout << "  --max-episodes=NUMBER         Maximum episodic memory episodes" << std::endl;
+    std::cout << "  --stdp-ltp-weight=VALUE        STDP LTP learning rate" << std::endl;
+    std::cout << "  --stdp-ltd-weight=VALUE        STDP LTD learning rate" << std::endl;
+    std::cout << "  --stdp-time-constant=VALUE     STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis-rate=VALUE    Synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning-rate=VALUE           Pruning rate" << std::endl;
+    std::cout << "  --dopamine-baseline=VALUE      Baseline dopamine level" << std::endl;
+    std::cout << "  --curiosity-baseline=VALUE     Baseline curiosity level" << std::endl;
+    std::cout << "\nExamples:" << std::endl;
+    std::cout << "  nlm --neurons=500 --steps=1000 --phase=6" << std::endl;
+    std::cout << "  nlm --config=my_config.cfg --load=brain_state.bin --output=saved_state.bin" << std::endl;
+    std::cout << "  nlm --experiment=learning --neurons=200 --steps=500" << std::endl;
+    std::cout << "  nlm --enable-development --enable-curiosity --verbose" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 6.0 - Neural Learning Machine" << std::endl;
+    std::cout << "Version 6.0.0 - Final Integration" << std::endl;
+    std::cout << "An experimental artificial developmental brain." << std::endl;
+}
+
+void applyAdvancedConfig(std::shared_ptr<Config> config, const std::unordered_map<std::string, std::string>& args) {
+    // Apply various configuration options based on arguments
+    for (const auto& [key, value] : args) {
+        try {
+            if (key == "neurons") {
+                config->set("neuron_count", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "regions") {
+                config->set("region_count", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "random_seed") {
+                config->set("random_seed", static_cast<uint64_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "timestep") {
+                config->set("simulation_timestep", std::stod(value), ConfigSource::CommandLine);
+            } else if (key == "connection_prob") {
+                float prob = std::stof(value);
+                config->set("connection_probability", prob, ConfigSource::CommandLine);
+            } else if (key == "stdp_ltp_weight") {
+                config->set("stdp_ltp_weight", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_ltd_weight") {
+                config->set("stdp_ltd_weight", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_time_constant") {
+                config->set("stdp_tau", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "synaptogenesis_rate") {
+                config->set("synaptogenesis_rate", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "pruning_rate") {
+                config->set("pruning_rate", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "dopamine_baseline") {
+                config->set("dopamine_baseline", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "curiosity_baseline") {
+                config->set("curiosity_baseline", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "reward_discount_factor") {
+                config->set("reward_discount_factor", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "memory_capacity") {
+                config->set("working_memory_capacity", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "max_episodes") {
+                config->set("episodic_memory_max_episodes", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "checkpoint_interval") {
+                config->set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+                config->set("replay_interval", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "replay_interval") {
+                config->set("replay_interval", static_cast<size_t>(std::stoull(value)), ConfigSource::CommandLine);
+            } else if (key == "enable_plasticity") {
+                config->set("enable_structural_plasticity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_plasticity") {
+                config->set("enable_structural_plasticity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_development") {
+                config->set("enable_development", true, ConfigSource::CommandLine);
+            } else if (key == "disable_development") {
+                config->set("enable_development", false, ConfigSource::CommandLine);
+            } else if (key == "enable_curiosity") {
+                config->set("enable_curiosity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_curiosity") {
+                config->set("enable_curiosity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_reward") {
+                config->set("enable_reward_modulation", true, ConfigSource::CommandLine);
+            } else if (key == "disable_reward") {
+                config->set("enable_reward_modulation", false, ConfigSource::CommandLine);
+            } else if (key == "enable_visualization") {
+                config->set("visualization_enabled", true, ConfigSource::CommandLine);
+            } else if (key == "disable_visualization") {
+                config->set("visualization_enabled", false, ConfigSource::CommandLine);
+            } else if (key == "enable_checkpointing") {
+                config->set("enable_checkpointing", true, ConfigSource::CommandLine);
+            } else if (key == "disable_checkpointing") {
+                config->set("enable_checkpointing", false, ConfigSource::CommandLine);
+            } else if (key == "enable_structural_plasticity") {
+                config->set("enable_structural_plasticity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_structural_plasticity") {
+                config->set("enable_structural_plasticity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_developmental") {
+                config->set("enable_development", true, ConfigSource::CommandLine);
+            } else if (key == "disable_developmental") {
+                config->set("enable_development", false, ConfigSource::CommandLine);
+            } else if (key == "enable_curiosity_enabled") {
+                config->set("enable_curiosity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_curiosity_enabled") {
+                config->set("enable_curiosity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_reward_modulation_enabled") {
+                config->set("enable_reward_modulation", true, ConfigSource::CommandLine);
+            } else if (key == "disable_reward_modulation_enabled") {
+                config->set("enable_reward_modulation", false, ConfigSource::CommandLine);
+            } else if (key == "enable_visualization_enabled") {
+                config->set("visualization_enabled", true, ConfigSource::CommandLine);
+            } else if (key == "disable_visualization_enabled") {
+                config->set("visualization_enabled", false, ConfigSource::CommandLine);
+            } else if (key == "enable_checkpointing_enabled") {
+                config->set("enable_checkpointing", true, ConfigSource::CommandLine);
+            } else if (key == "disable_checkpointing_enabled") {
+                config->set("enable_checkpointing", false, ConfigSource::CommandLine);
+            } else if (key == "enable_structural_plasticity_enabled") {
+                config->set("enable_structural_plasticity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_structural_plasticity_enabled") {
+                config->set("enable_structural_plasticity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_development_enabled") {
+                config->set("enable_development", true, ConfigSource::CommandLine);
+            } else if (key == "disable_development_enabled") {
+                config->set("enable_development", false, ConfigSource::CommandLine);
+            } else if (key == "enable_curiosity_enabled") {
+                config->set("enable_curiosity", true, ConfigSource::CommandLine);
+            } else if (key == "disable_curiosity_enabled") {
+                config->set("enable_curiosity", false, ConfigSource::CommandLine);
+            } else if (key == "enable_reward_modulation_enabled") {
+                config->set("enable_reward_modulation", true, ConfigSource::CommandLine);
+            } else if (key == "disable_reward_modulation_enabled") {
+                config->set("enable_reward_modulation", false, ConfigSource::CommandLine);
+            } else if (key == "enable_visualization_enabled") {
+                config->set("visualization_enabled", true, ConfigSource::CommandLine);
+            } else if (key == "disable_visualization_enabled") {
+                config->set("visualization_enabled", false, ConfigSource::CommandLine);
+            } else if (key == "enable_checkpointing_enabled") {
+                config->set("enable_checkpointing", true, ConfigSource::CommandLine);
+            } else if (key == "disable_checkpointing_enabled") {
+                config->set("enable_checkpointing", false, ConfigSource::CommandLine);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error applying config option " + key + ": " + e.what());
+        }
+    }
+}
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

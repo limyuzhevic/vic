@@ -50,6 +50,14 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
@@ -79,6 +87,54 @@ void Neuron::decrementRefractory() {
     }
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::setFiringState(FiringState state) {
+    pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
 void Neuron::setFiringRate(FiringRate rate) {
     pImpl->state.firingRate = rate;
 }
@@ -89,10 +145,6 @@ void Neuron::setLeakConductance(MembranePotential conductance) {
 
 MembranePotential Neuron::getLeakConductance() const {
     return pImpl->state.leakConductance;
-}
-
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -147,6 +199,10 @@ void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
@@ -166,8 +222,20 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
@@ -184,8 +252,16 @@ void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
