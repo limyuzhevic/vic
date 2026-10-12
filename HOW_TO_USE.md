@@ -4,10 +4,13 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**Phase 6 Status**: Most cognitive systems are implemented but **disconnected** from the main brain loop. Phase 6 focuses on integration rather than adding new features.
+
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API for Phase 6 integration
+
 
 ---
 
@@ -217,7 +220,13 @@ def run_agent_simulation(num_steps=1000):
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
+    # 6. Enable subsystems (Phase 6 integration)
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop (Phase 6 focus on integration)
     for step in range(num_steps):
         # Update world
         world.update(timestep=0.1)
@@ -225,16 +234,16 @@ def run_agent_simulation(num_steps=1000):
         # Get sensory input from world
         percept = world.getSensoryPercept()
         
-        # Process sensory input in brain
+        # Process sensory input in brain (enable working memory if available)
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain step (this now integrates working memory, episodic memory,
+        # prediction systems if they are available via getWorkingMemory(),
+        # getEpisodicMemory(), etc.)
         brain.step(step)
         
-        # Decode motor command from brain activity
+        # Get action and apply to world
         motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
         # Apply reward modulation
@@ -244,13 +253,21 @@ def run_agent_simulation(num_steps=1000):
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Print progress (Phase 6 metrics)
         if step % 100 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            
+            # Phase 6 integration metrics (if available)
+            if brain.getWorkingMemory():
+                print(f"  Working memory: Connected")
+            if brain.getEpisodicMemory():
+                print(f"  Episodic memory: Active")
+            if brain.getPredictionSystem():
+                print(f"  Prediction system: Active")
 
 # Run the simulation
 run_agent_simulation(1000)
@@ -444,42 +461,107 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+### Memory Integration Configuration (Phase 6)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `working_memory.enable` | bool | true | Enable working memory integration |
+| `episodic_memory.enable` | bool | true | Enable episodic memory integration |
+| `semantic_memory.enable` | bool | false | Enable semantic memory (EXPERIMENTAL) |
+| `procedural_memory.enable` | bool | false | Enable procedural memory (EXPERIMENTAL) |
+| `associative_memory.enable` | bool | false | Enable associative memory (EXPERIMENTAL) |
+
+### Prediction System Configuration (Phase 6)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `prediction_system.enable` | bool | true | Enable prediction system |
+| `prediction_system.horizon` | int | 5 | Prediction horizon (steps) |
+| `prediction_system.confidence_threshold` | float | 0.5 | Confidence threshold for predictions |
+
+### Cognitive Integration Configuration (Phase 6)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `neural_planner.enable` | bool | true | Enable neural planner |
+| `concept_formation.enable` | bool | true | Enable concept formation |
+| `self_model.enable` | bool | false | Enable self-model (EXPERIMENTAL) |
+| `social_learning.enable` | bool | false | Enable social learning (EXPERIMENTAL) |
+
+### Development Configuration (Phase 6)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.initial_plasticity_rate` | float | 1.0 | Initial plasticity rate |
+| `development.critical_period_end` | int | 100 | Steps until critical period ends |
+| `development.maturation_rate` | float | 0.5 | Rate of maturation |
+| `development.plasticity_decay` | float | 0.95 | Plasticity decay per timestep |
+
+### Neuromodulation Configuration (Phase 6)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `neuromod.serotonin.enable` | bool | false | Enable serotonin modulation (EXPERIMENTAL) |
+| `neuromod.norepinephrine.enable` | bool | false | Enable norepinephrine modulation (EXPERIMENTAL) |
+| `neuromod.acetylcholine.enable` | bool | false | Enable acetylcholine modulation (EXPERIMENTAL) |
+
+---
 
 ---
 
 ## Part 5: Example Scripts
 
-### Minimal Example
+### Minimal Example (Phase 6 Ready)
 
 ```python
 import pynlm
 
 # Create and initialize
 config = pynlm.createDefaultConfig()
+
+# Enable Phase 6 integration features
+config.set("working_memory.enable", True)
+config.set("episodic_memory.enable", True)
+config.set("prediction_system.enable", True)
+config.set("neural_planner.enable", True)
+config.set("concept_formation.enable", True)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Simulate
+# Simulate (Phase 6 integration happens automatically if systems are available)
 for i in range(100):
     brain.step(i)
+    
+    # Phase 6 integration metrics (if available)
+    if brain.getWorkingMemory():
+        print(f"Step {i}: Working memory active")
+    if brain.getEpisodicMemory():
+        print(f"Step {i}: Episodic memory active")
+    if brain.getPredictionSystem():
+        print(f"Step {i}: Prediction system active")
 
-print("Simulation complete!")
+print("Simulation complete with Phase 6 integration!")
 ```
 
-### Environment Interaction
+### Environment Interaction (Phase 6 Integration)
 
 ```python
 import pynlm
 
-# Setup
+# Setup with Phase 6 integration
 config = pynlm.createDefaultConfig()
+
+# Enable Phase 6 integration features
+config.set("working_memory.enable", True)
+config.set("episodic_memory.enable", True)
+config.set("prediction_system.enable", True)
+config.set("neural_planner.enable", True)
+config.set("concept_formation.enable", True)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 agent = pynlm.createAgentBrain(brain)
@@ -489,11 +571,27 @@ world.reset()
 agent.initialize(world)
 
 # Run episode
-for _ in range(500):
+for step in range(500):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
+    brain.step(step)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    # Phase 6 integration monitoring
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Working memory: {'Active' if brain.getWorkingMemory() else 'Not Available'}")
+        print(f"  Episodic memory: {'Active' if brain.getEpisodicMemory() else 'Not Available'}")
+        print(f"  Prediction system: {'Active' if brain.getPredictionSystem() else 'Not Available'}")
+        
+        # Check if memory systems are working (Phase 6 requirement)
+        if not brain.getWorkingMemory():
+            print(f"  ⚠️ WARNING: Working memory not integrated!")
+        if not brain.getEpisodicMemory():
+            print(f"  ⚠️ WARNING: Episodic memory not integrated!")
+        if not brain.getPredictionSystem():
+            print(f"  ⚠️ WARNING: Prediction system not integrated!")
 ```
 
 ---
@@ -524,10 +622,22 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+**Phase 6 Integration Issues:**
+- Many memory and cognitive systems exist but are disconnected
+- If `getWorkingMemory()`, `getEpisodicMemory()`, or `getPredictionSystem()` return nullptr, it's a Phase 6 integration issue
+- Review `docs/PHASE6_FINAL_AUDIT.md` for current integration status
+- Focus on connecting existing systems rather than adding new features
+
 ---
 
 ## Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Current integration status (Phase 6 priority: CONNECT EXISTING SYSTEMS)
+
+**Current Status:** NLM has sophisticated **architecture** but functions as a **basic neural simulator** rather than an integrated artificial brain. Phase 6 goal is to make existing components work together as a coherent whole.

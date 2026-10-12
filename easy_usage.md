@@ -24,7 +24,7 @@ That's it! NLM simulates all of this.
 
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain (Phase 6 Integration)
 
 ```python
 import pynlm
@@ -42,7 +42,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Phase 6 Integration)
 
 ```python
 import pynlm
@@ -292,6 +292,9 @@ print("Agent simulation complete!")
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Read `docs/PHASE6_FINAL_AUDIT.md` to see what's implemented but not yet integrated
+4. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**Phase 6 Priority**: Focus on CONNECTING existing systems rather than adding new components. Most cognitive systems (memory, prediction, planning) exist but need integration.
+
+That's it! You're now ready to use NLM Phase 6!
