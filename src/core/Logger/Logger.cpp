@@ -1,23 +1,43 @@
-#include "Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <mutex>
+#include <unistd.h>
 
 namespace nlm {
 
-struct ConsoleLogger::Impl {
-    LogLevel level = LogLevel::Info;
-    bool useColors = true;
-    std::ofstream fileOut;
-    std::mutex mutex;
-};
+bool isTerminalColorSupported() {
+    // Check if output is going to a terminal
+    if (!std::cout.is_open()) {
+        return false;
+    }
+    
+    // Check environment variables known to indicate color support
+    const char* colorTerm = std::getenv("COLORTERM");
+    const char* term = std::getenv("TERM");
+    
+    if (colorTerm && std::string(colorTerm).length() > 0) {
+        return true;
+    }
+    if (term && (std::string(term).find("color") != std::string::npos || 
+                 std::string(term).find("xterm") != std::string::npos)) {
+        return true;
+    }
+    
+    // Check if stderr is a tty (for error messages) - more robust check
+    // Use fileno() which is more reliable than comparing rdbuf
+    if (std::cerr.good() && std::isatty(fileno(stderr))) {
+        return true;
+    }
+    
+    return false;
+}
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    // Auto-detect terminal color support
+    pImpl->useColors = isTerminalColorSupported();
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    // Auto-detect terminal color support
+    pImpl->useColors = isTerminalColorSupported();
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
@@ -92,6 +112,18 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
 }
 
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
+    const char* term = std::getenv("TERM");
+    
+    // For terminals that don't support colors (e.g., dumb terminals)
+    if (term && std::string(term) == "dumb") {
+        return "";
+    }
+    
+    // Additional safety check: if terminal doesn't support colors, return empty
+    if (!isTerminalColorSupported()) {
+        return "";
+    }
+    
     switch (level) {
         case LogLevel::Debug: return "\033[36m";    // Cyan
         case LogLevel::Info: return "\033[32m";      // Green

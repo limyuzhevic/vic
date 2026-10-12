@@ -58,16 +58,47 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+    // Enable/disable curiosity-based exploration
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Get detailed brain statistics for debugging
+    std::string getDebugInfo() const;
+    
+    // Advanced control methods
+    void setExplorationWeight(float weight) { explorationWeight_ = std::clamp(weight, 0.0f, 1.0f); }
+    void setLearningRate(float rate) { learningRate_ = std::clamp(rate, 0.001f, 1.0f); }
+    void setNoveltyThreshold(float threshold) { noveltyThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    
+    // Memory management for advanced users
+    void enableMemoryPersistence(bool enable) { memoryPersistenceEnabled_ = enable; }
+    void setMemoryRetention(float retention) { memoryRetention_ = std::clamp(retention, 0.0f, 1.0f); }
+    
+    // Performance monitoring
+    float getAverageActivityLevel() const;
+    float getExplorationRatio() const;
+    size_t getTotalMemoryUsage() const;
+    
+    // Advanced neuromodulation controls
+    void setDopamineGain(float gain) { dopamineGain_ = std::clamp(gain, 0.0f, 10.0f); }
+    void setCuriosityGain(float gain) { curiosityGain_ = std::clamp(gain, 0.0f, 10.0f); }
+    void setNoveltyDecay(float decay) { noveltyDecay_ = std::clamp(decay, 0.1f, 1.0f); }
+    
+    // Development control for advanced users
+    void forceDevelopmentStage(DevelopmentalStage stage) { 
+        if (brain_) {
+            brain_->setDevelopmentalStage(stage);
+        }
+    }
+    void setDevelopmentSpeed(float speed) { developmentSpeed_ = std::clamp(speed, 0.1f, 10.0f); }
+    
+    // Sensory/motor tuning
+    void setSensoryGain(float gain) { sensoryGain_ = std::clamp(gain, 0.1f, 10.0f); }
+    void setMotorThreshold(float threshold) { motorThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    
+    // Debug and visualization controls
+    void enableDebugVisualization(bool enable) { debugVisualizationEnabled_ = enable; }
+    void setVisualizationScale(float scale) { visualizationScale_ = std::clamp(scale, 0.1f, 5.0f); }
     
 private:
     // Motor decoding: convert neural activity to motor command
