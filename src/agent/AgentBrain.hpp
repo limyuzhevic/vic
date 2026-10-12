@@ -70,6 +70,9 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Initialize neuron groups by type
+    void initializeNeuronGroups();
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     

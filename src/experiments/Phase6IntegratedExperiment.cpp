@@ -32,6 +32,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    cfg->set("plasticity_learning_rate", 0.01f);
+    cfg->set("dopamine_baseline", 0.1f);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
