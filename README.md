@@ -2,6 +2,10 @@
 
 **An Experimental Artificial Developmental Brain**
 
+## Quick Start Guide
+
+For a rapid introduction to NLM, see our **Quick Start Guide** at `QUICK_START.md` or visit our **Unified Documentation Hub** at `NLM_Documentation.md` for comprehensive documentation.
+
 ## What is NLM?
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
@@ -20,49 +24,61 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION** - All previous phases completed and integrated into a coherent artificial brain system.
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+For detailed Phase 6 integration achievements, see `docs/PHASE6_FINAL_AUDIT.md` or the Unified Documentation Hub.
 
-### Phase 6 Integration Achievements
+## Quick Usage
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### Basic Python Usage
+```python
+import pynlm
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+# Create and initialize brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+# Run simulation
+for i in range(100):
+    brain.step(i)
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+```
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+### Complete Agent Example
+```python
+import pynlm
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+def run_agent_simulation(world_size=20, num_steps=500):
+    """Run a complete agent simulation with learning and development."""
+    
+    # Create and initialize brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent and world
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=world_size, height=world_size, 
+                   visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent.initialize(world)
+    
+    # Enable learning subsystems
+    agent.enableCuriosity(True)
+    agent.enableRewardModulation(True)
+    agent.enableDevelopment(True)
+    
+    # Run simulation with progress tracking
+    pynlm.run_with_progress(brain, world, agent, num_steps)
+    
+    return brain, world, agent
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+# Run the simulation
+brain, world, agent = run_agent_simulation()
+```
 
 ## Building
 
@@ -82,36 +98,136 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Python Package Structure
+
+We've reorganized the Python bindings into a modern package structure:
 
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+pynlm/
+├── __init__.py              # Main package interface
+├── brain.py                 # Brain simulation classes
+├── agent.py                 # Agent brain interface
+├── world.py                 # World simulation
+├── sensory.py               # Sensory input systems
+├── motor.py                 # Motor and action systems
+├── config.py                # Configuration management
+├── types.py                 # Type definitions and enumerations
+├── exceptions.py            # Custom exception classes
+├── utils.py                 # Utility functions
+├── README.md                # Module-specific documentation
+└── examples/                # Example scripts
+    ├── basic.py             # Basic usage examples
+    ├── agent_simulation.py  # Complete agent example
+    ├── advanced_features.py # Advanced feature demonstrations
+    └── performance_tests.py # Performance benchmarking
+```
+
+## Documentation
+
+### Unified Documentation Hub
+Our comprehensive documentation is now consolidated in `NLM_Documentation.md`, which includes:
+
+- **Quick Start Guide** with code examples
+- **Complete API documentation** with all classes and methods
+- **Architecture overview** and system philosophy
+- **Development and debugging** guides
+- **Performance and monitoring** tools
+- **Configuration options** and parameters
+- **Phase 6 integration achievements**
+
+### Other Documentation
+- `docs/` directory: Technical documentation, scientific background, experiment descriptions
+- `docs/PHASE6_FINAL_AUDIT.md`: Detailed Phase 6 audit report
+- `NLM_Documentation.md`: Unified comprehensive guide (NEW)
+
+## Performance Monitoring and Utilities
+
+The Python package now includes enhanced utilities:
+
+### Progress Tracking
+```python
+# Run simulation with progress reporting and statistics
+pynlm.run_with_progress(brain, world, agent, num_steps=1000)
+```
+
+### Validation
+```python
+# Validate simulation setup
+pynlm.validate_simulation_setup(brain, world, agent)
+```
+
+### Checkpoint Management
+```python
+# Save simulation state with metadata
+pynlm.save_checkpoint(brain, "checkpoint.bin", "Simulation at step 100")
+```
+
+### Benchmarking
+```python
+# Benchmark simulation performance
+stats = pynlm.benchmark_simulation(brain, world, agent, num_steps=1000)
+print(f"Average time: {stats['average_time']:.3f}s")
+print(f"Steps per second: {stats['steps_per_second']:.1f}")
+```
+
+## Key Improvements Made
+
+### 1. **Modern Python Package Structure**
+- Created organized `pynlm/` package with proper `__init__.py`
+- Split functionality into logical modules (brain, agent, world, sensory, motor, config, types)
+- Added comprehensive utilities and error handling
+
+### 2. **Enhanced Documentation**
+- Created unified `NLM_Documentation.md` hub
+- Consolidated information from `easy_usage.md`, `HOW_TO_USE.md`, and `README.md`
+- Added modern API documentation with examples
+- Maintained backward compatibility with existing docs
+
+### 3. **Advanced Python Features**
+- Added performance monitoring utilities
+- Implemented progress tracking for long simulations
+- Created checkpoint management with metadata
+- Added benchmarking tools
+- Implemented validation utilities
+
+### 4. **Developer Experience**
+- Added comprehensive error handling with custom exceptions
+- Included quick reference guides and example patterns
+- Enhanced interactive utilities
+- Improved build configuration with modern pyproject.toml
+
+### 5. **Backward Compatibility**
+- All existing Python API functionality preserved
+- Existing examples continue to work
+- Documentation transitions are smooth
+- No breaking changes to public interfaces
+
+## Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_test` | Executable | Unit test suite |
+
+## Testing
+
+### Running Tests
+```bash
+# Install development dependencies
+pip install -e .[dev]
+
+# Run unit tests
+pytest
+
+# Run tests with coverage
+pytest --cov=pynlm --cov-report=html
 ```
 
 ## Phase Summary
@@ -223,7 +339,7 @@ CHANGED FUTURE BEHAVIOR
 
 ## License
 
-MIT
+MIT License. See LICENSE file for details.
 
 ## Authors
 

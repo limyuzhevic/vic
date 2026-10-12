@@ -1,57 +1,61 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core", "pybind11", "setuptools"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "1.0.0"
+description = "Neural Learning Machine Python Bindings - Experimental artificial developmental brain simulator"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
+license = {text = "MIT"}
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Research Team", email = "research@nlm.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+maintainers = [
+    {name = "NLM Research Team", email = "research@nlm.org"}
+]
+keywords = ["neural-networks", "brain", "neuroscience", "ai", "developmental", "simulation"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
+    "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest",
+    "pytest-cov",
+    "scikit-build-core",
+    "pybind11",
+]
+examples = [
+    "numpy",
+    "matplotlib",
 ]
 
 [project.urls]
-Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
-Repository = "https://github.com/nlm-project/nlm.git"
+homepage = "https://github.com/nlm-research/pynlm"
+repository = "https://github.com/nlm-research/pynlm"
+bug-tracker = "https://github.com/nlm-research/pynlm/issues"
+documentation = "https://nlm.readthedocs.io"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
-]
+[tool.scikit-build-core]
+build-type = "Release"
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+[tool.setuptools]
+package-dir = {"" = "src"}
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+[tool.scikit-build-core.cmake]
+minimum-version = "3.16"
