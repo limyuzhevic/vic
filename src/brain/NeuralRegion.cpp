@@ -1,3 +1,4 @@
+#include "../core/Random/Random.hpp"
 #include "NeuralRegion.hpp"
 #include <algorithm>
 #include <stdexcept>

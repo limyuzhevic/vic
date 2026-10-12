@@ -5,6 +5,8 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
