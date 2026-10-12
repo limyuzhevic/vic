@@ -77,6 +77,7 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
+# First, build the project (if not already built)
 ./nlm_phase6_demo
 ```
 

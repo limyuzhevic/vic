@@ -101,7 +101,8 @@ std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& n
             return exp;
         }
     }
-    return nullptr;
+    return {}; // Return empty shared_ptr if experiment not found
+}
 }
 
 void ExperimentRunner::clearExperiments() {

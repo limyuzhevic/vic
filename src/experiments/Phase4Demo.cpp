@@ -1,18 +1,13 @@
-#include <iostream>
-#include <memory>
-#include <iomanip>
-#include <sstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
 #include "world/SimpleWorld.hpp"
-#include "experiments/Phase4Experiment.hpp"
+#include "Phase4Experiment.hpp"
 #include "prediction/NeuralPrediction.hpp"
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;

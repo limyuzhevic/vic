@@ -46,12 +46,13 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | Main simulation executable (Phase 2 basic neural computation) |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -400,10 +401,21 @@ pynlm.DevelopmentalStage.Adult
 pynlm.DevelopmentalStage.Aging
 
 # Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
+: pynlm.ActionType.MoveForward
+: pynlm.ActionType.MoveBackward
+: pynlm.ActionType.MoveLeft
+: pynlm.ActionType.MoveRight
+: pynlm.ActionType.TurnLeft
+: pynlm.ActionType.TurnRight
+: pynlm.ActionType.Look
+: pynlm.ActionType.LookUp
+: pynlm.ActionType.LookDown
+: pynlm.ActionType.Interact
+: pynlm.ActionType.Eat
+: pynlm.ActionType.Drink
+: pynlm.ActionType.Rest
+: pynlm.ActionType.Wait
+: pynlm.ActionType.Custom
 # ... and more
 
 # World object types
