@@ -1,8 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <vector>
-#include <array>
+#include <memory>
 
 namespace nlm {
 
@@ -99,12 +95,12 @@ public:
     float getLastSpikeTime() const;
     
     // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt) const;
     
     // Incoming signals (post-synaptic potentials)
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
+    void receiveModulatoryInput(MembranePotential amplitude) const;
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
@@ -145,7 +141,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

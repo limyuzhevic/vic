@@ -6,7 +6,7 @@ namespace nlm {
 
 struct SpikeSystem::Impl {
     std::queue<SpikeEvent> pendingSpikes;
-    std::vector<DetailedSpikeEvent> spikeHistory;
+    std::deque<DetailedSpikeEvent> spikeHistory;  // Use deque for O(1) trimming
     std::vector<SpikeHandler> handlers;
     std::vector<DelayedSpikeHandler> delayedHandlers;
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
@@ -18,19 +18,15 @@ struct SpikeSystem::Impl {
     Impl() : maxHistorySize(10000) {}
 };
 
-SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
+SpikeSystem::SpikeSystem() : pImpl(std::make_unique<Impl>()) {}
 
 SpikeSystem::~SpikeSystem() = default;
 
-SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -66,9 +62,9 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed using deque's O(1) pop_front
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            pImpl->spikeHistory.pop_front();
         }
         
         // Call handlers
@@ -102,7 +98,7 @@ void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
     pImpl->delayedHandlers.push_back(handler);
 }
 
-const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
+const std::deque<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
     return pImpl->spikeHistory;
 }
 

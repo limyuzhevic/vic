@@ -2,9 +2,9 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
-#include <vector>
-#include <queue>
+#include <deque>
 #include <functional>
+#include <memory>
 #include <unordered_map>
 
 namespace nlm {
@@ -57,7 +57,7 @@ public:
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
     // Get spike history
-    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
+    const std::deque<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();
     
     // Get spike count
@@ -74,7 +74,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
