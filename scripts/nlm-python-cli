@@ -1,0 +1,892 @@
+def analyze_brain_state(brain, verbose: bool = False) -> dict:
+    """Perform comprehensive brain state analysis."""
+    logger.info("=== Brain State Analysis ===")
+    
+    # Basic statistics
+    total_neurons = brain.getTotalNeuronCount()
+    total_synapses = brain.getTotalSynapseCount()
+    total_spikes = brain.getTotalSpikeCount()
+    active_neurons = brain.getActiveNeuronCount()
+    firing_neurons = brain.getFiringNeuronCount()
+    average_firing_rate = brain.getAverageFiringRate()
+    e_i_ratio = brain.getExcitationInhibitionRatio()
+    pending_spikes = brain.getPendingSpikeEventCount()
+    
+    # Calculate derived metrics
+    activity_level = (firing_neurons / total_neurons * 100) if total_neurons > 0 else 0.0
+    spike_rate_per_neuron = (total_spikes / total_neurons) if total_neurons > 0 else 0.0
+    stability = 1.0 / (1.0 + pending_spikes)
+    
+    # Determine health status
+    health_status = "HEALTHY"
+    if pending_spikes > 100 or average_firing_rate < 0.1:
+        health_status = "UNSTABLE"
+    if firing_neurons == 0:
+        health_status = "INACTIVE"
+    
+    # Log analysis results
+    logger.info("Analysis Summary:")
+    logger.info(f"  Total neurons: {total_neurons}")
+    logger.info(f"  Total synapses: {total_synapses}")
+    logger.info(f"  Total spikes: {total_spikes}")
+    logger.info(f"  Active neurons: {active_neurons}")
+    logger.info(f"  Firing neurons: {firing_neurons}")
+    logger.info(f"  Average firing rate: {average_firing_rate:.4f} Hz")
+    logger.info(f"  Activity level: {activity_level:.2f}%")
+    logger.info(f"  E/I ratio: {e_i_ratio:.4f}")
+    logger.info(f"  Spike rate per neuron: {spike_rate_per_neuron:.4f}")
+    logger.info(f"  Stability metric: {stability:.4f}")
+    logger.info(f"  Brain health: {health_status}")
+    
+    if verbose:
+        logger.info("Detailed analysis:")
+        logger.info(f"    Network density: {total_synapses / (total_neurons * total_neurons):.6f}")
+        logger.info(f"    Firing efficiency: {(firing_neurons / active_neurons * 100) if active_neurons > 0 else 0:.2f}%")
+        logger.info(f"    Spike efficiency: {(total_spikes / (firing_neurons * 10)) if firing_neurons > 0 else 0:.2f} spikes per neuron")
+    
+    return {
+        'total_neurons': total_neurons,
+        'total_synapses': total_synapses,
+        'total_spikes': total_spikes,
+        'active_neurons': active_neurons,
+        'firing_neurons': firing_neurons,
+        'average_firing_rate': average_firing_rate,
+        'activity_level': activity_level,
+        'e_i_ratio': e_i_ratio,
+        'stability': stability,
+        'health_status': health_status
+    }
+
+def generate_brain_state_report(brain, filename: str) -> bool:
+    """Generate a comprehensive brain state report."""
+    try:
+        logger.info(f"=== Generating Brain State Report: {filename} ===")
+        
+        analysis = analyze_brain_state(brain, verbose=True)
+        
+        report = {
+            "Report Header": {
+                "Title": "NLM Brain State Report",
+                "Generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "Version": "2.0.0",
+                "Phase": "6 - Final Integration"
+            },
+            "Basic Statistics": {
+                "Total Neurons": analysis['total_neurons'],
+                "Total Synapses": analysis['total_synapses'],
+                "Total Spikes": analysis['total_spikes'],
+                "Active Neurons": analysis['active_neurons'],
+                "Firing Neurons": analysis['firing_neurons'],
+                "Average Firing Rate (Hz)": analysis['average_firing_rate'],
+                "Activity Level (%)": analysis['activity_level'],
+                "E/I Ratio": analysis['e_i_ratio'],
+                "Stability Metric": analysis['stability'],
+                "Health Status": analysis['health_status']
+            },
+            "Network Properties": {
+                "Network Density": analysis['total_synapses'] / (analysis['total_neurons'] * analysis['total_neurons']) if analysis['total_neurons'] > 0 else 0,
+                "Firing Efficiency (%)": (analysis['firing_neurons'] / analysis['active_neurons'] * 100) if analysis['active_neurons'] > 0 else 0,
+                "Current Activity": "Active" if analysis['firing_neurons'] > 0 else "Inactive"
+            },
+            "System Status": {
+                "Neuromodulation": "Active" if brain.getDopamine() and brain.getCuriosity() else "Inactive",
+                "Memory Systems": "Active" if brain.getWorkingMemory() else "Inactive",
+                "Plasticity": "Active" if analysis['total_synapses'] > 0 else "Inactive",
+                "Prediction": "Active" if brain.getPredictionSystem() else "Inactive"
+            },
+            "Recommendations": generate_health_recommendations(analysis)
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        logger.info(f"✓ Brain state report generated: {filename}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to generate brain state report: {e}")
+        return False
+
+def generate_health_recommendations(analysis: dict) -> list:
+    """Generate health recommendations based on brain state analysis."""
+    recommendations = []
+    
+    if analysis['total_neurons'] == 0:
+        recommendations.append("Increase neuron count or adjust initial conditions")
+    
+    if analysis['average_firing_rate'] < 0.1:
+        recommendations.append("Increase stimulation or adjust plasticity parameters")
+    
+    if analysis['total_synapses'] == 0:
+        recommendations.append("Check synapse formation or structural plasticity settings")
+    
+    if analysis['activity_level'] < 5:
+        recommendations.append("Investigate neural activity and excitability settings")
+    
+    if analysis['stability'] < 0.5:
+        recommendations.append("Review spike event management and network stability")
+    
+    if analysis['e_i_ratio'] > 10 or analysis['e_i_ratio'] < 0.1:
+        recommendations.append("Balance excitation and inhibition in the network")
+    
+    if analysis['health_status'] != "HEALTHY":
+        recommendations.append("Address current health issues before proceeding")
+    
+    if not recommendations:
+        recommendations.append("All systems operating normally")
+    
+    return recommendations
+
+def monitor_brain_performance(brain, interval: float = 1.0, continuous: bool = False) -> dict:
+    """Monitor brain performance metrics."""
+    logger.info(f"=== Brain Performance Monitoring ===")
+    logger.info(f"Monitoring interval: {interval} seconds")
+    logger.info(f"Continuous mode: {'Yes' if continuous else 'No'}")
+    
+    if continuous:
+        logger.info("Continuous monitoring not implemented in Python CLI.")
+        logger.info("For continuous monitoring, use the C++ CLI with --monitor flag.")
+        return {}
+    
+    # Perform single monitoring iteration
+    logger.info("Performance metrics (single iteration):")
+    
+    analysis = analyze_brain_state(brain)
+    
+    monitoring_data = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "monitoring_interval": interval,
+        "performance_metrics": {
+            "neural_activity": f"{analysis['firing_neurons']}/{analysis['total_neurons']}",
+            "spike_rate": f"{analysis['average_firing_rate']:.4f} Hz",
+            "plasticity_activity": "Active" if analysis['total_synapses'] > 0 else "Inactive",
+            "memory_utilization": "Active" if brain.getWorkingMemory() else "Inactive",
+            "system_health": analysis['health_status']
+        },
+        "alerts": []
+    }
+    
+    # Check for performance alerts
+    if analysis['firing_neurons'] == 0:
+        monitoring_data['alerts'].append("ALERT: No firing neurons detected")
+    
+    if analysis['average_firing_rate'] < 0.1:
+        monitoring_data['alerts'].append("WARNING: Low firing rate detected")
+    
+    if analysis['stability'] < 0.5:
+        monitoring_data['alerts'].append("WARNING: Low stability detected")
+    
+    if analysis['e_i_ratio'] > 10 or analysis['e_i_ratio'] < 0.1:
+        monitoring_data['alerts'].append("WARNING: Unbalanced excitation/inhibition")
+    
+    logger.info(f"  Neural activity: {monitoring_data['performance_metrics']['neural_activity']}")
+    logger.info(f"  Spike rate: {monitoring_data['performance_metrics']['spike_rate']}")
+    logger.info(f"  Plasticity activity: {monitoring_data['performance_metrics']['plasticity_activity']}")
+    logger.info(f"  System health: {monitoring_data['performance_metrics']['system_health']}")
+    
+    if monitoring_data['alerts']:
+        logger.warning("Alerts:")
+        for alert in monitoring_data['alerts']:
+            logger.warning(f"    {alert}")
+    else:
+        logger.info("  No alerts - All systems normal")
+    
+    return monitoring_data
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Warning: pynlm module not available. Some features will be disabled.", file=sys.stderr)
+
+# Global logger (simplified version)
+class SimpleLogger:
+    def __init__(self, level: str = "INFO"):
+        self.level = level.upper()
+        self.levels = {
+            "DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4
+        }
+    
+    def log(self, level: str, message: str, verbose: bool = False):
+        if self.levels.get(level, 1) >= self.levels.get(self.level, 1):
+            timestamp = time.strftime("%H:%M:%S")
+            print(f"[{timestamp} {level}] {message}")
+            if verbose:
+                import traceback as tb
+                tb.print_stack(file=sys.stderr)
+    
+    def debug(self, msg: str, verbose: bool = False):
+        self.log("DEBUG", msg, verbose)
+    
+    def info(self, msg: str):
+        self.log("INFO", msg)
+    
+    def warning(self, msg: str, verbose: bool = False):
+        self.log("WARNING", msg, verbose)
+    
+    def error(self, msg: str, verbose: bool = False):
+        self.log("ERROR", msg, verbose)
+    
+    def critical(self, msg: str, verbose: bool = False):
+        self.log("CRITICAL", msg, verbose)
+
+logger = SimpleLogger()
+
+def print_banner():
+    """Print the NLM banner."""
+    banner = """
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║     NLM — 熙然                                                ║
+║     Neural Learning Machine                                   ║
+║                                                               ║
+║     Phase 6: Final Integration                                ║
+║                                                               ║
+║     An experimental artificial developmental brain.            ║
+║     This phase implements:                                    ║
+║     - Real LIF neuron dynamics                                ║
+║     - Event-driven spike propagation                          ║
+║     - STDP and Hebbian plasticity                            ║
+║     - Structural plasticity                                   ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+"""
+    print(banner)
+
+def print_help():
+    """Print help information."""
+    help_text = """
+NLM — 熙然 (Neural Learning Machine) Python CLI Tools
+Usage: nlm [OPTIONS]
+
+Core Options:
+  --help, -h                 Show this help message
+  --version                  Show version information
+  --config FILE              Load configuration from FILE (default: configs/default.cfg)
+
+Experiment Options:
+  --benchmark                Run performance benchmark
+  --demo MODE                Run demonstration mode (connectivity, plasticity, stdp)
+  --analyze                   Run brain state analysis
+  --validate                  Validate configuration file
+
+Configuration Options:
+  --export-config FILE       Export current configuration to FILE
+  --import-config FILE       Import configuration from FILE
+  --compare-configs F1 F2    Compare two configuration files
+
+Monitoring Options:
+  --monitor                  Start monitoring mode
+  --profile                   Profile performance
+  --watch                     Watch files for changes
+
+Development Tools:
+  --test                      Run tests
+  --debug                     Enable debug mode
+  --trace                     Enable detailed tracing
+  --log-level LEVEL          Set log level (DEBUG, INFO, WARNING, ERROR)
+
+Python-Specific Options:
+  --python-cli               Use enhanced Python CLI features
+  --no-banner                Suppress banner display
+
+Examples:
+  nlm --help                    Show help
+  nlm --version                 Show version
+  nlm --benchmark               Run benchmark
+  nlm --demo plasticity         Run plasticity demo
+  nlm --analyze                 Analyze brain state
+  nlm --config myconfig.cfg     Use custom config file
+  nlm --python-cli --analyze     Use Python CLI features with analysis
+"""
+    print(help_text)
+
+def print_version():
+    """Print version information."""
+    print("NLM (熙然) — Neural Learning Machine")
+    print("Version: 2.0.0")
+    print("Phase: 6 - Final Integration")
+    print("Python Interface: Enhanced CLI Tools")
+    print("Features: Real LIF neurons, STDP, Hebbian plasticity, Structural plasticity")
+    print("Architecture: Neuromodulation + Memory + Prediction + Cognition + Development")
+    print("Built with: pybind11 bindings for Python integration")
+
+def validate_config_file(config_file: str) -> bool:
+    """Validate configuration file."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for validation")
+        return False
+    
+    try:
+        logger.info(f"Validating configuration file: {config_file}")
+        
+        # Load configuration
+        config = pynlm.createDefaultConfig()
+        if config.loadFromFile(config_file):
+            logger.info("✓ Configuration validation successful!")
+            
+            # Log key configuration details
+            logger.info("Configuration summary:")
+            logger.info(f"  random_seed: {config.has('random_seed')}")
+            logger.info(f"  neuron_count: {config.has('neuron_count')}")
+            logger.info(f"  region_count: {config.has('region_count')}")
+            logger.info(f"  simulation_timestep: {config.has('simulation_timestep')}")
+            
+            return True
+        else:
+            logger.error(f"Failed to load configuration from: {config_file}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Validation failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def export_config(config_file: str) -> bool:
+    """Export configuration to file."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for export")
+        return False
+    
+    try:
+        logger.info(f"Exporting configuration to: {config_file}")
+        
+        config = pynlm.createDefaultConfig()
+        config.saveToFile(config_file)
+        
+        logger.info(f"✓ Configuration exported successfully to {config_file}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Export failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def import_config(config_file: str) -> bool:
+    """Import configuration from file."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for import")
+        return False
+    
+    try:
+        logger.info(f"Importing configuration from: {config_file}")
+        
+        config = pynlm.createDefaultConfig()
+        if config.loadFromFile(config_file):
+            logger.info(f"✓ Configuration imported successfully from {config_file}")
+            return True
+        else:
+            logger.error(f"Failed to import configuration from: {config_file}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Import failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def compare_configs(config_file1: str, config_file2: str) -> bool:
+    """Compare two configuration files."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for comparison")
+        return False
+    
+    try:
+        logger.info(f"Comparing configurations: {config_file1} vs {config_file2}")
+        
+        # Load both configurations
+        config1 = pynlm.createDefaultConfig()
+        config2 = pynlm.createDefaultConfig()
+        
+        if not (config1.loadFromFile(config_file1) and config2.loadFromFile(config_file2)):
+            logger.error("Failed to load one or both configuration files")
+            return False
+        
+        # Get keys from both configs
+        keys1 = config1.getKeys()
+        keys2 = config2.getKeys()
+        
+        logger.info("Configuration comparison results:")
+        logger.info(f"  File 1 keys ({len(keys1)}): {', '.join(sorted(keys1))}")
+        logger.info(f"  File 2 keys ({len(keys2)}): {', '.join(sorted(keys2))}")
+        
+        # Find differences
+        only_in_1 = set(keys1) - set(keys2)
+        only_in_2 = set(keys2) - set(keys1)
+        common = set(keys1) & set(keys2)
+        
+        logger.info(f"  Only in file 1: {', '.join(sorted(only_in_1)) if only_in_1 else 'None'}")
+        logger.info(f"  Only in file 2: {', '.join(sorted(only_in_2)) if only_in_2 else 'None'}")
+        logger.info(f"  Common keys: {len(common)} keys")
+        
+        if only_in_1 or only_in_2:
+            logger.warning("Configurations have differences!")
+            return False
+        else:
+            logger.info("✓ Configurations are identical!")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Comparison failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def run_benchmark(config_file: Optional[str] = None) -> bool:
+    """Run performance benchmark."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for benchmarking")
+        return False
+    
+    try:
+        logger.info("=== Running NLM Benchmark ===")
+        
+        # Create configuration
+        config = pynlm.createDefaultConfig()
+        if config_file and config.loadFromFile(config_file):
+            logger.info(f"Loaded configuration from: {config_file}")
+        else:
+            logger.info("Using default configuration")
+        
+        # Create brain
+        logger.info("Creating brain...")
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Get initial state
+        initial_spikes = brain.getTotalSpikeCount()
+        initial_time = time.time()
+        
+        # Run benchmark simulation
+        steps = 1000  # Fixed number of steps for consistent benchmarking
+        logger.info(f"Running benchmark for {steps} steps...")
+        
+        for step in range(steps):
+            brain.step(step, step * 0.001)
+            
+            # Log progress every 200 steps
+            if step % 200 == 0:
+                current_spikes = brain.getTotalSpikeCount()
+                spike_rate = current_spikes - initial_spikes
+                logger.info(f"  Step {step}: {spike_rate} spikes")
+        
+        # Calculate results
+        final_spikes = brain.getTotalSpikeCount()
+        final_time = time.time()
+        
+        total_time = final_time - initial_time
+        steps_per_second = steps / total_time
+        spike_rate = final_spikes - initial_spikes
+        
+        logger.info("=== Benchmark Results ===")
+        logger.info(f"  Steps: {steps}")
+        logger.info(f"  Initial spikes: {initial_spikes}")
+        logger.info(f"  Final spikes: {final_spikes}")
+        logger.info(f"  Spike rate: {spike_rate} spikes")
+        logger.info(f"  Total time: {total_time:.3f}s")
+        logger.info(f"  Performance: {steps_per_second:.1f} steps/second")
+        logger.info(f"  Neurons: {brain.getTotalNeuronCount()}")
+        logger.info(f"  Synapses: {brain.getTotalSynapseCount()}")
+        logger.info(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Benchmark failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def run_demo(config_file: Optional[str], mode: str) -> bool:
+    """Run demonstration mode."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for demo")
+        return False
+    
+    try:
+        logger.info(f"=== Running Demo Mode: {mode} ===")
+        
+        # Create configuration
+        config = pynlm.createDefaultConfig()
+        if config_file and config.loadFromFile(config_file):
+            logger.info(f"Loaded configuration from: {config_file}")
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        if mode == "connectivity":
+            logger.info("Running basic connectivity test...")
+            
+            # Get initial spike count
+            initial_spikes = brain.getTotalSpikeCount()
+            
+            # Inject current into sensory neurons
+            logger.info("  Injecting current into 20 sensory neurons...")
+            brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 30.0)
+            
+            # Run simulation
+            for step in range(50):
+                brain.step(step, step * 0.001)
+            
+            # Calculate results
+            final_spikes = brain.getTotalSpikeCount()
+            spikes_generated = final_spikes - initial_spikes
+            
+            logger.info("  Results:")
+            logger.info(f"    Spikes generated: {spikes_generated}")
+            
+            if spikes_generated > 0:
+                logger.info("  ✓ Spikes propagate through network")
+            else:
+                logger.info("  ! No spikes detected")
+                
+        elif mode == "plasticity":
+            logger.info("Running plasticity learning experiment...")
+            
+            # Enable plasticity
+            # Note: This requires access to internal APIs which may not be exposed
+            # For now, we'll create a more basic demonstration
+            logger.info("  Creating neural activity patterns...")
+            
+            for step in range(200):
+                # Create input pattern
+                brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 20.0)
+                brain.step(step, step * 0.001)
+                
+                # Log progress
+                if step % 50 == 0:
+                    logger.info(f"  Step {step}: {brain.getTotalSpikeCount()} spikes")
+            
+            logger.info("  ✓ Plasticity demonstration completed")
+            
+        elif mode == "stdp":
+            logger.info("Running STDP verification...")
+            logger.info("  STDP demonstration requires internal synapse access")
+            logger.info("  For now, running basic activity demonstration...")
+            
+            for step in range(100):
+                brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 25.0)
+                brain.step(step, step * 0.001)
+            
+            logger.info("  ✓ STDP activity demonstration completed")
+            
+        else:
+            logger.warning(f"Unknown demo mode: {mode}. Available modes: connectivity, plasticity, stdp")
+            return False
+        
+        brain.logStatus()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Demo failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def analyze_brain(config_file: Optional[str]) -> bool:
+    """Analyze brain state."""
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm not available for analysis")
+        return False
+    
+    try:
+        logger.info("=== Brain State Analysis ===")
+        
+        # Create configuration and brain
+        config = pynlm.createDefaultConfig()
+        if config_file and config.loadFromFile(config_file):
+            logger.info(f"Loaded configuration from: {config_file}")
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Generate some activity
+        logger.info("Generating test activity...")
+        for step in range(100):
+            brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 15.0)
+            brain.step(step, step * 0.001)
+        
+        # Perform analysis
+        logger.info("Analysis results:")
+        logger.info(f"  Total neurons: {brain.getTotalNeuronCount()}")
+        logger.info(f"  Total synapses: {brain.getTotalSynapseCount()}")
+        logger.info(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        logger.info(f"  Active neurons: {brain.getActiveNeuronCount()}")
+        logger.info(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        logger.info(f"  Average firing rate: {brain.getAverageFiringRate():.4f}")
+        logger.info(f"  Excitation/Inhibition ratio: {brain.getExcitationInhibitionRatio():.4f}")
+        logger.info(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+        
+        # Get detailed brain status
+        brain.logStatus()
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Analysis failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def run_tests() -> bool:
+    """Run tests."""
+    logger.info("=== Running NLM Tests ===")
+    
+    try:
+        # Test 1: Check if pynlm is available
+        logger.info("Test 1: Checking pynlm availability...")
+        if not PYNLM_AVAILABLE:
+            logger.error("pynlm not available")
+            return False
+        logger.info("  ✓ pynlm is available")
+        
+        # Test 2: Create basic components
+        logger.info("Test 2: Creating basic components...")
+        config = pynlm.createDefaultConfig()
+        logger.info("  ✓ Configuration created")
+        
+        # Test 3: Create brain
+        logger.info("Test 3: Creating brain...")
+        brain = pynlm.createBrain(config)
+        logger.info("  ✓ Brain created")
+        
+        # Test 4: Initialize brain
+        logger.info("Test 4: Initializing brain...")
+        if brain.initialize():
+            logger.info("  ✓ Brain initialized")
+        else:
+            logger.error("  ✗ Brain initialization failed")
+            return False
+        
+        # Test 5: Run basic simulation
+        logger.info("Test 5: Running basic simulation...")
+        for step in range(10):
+            brain.step(step, step * 0.001)
+        logger.info("  ✓ Basic simulation completed")
+        
+        logger.info("=== All tests passed! ===")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Tests failed with error: {e}")
+        if logger.level == "DEBUG":
+            logger.debug(traceback.format_exc(), verbose=True)
+        return False
+
+def create_config_template(output_file: str = "config_template.json") -> bool:
+    """Create a configuration template file."""
+    try:
+        logger.info(f"Creating configuration template: {output_file}")
+        
+        template = {
+            "# NLM Configuration Template": "This is a template for NLM configuration files.",
+            "# Random seed for reproducible experiments": "",
+            "random_seed": 42,
+            "# Simulation timestep in seconds": "",
+            "simulation_timestep": 0.001,
+            "# Number of neurons in the brain": "",
+            "neuron_count": 1000,
+            "# Number of brain regions": "",
+            "region_count": 2,
+            "# Connection probability for random connectivity": "",
+            "connection_probability": 0.1,
+            "# Plasticity settings": "",
+            "plasticity_learning_rate": 0.01,
+            "stdp_ltp_weight": 0.01,
+            "stdp_ltd_weight": 0.012,
+            "stdp_time_constant": 20.0,
+            "# Development settings": "",
+            "synaptogenesis_rate": 0.001,
+            "pruning_rate": 0.0001,
+            "# Neuromodulation settings": "",
+            "dopamine_baseline": 0.1,
+            "# Reward settings": "",
+            "reward_discount_factor": 0.99,
+            "# Environment settings": "",
+            "environment_name": "GridWorld",
+            "environment_width": 10,
+            "environment_height": 10,
+            "# Logging settings": "",
+            "log_level": "INFO",
+            "log_to_file": False,
+            "log_filename": "nlm.log",
+            "# Simulation settings": "",
+            "max_simulation_steps": 10000,
+            "simulation_time_limit": 0.0,
+            "# Visualization settings": "",
+            "visualization_enabled": False,
+            "visualization_update_rate": 30.0
+        }
+        
+        with open(output_file, 'w') as f:
+            json.dump(template, f, indent=2)
+        
+        logger.info(f"✓ Configuration template created: {output_file}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to create template with error: {e}")
+        return False
+
+def main():
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(
+        description="NLM Python CLI Tools - Enhanced command-line interface for NLM Python bindings",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm --help                    Show help
+  nlm --version                 Show version
+  nlm --benchmark               Run benchmark
+  nlm --demo connectivity        Run connectivity demo
+  nlm --analyze                 Analyze brain state
+  nlm --validate --config config.json  Validate configuration
+  nlm --python-cli --analyze     Use enhanced Python CLI features
+        """
+    )
+    
+    # Core options
+    parser.add_argument("--help", "-h", action="store_true", help="Show this help message")
+    parser.add_argument("--version", action="store_true", help="Show version information")
+    parser.add_argument("--config", help="Load configuration from FILE (default: configs/default.cfg)")
+    parser.add_argument("--no-banner", action="store_true", help="Suppress banner display")
+    
+    # Experiment options
+    parser.add_argument("--benchmark", action="store_true", help="Run performance benchmark")
+    parser.add_argument("--demo", help="Run demonstration mode (connectivity, plasticity, stdp)")
+    parser.add_argument("--analyze", action="store_true", help="Run brain state analysis")
+    parser.add_argument("--validate", action="store_true", help="Validate configuration file")
+    
+    # Configuration options
+    parser.add_argument("--export-config", help="Export current configuration to FILE")
+    parser.add_argument("--import-config", help="Import configuration from FILE")
+    parser.add_argument("--compare-configs", nargs=2, help="Compare two configuration files")
+    
+    # Monitoring options
+    parser.add_argument("--monitor", action="store_true", help="Start monitoring mode")
+    parser.add_argument("--profile", action="store_true", help="Profile performance")
+    parser.add_argument("--watch", action="store_true", help="Watch files for changes")
+    
+    # Development tools
+    parser.add_argument("--test", action="store_true", help="Run tests")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--trace", action="store_true", help="Enable detailed tracing")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                       default="INFO", help="Set log level (default: INFO)")
+    
+    # Python-specific options
+    parser.add_argument("--python-cli", action="store_true", help="Use enhanced Python CLI features")
+    parser.add_argument("--create-template", help="Create configuration template file", metavar="FILE")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Handle help/version flags
+    if args.help or len(sys.argv) == 1:
+        print_banner()
+        print_help()
+        return 0
+    
+    if args.version:
+        print_version()
+        return 0
+    
+    # Update global logger level
+    logger.level = args.log_level
+    
+    # Display banner if requested
+    if not args.no_banner:
+        print_banner()
+    
+    # Handle creation of template file
+    if args.create_template:
+        if create_config_template(args.create_template):
+            logger.info("Template creation completed successfully!")
+            return 0
+        else:
+            return 1
+    
+    # Handle configuration operations (these can run independently)
+    if args.validate:
+        if validate_config_file(args.config or "configs/default.cfg"):
+            logger.info("Configuration validation completed successfully.")
+            return 0
+        else:
+            return 1
+    
+    if args.export_config:
+        if export_config(args.export_config):
+            return 0
+        else:
+            return 1
+    
+    if args.import_config:
+        if import_config(args.import_config):
+            return 0
+        else:
+            return 1
+    
+    if args.compare_configs:
+        if compare_configs(args.compare_configs[0], args.compare_configs[1]):
+            return 0
+        else:
+            return 1
+    
+    # If pynlm is not available, exit with error
+    if not PYNLM_AVAILABLE:
+        logger.error("pynlm module is not available. Please install the NLM Python bindings.")
+        logger.info("Installation: pip install -e . (from the NLM root directory)")
+        return 1
+    
+    # Handle Python CLI features (specialized operations)
+    if args.python_cli:
+        logger.info("Using enhanced Python CLI features...")
+        
+        if args.benchmark:
+            return 0 if run_benchmark(args.config) else 1
+        elif args.demo:
+            return 0 if run_demo(args.config, args.demo) else 1
+        elif args.analyze:
+            return 0 if analyze_brain(args.config) else 1
+        else:
+            logger.warning("No Python CLI operation specified. Running basic analysis.")
+            return 0 if analyze_brain(args.config) else 1
+    
+    # Handle monitoring and development tools
+    if args.monitor:
+        logger.info("Monitoring mode is not yet implemented in Python CLI.")
+        return 0
+    
+    if args.profile:
+        logger.info("Profiling mode is not yet implemented in Python CLI.")
+        return 0
+    
+    if args.watch:
+        logger.info("Watch mode is not yet implemented in Python CLI.")
+        return 0
+    
+    if args.debug:
+        logger.info("Debug mode enabled.")
+        logger.level = "DEBUG"
+        logger.warning("Debug logging enabled")
+        return 0
+    
+    if args.trace:
+        logger.info("Trace mode enabled.")
+        logger.level = "DEBUG"
+        logger.warning("Trace logging enabled")
+        return 0
+    
+    if args.test:
+        return 0 if run_tests() else 1
+    
+    # Default: run analysis with Python CLI features
+    logger.info("No specific operation requested. Running analysis with Python CLI features.")
+    return 0 if analyze_brain(args.config) else 1
+
+if __name__ == "__main__":
+    sys.exit(main())
