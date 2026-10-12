@@ -1,16 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
 // Configuration value types
 using ConfigValue = std::variant<
     int,
@@ -42,6 +29,11 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Forward declaration for JSON
+namespace nlohmann {
+    class json;
+}
 
 // Main configuration class
 class Config {
@@ -92,6 +84,12 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // New JSON/YAML support methods (Phase 2)
+    void parseJson(const json& j);
+    ConfigValue jsonToConfigValue(const json& j) const;
+    json configValueToJson(const ConfigValue& value) const;
+    bool loadFromFileSimpleFormat(const std::string& filepath);
     
 private:
     struct Impl;
