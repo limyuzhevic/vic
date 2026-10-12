@@ -6,6 +6,8 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <queue>
 
 namespace nlm {
 
@@ -77,17 +79,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -125,17 +127,7 @@ public:
     void replaySequence(const std::vector<size_t>& episodeIds);
 
 private:
-    // Compute similarity between query and stored episode
-    float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
-
-    // Check if episode matches criteria
-    bool matchesCriteria(const EpisodicMemoryItem& episode,
-                        const std::vector<float>* sensoryQuery,
-                        SimulationStep* startTime,
-                        SimulationStep* endTime,
-                        ActionType* actionQuery) const;
-
+    // Forward declare implementation
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -143,6 +135,9 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    
+    // Forward declaration for LRU list cleanup
+    void cleanupLRU();
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

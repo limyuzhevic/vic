@@ -282,11 +282,8 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
-    
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(static_cast<uint32_t>(2), static_cast<uint32_t>(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

@@ -8,11 +8,11 @@ namespace nlm {
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    // Maintenance connections (recurrent) - now using map for O(1) lookups
+    std::unordered_map<NeuronId, std::vector<NeuronId>> maintenanceSynapses;
     
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
+    // Memory trace ages (for age tracking)
+    std::unordered_map<NeuronId, SimulationStep> ageTracker;
     
     Impl() : brain(nullptr) {}
 };
@@ -23,6 +23,10 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize maps for optimized lookups
+    neuronActivationMap_.reserve(capacity_);
+    neuronAgeMap_.reserve(capacity_);
+    lruIndex_.reserve(capacity_);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -43,14 +47,26 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
+        // Update map entries
+        neuronActivationMap_[neuron] = activation;
+        auto ageIt = neuronAgeMap_.find(neuron);
+        if (ageIt != neuronAgeMap_.end()) {
+            ageIt->second = 0;
+        } else {
+            neuronAgeMap_[neuron] = 0;
+        }
+        
+        // Update LRU
+        auto lruIt = lruIndex_.find(neuron);
+        if (lruIt != lruIndex_.end()) {
+            lruOrder_.erase(lruIt->second);
+            lruOrder_.push_back(neuron);
+            lruIt->second = std::prev(lruOrder_.end());
+        }
+        
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 5.0f);
         }
         
         // Update stored activation
@@ -70,17 +86,38 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    // O(1) lookup using map
+    auto activationIt = neuronActivationMap_.find(neuron);
+    auto ageIt = neuronAgeMap_.find(neuron);
     
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
+    // Helper: Get neuron index using LRU map for O(1) lookup
+    auto getNeuronIndex = [this](NeuronId neuron) -> size_t {
+        auto it = lruIndex_.find(neuron);
+        if (it != lruIndex_.end()) {
+            return std::distance(memoryNeurons_.begin(), it->second);
+        }
+        return 0; // Fallback
+    };
+
+    if (activationIt != neuronActivationMap_.end()) {
+        // Update existing neuron - maintain vector consistency
+        size_t idx = getNeuronIndex(neuron);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        activationIt->second = activation;
+        if (ageIt != neuronAgeMap_.end()) {
+            ageIt->second = 0;
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        neuronActivationMap_[neuron] = activation;
+        neuronAgeMap_[neuron] = 0;
+        
+        // Update LRU order
+        lruOrder_.push_back(neuron);
+        lruIndex_[neuron] = std::prev(lruOrder_.end());
     }
     
     // Inject current to maintain activation
@@ -101,14 +138,15 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+    // O(1) lookup using map
+    return neuronActivationMap_.find(neuron) != neuronActivationMap_.end();
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
+    // O(1) lookup using map
+    auto it = neuronActivationMap_.find(neuron);
+    if (it != neuronActivationMap_.end()) {
+        return it->second;
     }
     return 0.0f;
 }
@@ -117,23 +155,45 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
     // Update maintenance - reinforce active memory neurons
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
+    // Use map for O(1) lookups
+    std::vector<NeuronId> neuronsToProcess;
+    std::vector<float> newActivations;
+    
+    for (const auto& neuronPair : neuronActivationMap_) {
+        neuronsToProcess.push_back(neuronPair.first);
+        newActivations.push_back(neuronPair.second);
+    }
+    
+    for (size_t i = 0; i < neuronsToProcess.size(); ++i) {
+        NeuronId neuron = neuronsToProcess[i];
+        float activation = newActivations[i];
         
         if (activation > 0.1f) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+            auto ageIt = neuronAgeMap_.find(neuron);
+            if (ageIt != neuronAgeMap_.end()) {
+                ageIt->second++;
+                SimulationStep currentAge = ageIt->second;
+                
+                // Check if trace is too old
+                if (currentAge > 1000) {
+                    activation *= (1.0f - decayRate_);
+                    
+                    // Update map entry
+                    neuronActivationMap_[neuron] = activation;
+                    newActivations[i] = activation;
+                }
             }
             
-            memoryActivations_[i] = activation;
+            // Also update vector for consistency using LRU index
+            auto it = lruIndex_.find(neuron);
+            if (it != lruIndex_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it->second);
+                memoryActivations_[idx] = activation;
+            }
         }
     }
     
@@ -150,11 +210,23 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    
+    // Clear optimized data structures
+    neuronActivationMap_.clear();
+    neuronAgeMap_.clear();
+    lruOrder_.clear();
+    lruIndex_.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
-    for (auto& activation : memoryActivations_) {
-        activation = std::min(1.0f, activation * factor);
+    // Use optimized map for O(1) access and update
+    for (auto& pair : neuronActivationMap_) {
+        pair.second = std::min(1.0f, pair.second * factor);
+    }
+    
+    // Also update vector for consistency
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        memoryActivations_[i] = std::min(1.0f, memoryActivations_[i] * factor);
     }
 }
 
@@ -166,25 +238,43 @@ void NeuralWorkingMemory::runCompetition() {
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
-            winners_.push_back(memoryNeurons_[i]);
+    // Single-pass winner selection - find the neuron with maximum activation
+    NeuronId bestNeuron = memoryNeurons_[0];
+    float maxActivation = memoryActivations_[0];
+    
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] >= threshold && memoryActivations_[i] > maxActivation) {
+            bestNeuron = memoryNeurons_[i];
+            maxActivation = memoryActivations_[i];
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // If we found at least one winner
+    if (maxActivation >= threshold) {
+        winners_.push_back(bestNeuron);
+    }
+    
+    // Optimized inhibition calculation - O(n) instead of O(n²)
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+        // Use map for O(1) lookup
+        bool isWinner = winnersMap_.find(memoryNeurons_[i]) != winnersMap_.end();
         
         if (!isWinner && brain_) {
             // Apply strong inhibition
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
+    
+    // Update winnersMap_ for O(1) isWinning() lookups
+    winnersMap_.clear();
+    for (const NeuronId& winner : winners_) {
+        winnersMap_[winner] = true;
+    }
 }
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
+    // Use map for O(1) lookup
+    return winnersMap_.find(neuron) != winnersMap_.end();
 }
 
 float NeuralWorkingMemory::getMemoryActivity() const {
@@ -199,48 +289,91 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
     // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
-    }
+    auto& targets = pImpl->maintenanceSynapses[from];
+    bool exists = std::find(targets.begin(), targets.end(), to) != targets.end();
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    if (!exists) {
+        targets.push_back(to);
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
     // Apply maintenance currents through recurrent connections
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        float fromActivation = 0.0f;
+    for (const auto& fromNeuron : pImpl->maintenanceSynapses) {
+        // Get from neuron activation using map
+        auto it = neuronActivationMap_.find(fromNeuron.first);
+        float fromActivation = (it != neuronActivationMap_.end()) ? it->second : 0.0f;
         
-        // Find from neuron activation
-        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
-        if (it != memoryNeurons_.end()) {
-            size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
-        }
-        
-        if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+        // Apply to all targets
+        for (const NeuronId& toNeuron : fromNeuron.second) {
+            if (fromActivation > 0.1f && brain_) {
+                // Send maintenance signal
+                brain_->injectCurrent(toNeuron, fromActivation * 2.0f);
+            }
         }
     }
 }
 
 void NeuralWorkingMemory::decayWeakTraces() {
-    std::vector<size_t> toRemove;
-    
-    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
-        
-        if (memoryActivations_[i] < 0.01f) {
-            toRemove.push_back(i);
+    // Use LRU eviction to remove old traces instead of decay scanning
+    if (lruOrder_.size() >= capacity_ * 2 / 3) {  // Trigger at 2/3 capacity
+        // Evict oldest neurons from LRU
+        while (lruOrder_.size() > capacity_ * 2 / 3) {
+            NeuronId oldest = lruOrder_.front();
+            lruOrder_.pop_front();
+            lruIndex_.erase(oldest);
+            
+            // Remove from maps
+            neuronActivationMap_.erase(oldest);
+            neuronAgeMap_.erase(oldest);
+            
+            // Find and remove from vectors using LRU index for O(1) lookup
+            auto it = lruIndex_.find(oldest);
+            if (it != lruIndex_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it->second);
+                memoryNeurons_.erase(it->second);
+                memoryActivations_.erase(memoryActivations_.begin() + idx);
+                memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+                lruIndex_.erase(it);
+            }
         }
-    }
-    
-    // Remove weak traces (in reverse order to maintain indices)
-    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    } else {
+        // Minor decay for all traces
+        for (auto& pair : neuronActivationMap_) {
+            pair.second *= (1.0f - decayRate_);
+            // Update timestamps
+            auto ageIt = neuronAgeMap_.find(pair.first);
+            if (ageIt != neuronAgeMap_.end()) {
+                ageIt->second++;
+            }
+        }
+        
+        // Also decay vector entries for consistency
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            if (memoryActivations_[i] < 0.01f) {
+                // Remove weak trace
+                NeuronId neuronToRemove = memoryNeurons_[i];
+                
+                // Remove from maps
+                neuronActivationMap_.erase(neuronToRemove);
+                neuronAgeMap_.erase(neuronToRemove);
+                
+                // Remove from LRU
+                auto lruIt = lruIndex_.find(neuronToRemove);
+                if (lruIt != lruIndex_.end()) {
+                    lruOrder_.erase(lruIt->second);
+                    lruIndex_.erase(lruIt);
+                }
+                
+                // Remove from vectors (in reverse order)
+                if (i < memoryNeurons_.size()) {
+                    memoryNeurons_.erase(memoryNeurons_.begin() + i);
+                    memoryActivations_.erase(memoryActivations_.begin() + i);
+                    memoryTimestamps_.erase(memoryTimestamps_.begin() + i);
+                    i--;  // Adjust for removed element
+                }
+            }
+        }
     }
 }
 
