@@ -6,6 +6,9 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../errors/ErrorTypes.hpp"
+#include "../errors/ErrorContext.hpp"
+#include "../error_reporting/ErrorReporter.hpp"
 #include <memory>
 #include <string>
 
@@ -184,12 +187,131 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+// Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
+    // Error handling
+    bool handleError(const ErrorContext& error);
+    bool handleWarning(const ErrorContext& warning);
+    ErrorHandlingResult handleError(const ErrorHandlingResult& result);
+
+    // Error reporting
+    void reportError(const ErrorContext& error);
+    void reportWarning(const ErrorContext& warning);
+    void reportError(const std::string& message, ErrorSeverity severity = ErrorSeverity::Error,
+                   ErrorCode code = ErrorCodes::UNKNOWN,
+                   const std::string& sourceFile = "", const std::string& sourceFunction = "",
+                   int sourceLine = 0);
+
+    // Recovery
+    bool recoverFromError(const ErrorContext& error);
+    bool rollbackState(const std::string& operationId);
+    bool restoreCheckpoint(const std::string& checkpointId);
+
+    // Monitoring
+    SystemMetrics getSystemMetrics() const;
+    ComponentHealth getComponentHealth() const;
+    HealthStatus getHealthStatus() const;
+    double getHealthScore() const;
+
+    // Statistics
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
+
+    // Produce motor/action output based on motor neuron activity
+    std::unique_ptr<class Action> produceAction();
+
+    // Apply neuromodulatory signals
+    void applyNeuromodulation(const class Neuromodulator& signal);
+
+    // Update plasticity rules (called automatically in step)
+    void updatePlasticity();
+
+    // Apply developmental changes (called automatically in step)
+    void develop();
+
+    // Reset brain state
+    void reset();
+
+    // Save brain state to file (checkpointing)
+    bool save(const std::string& filepath) const;
+
+    // Load brain state from file
+    bool load(const std::string& filepath);
+
+    // Region management
+    RegionId addRegion(const std::string& name = "");
+    NeuralRegion* getRegion(RegionId id);
+    const NeuralRegion* getRegion(RegionId id) const;
+    size_t getRegionCount() const;
+    std::vector<RegionId> getRegionIds() const;
+
+    // Get all regions
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+
+    // Inter-region connection management
+    void addInterRegionConnection(RegionId source, RegionId target,
+                                  float weight = 0.0f, Delay delay = 1);
+    void removeInterRegionConnection(RegionId source, RegionId target);
+
+    // Global statistics
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
+
+    // ========== MEMORY SYSTEMS ==========
+
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory();
+
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory();
+
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory();
+
+    // ========== PREDICTION SYSTEM ==========
+
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+
+    // ========== COGNITION SYSTEMS ==========
+
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+
+    // ========== DEVELOPMENT SYSTEM ==========
+
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+
+    // ========== NEUROMODULATION SYSTEMS ==========
+
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+
     // Logging
     void logStatus() const;
     

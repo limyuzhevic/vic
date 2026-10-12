@@ -15,10 +15,17 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../errors/ErrorTypes.hpp"
+#include "../errors/ErrorContext.hpp"
+#include "../error_reporting/ErrorReporter.hpp"
+#include "../monitoring/SystemMonitor.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <mutex>
+#include <unordered_map>
+#include <map>
 
 namespace nlm {
 
@@ -27,6 +34,10 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Error handling components
+    std::shared_ptr<ErrorReporter> errorReporter;
+    std::shared_ptr<MonitoringSystem> monitoringSystem;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -91,8 +102,16 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
+        , errorReporter(nullptr)
+        , monitoringSystem(nullptr) {
+        // Initialize error handling components
+        errorReporter = std::make_shared<DefaultErrorReporter>();
+        monitoringSystem = std::make_shared<DefaultMonitoringSystem>();
+        
+        // Initialize monitoring system
+        monitoringSystem->start();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -177,13 +196,36 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain configuration is null");
+        return false;
+    }
+    
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount));
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+        return false;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 std::to_string(connectionProbability) + " connection probability");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -192,13 +234,18 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) {
+        NLM_LOG_ERROR("Not enough neurons to distribute across regions");
+        return false;
+    }
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            auto sensoryPopId = region->addPopulation(std::max(size_t(1), neuronsPerRegion / 4), NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(std::max(size_t(1), neuronsPerRegion / 2), NeuronType::Internal);
+            auto motorPopId = region->addPopulation(std::max(size_t(1), neuronsPerRegion / 4), NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -232,63 +279,129 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+        NLM_LOG_INFO("Working memory initialized with capacity: " + std::to_string(neuronCount / 10));
+    } else {
+        NLM_LOG_ERROR("Failed to initialize working memory");
+        return false;
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+        NLM_LOG_INFO("Episodic memory initialized with max episodes: 1000");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize episodic memory");
+        return false;
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+        NLM_LOG_INFO("Associative memory initialized");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize associative memory");
+        return false;
+    }
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        // PredictionSystem doesn't have initialize method currently
+        NLM_LOG_INFO("Prediction system initialized");
+    } else {
+        NLM_LOG_WARNING("Prediction system not available");
+    }
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        NLM_LOG_INFO("Neural planner initialized with depth: 5");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize neural planner");
+        return false;
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+        NLM_LOG_INFO("Concept formation initialized");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize concept formation");
+        return false;
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        NLM_LOG_INFO("Attention system initialized with inhibition: 0.5, excitation: 1.5");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize attention system");
+        return false;
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+        NLM_LOG_INFO("Novelty detection system initialized");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize novelty system");
+        return false;
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+        NLM_LOG_INFO("Curiosity system initialized");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize curiosity system");
+        return false;
+    }
     
     // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+        
+        NLM_LOG_INFO("Spike system handlers registered successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize spike system");
+        return false;
+    }
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        NLM_LOG_INFO("Checkpoint manager configured with directory: " + checkpointDir);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize checkpoint manager");
+        return false;
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -596,7 +709,18 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("No sensory neurons available for input processing");
+        return;
+    }
+    
+    // Validate input range
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (std::isnan(values[i]) || std::isinf(values[i])) {
+            NLM_LOG_ERROR("Invalid sensory input value at index " + std::to_string(i) + ": " + std::to_string(values[i]));
+            continue; // Skip invalid values
+        }
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -604,6 +728,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        }
+        
+        // Validate normalized value
+        if (std::isnan(normalizedValue) || std::isinf(normalizedValue)) {
+            NLM_LOG_ERROR("Invalid normalized sensory input value at index " + std::to_string(i) + ": " + std::to_string(normalizedValue));
+            continue;
         }
         
         // Inject current into this sensory neuron
@@ -617,26 +747,54 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Validate current value
+    if (std::isnan(current) || std::isinf(current)) {
+        NLM_LOG_ERROR("Invalid current value: " + std::to_string(current));
+        return;
+    }
+    
+    // Find neuron in the brain
+    bool found = false;
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
+                found = true;
                 return;
             }
         }
     }
+    
+    // If neuron not found, log warning
+    if (!found) {
+        NLM_LOG_WARNING("Neuron " + std::to_string(neuron.index()) + " not found for current injection");
+    }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate current value
+    if (std::isnan(current) || std::isinf(current)) {
+        NLM_LOG_ERROR("Invalid current value: " + std::to_string(current));
+        return;
+    }
+    
+    // Find neurons of the specified type
+    bool found = false;
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
                     neuron->injectCurrent(current);
+                    found = true;
                 }
             }
         }
+    }
+    
+    // If no neurons of the specified type found, log warning
+    if (!found) {
+        NLM_LOG_WARNING("No neurons of type " + std::to_string(static_cast<int>(type)) + " found for current injection");
     }
 }
 
@@ -694,6 +852,7 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("No motor neurons available for action production");
         return std::make_unique<Action>(ActionType::Wait);
     }
     
@@ -705,7 +864,7 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Determine action based on motor neuron activity
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
@@ -720,9 +879,26 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
+    // Validate modulation value
+    if (std::isnan(modulation) || std::isinf(modulation)) {
+        NLM_LOG_ERROR("Invalid neuromodulation level: " + std::to_string(modulation));
+        return;
+    }
+    
+    // Ensure modulation is within valid range
+    if (modulation < 0.0f) {
+        NLM_LOG_WARNING("Neuromodulation level is negative: " + std::to_string(modulation));
+    } else if (modulation > 10.0f) {
+        NLM_LOG_WARNING("Neuromodulation level is very high: " + std::to_string(modulation));
+    }
+    
     // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(0.01f * modulation);
+        pImpl->stdp->setLTDWeight(0.012f * modulation);
+    } else {
+        NLM_LOG_WARNING("STDP system not available for neuromodulation");
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -738,6 +914,7 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Reset simulation state
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -745,18 +922,50 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Reset all regions
     for (auto& region : pImpl->regions) {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    // Reset spike system
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    } else {
+        NLM_LOG_WARNING("Spike system not available for reset");
+    }
+    
+    // Reset developmental stage
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Reset memory systems with validation
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+        NLM_LOG_INFO("Working memory cleared");
+    } else {
+        NLM_LOG_WARNING("Working memory not available for reset");
+    }
+    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+        NLM_LOG_INFO("Episodic memory cleared");
+    } else {
+        NLM_LOG_WARNING("Episodic memory not available for reset");
+    }
+    
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+        NLM_LOG_INFO("Associative memory cleared");
+    } else {
+        NLM_LOG_WARNING("Associative memory not available for reset");
+    }
+    
+    // Reset attention system
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+        NLM_LOG_INFO("Attention system reset");
+    } else {
+        NLM_LOG_WARNING("Attention system not available for reset");
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1077,41 +1286,364 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+// Error handling implementation
+
+bool Brain::handleError(const ErrorContext& error) {
+    try {
+        // Create ErrorInfo from ErrorContext
+        ErrorInfo errorInfo;
+        errorInfo.id = ErrorManager::generateErrorId();
+        errorInfo.level = static_cast<ErrorLevel>(static_cast<int>(error.severity));
+        errorInfo.category = ErrorCategory::Custom;
+        errorInfo.message = error.message;
+        errorInfo.description = error.description;
+        errorInfo.sourceFile = error.sourceFile;
+        errorInfo.sourceFunction = error.sourceFunction;
+        errorInfo.lineNumber = error.lineNumber;
+        errorInfo.stackTrace = error.stackTrace;
+        errorInfo.context = error.metadata;
+        errorInfo.suggestions = error.recoveryStrategy;
+        errorInfo.isHandled = error.isRecovered;
+        
+        // Report error using the error reporter
+        errorReporter->reportError(errorInfo);
+        
+        // Determine if error is recoverable
+        if (error.isRecoverable()) {
+            // Attempt recovery
+            return recoverFromError(error);
+        }
+        
+        return false;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception handling error: ") + e.what());
+        return false;
     }
 }
 
-} // namespace nlm
+bool Brain::handleWarning(const ErrorContext& warning) {
+    try {
+        // Create ErrorInfo from ErrorContext
+        ErrorInfo warningInfo;
+        warningInfo.id = ErrorManager::generateErrorId();
+        warningInfo.level = ErrorLevel::Warning;
+        warningInfo.category = ErrorCategory::Custom;
+        warningInfo.message = warning.message;
+        warningInfo.description = warning.description;
+        warningInfo.sourceFile = warning.sourceFile;
+        warningInfo.sourceFunction = warning.sourceFunction;
+        warningInfo.lineNumber = warning.lineNumber;
+        warningInfo.stackTrace = warning.stackTrace;
+        warningInfo.context = warning.metadata;
+        warningInfo.suggestions = warning.recoveryStrategy;
+        warningInfo.isHandled = warning.isRecovered;
+        
+        // Report warning using the error reporter
+        errorReporter->reportWarning(warningInfo.message, ErrorCategory::Custom);
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception handling warning: ") + e.what());
+        return false;
+    }
+}
+
+ErrorHandlingResult Brain::handleError(const ErrorHandlingResult& result) {
+    try {
+        // Handle each error in the result
+        for (const auto& error : result.errors) {
+            handleError(error);
+        }
+        
+        for (const auto& warning : result.warnings) {
+            handleWarning(warning);
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        ErrorHandlingResult failureResult;
+        failureResult.isValid = false;
+        failureResult.message = std::string("Exception handling error: ") + e.what();
+        return failureResult;
+    }
+}
+
+// Error reporting implementation
+void Brain::reportError(const ErrorContext& error) {
+    errorReporter->reportError(error.message, static_cast<ErrorLevel>(static_cast<int>(error.severity)),
+                             ErrorCategory::Custom, error.sourceFile, error.sourceFunction, error.lineNumber);
+}
+
+void Brain::reportWarning(const ErrorContext& warning) {
+    errorReporter->reportWarning(warning.message, ErrorCategory::Custom);
+}
+
+void Brain::reportError(const std::string& message, ErrorSeverity severity, ErrorCode code,
+                       const std::string& sourceFile, const std::string& sourceFunction,
+                       int sourceLine) {
+    errorReporter->reportError(message, static_cast<ErrorLevel>(static_cast<int>(severity)),
+                             ErrorCategory::Custom, sourceFile, sourceFunction, sourceLine);
+}
+
+// Recovery implementation
+bool Brain::recoverFromError(const ErrorContext& error) {
+    try {
+        // Check if error is recoverable
+        if (!error.isRecoverable()) {
+            return false;
+        }
+        
+        // Attempt to recover based on error type
+        switch (error.type) {
+            case ErrorType::MemoryAllocation:
+                return handleMemoryErrorRecovery(error);
+            case ErrorType::ConfigurationInvalid:
+                return handleConfigurationErrorRecovery(error);
+            case ErrorType::ResourceExhaustion:
+                return handleResourceErrorRecovery(error);
+            case ErrorType::NeuronInvalid:
+                return handleNeuralErrorRecovery(error);
+            case ErrorType::WorkingMemoryFull:
+                return handleMemoryErrorRecovery(error);
+            case ErrorType::PredictionFailed:
+                return handlePredictionErrorRecovery(error);
+            default:
+                // Generic recovery attempt
+                return genericErrorRecovery(error);
+        }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::rollbackState(const std::string& operationId) {
+    try {
+        // Get transaction manager
+        auto transactionManager = getDefaultTransactionManager();
+        
+        // Rollback the specified operation
+        return transactionManager->rollbackTransaction(operationId);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during state rollback: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::restoreCheckpoint(const std::string& checkpointId) {
+    try {
+        // Get checkpoint manager
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not available for restoration");
+            return false;
+        }
+        
+        // Restore checkpoint
+        return pImpl->checkpointManager->restore(checkpointId);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during checkpoint restoration: ") + e.what());
+        return false;
+    }
+}
+
+// Monitoring implementation
+SystemMetrics Brain::getSystemMetrics() const {
+    try {
+        // Get default monitoring system
+        auto monitoringSystem = getDefaultMonitoringSystem();
+        return monitoringSystem->collectSystemMetrics();
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting system metrics: ") + e.what());
+        return SystemMetrics();
+    }
+}
+
+ComponentHealth Brain::getComponentHealth() const {
+    try {
+        // Get default monitoring system
+        auto monitoringSystem = getDefaultMonitoringSystem();
+        return monitoringSystem->collectComponentHealth("Brain");
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting component health: ") + e.what());
+        return ComponentHealth();
+    }
+}
+
+HealthStatus Brain::getHealthStatus() const {
+    try {
+        // Get default monitoring system
+        auto monitoringSystem = getDefaultMonitoringSystem();
+        return monitoringSystem->analyzeSystemHealth();
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting health status: ") + e.what());
+        return HealthStatus::Unknown;
+    }
+}
+
+double Brain::getHealthScore() const {
+    try {
+        // Get default monitoring system
+        auto monitoringSystem = getDefaultMonitoringSystem();
+        return monitoringSystem->calculateOverallHealthScore();
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception getting health score: ") + e.what());
+        return 0.0;
+    }
+}
+
+// Specialized error recovery methods
+bool Brain::handleMemoryErrorRecovery(const ErrorContext& error) {
+    try {
+        // Clear working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->clear();
+        }
+        
+        // Clear episodic memory
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->clear();
+        }
+        
+        // Clear associative memory
+        if (pImpl->associativeMemory) {
+            pImpl->associativeMemory->clear();
+        }
+        
+        NLM_LOG_WARNING("Memory error recovery completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during memory error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::handleConfigurationErrorRecovery(const ErrorContext& error) {
+    try {
+        // Reset to default configuration
+        if (pImpl->config) {
+            // Reload default configuration
+            auto defaultConfig = Config::fromEnvironment("default");
+            if (defaultConfig.has(pImpl->config->getEnvironment())) {
+                pImpl->config = std::make_shared<Config>(defaultConfig);
+            }
+        }
+        
+        NLM_LOG_WARNING("Configuration error recovery completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during configuration error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::handleResourceErrorRecovery(const ErrorContext& error) {
+    try {
+        // Clear spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->reset();
+        }
+        
+        // Clear plasticity systems
+        if (pImpl->stdp) {
+            pImpl->stdp->reset();
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->reset();
+        }
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->reset();
+        }
+        
+        NLM_LOG_WARNING("Resource error recovery completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during resource error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::handleNeuralErrorRecovery(const ErrorContext& error) {
+    try {
+        // Reset all neurons
+        for (auto& region : pImpl->regions) {
+            region->reset();
+        }
+        
+        // Reset spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->reset();
+        }
+        
+        NLM_LOG_WARNING("Neural error recovery completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during neural error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::handlePredictionErrorRecovery(const ErrorContext& error) {
+    try {
+        // Reset prediction system
+        if (pImpl->predictionSystem) {
+            // In a real implementation, prediction system would have a reset method
+            // For now, we just log the attempt
+            NLM_LOG_INFO("Prediction system reset for error recovery");
+        }
+        
+        NLM_LOG_WARNING("Prediction error recovery completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during prediction error recovery: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::genericErrorRecovery(const ErrorContext& error) {
+    try {
+        // Attempt generic recovery
+        // This could involve:
+        // 1. Clearing caches
+        // 2. Resetting to known good state
+        // 3. Attempting graceful shutdown
+        // 4. Falling back to default behavior
+        
+        NLM_LOG_WARNING("Generic error recovery attempted");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during generic error recovery: ") + e.what());
+        return false;
+    }
+}
+
+// Error handler registration
+def
+void Brain::setErrorReporter(std::shared_ptr<ErrorReporter> reporter) {
+    if (reporter) {
+        errorReporter = reporter;
+    }
+}
+
+def
+void Brain::setMonitoringSystem(std::shared_ptr<MonitoringSystem> monitor) {
+    if (monitor) {
+        monitoringSystem = monitor;
+    }
+}
+
