@@ -83,6 +83,8 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
@@ -109,9 +111,31 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
+    // Novelty detection decay rate (initialized in constructor)
     float sensoryNoveltyDecay_;
+    
+    // Constants for better maintainability
+    static constexpr float NOVELTY_DECAY_RATE = 0.99f;
+    static constexpr float VISION_SCALE_FACTOR = 5.0f;
+    static constexpr float TOUCH_SCALE_FACTOR = 8.0f;
+    static constexpr float INTERNAL_SCALE_FACTOR = 5.0f;
+    static constexpr float PROPRIOCEPTION_SCALE_FACTOR = 3.0f;
+    static constexpr float MIN_ACTIVITY_THRESHOLD = 0.3f;
+    static constexpr float MAX_ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float MAX_EXPLORATION_CHANCE = 0.3f;
+    static constexpr float MIN_NOVELTY_THRESHOLD = 0.001f;
+    static constexpr float MAX_NOVELTY_LEVEL = 1.0f;
+    static constexpr float MAX_DOPAMINE_LEVEL = 1.0f;
+    static constexpr float MIN_DOPAMINE_LEVEL = -1.0f;
+    static constexpr float MAX_PLATIVITY_FACTOR = 2.0f;
+    static constexpr float MIN_PLATIVITY_FACTOR = 0.1f;
+    static constexpr float MAX_CURIOUSITY_LEVEL = 1.0f;
+    static constexpr float MIN_DEVELOPMENTAL_AGE = 60.0;
+    static constexpr float MIN_CRITICAL_PERIOD_AGE = 300.0;
+    static constexpr float MIN_MATURATION_AGE = 900.0;
+    static constexpr float MAX_DEVELOPMENTAL_AGE = 900.0;
+    static constexpr float MAX_Sensory_NOVELTY_DECAY_RATE = 1.0f;
+    static constexpr float MIN_Sensory_NOVELTY_DECAY_RATE = 0.0f;
 };
 
 } // namespace nlm
