@@ -301,8 +301,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -319,6 +319,184 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
+}
+
+void printUsage() {
+    printBanner();
+    std::cout << R"(
+Usage: nlm [OPTIONS]
+
+Core Options:
+  --help, -h              Show this help message
+  --config FILE, -c FILE    Load configuration from file
+  --neuron-count N, -n N   Set number of neurons (default: 500)
+  --steps S, -s S           Number of simulation steps (default: 1000)
+  --timestep T, -t T        Simulation timestep (default: 0.001)
+
+Plasticity Options:
+  --stdp-enable             Enable STDP plasticity (default: enabled)
+  --stdp-ltp W             STDP LTP weight (default: 0.02)
+  --stdp-ltd W              STDP LTD weight (default: 0.015)
+  --stdp-tau T              STDP time constant (default: 20.0)
+  --hebbian-enable          Enable Hebbian plasticity (default: enabled)
+  --structural-enable       Enable structural plasticity (default: enabled)
+
+Development Options:
+  --development-stage S     Set developmental stage (Initial, CriticalPeriod, Maturation, Adult, Aging)
+  --synaptogenesis R        Synaptogenesis rate (default: 0.0001)
+  --pruning R              Pruning rate (default: 0.00001)
+
+Neuromodulation Options:
+  --dopamine-scale V       Dopamine modulation scale (default: 1.0)
+  --curiosity-enable        Enable curiosity-driven exploration (default: enabled)
+  --novelty-enable          Enable novelty detection (default: enabled)
+
+Logging Options:
+  --log-level L             Log level (Trace, Debug, Info, Warning, Error, Critical)
+  --log-to-file              Log to file instead of console
+  --log-file F              Log file path (default: nlm.log)
+
+Test Modes:
+  --test-mode M             Test mode (basic, connectivity, plasticity, stdp, all)
+  --quick-test              Run quick functional test
+  --performance-benchmark    Run performance benchmark
+  --help-tests              Show test mode options
+
+Output Options:
+  --output FILE, -o FILE     Save brain state to file
+  --load FILE, -l FILE        Load brain state from file
+  --verbose, -v              Enable verbose output
+  --quiet, -q                Suppress output
+
+World Options (for agent experiments):
+  --world-width W           World width (default: 10)
+  --world-height H           World height (default: 10)
+  --world-vision W,V         Vision dimensions (default: 8,8)
+  --agent-start X,Y          Agent starting position (default: middle)
+
+Performance Options:
+  --parallel                Enable parallel processing
+  --simd                     Enable SIMD optimizations
+  --threads N               Number of threads (default: auto)
+
+Advanced Options:
+  --experiment E             Run specific experiment (phase3, phase4, phase6, custom)
+  --checkpoint C             Create checkpoint every N steps
+  --resume-from CHECKPOINT    Resume from checkpoint file
+  --random-seed S            Random seed for reproducible experiments
+
+Examples:
+  nlm --neuron-count 1000 --steps 2000 --test-mode connectivity
+  nlm --config custom.cfg --development-stage Adult --output brain_state.bin
+  nlm --test-mode plasticity --stdp-ltp 0.03 --stdp-ltd 0.02
+  nlm --experiment phase4 --quick-test
+
+For more detailed information about NLM, visit: https://github.com/nlm-project/nlm
+  )" << std::endl;
+}
+
+void handleAdvancedOptions(std::shared_ptr<Config> config, int argc, char** argv) {
+    // Process additional command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Test modes
+        if (arg == "--test-mode" || arg == "-test-mode") {
+            if (i + 1 < argc) {
+                std::string mode = argv[++i];
+                config->set("test_mode", mode, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--help-tests") {
+            printTestHelp();
+        }
+        
+        // World options
+        else if (arg == "--world-width" || arg == "-world-width") {
+            if (i + 1 < argc) {
+                int width = std::stoi(argv[++i]);
+                config->set("world_width", width, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--world-height" || arg == "-world-height") {
+            if (i + 1 < argc) {
+                int height = std::stoi(argv[++i]);
+                config->set("world_height", height, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--world-vision" || arg == "-world-vision") {
+            if (i + 1 < argc) {
+                std::string vision = argv[++i];
+                size_t comma_pos = vision.find(',');
+                if (comma_pos != std::string::npos) {
+                    int width = std::stoi(vision.substr(0, comma_pos));
+                    int height = std::stoi(vision.substr(comma_pos + 1));
+                    config->set("world_vision_width", width, ConfigSource::CommandLine);
+                    config->set("world_vision_height", height, ConfigSource::CommandLine);
+                }
+            }
+        } else if (arg == "--agent-start" || arg == "-agent-start") {
+            if (i + 1 < argc) {
+                std::string pos = argv[++i];
+                size_t comma_pos = pos.find(',');
+                if (comma_pos != std::string::npos) {
+                    float x = std::stof(pos.substr(0, comma_pos));
+                    float y = std::stof(pos.substr(comma_pos + 1));
+                    config->set("agent_start_x", x, ConfigSource::CommandLine);
+                    config->set("agent_start_y", y, ConfigSource::CommandLine);
+                }
+            }
+        }
+        
+        // Performance options
+        else if (arg == "--parallel") {
+            config->set("parallel_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--simd") {
+            config->set("simd_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--threads" || arg == "-threads") {
+            if (i + 1 < argc) {
+                int threads = std::stoi(argv[++i]);
+                config->set("num_threads", threads, ConfigSource::CommandLine);
+            }
+        }
+        
+        // Advanced options
+        else if (arg == "--experiment" || arg == "-experiment") {
+            if (i + 1 < argc) {
+                std::string experiment = argv[++i];
+                config->set("experiment_type", experiment, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--checkpoint" || arg == "-checkpoint") {
+            if (i + 1 < argc) {
+                int checkpoint = std::stoi(argv[++i]);
+                config->set("checkpoint_interval", checkpoint, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--resume-from" || arg == "-resume-from") {
+            if (i + 1 < argc) {
+                std::string checkpoint = argv[++i];
+                config->set("resume_checkpoint", checkpoint, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--random-seed" || arg == "-random-seed") {
+            if (i + 1 < argc) {
+                int64_t seed = std::stoll(argv[++i]);
+                config->set("random_seed", seed, ConfigSource::CommandLine);
+            }
+        }
+    }
+}
+
+void printTestHelp() {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test Mode Options ===");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Available test modes:")
+    NLM_LOG_INFO("  basic       - Basic connectivity test (neurons, synapses, spikes)")
+    NLM_LOG_INFO("  connectivity - Neural connectivity and propagation test")
+    NLM_LOG_INFO("  plasticity   - Plasticity learning and weight changes")
+    NLM_LOG_INFO("  stdp        - Spike-timing dependent plasticity verification")
+    NLM_LOG_INFO("  all         - Run all available tests")
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Test flags:")
+    NLM_LOG_INFO("  --quick-test           Run quick functional test (10 steps)")
+    NLM_LOG_INFO("  --performance-benchmark Run performance benchmark")
+    NLM_LOG_INFO("");
 }
 
 int main(int argc, char** argv) {

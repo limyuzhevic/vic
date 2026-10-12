@@ -64,23 +64,47 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Quick Install
 
+The Python bindings for NLM use scikit-build-core for modern Python packaging:
+
+### One-Command Installation (Recommended)
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+pip install .
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
+### Development Installation
 ```bash
-./nlm_phase6_demo
+pip install -e .
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Installation from Build
+```bash
+pip install build
+python -m build
+pip install dist/*.whl
+```
+
+## Quick Install
+
+The Python bindings for NLM use scikit-build-core for modern Python packaging:
+
+### One-Command Installation (Recommended)
+```bash
+pip install .
+```
+
+### Development Installation
+```bash
+pip install -e .
+```
+
+### Installation from Build
+```bash
+pip install build
+python -m build
+pip install dist/*.whl
+```
 
 ## Project Structure
 
