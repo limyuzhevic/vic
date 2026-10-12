@@ -4,6 +4,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include <memory>
 #include <vector>
+#include <map>  // Required for getSignalRanges()
 
 namespace nlm {
 
@@ -40,6 +41,18 @@ public:
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
+    // Configure vision dimensions (useful for different environments)
+    void configureVision(size_t width, size_t height);
+    
+    // Get signal ranges for advanced sensory processing
+    // Returns mapping of signal type to index range for efficient access
+    // Returns const reference to static map for performance optimization
+    static const std::map<std::string, std::pair<size_t, size_t>>& getSignalRanges() const;
+    
+    // Validate sensory data ranges
+    // Ensures all vectors have reasonable sizes for the system
+    bool validateData() const;
+
     // Timestamp
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }

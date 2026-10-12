@@ -20,14 +20,35 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Validate input
+    if (!brain) {
+        NLM_LOG_ERROR("AgentBrain: Cannot initialize with null brain pointer");
+        return;
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            if (!region) {
+                NLM_LOG_WARN("AgentBrain: Found null region, skipping");
+                continue;
+            }
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_WARN("AgentBrain: Found null population, skipping");
+                    continue;
+                }
+                
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) {
+                            NLM_LOG_WARN("AgentBrain: Found null neuron in motor population, skipping");
+                            continue;
+                        }
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +65,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) {
+                            NLM_LOG_WARN("AgentBrain: Found null neuron in sensory population, skipping");
+                            continue;
+                        }
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -59,11 +85,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    NLM_LOG_INFO("AgentBrain initialized with " +
+                 std::to_string(motorForward_.size() + motorBackward_.size() + 
+                               motorTurnLeft_.size() + motorTurnRight_.size() +
+                               motorInteract_.size() + motorWait_.size()) + " motor neurons, " +
+                 std::to_string(sensoryVision_.size() + sensoryTouch_.size() + 
+                               sensoryInternal_.size() + sensoryProprioception_.size()) + " sensory neurons");
 }
 
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Validate world parameter
+    if (!world.getWidth() || !world.getHeight()) {
+        NLM_LOG_WARN("AgentBrain::initialize: World has invalid dimensions");
+    }
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -85,7 +123,16 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Validate input percept
+    if (!percept.validateData()) {
+        NLM_LOG_WARN("AgentBrain::processSensoryInput: Invalid sensory data detected");
+        return;
+    }
+    
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::processSensoryInput: Brain not available");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -93,6 +140,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
+            // Validate current value
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +153,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +165,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,6 +177,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -132,17 +192,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             totalDiff += diff;
         }
         
-        // Normalize
+        // Normalize with safety check
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
+        // Apply decay and update with bounds checking
         noveltyLevel_ *= sensoryNoveltyDecay_;
+        noveltyLevel_ = std::clamp(noveltyLevel_, 0.0f, 1.0f);
         
         // Store for next time
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
@@ -150,11 +211,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::decodeMotorCommand: Brain not available, returning Wait");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Apply curiosity-based exploration with safety check
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
     }
@@ -217,8 +281,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - use actual range of MotorCommand enum
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7); // MotorCommand has 8 values (0-7)
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,7 +291,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;
+                default: return MotorCommand::Wait; // Should never reach here
             }
         }
     }

@@ -260,6 +260,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAudio", &SensoryPercept::getAudio)
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("configureVision", &SensoryPercept::configureVision,
+             py::arg("width"), py::arg("height"),
+             "Configure vision dimensions for different environments")
+        .def("getSignalRanges", &SensoryPercept::getSignalRanges,
+             "Get signal ranges for advanced sensory processing")
+        .def("validateData", &SensoryPercept::validateData,
+             "Validate sensory data ranges for integrity")
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
@@ -416,6 +423,174 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+    
+    // Advanced brain creation with common configurations
+    m.def("createDefaultBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a default brain with sensible parameters");
+    
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+    
+    // Advanced world creation
+    m.def("createDefaultWorld", [](int width = 100, int height = 100, 
+                                  int visionWidth = 16, int visionHeight = 16) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setAgentStart(width/2, height/2);
+        return world;
+    }, py::arg("width") = 100, py::arg("height") = 100,
+       py::arg("visionWidth") = 16, py::arg("visionHeight") = 16,
+       "Create a default world with configurable size");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Expert utilities and advanced functions
+    m.def("createAgentWithWorld", 
+          [](std::shared_ptr<Config> config, int width, int height) {
+              auto brain = std::make_shared<Brain>(config);
+              brain->initialize();
+              auto world = std::make_shared<SimpleWorld>();
+              world->configure(width, height, 16, 16);
+              world->setAgentStart(width/2, height/2);
+              return std::make_tuple(brain, world);
+          }, py::arg("config"), py::arg("width"), py::arg("height"),
+          "Advanced utility to create complete agent system with brain and world");
+    
+    m.def("runSimulationStep", 
+          [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+             std::shared_ptr<AgentBrain> agent, double timestep = 0.001) {
+              // Process current world state to percept
+              auto percept = world->getSensoryPercept();
+              agent->processSensoryInput(percept);
+              
+              // Run brain step
+              brain->step(static_cast<SimulationStep>(world->getSimulationTime()), timestep);
+              
+              // Decode motor command
+              MotorCommand cmd = agent->decodeMotorCommand();
+              
+              // Apply to world
+              world->applyMotorCommand(cmd, world->getSimulationTime());
+              
+              // Update world
+              world->update(timestep);
+              
+              return std::make_tuple(percept, cmd, world->getAgentBody());
+          }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("timestep") = 0.001,
+          "Advanced simulation step function combining brain, world, and agent logic");
+    
+    // Configuration utilities
+    m.def("createCustomConfig", 
+          [](std::map<std::string, std::string> settings) {
+              auto config = std::make_shared<Config>();
+              for (const auto& pair : settings) {
+                  // Try to parse as different types
+                  try {
+                      int64_t intVal = std::stoll(pair.second);
+                      config->set(pair.first, intVal, ConfigSource::Default);
+                  } catch (...) {
+                      try {
+                          float floatVal = std::stof(pair.second);
+                          config->set(pair.first, floatVal, ConfigSource::Default);
+                      } catch (...) {
+                          config->set(pair.first, pair.second, ConfigSource::Default);
+                      }
+                  }
+              }
+              return config;
+          }, py::arg("settings"),
+          "Create a custom configuration from a map of settings");
+    
+    m.def("getSystemInfo", []() {
+          std::map<std::string, std::string> info;
+          info["version"] = "Phase 6.0";
+          info["description"] = "NLM Neural Learning Machine - Advanced AI Research Platform";
+          info["python_bindings"] = "pynlm";
+          info["documentation"] = "https://nlm.readthedocs.io";
+          return info;
+      }, "Get system information and version details");
+    
+    m.def("validateAgentConfiguration", 
+          [](std::shared_ptr<Config> config) {
+              std::map<std::string, bool> validationResults;
+              validationResults["has_random_seed"] = config->has("random_seed");
+              validationResults["has_simulation_timestep"] = config->has("simulation_timestep");
+              validationResults["has_neuron_count"] = config->has("neuron_count");
+              validationResults["has_region_count"] = config->has("region_count");
+              return validationResults;
+          }, py::arg("config"),
+          "Validate agent configuration and return validation results");
+    
+    // Performance optimization utilities
+    m.def("benchmarkBrainInitialization", 
+          [](int iterations = 10) {
+              auto config = std::make_shared<Config>();
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+              
+              std::vector<double> times;
+              for (int i = 0; i < iterations; ++i) {
+                  auto start = std::chrono::high_resolution_clock::now();
+                  auto brain = std::make_shared<Brain>(config);
+                  brain->initialize();
+                  auto end = std::chrono::high_resolution_clock::now();
+                  times.push_back(std::chrono::duration<double>(end - start).count());
+              }
+              
+              double avg = 0.0, min = times[0], max = times[0];
+              for (double t : times) {
+                  avg += t;
+                  if (t < min) min = t;
+                  if (t > max) max = t;
+              }
+              avg /= times.size();
+              
+              return std::make_tuple(avg, min, max, times.size());
+          }, py::arg("iterations") = 10,
+          "Benchmark brain initialization performance");
+    
+    m.def("configureAdvancedSensory", 
+          [](std::shared_ptr<SensoryPercept> percept, 
+             std::map<std::string, std::vector<float>> channels) {
+              if (channels.find("vision") != channels.end()) {
+                  percept->setVision(channels["vision"]);
+              }
+              if (channels.find("touch") != channels.end()) {
+                  percept->setTouch(channels["touch"]);
+              }
+              if (channels.find("internal") != channels.end()) {
+                  percept->setInternal(channels["internal"]);
+              }
+              if (channels.find("proprioception") != channels.end()) {
+                  percept->setProprioception(channels["proprioception"]);
+              }
+              if (channels.find("audio") != channels.end()) {
+                  percept->setAudio(channels["audio"]);
+              }
+              return percept;
+          }, py::arg("percept"), py::arg("channels"),
+          "Configure advanced sensory channels with multiple modalities");
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
