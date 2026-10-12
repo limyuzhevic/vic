@@ -1,0 +1,47 @@
+# Test JSON configuration file
+test_config.json:
+{
+    "json_int": 123,
+    "json_double": 45.67,
+    "json_string": "JSON test",
+    "json_bool": true,
+    "json_array_int": [1, 2, 3, 4, 5],
+    "json_array_string": ["a", "b", "c"],
+    "nested_config": {
+        "inner_key": "inner_value",
+        "inner_number": 42
+    },
+    "_description": "Test configuration file",
+    "_source": "file"
+}
+
+# Test YAML configuration file
+test_config.yaml:
+json_int: 123
+json_double: 45.67
+json_string: "YAML test"
+json_bool: true
+json_array_int:
+  - 1
+  - 2
+  - 3
+json_array_string:
+  - a
+  - b
+  - c
+nested_config:
+  inner_key: inner_value
+  inner_number: 42
+_description: Test YAML configuration file
+_source: file
+
+# Test backward compatibility key=value format
+test_config.kv:
+# This is a comment
+key1 = value1
+key2 = 123
+key3 = 3.14
+key4 = true
+key5 = [1, 2, 3]
+# Another comment
+key6 = "quoted value"

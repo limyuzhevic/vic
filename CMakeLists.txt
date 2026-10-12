@@ -23,12 +23,16 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
+    src/core/ErrorHandling/src/NLMError.cpp
+    src/core/ErrorHandling/src/ConfigurationError.cpp
+    src/core/ErrorHandling/src/ValidationError.cpp
+    src/core/ErrorHandling/src/SerializationError.cpp
+    src/core/ErrorHandling/src/NeuralError.cpp
+    src/core/ErrorHandling/src/MemoryError.cpp
+    src/core/ErrorHandling/src/SystemError.cpp
+    src/core/ErrorHandling/src/PerformanceError.cpp
+    src/core/ErrorHandling/src/NetworkError.cpp
+    src/core/ErrorHandling/src/ErrorHandling.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp

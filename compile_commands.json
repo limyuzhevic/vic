@@ -1,0 +1,8 @@
+{"version": 3, "compile_commands": [
+    {
+        "directory": "/workspace/app",
+        "file": "/workspace/app/src/core/Logger/Logger.hpp",
+        "command": "g++ -std=c++20 -I./src -c /workspace/app/src/core/Logger/Logger.cpp -o /tmp/test_logger.o",
+        "output": "/tmp/test_logger.o"
+    }
+]}
