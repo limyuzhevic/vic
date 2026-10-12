@@ -48,6 +48,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key format (alphanumeric and underscores)
+            if (!key.empty() && !std::all_of(key.begin(), key.end(),
+                                              [](char c) { return std::isalnum(c) || c == '_'; })) {
+                NLM_LOG_WARNING("Invalid config key format: " + key + ", skipping");
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
         }
     }
@@ -115,6 +122,57 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key format
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty key");
+        return;
+    }
+    
+    // Check if key contains only valid characters
+    bool validKey = true;
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_') {
+            validKey = false;
+            break;
+        }
+    }
+    
+    if (!validKey) {
+        NLM_LOG_ERROR("Invalid key format: " + key);        return;
+    }
+    
+    // Validate value based on key type (basic validation)
+    if (key == "neuron_count" && std::holds_alternative<size_t>(value)) {
+        size_t count = std::get<size_t>(value);
+        if (count == 0 || count > 100000) {
+            NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(count) + ", must be between 1 and 100000");
+            return;
+        }
+    } else if (key == "region_count" && std::holds_alternative<size_t>(value)) {
+        size_t count = std::get<size_t>(value);
+        if (count == 0 || count > 1000) {
+            NLM_LOG_ERROR("Invalid region count: " + std::to_string(count) + ", must be between 1 and 1000");
+            return;
+        }
+    } else if ((key == "connection_probability" || key == "stdp_ltp_weight" || 
+                key == "stdp_ltd_weight" || key == "synaptogenesis_rate" ||
+                key == "pruning_rate" || key == "replay_interval" ||
+                key == "consolidation_interval") && std::holds_alternative<double>(value)) {
+        double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            NLM_LOG_ERROR("Invalid probability value: " + std::to_string(val) + ", must be between 0.0 and 1.0");
+            return;
+        }
+    } else if ((key == "random_seed" || key == "simulation_timestep") && 
+               (std::holds_alternative<int64_t>(value) || std::holds_alternative<size_t>(value))) {
+        auto val = std::holds_alternative<int64_t>(value) ? 
+            std::get<int64_t>(value) : std::get<size_t>(value);
+        if (static_cast<int64_t>(val) < 0) {
+            NLM_LOG_ERROR("Invalid seed/timestep value: " + std::to_string(val) + ", must be non-negative");
+            return;
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
