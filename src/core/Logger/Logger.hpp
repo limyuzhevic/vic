@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <system_error>
 
 namespace nlm {
 
@@ -17,6 +18,9 @@ enum class LogLevel {
     Error = 3,
     Critical = 4
 };
+
+// Include error handling system
+#include "Error/NLMException.hpp"
 
 // Log entry structure
 struct LogEntry {

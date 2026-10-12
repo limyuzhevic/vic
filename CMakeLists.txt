@@ -83,8 +83,8 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Error handling system
+    src/core/Error/NLMException.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -143,9 +143,8 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Error handling test executable
+add_executable(test_error_handling
+    src/core/Error/TestErrorHandling.cpp
 )
+target_link_libraries(test_error_handling PUBLIC nlm_core)
