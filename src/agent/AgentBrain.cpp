@@ -162,74 +162,184 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
+    // Enhanced action selection with temporal context and novelty weighting
+    float timeWeightedForwardAct = forwardAct * (1.0f + noveltyLevel_ * 0.3f);
+    float timeWeightedBackwardAct = backwardAct * (1.0f + noveltyLevel_ * 0.3f);
+    float timeWeightedLeftAct = leftAct * (1.0f + curiosityLevel_ * 0.2f);
+    float timeWeightedRightAct = rightAct * (1.0f + curiosityLevel_ * 0.2f);
+    float timeWeightedInteractAct = interactAct * (1.0f + dopamineLevel_ * 0.5f);
+    float timeWeightedWaitAct = waitAct;
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Apply action-specific modulations based on neuromodulators
+    // Dopamine enhances goal-directed actions
+    float dopamineMod = 1.0f + std::max(0.0f, dopamineLevel_) * 0.3f;
+    timeWeightedForwardAct *= dopamineMod;
+    timeWeightedInteractAct *= dopamineMod;
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
+    // Novelty enhances exploration and new experiences
+    float noveltyMod = 1.0f + noveltyLevel_ * 0.5f;
+    timeWeightedLeftAct *= noveltyMod;
+    timeWeightedRightAct *= noveltyMod;
+    
+    // Curiosity drives exploration when baseline action is weak
+    float curiosityMod = 1.0f + curiosityLevel_ * 0.4f;
+    timeWeightedWaitAct *= curiosityMod;
+    
+    // Find maximum activity with enhanced weighting
+    struct { MotorCommand cmd; float activity; float baseActivity; float neuromodMod; } commands[] = {
+        {MotorCommand::MoveForward, timeWeightedForwardAct, forwardAct, dopamineMod},
+        {MotorCommand::MoveBackward, timeWeightedBackwardAct, backwardAct, dopamineMod},
+        {MotorCommand::TurnLeft, timeWeightedLeftAct, leftAct, noveltyMod},
+        {MotorCommand::TurnRight, timeWeightedRightAct, rightAct, noveltyMod},
+        {MotorCommand::Interact, timeWeightedInteractAct, interactAct, dopamineMod},
+        {MotorCommand::Wait, timeWeightedWaitAct, waitAct, curiosityMod}
     };
     
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = waitAct;
+    float bestNeuromod = curiosityMod;
     
+    // Enhanced selection logic: prefer actions with high neuromodulation and base activity
     for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
+        // Composite score considering activity, neuromodulation, and action type
+        float score = c.activity * 0.6f + c.neuromod * 0.3f + c.baseActivity * 0.1f;
+        
+        // Override for strong neuromodulation (prioritize curiosity-driven exploration)
+        if (c.neuromod > 1.3f && c.baseActivity < 0.3f) {
+            score *= 1.5f;  // Boost exploration actions when neuromod is high
+        }
+        
+        if (score > bestActivity || 
+            (std::abs(score - bestActivity) < 0.01f && c.neuromod > bestNeuromod)) {
+            bestActivity = score;
             best = c.cmd;
+            bestNeuromod = c.neuromod;
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Enhanced action threshold with adaptive modulation
+    float adaptiveThreshold = 0.5f;
+    
+    // Lower threshold when neuromodulation is high (more exploratory)
+    if (neuromodulationLevel > 0.3f) {
+        adaptiveThreshold = 0.3f;
+    }
+    
+    // Even lower threshold when curiosity is very high (always explore)
+    if (curiosityLevel_ > 0.7f) {
+        adaptiveThreshold = 0.2f;
+    }
+    
+    // Enhanced action selection logic
+    if (bestActivity < adaptiveThreshold) {
+        // Low activity: prefer curiosity-driven exploration or maintain status quo
+        if (curiosityLevel_ > 0.6f) {
+            // High curiosity: random exploration
+            return selectWithCuriosity(MotorCommand::Wait);
+        } else if (dopamineLevel_ < -0.3f) {
+            // Negative dopamine: increase exploration tendency
+            if (std::rand() % 100 < 30) {  // 30% chance to explore
+                return selectWithCuriosity(MotorCommand::Wait);
+            }
+        }
+        
         return MotorCommand::Wait;
+    }
+    
+    // Action-specific feedback modulation
+    switch (best) {
+        case MotorCommand::MoveForward:
+            // Record successful forward movement for future reference
+            lastAction_ = best;
+            actionHistory_.push_back({best, bestActivity, time(0)});
+            break;
+        case MotorCommand::Interact:
+            // Successful interaction can increase confidence in future interactions
+            interactionSuccessCount_++;
+            lastAction_ = best;
+            actionHistory_.push_back({best, bestActivity, time(0)});
+            break;
+        default:
+            lastAction_ = best;
+            actionHistory_.push_back({best, bestActivity, time(0)});
+            break;
     }
     
     return best;
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
+    // Enhanced exploration with temporal weighting and action value learning
     if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        // Calculate action preference based on history and neuromodulation
+        std::vector<std::pair<MotorCommand, float>> actionPreferences;
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        // Get action history for preference calculation
+        float totalActionValue = 0.0f;
+        for (const auto& actionData : actionHistory_) {
+            totalActionValue += actionData.value;
+        }
+        
+        // Calculate preferences based on action value and novelty
+        for (int i = 0; i < 8; ++i) {  // All possible motor commands
+            MotorCommand cmd = static_cast<MotorCommand>(i);
+            float baseValue = 0.33f;  // Base exploration probability
+            
+            // Find last occurrence of this action
+            float lastOccurrence = 1000000.0f; // Large number for "never"
+            for (const auto& actionData : actionHistory_) {
+                if (actionData.cmd == cmd) {
+                    lastOccurrence = std::min(lastOccurrence, actionData.timestamp);
+                }
+            }
+            
+            // Lower recent occurrence = higher preference for exploration
+            float recencyBonus = std::max(0.0f, 1.0f - (lastOccurrence / 100.0f));
+            
+            // Action value from history
+            float actionValue = 0.0f;
+            for (const auto& actionData : actionHistory_) {
+                if (actionData.cmd == cmd) {
+                    actionValue += actionData.value;
+                }
+            }
+            
+            if (actionHistory_.size() > 0) {
+                actionValue /= actionHistory_.size();
+            }
+            
+            // Enhanced preference calculation
+            float preference = baseValue * (1.0f + curiosityLevel_ * 0.5f) * 
+                              (1.0f + recencyBonus * 0.3f) * 
+                              (1.0f + actionValue * 0.2f);
+            
+            // Ensure reasonable bounds
+            preference = std::clamp(preference, 0.0f, 1.0f);
+            
+            actionPreferences.emplace_back(cmd, preference);
+            totalActionValue += preference;
+        }
+        
+        // Normalize preferences
+        if (totalActionValue > 0.0f) {
+            for (auto& pref : actionPreferences) {
+                pref.second /= totalActionValue;
             }
         }
+        
+        // Select action based on preferences (roulette wheel selection)
+        float randValue = static_cast<float>(std::rand()) / RAND_MAX;
+        float cumulative = 0.0f;
+        
+        for (const auto& pref : actionPreferences) {
+            cumulative += pref.second;
+            if (randValue <= cumulative) {
+                return pref.first;
+            }
+        }
+        
+        // Fallback to last choice
+        return lastAction_;
     }
     
     return defaultCmd;
