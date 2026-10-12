@@ -11,18 +11,17 @@
 
 namespace nlm {
 
-// Forward declarations
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
+// NeuralAssociativeMemory not yet implemented
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
-class AttentionalSelection;
+// AttentionalSelection not yet implemented
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -146,7 +145,7 @@ public:
     NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // NeuralAssociativeMemory not yet implemented
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -162,7 +161,7 @@ public:
     ConceptFormation* getConceptFormation();
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // AttentionalSelection not yet implemented
     
     // ========== DEVELOPMENT SYSTEM ==========
     

@@ -111,7 +111,7 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // NeuralAssociativeMemory not yet implemented
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -119,7 +119,7 @@ struct Brain::Impl {
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        // AttentionalSelection not yet implemented
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
