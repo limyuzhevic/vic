@@ -525,7 +525,14 @@ std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
                     if (pn.first == otherNeuron) {
                         activated.push_back(pn.second);
                         break;
-                    }
+    }
+
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+} // namespace nlm
                 }
             }
         }

@@ -1,4 +1,5 @@
 #include "Observation.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 namespace nlm {
 
