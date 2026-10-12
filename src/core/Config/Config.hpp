@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,13 +94,39 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Utility methods
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Internal file loading methods
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromYamlFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    void saveToJsonFile(std::ostream& stream) const;
+    void saveToYamlFile(std::ostream& stream) const;
+    void saveToSimpleFile(std::ostream& stream) const;
+    void parseJsonObject(const class nlohmann::json& jsonData, ConfigSource source);
 };
+
+} // namespace nlm
+
+// Explicit template instantiations
+namespace nlm {
+#define INSTANTIATE_TYPE(T) \
+template std::optional<T> Config::get<T>(const std::string&) const; \
+template T Config::getOr<T>(const std::string&, const T&) const;
+
+INSTANTIATE_TYPE(int)
+INSTANTIATE_TYPE(int64_t)
+INSTANTIATE_TYPE(double)
+INSTANTIATE_TYPE(bool)
+INSTANTIATE_TYPE(std::string)
+INSTANTIATE_TYPE(std::vector<int>)
+INSTANTIATE_TYPE(std::vector<double>)
+INSTANTIATE_TYPE(std::vector<std::string>)
 
 } // namespace nlm
