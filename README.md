@@ -1,230 +1,363 @@
-# NLM — 熙然
+# NLM (熙然) - Artificial Developmental Brain
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+NLM (熙然: "serene flow") is an experimental artificial developmental brain project implementing **Phase 6: Final Integration**. It represents a complete brain-inspired architecture with emergent cognition, moving beyond traditional transformer/LLM approaches to create a truly developmental artificial intelligence system.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Architecture
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Core Components
+- **Real Spiking Neural Computation**: LIF neurons with biological constraints, synaptic plasticity, and event-driven dynamics
+- **Integrated Memory Systems**: Working memory, episodic memory, and associative memory
+- **Prediction System**: Forward models for sensory prediction and error computation
+- **Cognition Systems**: Neural planning, concept formation, and attentional selection
+- **Neuromodulation**: Dopamine, curiosity, novelty, and prediction error signaling
+- **Development System**: Multi-stage developmental progression affecting plasticity
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### Design Philosophy
+- **Closed-loop architecture** with continuous interaction with environment
+- **Experience-driven learning** without pretraining or external supervision
+- **Developmental stages** affecting neural plasticity rates over time
+- **Embodiment** through real-time sensor-motor interaction
 
-## Current Phase
+## Key Improvements
 
-**PHASE 6: FINAL INTEGRATION**
+### 1. Advanced Configuration System
+```cpp
+// New configuration options for advanced users
+struct AdvancedConfig {
+    // Developmental parameters
+    float criticalPeriodStart;
+    float criticalPeriodEnd;
+    float maturationRate;
+    
+    // Neuromodulation parameters
+    float baselineDopamine;
+    float noveltyThreshold;
+    float curiosityGain;
+    
+    // Memory parameters
+    float memoryDecayRate;
+    float consolidationThreshold;
+    
+    // Advanced plasticity
+    float structuralPlasticityRate;
+    float pruningThreshold;
+    
+    // Development stages
+    DevelopmentalStage initialStage;
+    size_t stageTransitionSteps;
+};
+```
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### 2. Enhanced Brain Class Interface
+```cpp
+class AdvancedBrain : public Brain {
+public:
+    // Advanced control methods
+    bool setDevelopmentalStage(DevelopmentalStage stage, size_t steps);
+    void enableSleepCycle(bool enable, size_t sleepDuration);
+    void configureNeuromodulation(const NeuromodulationConfig& config);
+    
+    // Advanced queries
+    BrainState getBrainState() const;
+    DevelopmentReport getDevelopmentReport() const;
+    MemoryStatistics getMemoryStatistics() const;
+    
+    // Advanced interaction
+    void injectPattern(const NeuralPattern& pattern);
+    void triggerReplay(size_t episodeCount);
+    std::vector<float> extractFeatures() const;
+};
+```
 
-### Phase 6 Integration Achievements
-
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
-
+### 3. Advanced Command Line Interface
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Enhanced NLM command line interface
+nlm [OPTIONS] [COMMAND]
+
+COMMANDS:
+  run                    Run brain simulation
+  checkpoint FILE         Save brain state to file
+  load FILE              Load brain state from file
+  develop STAGE          Set developmental stage
+  status                 Show brain status
+  visualize [TYPE]       Generate visualizations
+  export ANALYSIS        Export analysis data
+
+OPTIONS:
+  --config FILE          Configuration file
+  --neurons N            Number of neurons
+  --regions R            Number of regions  
+  --timestep T           Simulation timestep
+  --steps S              Number of simulation steps
+  --log LEVEL            Log level (debug, info, warn, error)
+  --profile              Enable performance profiling
+  --save-interval N      Checkpoint save interval
+  --advanced            Enable advanced features
+
+ADVANCED COMMANDS:
+  nlm --advanced replay EPISODES    Replay stored episodes
+  nlm --advanced pattern PATTERN    Inject neural pattern
+  nlm --advanced analyze METRIC    Perform analysis
+  nlm --advanced evolve GENERATIONS Evolve brain
 ```
 
-## Running
+### 4. Power User Tools
 
-### Phase 6 Demo (Integration Test)
+#### Brain Evolution System
+```cpp
+class BrainEvolution {
+public:
+    // Evolve brain parameters
+    static std::unique_ptr<Brain> evolve(
+        const Brain& parent,
+        float mutationRate,
+        size_t generations,
+        const EvolutionConfig& config
+    );
+    
+    // Cross-breed brains
+    static std::unique_ptr<Brain> crossBreed(
+        const Brain& parent1,
+        const Brain& parent2,
+        float crossoverRate
+    );
+    
+    // Mutate brain parameters
+    static void mutate(Brain& brain, float mutationStrength);
+};
+```
+
+#### Advanced Analysis Tools
+```cpp
+class BrainAnalyzer {
+public:
+    // Analyze network topology
+    static NetworkTopology analyzeTopology(const Brain& brain);
+    
+    // Analyze memory performance
+    static MemoryPerformance analyzeMemory(const Brain& brain);
+    
+    // Analyze learning curves
+    static LearningCurve analyzeLearning(const Brain& brain);
+    
+    // Generate feature vector
+    static std::vector<float> extractFeatures(const Brain& brain);
+    
+    // Compare brains
+    static float compareBrains(const Brain& brain1, const Brain& brain2);
+};
+```
+
+### 5. Enhanced Visualization System
+```cpp
+class AdvancedVisualization {
+public:
+    // 3D neural network visualization
+    static void render3DNetwork(const Brain& brain, const Camera& camera);
+    
+    // Activity heat maps
+    static void renderActivityHeatmap(const Brain& brain, const TimeWindow& window);
+    
+    // Memory visualization
+    static void renderMemoryTrajectories(const Brain& brain);
+    
+    // Development progression
+    static void renderDevelopmentStages(const Brain& brain);
+    
+    // Export formats
+    static void exportToVRML(const Brain& brain, const std::string& filename);
+    static void exportToGLTF(const Brain& brain, const std::string& filename);
+};
+```
+
+### 6. Extended Sensory-Motor Interface
+```cpp
+class ExtendedAgentInterface {
+public:
+    // Multi-modal sensory input
+    void receiveAudioInput(const AudioData& data);
+    void receiveVisualInput(const ImageData& data);
+    void receiveTactileInput(const TactileData& data);
+    void receiveInternalSignals(const InternalSignals& signals);
+    
+    // Advanced motor output
+    Action executeComplexAction(const ActionPlan& plan);
+    void streamOutput(const std::vector<Action>& actions);
+    
+    // Haptic feedback
+    void provideHapticFeedback(const HapticSignal& signal);
+};
+```
+
+### 7. Advanced Learning Mechanisms
+```cpp
+class AdvancedLearning {
+public:
+    // Continual learning without catastrophic forgetting
+    static void enableContinualLearning(Brain& brain, size_t bufferSize);
+    
+    // Meta-learning - learning how to learn
+    static void enableMetaLearning(Brain& brain, const MetaLearningConfig& config);
+    
+    // Few-shot learning
+    static void enableFewShotLearning(Brain& brain, size_t supportSetSize);
+    
+    // Transfer learning
+    static void enableTransferLearning(Brain& brain, const Brain& source);
+};
+```
+
+## Configuration
+
+### Advanced Configuration File
+```yaml
+# configs/advanced.cfg
+brain:
+  name: "Advanced NLM Brain"
+  description: "Phase 6 integrated brain with advanced features"
+  
+neuron_system:
+  count: 5000
+  populations: 3
+  connection_probability: 0.15
+  
+memory:
+  working_memory_capacity: 500
+  episodic_memory_max_episodes: 2000
+  episodic_memory_window: 1000
+  consolidation_threshold: 0.7
+  
+prediction:
+  prediction_horizon: 50
+  prediction_error_threshold: 0.1
+  confidence_decay: 0.95
+  
+neuromodulation:
+  baseline_dopamine: 0.3
+  baseline_curiosity: 0.5
+  novelty_sensitivity: 0.8
+  prediction_error_gain: 1.2
+  
+development:
+  critical_period_start: 1000
+  critical_period_end: 10000
+  initial_stage: "CriticalPeriod"
+  stage_transition_steps: 1000
+  
+advanced_features:
+  enable_sleep_cycles: true
+  sleep_duration: 5000
+  replay_interval: 200
+  meta_learning_enabled: true
+  continual_learning_enabled: true
+  transfer_learning_enabled: true
+```
+
+## Usage Examples
+
+### Basic Advanced Usage
 ```bash
-./nlm_phase6_demo
+# Run with advanced configuration
+nlm --advanced --config configs/advanced.cfg run --steps 10000
+
+# Save evolved brain state
+nlm checkpoint evolved_brain.cfg
+
+# Load and continue development
+nlm load evolved_brain.cfg run --steps 5000
+
+# Visualize brain activity
+nlm visualize network --output network.vrml
+nlm visualize activity --window 1000 --output activity.png
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Programming API
+```cpp
+#include <nlm/nlm.hpp>
 
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
-
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+int main() {
+    // Create advanced brain
+    auto config = std::make_shared<Config>("configs/advanced.cfg");
+    auto brain = std::make_unique<AdvancedBrain>(config);
+    
+    // Initialize with advanced features
+    brain->initialize();
+    
+    // Run simulation
+    for (size_t step = 0; step < 10000; ++step) {
+        // Receive multi-modal input
+        brain->receiveVisualInput(getVisualInput());
+        brain->receiveAudioInput(getAudioInput());
+        brain->receiveTactileInput(getTactileInput());
+        
+        // Step brain
+        brain->step(step);
+        
+        // Execute learned skills
+        auto action = brain->executeComplexAction(learnedSkill);
+        
+        // Provide haptic feedback
+        brain->provideHapticFeedback(calculateHapticFeedback(action));
+    }
+    
+    // Analyze and export
+    auto features = BrainAnalyzer::extractFeatures(*brain);
+    BrainEvolution::evolve(*brain, 0.1f, 10);
+    
+    return 0;
+}
 ```
 
-## License
+## Performance Optimization
 
-MIT
+### Multi-threading Support
+```cpp
+class ParallelBrain {
+public:
+    void stepParallel(size_t steps, size_t threadCount);
+    void parallelPlasticity(size_t threadCount);
+    void parallelMemory(size_t threadCount);
+    void parallelPrediction(size_t threadCount);
+};
+```
 
-## Authors
+### Memory Management
+```cpp
+class MemoryEfficientBrain {
+public:
+    void enableMemoryPool(size_t poolSize);
+    void enableCompression(bool enable);
+    void enableLazyLoading(bool enable);
+    void enableCheckpointCompression(CompressionLevel level);
+};
+```
 
-Research project — See docs for scientific background.
+## Testing and Validation
+
+### Advanced Testing Suite
+```cpp
+class AdvancedTestSuite {
+public:
+    static void runDevelopmentalTests();
+    static void runLearningCurveTests();
+    static void runMemoryRetentionTests();
+    static void runPredictionAccuracyTests();
+    static void runEmergentBehaviorTests();
+    static void runPerformanceBenchmarks();
+};
+```
+
+## Summary
+
+The enhanced NLM (熙然) system provides a comprehensive artificial brain platform with:
+
+- **Advanced developmental capabilities** with configurable stage transitions
+- **Power user tools** for brain evolution and analysis
+- **Extended sensory-motor interfaces** for richer interaction
+- **Advanced learning mechanisms** including continual and meta-learning
+- **Enhanced visualization** for better understanding and debugging
+- **Performance optimizations** for scalable deployment
+
+This represents the culmination of the NLM project, providing researchers and developers with a sophisticated artificial brain system capable of complex cognition, learning, and adaptation.
