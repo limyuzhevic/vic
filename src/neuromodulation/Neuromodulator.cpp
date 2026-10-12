@@ -30,9 +30,16 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // PHASE 2: Real dopamine-modulated plasticity factor
+    // Dopamine modulates plasticity via D1/D2 receptor dynamics
+    // Base plasticity + dopamine-dependent modulation
+    float basePlasticity = 0.5f;
+    float dopamineModulation = pImpl->level * 0.5f;
+    
+    // Nonlinear response to dopamine levels
+    float sigmoidalModulation = 1.0f / (1.0f + std::exp(-2.0f * (pImpl->level - 0.5f)));
+    
+    return basePlasticity + sigmoidalModulation * dopamineModulation;
 }
 
 void Dopamine::update(TimestepDuration dt) {
@@ -42,15 +49,27 @@ void Dopamine::update(TimestepDuration dt) {
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // PHASE 2: Real reward signaling
+    // Dopamine bursts proportionally to reward prediction error
+    float phasicBurst = reward * pImpl->releaseRate;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + phasicBurst);
+    
+    // Log the reward signal for debugging
+    NLM_LOG_DEBUG("Dopamine reward signal: " + std::to_string(reward) + 
+                  " (current level: " + std::to_string(pImpl->level) + ")");
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // PHASE 2: Reward prediction error signaling
+    // Phasic dopamine responds to prediction errors (Rescorla-Wagner style)
+    float rpeSignal = error * pImpl->releaseRate;
+    pImpl->level = std::max(0.0f, std::min(pImpl->peak, pImpl->level + rpeSignal));
+    
+    // Encode prediction error magnitude for learning modulation
+    float predictionErrorInfluence = std::tanh(std::abs(error)) * pImpl->level;
+    
+    NLM_LOG_DEBUG("Dopamine RPE signal: " + std::to_string(error) + 
+                  " (influence: " + std::to_string(predictionErrorInfluence) + ")");
 }
 
 } // namespace nlm

@@ -531,3 +531,5 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [API_REFERENCE.md](docs/API_REFERENCE.md) - Complete Python API reference
+- [README.md](README.md) - Project overview and setup instructions

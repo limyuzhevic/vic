@@ -292,6 +292,8 @@ print("Agent simulation complete!")
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Read `docs/API_REFERENCE.md` for complete API documentation
+4. Experiment with different configurations!
+5. Run the unit tests to understand system behavior
 
 That's it! You're now ready to use NLM.
