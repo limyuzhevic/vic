@@ -28,19 +28,27 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Environment
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Configuration diff
+struct ConfigDiff {
+    struct ValueDiff {
+        std::string key;
+        ConfigValue oldValue;
+        ConfigValue newValue;
+        
+        ValueDiff() : key(), oldValue(), newValue() {}
+        ValueDiff(const std::string& k, const ConfigValue& old, const ConfigValue& newVal)
+            : key(k), oldValue(old), newValue(newVal) {}
+    };
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    std::vector<ValueDiff> differences;
+    std::vector<std::string> onlyInFirst;
+    std::vector<std::string> onlyInSecond;
+    
+    ConfigDiff() : differences(), onlyInFirst(), onlyInSecond() {}
 };
 
 // Main configuration class
@@ -92,6 +100,21 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Set default agent brain sensory dimensions
+    void setVisionDimensions(size_t width, size_t height);
+    void setTouchCount(size_t count);
+    void setInternalSignalCount(size_t count);
+    void setProprioceptionCount(size_t count);
+    void setMotorActionCount(size_t count);
+    
+    // Get agent brain sensory dimensions
+    size_t getVisionWidth() const;
+    size_t getVisionHeight() const;
+    size_t getTouchCount() const;
+    size_t getInternalSignalCount() const;
+    size_t getProprioceptionCount() const;
+    size_t getMotorActionCount() const;
     
 private:
     struct Impl;

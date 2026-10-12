@@ -35,7 +35,15 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
-    # Dynamics
+    src/brain/MemoryPoolManager.cpp
+    src/brain/BrainAdapter.cpp
+    src/brain/BrainAdapter.hpp
+    src/brain/MemoryPoolManager.cpp
+    src/brain/MemoryPoolManager.hpp
+    src/brain/OptimizedBrain.cpp
+    src/brain/OptimizedBrain.hpp
+    src/brain/MemoryPool.cpp
+    src/brain/MemoryPool.hpp
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
     # Plasticity
@@ -83,11 +91,21 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
+    src/experiments/ResearchMetrics.cpp
+    src/experiments/ResearchTools.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    # Visualization - added advanced visualization system
     src/visualization/VisualizationInterface.cpp
+    src/visualization/NLMLiveVisualization.cpp
+    # Phase 6 experiments
+    # Performance implementations
+    src/performance/EventSystem.cpp
+    src/performance/ConnectivityManager.cpp
+    src/performance/SIMDProcessor.cpp
+    src/performance/CompleteCheckpointSystem.cpp
+    # Phase 6 experiments
+    src/experiments/Phase6IntegratedExperiment.cpp
 )
-
-target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
@@ -96,6 +114,11 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/SensoryTransduction.cpp
+    src/agent/MotorDecoder.cpp
+    src/agent/Neuromodulator.cpp
+    src/agent/Developer.cpp
+    src/agent/ExplorationAgent.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)

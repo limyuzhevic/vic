@@ -39,7 +39,7 @@ public:
         brain->initialize();
         
         // Create agent brain interface
-        AgentBrain agentBrain(brain);
+        AgentBrain agentBrain(brain, config);  // New constructor with config
         agentBrain.initialize(world);
         
         // Configure agent brain
