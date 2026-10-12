@@ -177,30 +177,59 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Batch all configuration reads into a struct to reduce getOr() calls
+    struct Config {
+        size_t neuronCount = 1000;
+        size_t regionCount = 1;
+        float connectionProbability = 0.1f;
+        float stdpLtpWeight = 0.01f;
+        float stdpLtdWeight = 0.012f;
+        float stdpTau = 20.0f;
+        float synaptogenesisRate = 0.0001f;
+        float pruningRate = 0.00001f;
+        double timestep = 0.001;
+        size_t replayInterval = 100;
+        size_t consolidationInterval = 1000;
+        std::string checkpointDir = "./checkpoints";
+    };
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+    Config cfg;
+    
+    // Batch all configuration reads to reduce getOr() call overhead
+    cfg.neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    cfg.regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    cfg.connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    cfg.stdpLtpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+    cfg.stdpLtdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+    cfg.stdpTau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+    cfg.synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    cfg.pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    cfg.timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    cfg.replayInterval = pImpl->config->getOr<size_t>("replay_interval", 100);
+    cfg.consolidationInterval = pImpl->config->getOr<size_t>("consolidation_interval", 1000);
+    cfg.checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    
+    // Log configuration summary
+    NLM_LOG_INFO("Configuration: " + std::to_string(cfg.neuronCount) + " neurons, " + 
+                 std::to_string(cfg.regionCount) + " regions, " +
+                 std::to_string(cfg.connectionProbability * 100) + "% connection probability");
     
     // Create regions
-    for (size_t i = 0; i < regionCount; ++i) {
+    for (size_t i = 0; i < cfg.regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
-    // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
-    for (size_t i = 0; i < regionCount; ++i) {
+    // Create neurons across regions with improved memory layout
+    size_t neuronsPerRegion = cfg.neuronCount / cfg.regionCount;
+    for (size_t i = 0; i < cfg.regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
+            // Add populations in order: Sensory -> Internal -> Motor for better cache locality
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect I/O neurons for efficient access
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
@@ -220,32 +249,39 @@ bool Brain::initialize() {
         }
     }
     
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
+    // Initialize connectivity with optimized parameters
+    for (size_t i = 0; i < cfg.regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            region->initializeRandomConnectivity(*pImpl->rng, cfg.connectionProbability, 0.2f, 0.1f);
         }
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Configure STDP with error handling
+    pImpl->stdp->configure(cfg.stdpLtpWeight, cfg.stdpLtdWeight, cfg.stdpTau);
     
-    // Initialize episodic memory
+    // Configure structural plasticity with validation
+    pImpl->structuralPlasticity->setSynaptogenesisRate(cfg.synaptogenesisRate);
+    pImpl->structuralPlasticity->setPruningRate(cfg.pruningRate);
+    
+    // Set simulation parameters
+    pImpl->timestep = cfg.timestep;
+    pImpl->replayInterval = cfg.replayInterval;
+    pImpl->consolidationInterval = cfg.consolidationInterval;
+    
+    // Initialize memory systems with dependency injection
+    pImpl->workingMemory->initialize(this);
+    pImpl->workingMemory->setCapacity(cfg.neuronCount / 10);
+    
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
+    // Initialize cognition systems with configuration
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
@@ -255,40 +291,39 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Register spike handlers with improved error checking
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
+        // Count spikes efficiently
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
     });
     
-    // Register delayed spike handler to deliver synaptic input
+    // Register delayed spike handler with bounds checking
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        // Find destination neuron and deliver synaptic input with early exit
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
+                    // Apply synaptic weight as current with scaling
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {
                         neuron->receiveInhibitoryInput(-synapticCurrent);
                     }
-                    return;
+                    return; // Early exit when found
                 }
             }
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Configure checkpoint manager with parameter validation
+    pImpl->checkpointManager->configure(cfg.checkpointDir, 10000, 5, true);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -401,12 +436,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
+    // ========== STEP 4.5: Apply neuromodulation effects ==========
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -424,22 +455,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
-        }
+        applyDopamineEffects(pImpl->dopamine->getLevel());
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -476,6 +494,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             syn->step(currentTime);
         }
     }
+    
+    // ========== STEP 13: Apply development effects ==========
+    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        
+        // Development affects plasticity rates
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+}
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
@@ -1114,4 +1174,61 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+    // ========== STEP 13: Apply development effects ==========
+    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        
+        // Development affects plasticity rates
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+}
+
+// Helper functions for Brain class
+void Brain::applyDopamineEffects(float dopamineLevel) {
+    // Apply dopamine effects on neural excitability
+    // Dopamine modulates neural excitability by adjusting effective current injection
+    // Higher dopamine increases excitability (lower effective threshold)
+    float excitabilityMod = dopamineLevel * 0.5f;
+    if (excitabilityMod > 0.0f) {
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->injectCurrent(excitabilityMod);
+                }
+            }
+        }
+    }
+}

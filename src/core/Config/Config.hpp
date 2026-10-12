@@ -93,6 +93,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
