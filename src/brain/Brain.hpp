@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -19,6 +20,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -28,6 +31,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -139,14 +146,24 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - knowledge representation (Phase 6 enhancement)
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits (Phase 6 enhancement)
+    ProceduralMemory* getProceduralMemory();
+    
+    // Get all memory systems for integrated access
+    const NeuralWorkingMemory* getWorkingMemory() const;
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
+    const SemanticMemory* getSemanticMemory() const;
+    const ProceduralMemory* getProceduralMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
