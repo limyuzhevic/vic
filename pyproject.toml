@@ -12,7 +12,7 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "neuroscience", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,6 +25,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dependencies = []
@@ -33,6 +35,26 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.8",
+    "matplotlib>=3.5",
+    "jupyter>=1.0",
+]
+
+[project.optional-dependencies]
+research = [
+    "pandas>=1.5",
+    "scikit-learn>=1.2",
+    "networkx>=2.8",
+    "plotly>=5.0",
+    "jinja2>=3.0",
+    "importlib-metadata>=4.0",
+]
+
+[project.optional-dependencies]
+benchmark = [
+    "memory_profiler>=0.5",
+    "psutil>=5.8",
+    "snakeviz>=2.1",
 ]
 
 [project.urls]

@@ -524,6 +524,407 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+## Part 6: Enhanced Python Bindings for Research
+
+### Overview of Enhanced Bindings
+
+NLM now provides enhanced Python bindings through the `pynlm_enhanced` module that significantly expands the research capabilities of the NLM framework. This enhanced version includes:
+
+- Advanced neuromodulation system APIs
+- Memory systems direct access
+- Prediction system for predictive coding research
+- Cognition and development system APIs
+- Performance profiling and analysis tools
+- Configuration validation and schema system
+- Research utilities for batch experiments and statistical analysis
+
+### Installing Enhanced Bindings
+
+```bash
+# Install the enhanced bindings (includes original pynlm)
+pip install -e .
+
+# Or install specific optional dependencies for research
+pip install pynlm[research]
+
+# For performance analysis
+pip install pynlm[benchmark]
+
+# For development and debugging
+pip install pynlm[dev]
+```
+
+### Key Enhanced Classes
+
+#### EnhancedConfig
+The `EnhancedConfig` class provides configuration validation and type-safe access:
+
+```python
+import pynlm_enhanced
+
+# Create enhanced configuration with validation
+config = pynlm_enhanced.createEnhancedConfig()
+config.setNeuronCount(1000)
+config.setConnectionProbability(0.1)
+
+# Validate configuration
+if config.validate():
+    print("Configuration is valid")
+else:
+    print("Configuration has errors")
+
+# Get configuration schema
+print(config.getSchema())
+```
+
+#### PerformanceProfiler
+Track simulation performance for optimization:
+
+```python
+import pynlm_enhanced
+
+# Create and start profiler
+profiler = pynlm_enhanced.PerformanceProfiler()
+profiler.start()
+
+# Run simulation steps
+for step in range(100):
+    brain.step(step)
+    profiler.step()
+
+# Stop and analyze
+profiler.stop()
+metrics = profiler.getMetrics()
+
+print(f"Average step time: {profiler.getAverageStepTime():.3f}ms")
+print(f"Min step time: {profiler.getMinStepTime():.3f}ms")
+print(f"Max step time: {profiler.getMaxStepTime():.3f}ms")
+print(f"Total spikes: {metrics.spikeCount}")
+```
+
+#### Research Utilities
+Batch processing and statistical analysis for research:
+
+```python
+import pynlm_enhanced
+from pynlm_enhanced import ResearchUtilities
+
+# Run batch experiments
+def run_experiment_config(neuron_count, plasticity):
+    config = pynlm_enhanced.createEnhancedConfig()
+    config.setNeuronCount(neuron_count)
+    return config
+
+configs = [
+    run_experiment_config(500, True),
+    run_experiment_config(1000, True),
+    run_experiment_config(2000, False)
+]
+
+# Run batch experiments
+results = pynlm_enhanced.ResearchUtilities.runBatchExperiments(configs)
+
+# Statistical analysis
+data = [result.totalReward for result in results]
+stats = pynlm_enhanced.ResearchUtilities.computeStatistics(data)
+print(f"Reward statistics: mean={stats['mean']:.3f}, std={stats['stddev']:.3f}")
+```
+
+#### Brain Research APIs
+Direct access to brain systems for research:
+
+```python
+import pynlm_enhanced
+
+# Enhanced brain operations
+brain_stats = brain.analyzeNeuralActivity()
+print("Neural activity analysis:")
+for key, value in brain_stats.items():
+    print(f"  {key}: {value}")
+
+# Store experiences for memory research
+brain.storeExperience(sensory_pattern, action_pattern, reward)
+
+# Control developmental stages
+brain.advanceDevelopmentStage(pynlm_enhanced.DevelopmentalStage.Maturation)
+```
+
+### Research Examples
+
+#### Example 1: Neuromodulation Research
+```python
+import pynlm_enhanced
+
+# Create research-ready brain
+brain = pynlm_enhanced.createResearchBrain(500, True)
+world = pynlm_enhanced.createSimpleWorld()
+world.configure(20, 20, 8, 8)
+agent = pynlm_enhanced.createAgentForResearch(brain, world)
+
+# Enable neuromodulation for research
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Conduct neuromodulation experiment
+brain.conductNeuromodulationExperiment("dopamine_reward", 1.0)
+brain.conductNeuromodulationExperiment("curiosity_drive", 0.5)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+#### Example 2: Memory Research
+```python
+import pynlm_enhanced
+
+# Create brain for memory research
+brain = pynlm_enhanced.createResearchBrain(1000, True)
+
+# Store experiences for memory analysis
+for step in range(50):
+    pattern = [float(i % 10) / 10.0 for i in range(10)]
+    brain.storeExperience(pattern, pattern, 0.5)
+    brain.step(step)
+
+# Analyze memory storage
+working_memory = brain.getWorkingMemory()
+if working_memory:
+    print(f"Working memory capacity: {working_memory.getCapacity()}")
+    print(f"Current traces: {working_memory.getCurrentSize()}")
+```
+
+#### Example 3: Performance Optimization
+```python
+import pynlm_enhanced
+
+# Create brain and profiler
+brain = pynlm_enhanced.createResearchBrain(2000, True)
+profiler = pynlm_enhanced.PerformanceProfiler()
+
+# Profile different configurations
+configs = [
+    {"neuron_count": 500, "plasticity": True},
+    {"neuron_count": 1000, "plasticity": True},
+    {"neuron_count": 2000, "plasticity": False}
+]
+
+for config in configs:
+    print(f"\nTesting {config['neuron_count']} neurons...")
+    brain = pynlm_enhanced.createResearchBrain(config['neuron_count'], config['plasticity'])
+    
+    profiler.start()
+    for step in range(50):
+        brain.step(step)
+        profiler.step()
+    profiler.stop()
+    
+    print(f"Performance: {profiler.getAverageStepTime():.3f}ms per step")
+    profiler.reset()
+```
+
+#### Example 4: Batch Experiment Analysis
+```python
+import pynlm_enhanced
+
+# Create multiple configurations for batch analysis
+base_config = pynlm_enhanced.createEnhancedConfig()
+configs = []
+
+# Generate parameter space
+for neuron_count in [100, 500, 1000]:
+    for plasticity in [True, False]:
+        config = pynlm_enhanced.createEnhancedConfig()
+        config.setNeuronCount(neuron_count)
+        configs.append(config)
+
+# Run batch experiment
+print("Running batch experiments...")
+results = pynlm_enhanced.ResearchUtilities.runBatchExperiments(configs)
+
+# Analyze results
+rewards = [result.totalReward for result in results]
+firing_rates = [result.avgFiringRate for result in results]
+
+stats = pynlm_enhanced.ResearchUtilities.computeStatistics(rewards)
+print(f"\n=== Batch Experiment Results ===")
+print(f"Average reward: {stats['mean']:.3f} ± {stats['stddev']:.3f}")
+print(f"Average firing rate: {sum(firing_rates)/len(firing_rates):.3f}")
+
+# Export for external analysis
+pynlm_enhanced.exportForAnalysis(brain, "batch_results.csv")
+```
+
+### Migration Guide
+
+#### From Original to Enhanced API
+
+**Original pynlm (unchanged):**
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+```
+
+**Enhanced pynlm_enhanced:**
+```python
+import pynlm_enhanced
+
+# Same basic functionality, plus enhanced features
+brain = pynlm_enhanced.createBrain(pynlm_enhanced.createEnhancedConfig())
+brain.initialize()
+
+# Access enhanced features
+profiler = pynlm_enhanced.PerformanceProfiler()
+metrics = brain.analyzeNeuralActivity()
+```
+
+** Gradual Migration:**
+```python
+# Start with enhanced API (includes original functionality)
+import pynlm_enhanced as pynlm
+
+# Use enhanced features
+config = pynlm.createEnhancedConfig()
+config.setNeuronCount(500)
+
+brain = pynlm.createBrain(config.getInternalConfig())
+brain.initialize()
+
+# Your existing code works unchanged
+# Plus new research capabilities
+profiler = pynlm.PerformanceProfiler()
+profiler.start()
+for step in range(100):
+    brain.step(step)
+    profiler.step()
+profiler.stop()
+```
+
+### Advanced Research Features
+
+#### Concept Formation Research
+```python
+import pynlm_enhanced
+
+brain = pynlm_enhanced.createResearchBrain(1000, True)
+
+# Access concept formation (if available)
+if hasattr(brain, 'getConceptFormation'):
+    concept_formation = brain.getConceptFormation()
+    
+    # Present experiences to concept formation
+    for step in range(50):
+        pattern = [float(i % 10) / 10.0 for i in range(10)]
+        features = [1.0, 2.0, 3.0]  # Example features
+        reward = 0.5
+        concept_id = concept_formation.presentExperience(pattern, features, reward, step)
+        
+        if concept_id > 0:
+            print(f"New concept discovered: ID {concept_id}")
+```
+
+#### Prediction Research
+```python
+import pynlm_enhanced
+
+brain = pynlm_enhanced.createResearchBrain(500, True)
+
+# Access prediction system (if available)
+if hasattr(brain, 'getPredictionSystem'):
+    prediction_system = brain.getPredictionSystem()
+    
+    # Make predictions and analyze prediction error
+    for step in range(50):
+        # Get current state
+        sensory_input = brain.getCurrentSensoryInput()
+        
+        # Make prediction
+        prediction = prediction_system.predictNextState(sensory_input)
+        
+        # Get prediction error
+        error = prediction_system.getPredictionError()
+        confidence = prediction_system.getConfidence()
+        
+        print(f"Prediction error: {error:.3f}, Confidence: {confidence:.3f}")
+```
+
+#### Development Research
+```python
+import pynlm_enhanced
+
+brain = pynlm_enhanced.createResearchBrain(200, True)
+
+# Study developmental stages
+for stage in pynlm_enhanced.DevelopmentalStage:
+    brain.advanceDevelopmentStage(stage)
+    print(f"Current stage: {stage}, Firing rate: {brain.getAverageFiringRate():.3f}")
+    
+    # Run experiment at each stage
+    for step in range(20):
+        brain.step(step)
+```
+
+### Performance Considerations
+
+#### Memory Profiling
+```python
+import pynlm_enhanced
+import psutil
+import os
+
+process = psutil.Process(os.getpid())
+
+brain = pynlm_enhanced.createResearchBrain(1000, True)
+profiler = pynlm_enhanced.PerformanceProfiler()
+
+profiler.start()
+for step in range(100):
+    brain.step(step)
+    profiler.step()
+    
+    # Monitor memory usage
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    print(f"Step {step}: Memory usage: {memory_mb:.2f} MB")
+
+profiler.stop()
+metrics = profiler.getMetrics()
+print(f"Peak memory: {memory_mb:.2f} MB")
+```
+
+#### Data Export for External Analysis
+```python
+import pynlm_enhanced
+
+brain = pynlm_enhanced.createResearchBrain(500, True)
+world = pynlm_enhanced.createSimpleWorld()
+world.configure(10, 10, 8, 8)
+agent = pynlm_enhanced.createAgentForResearch(brain, world)
+
+# Run experiment and collect data
+experiment_data = []
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    # Collect neural activity data
+    activity = brain.analyzeNeuralActivity()
+    activity['step'] = step
+    activity['world_time'] = world.getSimulationTime()
+    experiment_data.append(activity)
+
+# Export for analysis
+pynlm_enhanced.exportForAnalysis(brain, "experiment_data.csv", "csv")
+```
+
 ---
 
 ## Further Reading
