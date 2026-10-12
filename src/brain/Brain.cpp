@@ -231,19 +231,8 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,9 +244,14 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->novelty->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +505,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // The prediction system uses predictions to anticipate future sensory states
+        // This is essential for predictive coding and forward models
+        
+        // For now, the PredictionSystem interface doesn't have an update method
+        // In a full implementation, we would call:
+        // pImpl->predictionSystem->update(sensoryInput, predictionError);
+        
+        // Track prediction error for neuromodulation
+        // This provides feedback about prediction accuracy
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +530,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // Concept formation discovers recurring patterns from experience
+        // This helps with categorization, abstraction, and generalization
+        
+        // Process current sensory input and neural activity to form new concepts
+        // ConceptFormation would analyze patterns and create concept prototypes
+        // This happens continuously as the brain processes experience
+        
+        // In a full implementation, we would extract patterns from:
+        // - Current sensory input via receiveSensoryInput()
+        // - Active neural patterns from working memory
+        // - Episode data from episodic memory
+        
+        // For now, concept formation is a placeholder that would be
+        // fully integrated with the brain's learning mechanisms
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

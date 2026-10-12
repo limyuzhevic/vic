@@ -3,16 +3,30 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <memory>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
+class Brain;
+class SensoryInput;
+
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize prediction system with brain reference
+    void initialize(Brain* brain);
+    
+    // Update prediction system with current state
+    // This is called during each brain step to update predictions
+    void update(const Brain* brain, SimulationStep currentStep, Timestamp currentTime);
+    
+    // Set the current sensory input for prediction
+    void setCurrentInput(const SensoryInput& input);
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
@@ -37,6 +51,9 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    std::unique_ptr<SensoryInput> currentInput_;
 };
 
 } // namespace nlm

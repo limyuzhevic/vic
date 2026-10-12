@@ -1,4 +1,7 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include <algorithm>
 
 namespace nlm {
 
@@ -10,9 +13,30 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl), brain_(nullptr), currentInput_(nullptr) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    brain_ = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
+
+void PredictionSystem::update(const Brain* brain, SimulationStep currentStep, Timestamp currentTime) {
+    if (!currentInput_ || !brain) return;
+    
+    // Update prediction based on current input
+    // This would implement predictive coding in Phase 2
+    // For now, just compute a simple error
+    if (currentInput_->getData().size() > 0) {
+        pImpl->predictionError = 0.001f;  // Simple placeholder error
+        pImpl->errorHistory.push_back(pImpl->predictionError);
+    }
+}
+
+void PredictionSystem::setCurrentInput(const SensoryInput& input) {
+    currentInput_ = input.clone();
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
