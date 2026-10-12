@@ -64,7 +64,8 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+Synapse::Synapse(Synapse&& other) noexcept {
+    pImpl = other.pImpl;
     other.pImpl = nullptr;
 }
 

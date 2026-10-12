@@ -161,14 +161,21 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+Brain::Brain(Brain&& other) noexcept {
+    // Move ownership of all resources
+    pImpl = other.pImpl;
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Delete current resources
         delete pImpl;
+        
+        // Move ownership
         pImpl = other.pImpl;
+        
+        // Set source to nullptr to prevent double deletion
         other.pImpl = nullptr;
     }
     return *this;

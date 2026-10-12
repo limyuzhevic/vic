@@ -71,6 +71,11 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
