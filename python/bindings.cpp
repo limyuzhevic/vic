@@ -348,7 +348,6 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
@@ -385,8 +384,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             "Get the underlying brain as a shared_ptr")
+        .def("getBrainPtr", [](const AgentBrain& self) {
+            return self.getBrainRaw();
+        }, "Get raw brain pointer (unsafe, for internal use)")
+        .def("getBrainConfig", [](const AgentBrain& self) {
+            return self.getBrain()->getConfig();
+        }, "Get brain configuration")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,

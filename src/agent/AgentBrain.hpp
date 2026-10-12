@@ -56,7 +56,10 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    std::shared_ptr<Brain> getBrain() const { return brain_; }
+    
+    // Get raw brain pointer (for internal use only)
+    Brain* getBrainRaw() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

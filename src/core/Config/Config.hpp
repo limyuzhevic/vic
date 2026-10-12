@@ -1,46 +1,74 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+// Forward declarations
+class ConfigValidator;
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+// Configuration validation result
+struct ConfigValidationResult {
+    bool valid;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    ConfigValidationResult() : valid(true) {}
+    
+    void addError(const std::string& error) {
+        valid = false;
+        errors.push_back(error);
+    }
+    
+    void addWarning(const std::string& warning) {
+        warnings.push_back(warning);
+    }
+    
+    std::string getSummary() const {
+        std::ostringstream oss;
+        if (!valid) {
+            oss << "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                oss << "  ERROR: " << error << "\n";
+            }
+        }
+        if (!warnings.empty()) {
+            oss << "Warnings:\n";
+            for (const auto& warning : warnings) {
+                oss << "  WARNING: " << warning << "\n";
+            }
+        }
+        if (valid && warnings.empty()) {
+            oss << "Configuration is valid.\n";
+        }
+        return oss.str();
+    }
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Required configuration keys validation
+class ConfigValidator {
+public:
+    // Validate configuration against a set of required keys
+    static ConfigValidationResult validateRequiredKeys(const Config& config, 
+        const std::vector<std::string>& requiredKeys);
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    // Validate configuration value types against schema
+    static ConfigValidationResult validateTypes(const Config& config,
+        const std::unordered_map<std::string, std::type_index>& schema);
+    
+    // Validate configuration values against constraints
+    static ConfigValidationResult validateConstraints(const Config& config,
+        const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& constraints);
+    
+    // Validate configuration values range
+    static ConfigValidationResult validateRanges(const Config& config,
+        const std::unordered_map<std::string, std::pair<double, double>>& ranges);
+    
+    // Validate that configuration has no missing dependencies
+    static ConfigValidationResult validateDependencies(const Config& config,
+        const std::unordered_map<std::string, std::vector<std::string>>& dependencies);
+    
+    // Comprehensive validation
+    static ConfigValidationResult validate(const Config& config,
+        const std::vector<std::string>& requiredKeys = {},
+        const std::unordered_map<std::string, std::type_index>& schema = {},
+        const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& constraints = {});
 };
 
 // Main configuration class
@@ -93,6 +121,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    ConfigValidationResult validate(const std::vector<std::string>& requiredKeys = {}) const;
+    ConfigValidationResult validateTypes(const std::unordered_map<std::string, std::type_index>& schema) const;
+    ConfigValidationResult validateConstraints(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& constraints) const;
+    
+    // Merge configuration from another config (runtime overrides)
+    void merge(const Config& other);
+    
+    // Get configuration by source
+    std::vector<ConfigEntry> getEntries(ConfigSource source) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +140,30 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Validation helper functions
+namespace ConfigValidation {
+    // Validate configuration type
+    bool validateType(const ConfigValue& value, const std::type_index& expectedType);
+    
+    // Validate string configuration
+    bool validateString(const std::string& value, size_t minLength = 0, size_t maxLength = std::numeric_limits<size_t>::max());
+    
+    // Validate numeric configuration
+    bool validateNumber(const ConfigValue& value, double min = std::numeric_limits<double>::lowest(), 
+                       double max = std::numeric_limits<double>::max());
+    
+    // Validate boolean configuration
+    bool validateBoolean(const ConfigValue& value);
+    
+    // Validate array configuration
+    bool validateArray(const ConfigValue& value, size_t minSize = 0, size_t maxSize = std::numeric_limits<size_t>::max());
+    
+    // Validate configuration path
+    bool validatePath(const std::string& path);
+    
+    // Sanitize configuration key
+    std::string sanitizeKey(const std::string& key);
+}
 
 } // namespace nlm

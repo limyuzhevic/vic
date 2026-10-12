@@ -62,7 +62,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        if (agent.getBrainRaw()->getRegions().size() == 0) {
+            NLM_LOG_ERROR("No brain regions available for observation");
+            break;
+        }
+        SensoryPercept percept = world.observe(agent.getBrainRaw()->getRegions()[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +78,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(agent.getBrainRaw()->getRegions()[0].get(), cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(agent.getBrainRaw()->getRegions()[0].get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -108,24 +112,106 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    result.endTime = time(nullptr);
+    auto endWall = std::chrono::high_resolution_clock::now();
+    result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    // Complete integration verification - test all systems on the running brain
+    NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    bool integrationSuccess = true;
+    
+    // Test 1: Memory systems exist and are connected
+    if (brain->getWorkingMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Working memory is integrated");
+        result.memoryWorkingMemoryIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
+        integrationSuccess = false;
+        result.memoryWorkingMemoryIntegrated = false;
+    }
+    
+    if (brain->getEpisodicMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Episodic memory is integrated");
+        result.memoryEpisodicMemoryIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
+        integrationSuccess = false;
+        result.memoryEpisodicMemoryIntegrated = false;
+    }
+    
+    // Test 2: Neuromodulation systems exist
+    if (brain->getDopamine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
+        result.neuromodulationIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
+        integrationSuccess = false;
+        result.neuromodulationIntegrated = false;
+    }
+    
+    if (brain->getCuriosity() != nullptr) {
+        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
+        result.curiosityIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        integrationSuccess = false;
+        result.curiosityIntegrated = false;
+    }
+    
+    // Test 3: Prediction system exists
+    if (brain->getPredictionSystem() != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+        result.predictionIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        integrationSuccess = false;
+        result.predictionIntegrated = false;
+    }
+    
+    // Test 4: Cognition systems exist
+    if (brain->getPlanner() != nullptr) {
+        NLM_LOG_INFO("[PASS] Planner is integrated");
+        result.plannerIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
+        integrationSuccess = false;
+        result.plannerIntegrated = false;
+    }
+    
+    if (brain->getConceptFormation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Concept formation is integrated");
+        result.conceptFormationIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
+        integrationSuccess = false;
+        result.conceptFormationIntegrated = false;
+    }
+    
+    if (brain->getAttention() != nullptr) {
+        NLM_LOG_INFO("[PASS] Attention is integrated");
+        result.attentionIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        integrationSuccess = false;
+        result.attentionIntegrated = false;
+    }
+    
+    // Test 5: Development system exists
+    if (brain->getDevelopmentSystem() != nullptr) {
+        NLM_LOG_INFO("[PASS] Development system is integrated");
+        result.developmentIntegrated = true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
+        integrationSuccess = false;
+        result.developmentIntegrated = false;
+    }
+    
+    NLM_LOG_INFO("=== Integration Verification Complete ===");
+    NLM_LOG_INFO("Overall integration status: " + std::string(integrationSuccess ? "SUCCESS" : "FAILED"));
     
     // Test checkpointing
+    if (config.enableCheckpointing) {
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
         if (brain->save(config.checkpointPath)) {

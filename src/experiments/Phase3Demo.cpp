@@ -132,7 +132,7 @@ public:
             metrics.finalCuriosity = agentBrain.getCuriosityLevel();
             metrics.finalEnergy = world.getAgentBody().energy;
             metrics.predictionError = agentBrain.getPredictionError();
-            metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
+            metrics.developmentalAge = agentBrain.getBrainRaw()->getTotalSynapseCount();  // Use as proxy
             metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
             metrics.totalSynapses = brain->getTotalSynapseCount();
             metrics.averageFiringRate = brain->getAverageFiringRate();

@@ -74,7 +74,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Curiosity: " << (result.curiosityIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Planner: " << (result.plannerIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Concept Formation: " << (result.conceptFormationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Attention: " << (result.attentionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
     std::cout << std::endl;
