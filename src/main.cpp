@@ -324,7 +324,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6: Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,31 +332,68 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
+    NLM_LOG_INFO("Integrating all existing systems into a coherent artificial brain.");
+    NLM_LOG_INFO("This is the final Phase 6 integration demo.");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Create Phase 6 integrated experiment
+    NLM_LOG_INFO("Creating Phase 6 integration experiment...");
+    Phase6IntegratedExperiment experiment;
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    // Configure for demo
+    Phase6Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    
+    // Run the complete integration demo
+    NLM_LOG_INFO("Running Phase 6 integration demo...");
+    Phase6IntegrationResult result = experiment.run(config);
+    
+    // Print results
+    std::cout << "\n=== PHASE 6 INTEGRATION RESULTS ===\n";
+    std::cout << "Total Reward (avg per step): " << result.totalReward << "\n";
+    std::cout << "Average Firing Rate: " << result.avgFiringRate << " Hz\n";
+    std::cout << "Episodes Stored: " << result.memoryEpisodesStored << "\n";
+    std::cout << "Dopamine Level: " << result.dopamineLevel << "\n";
+    std::cout << "Wall Clock Time: " << result.totalWallClockTime << " s\n\n";
+    
+    std::cout << "=== INTEGRATION STATUS ===\n";
+    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED ✓" : "DISCONNECTED ✗") << "\n";
+    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED ✓" : "DISCONNECTED ✗") << "\n";
+    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED ✓" : "DISCONNECTED ✗") << "\n";
+    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED ✓" : "DISCONNECTED ✗") << "\n";
+    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED ✓" : "DISCONNECTED ✗") << "\n";
+    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING ✓" : "NOT WORKING ✗") << "\n\n";
+    
+    // Summary
+    std::cout << "=== FINAL ASSESSMENT ===\n";
+    int integrationCount = (result.memoryWorkingMemoryIntegrated ? 1 : 0) +
+                          (result.memoryEpisodicMemoryIntegrated ? 1 : 0) +
+                          (result.neuromodulationIntegrated ? 1 : 0) +
+                          (result.predictionIntegrated ? 1 : 0) +
+                          (result.developmentIntegrated ? 1 : 0);
+    
+    if (integrationCount >= 4) {
+        std::cout << "✓ PHASE 6 SUCCESS: Most systems are integrated and working together.\n";
+        std::cout << "The NLM brain is now a functioning artificial neural substrate.\n";
+    } else {
+        std::cout << "! PHASE 6 NEEDS WORK: Some systems may not be fully integrated.\n";
+        std::cout << "Further development may be needed for full integration.\n";
     }
     
-    // Load config from file (ignore if not found)
+    if (result.checkpointingWorks) {
+        std::cout << "✓ Checkpoint system is working for persistence.\n";
+    }
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Phase 6 Integration Complete ===");
+    
+    return 0;
+}
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {

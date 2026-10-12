@@ -6,7 +6,7 @@
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
+NLM IS NOT:
 - A transformer or LLM
 - A chatbot
 - A deep learning model
@@ -88,13 +88,6 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
@@ -115,42 +108,6 @@ NLM/
 ```
 
 ## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop

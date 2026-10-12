@@ -128,21 +128,25 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
+        std::string checkpointPath = config.checkpointPath.empty() ? "./checkpoint_test.bin" : config.checkpointPath;
+        
+        if (brain->save(checkpointPath)) {
+            NLM_LOG_INFO("Checkpoint saved successfully to: " + checkpointPath);
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
+            if (brain2->initialize()) {
+                if (brain2->load(checkpointPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint - possibly corrupted or incompatible version");
+                }
             } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+                NLM_LOG_ERROR("Failed to initialize second brain for checkpoint loading");
             }
         } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
+            NLM_LOG_ERROR("Failed to save checkpoint to " + checkpointPath);
         }
     }
     
