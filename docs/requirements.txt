@@ -1,0 +1,13 @@
+# docs/requirements.txt
+
+**Python dependencies for documentation generation**
+
+```
+mkdocs==1.5.3
+mkdocs-material==9.4.8
+mkdocstrings-python==1.7.0
+mermaid2==0.6.2
+PyYAML==6.0
+pillow==10.2.0
+pymdown-extensions==10.2
+```

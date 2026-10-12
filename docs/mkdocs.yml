@@ -1,0 +1,88 @@
+# NLM Documentation Generation Tools
+
+**Automated documentation generation for NLM**
+
+## Overview
+
+This document describes the NLM documentation generation infrastructure, including configuration, generation tools, and integration with the build system. The documentation generation system supports multiple formats and integrates with CI/CD pipelines.
+
+## Documentation Generation Overview
+
+NLM uses a comprehensive documentation generation system that:
+
+1. **Extracts API documentation** from source code using docstrings and comments
+2. **Generates multiple formats** (Markdown, HTML, PDF)
+3. **Integrates with build system** for automated generation
+4. **Supports continuous integration** for documentation updates
+5. **Provides consistency checks** and validation
+
+## Configuration Files
+
+### docs/mkdocs.yml
+
+```yaml
+# docs/mkdocs.yml - MkDocs configuration for web-based documentation
+
+site_name: NLM - Neural Learning Machine
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting_started/quick_start.md
+    - Installation: getting_started/installation.md
+    - Basic Usage: getting_started/basic_usage.md
+  - Python API:
+    - API Reference: api_reference/api_index.md
+    - Configuration: api_reference/config.md
+    - Brain Class: api_reference/brain.md
+    - AgentBrain Class: api_reference/agent_brain.md
+    - SimpleWorld Class: api_reference/simple_world.md
+  - Examples:
+    - Basic Examples: examples/example_index.md
+    - Advanced Examples: examples/advanced_examples.md
+  - Architecture:
+    - System Design: architecture/architecture_index.md
+    - Component Details: architecture/components.md
+    - Performance: architecture/performance.md
+  - Development:
+    - Contribution Guide: development/contribution.md
+    - Testing: development/testing.md
+    - Building: development/building.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - search.highlight
+    - search.share
+
+plugins:
+  - search
+  - mermaid2
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [python]
+          selection:
+            - pynlm
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.emoji
+  - pymdownx.magiclink
+  - pymdownx.tasklist
+  - pymdownx.keys
+  - pymdownx.snippets
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/nlm
+  - icon: fontawesome/brands/python
+    link: https://python.org
+
+copyright: © 2026 NLM Project

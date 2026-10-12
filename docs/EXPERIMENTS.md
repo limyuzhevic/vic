@@ -258,11 +258,25 @@ The RepresentationAnalyzer class provides:
 
 ## Anti-Cheating Measures
 
-Phase 4 experiments are designed to prevent shortcuts:
-- No predefined correct answers
-- No hard-coded task solutions
-- No symbolic lookups
-- External experiment code measures, not solves
+### Phase 6.1: Integration Verification
+Test if all brain systems (memory, neuromodulation, prediction, development) work together.
+
+**Procedure:**
+1. Run Phase 6 integration test
+2. Verify all components are connected
+3. Check integration metrics
+
+**Run with:**
+```bash
+./nlm_phase6_demo
+```
+
+**Metrics:**
+- Working Memory: Connected or Disconnected
+- Episodic Memory: Connected or Disconnected
+- Neuromodulation: Connected or Disconnected
+- Prediction: Connected or Disconnected
+- Development: Connected or Disconnected
 
 ## Reproducibility
 
@@ -271,3 +285,20 @@ All experiments use:
 - Version-controlled code
 - Deterministic simulation
 - Multiple seed runs for statistics
+
+## Quick Experiment Reference
+
+| Phase | Executable | Main Goal |
+|-------|------------|-----------|
+| Phase 2 | `./nlm` | Basic neural computation |
+| Phase 3 | `./nlm_phase3_demo` | World interaction |
+| Phase 4 | `./nlm_phase4_demo` | Cognitive abilities |
+| Phase 5 | `./nlm_phase5_demo` | Scaling & research |
+| Phase 6 | `./nlm_phase6_demo` | Integration verification |
+
+**Next Steps:**
+1. Run Phase 2 (`./nlm`) to understand basic neural computation
+2. Run Phase 3 (`./nlm_phase3_demo`) to see world interaction
+3. Run Phase 4 (`./nlm_phase4_demo`) to explore cognitive abilities
+4. Run Phase 5 (`./nlm_phase5_demo`) for large-scale research
+5. Run Phase 6 (`./nlm_phase6_demo`) to verify full integration

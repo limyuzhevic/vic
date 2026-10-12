@@ -52,6 +52,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 research platform |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
