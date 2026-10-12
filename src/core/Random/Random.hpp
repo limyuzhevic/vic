@@ -1,8 +1,4 @@
-#pragma once
-
-#include <cstdint>
-#include <random>
-#include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -103,7 +99,7 @@ auto RandomGenerator::pickRandom(const Container& container) -> typename Contain
         throw std::runtime_error("Cannot pick from empty container");
     }
     auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
+    std::advance(it, pickRandomIndex(static_cast<uint64_t>(container.size())));
     return *it;
 }
 
