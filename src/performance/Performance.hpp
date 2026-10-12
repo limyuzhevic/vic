@@ -32,10 +32,6 @@
  * 
  * This infrastructure is designed to scale from 10k to 100M+ neurons.
  */
-
-#ifndef NLM_PERFORMANCE_HPP
-#define NLM_PERFORMANCE_HPP
-
 // Configure performance features based on build settings
 #ifdef NLM_PERFORMANCE_ENABLED
     #define NLM_USE_MEMORY_POOL 1
@@ -82,5 +78,3 @@ class Neuron;
 class Synapse;
 
 } // namespace nlm
-
-#endif // NLM_PERFORMANCE_HPP

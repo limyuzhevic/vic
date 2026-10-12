@@ -321,6 +321,14 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Forward declarations for refactored main functions
+bool parseCommandLineArguments(int argc, char** argv, std::string& configFile);
+void initializeConfiguration(std::shared_ptr<Config> config);
+void logConfigurationSummary(const std::shared_ptr<Config>& config);
+void initializeBrainSystem(std::shared_ptr<Brain>& brain, const std::shared_ptr<Config>& config);
+void runAllDemonstrationTests(std::shared_ptr<Brain>& brain);
+void printPhase2CompletionSummary();
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -343,17 +351,11 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Parse command line arguments and get config file path
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (!parseCommandLineArguments(argc, argv, configFile)) {
+        NLM_LOG_ERROR("Failed to parse command line arguments");
+        return 1;
     }
     
     // Load config from file (ignore if not found)
@@ -366,6 +368,45 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Set default values for Phase 2
+    initializeConfiguration(config);
+    
+    // Log configuration summary
+    logConfigurationSummary(config);
+    
+    // Initialize brain
+    std::shared_ptr<Brain> brain;
+    initializeBrainSystem(brain, config);
+    
+    // Run all demonstration tests
+    runAllDemonstrationTests(brain);
+    
+    // Final brain status
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Final Brain Status ===");
+    brain->logStatus();
+    
+    // Print completion summary
+    printPhase2CompletionSummary();
+    
+    return 0;
+}
+
+bool parseCommandLineArguments(int argc, char** argv, std::string& configFile) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    return true;
+}
+
+void initializeConfiguration(std::shared_ptr<Config> config) {
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -381,8 +422,9 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
+}
+
+void logConfigurationSummary(const std::shared_ptr<Config>& config) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -391,7 +433,9 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
-    
+}
+
+void initializeBrainSystem(std::shared_ptr<Brain>& brain, const std::shared_ptr<Config>& config) {
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
@@ -400,15 +444,17 @@ int main(int argc, char** argv) {
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+        std::exit(1);
     }
     
     brain->logStatus();
-    
+}
+
+void runAllDemonstrationTests(std::shared_ptr<Brain>& brain) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
@@ -423,12 +469,9 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
+}
+
+void printPhase2CompletionSummary() {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
@@ -444,6 +487,4 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
-    return 0;
 }

@@ -115,14 +115,27 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input parameters
+    if (key.empty()) {
+        NLM_LOG_ERROR("Config key cannot be empty");
+        return;
+    }
+    
+    if (value.index() == -1) {
+        NLM_LOG_ERROR("Config value is invalid for key: " + key);
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_DEBUG("Updated config key: " + key);
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_DEBUG("Added new config key: " + key);
     }
 }
 
@@ -186,14 +199,27 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Helper function to safely trim strings with validation
 std::string Config::trim(const std::string& str) {
+    if (str.empty()) {
+        return str;
+    }
+    
     size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
+    if (start == std::string::npos) {
+        return "";
+    }
+    
     size_t end = str.find_last_not_of(" \t\r\n");
     return str.substr(start, end - start + 1);
 }
 
+// Helper function to safely convert strings to lowercase
 std::string Config::toLower(const std::string& str) {
+    if (str.empty()) {
+        return str;
+    }
+    
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;

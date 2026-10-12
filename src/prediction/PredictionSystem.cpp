@@ -1,3 +1,17 @@
+// Prediction System Implementation
+// Phase 4: Advanced Cognitive Functions
+//
+// Basic prediction system for sensory prediction and error computation:
+// - PLACEHOLDER - Phase 4 will implement real predictive coding
+// - Currently provides basic error computation infrastructure
+// - Designed to integrate with NLM's neural substrate
+//
+// Key features:
+// - Simple prediction error computation
+// - Error history tracking
+// - Confidence estimation
+// - Infrastructure for real-time predictive coding
+
 #include "PredictionSystem.hpp"
 
 namespace nlm {

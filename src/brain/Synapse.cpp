@@ -94,13 +94,37 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    // Validate weight within biological bounds
+    if (weight < pImpl->MIN_WEIGHT || weight > pImpl->MAX_WEIGHT) {
+        NLM_LOG_WARNING("Synapse weight " + std::to_string(weight) + 
+                       " outside valid range [" + std::to_string(pImpl->MIN_WEIGHT) + ", " + 
+                       std::to_string(pImpl->MAX_WEIGHT) + "]. Clamping.");
+        pImpl->weight = std::clamp(weight, pImpl->MIN_WEIGHT, pImpl->MAX_WEIGHT);
+    } else {
+        pImpl->weight = weight;
+    }
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    // Validate delta input
+    if (std::isnan(delta)) {
+        NLM_LOG_ERROR("Invalid NaN delta in addToWeight");
+        return;
+    }
+    
+    float oldWeight = pImpl->weight;
     pImpl->weight += delta;
+    
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Log significant weight changes for debugging
+    float weightChange = pImpl->weight - oldWeight;
+    if (std::abs(weightChange) > 0.1f) {
+        NLM_LOG_DEBUG("Significant weight change: " + std::to_string(oldWeight) + 
+                     " -> " + std::to_string(pImpl->weight) + 
+                     " (Δ=" + std::to_string(weightChange) + ")");
+    }
 }
 
 Delay Synapse::getDelay() const {
@@ -177,7 +201,15 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Validate decay rate
+    if (decayRate < 0.0f || decayRate >= 1.0f) {
+        NLM_LOG_ERROR("Invalid decay rate " + std::to_string(decayRate) + ", must be in [0, 1)");
+        return;
+    }
+    
     pImpl->eligibilityTrace *= (1.0f - decayRate);
+    
+    // Normalize to prevent numerical drift
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
     }

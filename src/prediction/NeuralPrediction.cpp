@@ -1,3 +1,23 @@
+// Neural Prediction System Implementation
+// Phase 4: Advanced Cognitive Functions
+//
+// Implements temporal prediction using the spiking substrate:
+// - NOT a Transformer - prediction emerges from learned synaptic dynamics
+// - Temporal sequences are learned through STDP and Hebbian plasticity
+// - Prediction error emerges from comparison of predicted vs actual sensory states
+// - No token prediction architecture - purely neural dynamics
+//
+// Key principles:
+// - Prediction is encoded in patterns of neural activity
+// - Temporal sequences are learned through STDP and Hebbian plasticity
+// - Prediction error emerges from comparison of predicted vs actual sensory states
+// - No token prediction architecture - purely neural dynamics
+//
+// Implements three main classes:
+// 1. NeuralPrediction - temporal prediction using learned sequences
+// 2. ActionConsequencePredictor - learns action->consequence mappings
+// 3. PredictionErrorSignal - computes and broadcasts prediction error
+
 #include "NeuralPrediction.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>

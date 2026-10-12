@@ -28,6 +28,10 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Failed to allocate memory for Neuron implementation");
+        std::exit(1);
+    }
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -191,6 +195,16 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate input parameters
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep dt=" + std::to_string(dt) + " in stepLIF, using default");
+        dt = 0.001;  // Use reasonable default timestep
+    }
+    
+    if (currentTime < 0.0) {
+        NLM_LOG_WARNING("Negative currentTime in stepLIF");
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,8 +227,25 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate critical parameters
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant tau=" + std::to_string(tau));
+        tau = 20.0f;  // Reset to reasonable default
+    }
+    
+    if (C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane capacitance C=" + std::to_string(C));
+        C = 1.0f;  // Reset to reasonable default
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
+    
+    // Prevent numerical instability
+    if (std::abs(synapticContribution) > 1000.0f) {
+        NLM_LOG_WARNING("Large synaptic contribution, limiting to prevent instability");
+        synapticContribution = std::clamp(synapticContribution, -1000.0f, 1000.0f);
+    }
     
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
