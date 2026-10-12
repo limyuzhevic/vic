@@ -61,8 +61,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - safely access first region
+        NeuralRegion* region = nullptr;
+        if (!agent.getBrain()->getRegions().empty()) {
+            region = agent.getBrain()->getRegions()[0].get();
+        }
+        
+        SensoryPercept percept;
+        if (region) {
+            percept = world.observe(region);
+        }
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +81,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action to world - safely access region
+        if (region) {
+            world.applyAction(region, cmd);
+        }
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward - safely access region
+        float reward = 0.0f;
+        if (region) {
+            reward = world.computeReward(region);
+        }
         totalReward += reward;
         
         // Apply reward modulation
@@ -105,14 +118,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
+    result.avgSynapticWeight = brain->getAverageSynapticWeight();
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
+    // Verify integration - safely access regions
+    NeuralRegion* testRegion = nullptr;
+    if (!brain->getRegions().empty()) {
+        testRegion = brain->getRegions()[0].get();
+    }
+    
+    result.memoryWorkingMemoryIntegrated = testRegion && (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);

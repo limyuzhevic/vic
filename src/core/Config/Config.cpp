@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <variant>
+#include <vector>
+#include <string>
+#include <cctype>
 
 namespace nlm {
 
@@ -19,9 +24,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to detect file type by extension
+    std::string ext = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos + 1);
+    }
     
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    // Try JSON parser first
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Fall back to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +76,18 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO: Implement proper JSON parser using nlohmann::json
+    // For now, fallback to simple format
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO: Implement proper YAML parser using YAML-CPP or similar
+    // For now, fallback to simple format
+    return loadFromSimpleFormat(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
