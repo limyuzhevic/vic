@@ -1,27 +1,38 @@
 #include "Config.hpp"
+#include "advanced_config/ConfigManager.hpp"
+#include "advanced_config/ConfigValidator.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <any>
 
 namespace nlm {
 
+// Config implementation
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unique_ptr<advanced_config::ConfigManager> advancedManager;
+    bool advancedEnabled;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->advancedManager = std::make_unique<advanced_config::ConfigManager>();
+    pImpl->advancedEnabled = false;
+}
 
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
-
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->importFromFile(filepath, "json");
+    }
     
+    // Use original implementation
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -29,19 +40,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -56,10 +64,32 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // For advanced system, command line parsing is handled by CommandLineConfigSource
+        // For backward compatibility, we can still support the old format
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                }
+            } else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        return true;
+    }
+    
+    // Use original implementation
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -67,9 +97,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        } else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
@@ -79,6 +107,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->exportToFile(filepath, "json");
+    }
+    
+    // Use original implementation
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +120,17 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(arg)>, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -94,6 +138,12 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->get<T>(key);
+    }
+    
+    // Use original implementation
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +165,13 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        pImpl->advancedManager->set<T>(key, value, source);
+        return;
+    }
+    
+    // Use original implementation
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -143,11 +200,24 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->has(key);
+    }
+    
+    // Use original implementation
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        pImpl->advancedManager->remove(key);
+        return;
+    }
+    
+    // Use original implementation
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,6 +226,12 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->getKeys();
+    }
+    
+    // Use original implementation
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
@@ -165,10 +241,23 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        pImpl->advancedManager->clear();
+        return;
+    }
+    
+    // Use original implementation
     pImpl->entries.clear();
 }
 
 std::string Config::summary() const {
+    if (pImpl->advancedEnabled && pImpl->advancedManager) {
+        // Use advanced configuration system
+        return pImpl->advancedManager->summary();
+    }
+    
+    // Use original implementation
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
@@ -186,6 +275,17 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+advanced_config::ConfigManager* Config::getAdvancedManager() const {
+    return pImpl->advancedManager.get();
+}
+
+void Config::enableAdvancedConfig(bool enable) {
+    pImpl->advancedEnabled = enable;
+    if (enable && !pImpl->advancedManager) {
+        pImpl->advancedManager = std::make_unique<advanced_config::ConfigManager>();
+    }
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -199,7 +299,7 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+// Explicit template instantiations for get() and getOr()
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

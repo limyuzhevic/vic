@@ -6,12 +6,14 @@
 #include <variant>
 #include <optional>
 
+// Forward declaration for advanced config manager
+namespace advanced_config {
+    class ConfigManager;
+}
+
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
+// Configuration value types (same as original)
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -23,7 +25,7 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+// Configuration source (same as original)
 enum class ConfigSource {
     Default,
     File,
@@ -31,7 +33,7 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration entry (same as original)
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
@@ -43,7 +45,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class (maintains backward compatibility)
 class Config {
 public:
     Config();
@@ -92,7 +94,13 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+
+    // Advanced configuration system access (optional)
+    advanced_config::ConfigManager* getAdvancedManager() const;
     
+    // Enable advanced configuration system
+    void enableAdvancedConfig(bool enable = true);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

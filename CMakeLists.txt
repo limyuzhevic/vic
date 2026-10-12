@@ -19,132 +19,240 @@ else()
 endif()
 
 # Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Core library
 add_library(nlm_core STATIC
     # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
+    core/Types/Types.cpp
+    core/Config/Config.cpp
+    core/Random/Random.cpp
+    core/Logger/Logger.cpp
+    core/SimulationClock/SimulationClock.cpp
+    # Advanced Configuration
+    advanced_config/core/ConfigSchema.cpp
+    advanced_config/core/ConfigValidator.cpp
+    advanced_config/core/ConfigGroup.cpp
+    advanced_config/core/ConfigTemplate.cpp
+    advanced_config/core/ConfigProfile.cpp
+    advanced_config/core/ConfigSource.cpp
+    advanced_config/core/ConfigCallbacks.cpp
+    advanced_config/core/ConfigManager.cpp
     # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    brain/Neuron.cpp
+    brain/Synapse.cpp
+    brain/NeuralPopulation.cpp
+    brain/NeuralRegion.cpp
+    brain/Brain.cpp
     # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
+    dynamics/NeuralDynamics.cpp
+    dynamics/SpikeSystem.cpp
     # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
+    plasticity/PlasticityRule.cpp
+    plasticity/Hebbian.cpp
+    plasticity/STDP.cpp
+    plasticity/StructuralPlasticity.cpp
     # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
+    development/DevelopmentSystem.cpp
+    development/Synaptogenesis.cpp
+    development/Pruning.cpp
+    development/Maturation.cpp
     # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
+    neuromodulation/Neuromodulator.cpp
+    neuromodulation/Reward.cpp
+    neuromodulation/PredictionError.cpp
+    neuromodulation/Novelty.cpp
+    neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
+    memory/WorkingMemory.cpp
+    memory/EpisodicMemory.cpp
+    memory/SemanticMemory.cpp
+    memory/ProceduralMemory.cpp
+    memory/AssociativeMemory.cpp
+    memory/NeuralWorkingMemory.cpp
+    memory/NeuralEpisodicMemory.cpp
     # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
+    cognition/ConceptFormation.cpp
+    cognition/NeuralPlanner.cpp
     # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
+    sensory/SensoryInput.cpp
+    sensory/Vision.cpp
+    sensory/Audio.cpp
+    sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
+    prediction/PredictionSystem.cpp
+    prediction/NeuralPrediction.cpp
     # Motor
-    src/motor/MotorSystem.cpp
+    motor/MotorSystem.cpp
     # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
+    environment/Environment.cpp
+    environment/Observation.cpp
+    environment/Action.cpp
     # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
+    experiments/Experiment.cpp
+    experiments/ExperimentRunner.cpp
+    experiments/Metrics.cpp
+    # Experiment Management (Phase 2 Enhanced)
+    experiments/IExperiment.cpp
+    experiments/ExperimentResult.cpp
+    experiments/ExperimentRegistry.cpp
+    experiments/ExperimentFactory.cpp
+    experiments/ExperimentScheduler.cpp
+    experiments/ExperimentComparison.cpp
+    experiments/ExperimentManager.cpp
+    # Phase 2 Enhanced Experiments
+    experiments/BasicConnectivityExperiment.cpp
+    experiments/PlasticityExperiment.cpp
+    experiments/STDPVerificationExperiment.cpp
+    # Phase 6 Integrated Experiments
+    experiments/IntegratedBrainExperiment.cpp
+    experiments/MemorySystemExperiment.cpp
+    experiments/PredictionSystemExperiment.cpp
+    experiments/CognitiveEngineExperiment.cpp
+    experiments/NeuromodulationExperiment.cpp
+    experiments/DevelopmentExperiment.cpp
+    experiments/StructuralPlasticityExperiment.cpp
     # Visualization
-    src/visualization/VisualizationInterface.cpp
+    visualization/VisualizationInterface.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/advanced_config>
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Visualization library
+add_library(nlm_visualization STATIC
+    # Visualization components
+    visualization/NeuralVisualizer.cpp
+    visualization/NetworkTopologyVisualizer.cpp
+    visualization/3DNeuralVisualizer.cpp
+    visualization/ActivityHeatMapVisualizer.cpp
+    visualization/StatisticalChartVisualizer.cpp
+    visualization/TimeSeriesVisualizer.cpp
+    visualization/ScientificVisualizer.cpp
+    visualization/DashboardVisualizer.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_include_directories(nlm_visualization PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/visualization>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/visualization>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
+
+# Monitoring library
+add_library(nlm_monitoring STATIC
+    # Monitoring components
+    monitoring/SystemMonitor.cpp
+    monitoring/PerformanceMonitor.cpp
+    monitoring/ExperimentMonitor.cpp
+    monitoring/ResourceMonitor.cpp
+    monitoring/NetworkMonitor.cpp
+    monitoring/AnomalyDetector.cpp
+    monitoring/AlertManager.cpp
+    monitoring/MetricCollector.cpp
+)
+target_include_directories(nlm_monitoring PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/monitoring>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/monitoring>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_monitoring PUBLIC nlm_core)
+
+# User interface library
+add_library(nlm_ui STATIC
+    # User interface components
+    ui/VisualizationWindow.cpp
+    ui/ControlPanel.cpp
+    ui/ViewManager.cpp
+    ui/LayoutManager.cpp
+    ui/ViewExporter.cpp
+    ui/InteractionManager.cpp
+)
+target_include_directories(nlm_ui PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/ui>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/ui>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_ui PUBLIC nlm_core)
+
+# Integration library
+add_library(nlm_integration STATIC
+    # Integration components
+    integration/BrainStateVisualizer.cpp
+    integration/ExperimentProgressMonitor.cpp
+    integration/ResultVisualizer.cpp
+    integration/ComparisonVisualizer.cpp
+    integration/ParameterImpactVisualizer.cpp
+)
+target_include_directories(nlm_integration PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/integration>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/integration>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_integration PUBLIC nlm_core)
+
+# Agent system (body, sensory percept, agent-brain interface)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+    world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+    experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+    experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
 # Main executable
 add_executable(nlm
-    src/main.cpp
+    main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_visualization nlm_monitoring nlm_ui nlm_integration)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+    experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+    experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
