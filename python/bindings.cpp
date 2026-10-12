@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON or key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (key=value format)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -162,7 +162,41 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        
+        // Pythonic convenience methods
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default if missing (int)")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default if missing (float)")
+        .def("getOr", [](Config& self, const std::string& key, std::string defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default if missing (str)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, std::string value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (str)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (bool)")
+        .def("remove", [](Config& self, const std::string& key) {
+            self.remove(key);
+        }, py::arg("key"),
+             "Remove configuration key");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -266,7 +300,8 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions")
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
@@ -288,6 +323,46 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // Add convenience functions for common use cases
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration object");
+    
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+    
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Add global convenience functions
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, size_t steps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getFiringNeuronCount(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete simulation with brain, world, and agent (convenience function)");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +426,31 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic convenience methods for brain simulation
+        .def("runSteps", [](Brain& self, size_t steps, bool withTimestamps = false) {
+            if (withTimestamps) {
+                for (size_t i = 0; i < steps; ++i) {
+                    self.step(i, i * 0.001);
+                }
+            } else {
+                for (size_t i = 0; i < steps; ++i) {
+                    self.step(i);
+                }
+            }
+            return steps;
+        }, py::arg("steps"), py::arg("withTimestamps") = false,
+           "Run multiple simulation steps (convenience method)")
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count (alias)")
+        .def("getSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count (alias)")
+        .def("getFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate (alias)")
+        .def("isInitialized", [](const Brain& self) {
+            return self.getTotalNeuronCount() > 0;
+        }, "Check if brain is initialized");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -388,17 +487,50 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"),
+             "Enable/disable curiosity")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        
+        // Pythonic convenience methods
+        .def("setAllSubsystems", [](AgentBrain& self, bool reward, bool plasticity, bool development, bool curiosity) {
+            self.enableRewardModulation(reward);
+            self.enableStructuralPlasticity(plasticity);
+            self.enableDevelopment(development);
+            self.enableCuriosity(curiosity);
+        }, py::arg("reward"), py::arg("plasticity"), py::arg("development"), py::arg("curiosity"),
+           "Enable/disable all subsystems at once (convenience method)")
+        .def("getAllLevels", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.getNeuromodulationLevel(),
+                self.getCuriosityLevel(),
+                self.getNoveltyLevel(),
+                self.getPredictionError()
+            );
+        }, "Get all neuromodulation levels as a tuple")
+        .def("getSubsystemStats", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.isRewardModulationEnabled(),
+                self.isStructuralPlasticityEnabled(),
+                self.isDevelopmentEnabled(),
+                self.isCuriosityEnabled()
+            );
+        }, "Get subsystem enable/disable status as a tuple")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
