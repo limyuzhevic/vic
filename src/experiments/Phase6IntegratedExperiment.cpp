@@ -61,8 +61,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - use first available region
+        NeuralRegion* region = nullptr;
+        auto regions = agent.getBrain()->getRegions();
+        if (!regions.empty()) {
+            region = regions[0].get();
+        }
+        SensoryPercept percept = world.observe(region);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,7 +79,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(region, cmd);
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
@@ -128,14 +133,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        std::string checkpointPath = config.checkpointPath;
+        if (checkpointPath.empty()) {
+            // Use default temp path if not specified
+            checkpointPath = "/tmp/nlm_checkpoint_test.bin";
+        }
+        if (brain->save(checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
             brain2->initialize();
             
-            if (brain2->load(config.checkpointPath)) {
+            if (brain2->load(checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {

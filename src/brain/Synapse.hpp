@@ -8,8 +8,7 @@ namespace nlm {
 class Neuron;
 
 // Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
-
+// Implements real synaptic transmission with delays, short-term plasticity, and noise
 class Synapse {
 public:
     // Create synapse with IDs
@@ -70,9 +69,26 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Short-term plasticity state
+    float getUtilization() const;
+    float getFacilitation() const;
+    float getDepression() const;
+    void setUtilization(float utilization);
+    void setFacilitation(float facilitation);
+    void setDepression(float depression);
+    
+    // Synaptic noise parameters
+    float getSynapticNoiseLevel() const;
+    void setSynapticNoiseLevel(float noiseLevel);
+    
+    // Update synapse for one simulation step with real dynamics
     void step(Timestamp currentTime);
+    
+    // Apply spike input with realistic synaptic transmission
+    void applySpikeInput(Timestamp currentTime, SynapticWeight weight, bool isExcitatory);
+    
+    // Calculate synaptic conductance using exponential and alpha models
+    void calculateSynapticConductance(Timestamp currentTime, float& g_exp, float& g_alpha);
     
     // Reset to initial state
     void reset();

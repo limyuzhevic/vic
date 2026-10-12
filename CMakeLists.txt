@@ -139,12 +139,54 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# CLI Executables
+
+# Main enhanced CLI executable
+add_executable(nlm
+    src/main.cpp
+    src/main_cli.cpp
+    src/core/CLI/NLMCLI.hpp
+)
+#target_link_libraries(nlm PUBLIC nlm_core) # Need to fix header-only includes
+
+# Phase 6 Demo CLI executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6DemoCLI.cpp
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Experiment Runner CLI executable
+add_executable(nlm_experiment
+    src/experiments/ExperimentRunnerCLI.cpp
+    src/experiments/ExperimentRunner.cpp
+)
+target_link_libraries(nlm_experiment PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Configuration CLI executable
+add_executable(nlm_config
+    src/core/CLI/ConfigurationCLI.cpp
+)
+#target_link_libraries(nlm_config PUBLIC nlm_core) # For full config support
+
+# Checkpoint Management CLI executable
+add_executable(nlm_checkpoint
+    src/core/CLI/CheckpointManagementCLI.cpp
+)
+#target_link_libraries(nlm_checkpoint PUBLIC nlm_core) # For full checkpoint support
+
+# Visualization CLI executable
+add_executable(nlm_visualize
+    src/core/CLI/VisualizationCLI.cpp
+)
+#target_link_libraries(nlm_visualize PUBLIC nlm_core) # For full visualization support
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_phase6_demo nlm_experiment nlm_config nlm_checkpoint nlm_visualize nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

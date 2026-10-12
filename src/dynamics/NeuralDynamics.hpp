@@ -7,31 +7,42 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Real neural dynamics models for Phase 2
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // Real integrate-and-fire dynamics with biological realism
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Real synaptic dynamics with conductance-based models
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
+    // Realistic synaptic transmission with delays and short-term plasticity
     virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
     
     // Check if neuron should fire
+    // Includes refractory period and threshold checking
     virtual bool shouldFire(const Neuron* neuron) const = 0;
     
-    // Reset dynamics state
+    // Reset dynamics state to initial conditions
     virtual void reset() = 0;
+    
+    // Add noise and stochastic components
+    // Biological noise in ion channels and synaptic transmission
+    virtual void addNoise(Neuron* neuron, Synapse* synapse, RandomGenerator& rng) = 0;
+    
+    // Calculate synaptic current using conductance-based models
+    // Exponential and alpha synaptic conductances
+    virtual void calculateSynapticCurrent(Neuron* neuron) const = 0;
 };
 
-// Integrate-and-fire dynamics (simple model)
+// Real Integrate-and-Fire dynamics (Phase 2 complete implementation)
+// Biological realistic model with conductance-based synapses, noise, and refractory dynamics
 class IntegrateAndFireDynamics : public NeuralDynamics {
 public:
     IntegrateAndFireDynamics();
@@ -43,9 +54,26 @@ public:
     bool shouldFire(const Neuron* neuron) const override;
     void reset() override;
     
+    // Add noise and stochastic components for biological realism
+    void addNoise(Neuron* neuron, Synapse* synapse, RandomGenerator& rng) override;
+    
+    // Calculate synaptic current using conductance-based models
+    // Support both exponential and alpha synaptic conductances
+    void calculateSynapticCurrent(Neuron* neuron) const override;
+    
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
+    void setMembraneCapacitance(float C);
+    float getMembraneCapacitance() const;
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setRestingPotential(float V_rest);
+    float getRestingPotential() const;
+    void setResetPotential(float V_reset);
+    float getResetPotential() const;
+    void setRefractoryPeriod(uint32_t steps);
+    uint32_t getRefractoryPeriod() const;
     
 private:
     struct Impl;

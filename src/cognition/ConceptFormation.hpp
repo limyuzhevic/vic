@@ -77,25 +77,26 @@ public:
     ConceptFormation();
     ~ConceptFormation();
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
+    // Initialize with brain reference and prediction system
+    void initialize(Brain* brain, PredictionSystem* predictionSystem);
 
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
-    // or 0 if it's too early to tell, or new concept ID if novel
+    // 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
                             const std::vector<float>& features,
                             float reward,
                             SimulationStep currentTime);
 
     // Get the concept that best matches a pattern
+    // Uses neural similarity computation
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;
 
-    // Get all concepts
+    // Get all concepts discovered so far
     const std::vector<DiscoveredConcept>& getConcepts() const { return concepts_; }
 
-    // Get a specific concept
+    // Get a specific concept by ID
     const DiscoveredConcept* getConcept(size_t conceptId) const;
 
     // Get concept prototype
@@ -113,13 +114,9 @@ public:
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 
-    // Update concept with new instance
+    // Update concept with new instance using Hebbian learning
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                       const std::vector<float>& features, float reward);
-
-    // Compute similarity between two patterns
-    float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
 
     // Check if pattern is novel (doesn't belong to any existing concept)
     bool isNovel(const std::vector<float>& pattern,
@@ -128,39 +125,94 @@ public:
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
-    // Clear all concepts
+    // Clear all concepts and reset learning
     void clear();
 
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
-    // Set parameters
+    // Set concept formation parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    void setConceptStabilityThreshold(float t) { conceptStabilityThreshold_ = t; }
+
+    // Enable/disable hierarchical concept formation
+    void enableHierarchicalConceptFormation(bool enable) { hierarchicalConceptEnabled_ = enable; }
+
+    // Get current concept statistics
+    struct ConceptStats {
+        size_t totalConcepts;
+        size_t stableConcepts;  // Concepts above stability threshold
+        float meanConceptStability;
+        float meanConceptConfidence;
+        float novelConcepts;  // New concepts formed recently
+    };
+
+    ConceptStats getStats() const;
+
+    // Update concepts based on neural activity patterns
+    void updateFromNeuralActivity(const std::vector<float>& neuralPattern,
+                                 SimulationStep currentStep);
+
+    // Integrate prediction errors into concept formation
+    void integratePredictionError(const std::vector<float>& predicted,
+                                 const std::vector<float>& actual,
+                                 SimulationStep currentStep);
+
+    // Concept competition and cooperation
+    void updateConceptCompetition();
+    void updateConceptCooperation(size_t conceptId);
+
+    // Get concepts relevant for current goal
+    std::vector<size_t> getRelevantConcepts(const std::vector<float>& goalState) const;
 
 private:
-    // Create new concept from pattern
+    // Create new concept from pattern using neural dynamics
     size_t createConcept(const std::vector<float>& pattern,
                         const std::vector<float>& features,
-                        float reward);
+                        float reward,
+                        SimulationStep currentTime);
 
-    // Update concept prototype using Hebbian averaging
+    // Update concept prototype using neural averaging (Hebbian-like)
     void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
 
     // Check if concept is stable enough to be considered "discovered"
     bool isConceptStable(size_t conceptId) const;
 
+    // Compute similarity between two neural patterns
+    float computeSimilarity(const std::vector<float>& a,
+                          const std::vector<float>& b) const;
+
+    // Learn concept clustering from neural activity
+    void learnConceptClustering(const std::vector<std::vector<float>>& patterns);
+
+    // Compute concept stability based on instance consistency
+    float computeConceptStability(size_t conceptId) const;
+
+    // Update concept confidence based on neuromodulation
+    void updateConceptConfidence(size_t conceptId, float neuromodulationSignal);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
+    PredictionSystem* predictionSystem_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
     // Parameters
-    float formationThreshold_;  // Similarity threshold for forming new concept
-    float stabilityThreshold_;   // Stability needed to be considered stable
-    size_t stabilityWindow_;    // How many observations to consider for stability
+    float formationThreshold_;      // Similarity threshold for forming new concept
+    float stabilityThreshold_;       // Stability needed to be considered stable
+    size_t stabilityWindow_;        // How many observations to consider for stability
+    float conceptStabilityThreshold_; // Threshold for concept consolidation
+    bool hierarchicalConceptEnabled_;
+
+    // Concept competition tracking
+    std::vector<float> conceptCompetitions_;
+
+    // Learning state
+    std::deque<std::vector<float>> recentPatterns_;
+    SimulationStep lastConceptUpdate_;
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience
