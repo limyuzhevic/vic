@@ -164,13 +164,88 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Neural working memory system)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store information in working memory")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve information from working memory")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if working memory contains information for neuron")
+        .def("clear", &WorkingMemory::clear, "Clear all working memory")
+        .def("getCapacity", &WorkingMemory::getCapacity,
+             "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize,
+             "Get current working memory size")
+        .def("getMemoryNeurons", &WorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("isActive", &WorkingMemory::isActive, py::arg("neuron"),
+             "Check if neuron is currently active in working memory")
+        .def("update", &WorkingMemory::update, py::arg("dt"),
+             "Update working memory with decay and competition");
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Neural episodic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("clear", &EpisodicMemory::clear, "Clear all episodic memory")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("threshold"),
+             "Consolidate important memories")
+        .def("replayEpisode", &EpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay episode for memory strengthening");
+
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Neural semantic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact in semantic memory")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve fact from semantic memory")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if semantic memory contains fact")
+        .def("getAllFacts", &SemanticMemory::getAllFacts,
+             "Get all facts in semantic memory")
+        .def("getConceptSimilarity", &SemanticMemory::getConceptSimilarity,
+             py::arg("concept1"), py::arg("concept2"), "Get similarity between concepts")
+        .def("getRelatedConcepts", &SemanticMemory::getRelatedConcepts, py::arg("concept"),
+             "Get concepts related to given concept");
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Neural procedural memory system)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"),
+             "Learn a new skill from neural pattern")
+        .def("executeSkill", &ProceduralMemory::executeSkill, py::arg("name"),
+             "Execute a learned skill")
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"),
+             "Get skill by name")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"), py::arg("successRate"),
+             "Update skill proficiency")
+        .def("getSkillEffectiveness", &ProceduralMemory::getSkillEffectiveness, py::arg("name"),
+             "Get skill effectiveness")
+        .def("getTopSkills", &ProceduralMemory::getTopSkills, py::arg("count"),
+             "Get top skills by proficiency");
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Neural associative memory system)pbdoc")
+        .def(py::init<>())
+        .def("associate", py::overload_cast<const std::string&, const std::string&, float>(&AssociativeMemory::associate), py::arg("key1"), py::arg("key2"), py::arg("strength"),
+             "Create association between two concepts")
+        .def("associate", py::overload_cast<NeuronId, NeuronId, float>(&AssociativeMemory::associate), py::arg("neuron1"), py::arg("neuron2"), py::arg("strength"),
+             "Create association between two neurons")
+        .def("associate", py::overload_cast<const std::string&, NeuronId, float>(&AssociativeMemory::associate), py::arg("concept"), py::arg("neuron"), py::arg("strength"),
+             "Create association between concept and neuron")
+        .def("getAssociations", py::overload_cast<const std::string&>(&AssociativeMemory::getAssociations), py::arg("key"),
+             "Get concepts associated with given key")
+        .def("getAssociations", py::overload_cast<NeuronId>(&AssociativeMemory::getAssociations), py::arg("neuron"),
+             "Get neurons associated with given neuron")
+        .def("getStrength", &AssociativeMemory::getAssociationStrength, py::arg("key1"), py::arg("key2"),
+             "Get strength of association between two items")
+        .def("propagateActivation", &AssociativeMemory::propagateActivation, py::arg("key"), py::arg("factor"),
+             "Propagate activation through associations");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -400,21 +475,130 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add more commands to Python module for advanced users
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set advanced configuration for complex experiments
+        config->set("simulation_timestep", 0.0001, ConfigSource::Default);  // Higher precision
+        config->set("neuron_count", 5000, ConfigSource::Default);         // Larger network
+        config->set("region_count", 4, ConfigSource::Default);           // Multiple regions
+        config->set("connection_probability", 0.2, ConfigSource::Default); // More connections
+        
+        // Memory system configuration
+        config->set("working_memory_capacity", 500, ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", 10000, ConfigSource::Default);
+        config->set("semantic_memory_max_concepts", 5000, ConfigSource::Default);
+        config->set("procedural_memory_max_skills", 200, ConfigSource::Default);
+        
+        // Neuromodulation configuration
+        config->set("dopamine_baseline", 0.1, ConfigSource::Default);
+        config->set("curiosity_sensitivity", 0.5, ConfigSource::Default);
+        config->set("novelty_threshold", 0.05, ConfigSource::Default);
+        
+        // Plasticity configuration
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.025f, ConfigSource::Default);
+        config->set("stdp_time_constant", 25.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00002f, ConfigSource::Default);
+        
+        // Development configuration
+        config->set("development_period_duration", 600.0, ConfigSource::Default);
+        config->set("critical_period_start", 120.0, ConfigSource::Default);
+        config->set("critical_period_end", 300.0, ConfigSource::Default);
+        
+        // Advanced options
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        config->set("enable_predictive_coding", true, ConfigSource::Default);
+        config->set("enable_social_learning", false, ConfigSource::Default);
+        
+        return config;
+    }, "Create an advanced configuration optimized for complex experiments");
+    
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Minimal configuration for basic operation
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", 200, ConfigSource::Default);  // Smaller network
+        config->set("region_count", 1, ConfigSource::Default);   // Single region
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        
+        return config;
+    }, "Create a minimal configuration for basic operation");
+    
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Research-oriented configuration
+        config->set("simulation_timestep", 0.0005, ConfigSource::Default);  // High precision
+        config->set("neuron_count", 10000, ConfigSource::Default);          // Large network
+        config->set("region_count", 8, ConfigSource::Default);            // Many regions
+        config->set("connection_probability", 0.15, ConfigSource::Default);
+        
+        // Research focus areas
+        config->set("research_focus", "memory_integration", ConfigSource::Default);
+        config->set("research_tracking_level", "detailed", ConfigSource::Default);
+        config->set("enable_detailed_metrics", true, ConfigSource::Default);
+        config->set("enable_checkpointing", true, ConfigSource::Default);
+        config->set("checkpoint_interval", 1000, ConfigSource::Default);
+        
+        // Neuromodulation focus
+        config->set("curiosity_enabled", true, ConfigSource::Default);
+        config->set("novelty_detection_sensitivity", 0.03, ConfigSource::Default);
+        config->set("reward_prediction_error_weight", 1.5, ConfigSource::Default);
+        
+        return config;
+    }, "Create a research-oriented configuration");
+    
+    m.def("createDevelopmentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Development-focused configuration
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 2, ConfigSource::Default);
+        config->set("connection_probability", 0.12, ConfigSource::Default);
+        
+        // Development stages
+        config->set("development_mode", "accelerated", ConfigSource::Default);
+        config->set("plasticity_decay_rate", 0.8, ConfigSource::Default);
+        config->set("critical_period_multiplier", 2.0, ConfigSource::Default);
+        config->set("synaptogenesis_boost", 5.0, ConfigSource::Default);
+        
+        // Learning objectives
+        config->set("developmental_stage", "critical_period", ConfigSource::Default);
+        config->set("learning_objective", "skill_acquisition", ConfigSource::Default);
+        config->set("development_tracking_enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, "Create a development-focused configuration");
+    
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Exploration-focused configuration
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", 1500, ConfigSource::Default);
+        config->set("region_count", 3, ConfigSource::Default);
+        config->set("connection_probability", 0.18, ConfigSource::Default);
+        
+        // Exploration characteristics
+        config->set("exploration_mode", "curiosity_driven", ConfigSource::Default);
+        config->set("exploration_rate", 0.4, ConfigSource::Default);
+        config->set("novelty_response_multiplier", 1.2, ConfigSource::Default);
+        config->set("reward_variance", 0.3, ConfigSource::Default);
+        
+        // Exploration objectives
+        config->set("exploration_target", "environmental Mastery", ConfigSource::Default);
+        config->set("exploration_metrics", "behavioral Diversity", ConfigSource::Default);
+        
+        return config;
+    }, "Create an exploration-focused configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

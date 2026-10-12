@@ -787,16 +787,53 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.threshold.reserve(getTotalNeuronCount());
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
+        neuronData.firingState.reserve(getTotalNeuronCount());
+        neuronData.refractoryRemaining.reserve(getTotalNeuronCount());
+        neuronData.refractoryPeriod.reserve(getTotalNeuronCount());
+        neuronData.lastSpikeTime.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Found null region during checkpoint save");
+                continue;
+            }
+            
             for (const auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Found null population during checkpoint save");
+                    continue;
+                }
+                
                 for (const auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Found null neuron during checkpoint save");
+                        continue;
+                    }
+                    
                     const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
+                    
+                    // Validate neuron state
+                    if (std::isnan(state.membranePotential) || 
+                        std::isnan(state.restingPotential) ||
+                        std::isnan(state.threshold) ||
+                        std::isnan(state.resetPotential) ||
+                        std::isnan(state.leakConductance)) {
+                        NLM_LOG_ERROR("Invalid neuron state detected: NaN values");
+                        continue;
+                    }
+                    
+                    // Clamp values to reasonable ranges
+                    float clampedMembranePotential = std::clamp(state.membranePotential, -100.0f, 100.0f);
+                    float clampedRestingPotential = std::clamp(state.restingPotential, -100.0f, 100.0f);
+                    float clampedThreshold = std::clamp(state.threshold, -100.0f, 100.0f);
+                    float clampedResetPotential = std::clamp(state.resetPotential, -100.0f, 100.0f);
+                    float clampedLeakConductance = std::clamp(state.leakConductance, 0.0f, 1000.0f);
+                    
+                    neuronData.membranePotential.push_back(clampedMembranePotential);
+                    neuronData.restingPotential.push_back(clampedRestingPotential);
+                    neuronData.threshold.push_back(clampedThreshold);
+                    neuronData.resetPotential.push_back(clampedResetPotential);
+                    neuronData.leakConductance.push_back(clampedLeakConductance);
                     neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
@@ -813,7 +850,14 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
+            if (!region) continue;
+            
             for (const auto* syn : region->getSynapses()) {
+                if (!syn) {
+                    NLM_LOG_ERROR("Found null synapse during checkpoint save");
+                    continue;
+                }
+                
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -839,6 +883,9 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        return false;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown exception saving brain");
         return false;
     }
 }
