@@ -139,6 +139,21 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Visualization system (advanced analysis and export)
+add_library(nlm_visualization STATIC
+    src/visualization/VisualizationInterface.cpp
+)
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
+
+# Command line interface for advanced debugging and analysis
+add_executable(nlmc
+    src/nlmc/NLMCommandLine.cpp
+    src/nlmc/NLMCommandLine_impl.cpp
+)
+target_link_libraries(nlmc PUBLIC nlm_core nlm_agent nlm_visualization)
+target_include_directories(nlmc PUBLIC src)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

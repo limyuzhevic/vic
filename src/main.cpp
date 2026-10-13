@@ -19,6 +19,9 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
+// Command line interface (advanced debugging and analysis)
+#include "nlmc/NLMCommandLine.hpp"
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -345,9 +348,15 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    
+    // Override with config file from command line
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        // Handle --config-file arg or --config arg formats
+        if (arg == "--config-file" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.substr(0, 2) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -408,6 +417,29 @@ int main(int argc, char** argv) {
     }
     
     brain->logStatus();
+    
+    // Check if user requested command line interface
+    if (argc > 1 && std::string(argv[1]) == "--cli") {
+        // Initialize command line interface
+        initializeCLI(config, brain);
+        
+        // Process command line arguments through CLI
+        processCommandLine(argc, argv);
+        
+        // Clean up
+        cleanupCLI();
+        
+        return 0;
+    }
+    
+    // Initialize command line interface for internal use
+    initializeCLI(config, brain);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("For advanced debugging and analysis commands, use: nlmc --help");
+    NLM_LOG_INFO("Example: nlmc stats");
+    NLM_LOG_INFO("Example: nlmc debug-neurons");
+    NLM_LOG_INFO("Example: nlmc debug-synapses");
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
