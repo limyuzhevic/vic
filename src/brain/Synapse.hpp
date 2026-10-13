@@ -1,10 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
+#include <vector>
 
 namespace nlm {
 
-// Forward declaration
+// Forward declarations
 class Neuron;
 
 // Synapse representing a connection between neurons
@@ -78,7 +80,7 @@ public:
     void reset();
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
     
 private:
     struct Impl;

@@ -83,6 +83,12 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // Simulation control
+    bool isPaused() const { return isPaused_; }
+    void setPaused(bool paused) { isPaused_ = paused; }
+    double getTickRate() const { return timestep_; }
+    void setTickRate(double rate) { timestep_ = rate; }
+    
 private:
     // Generate vision from current view
     void generateVision();
@@ -123,6 +129,11 @@ private:
     
     // Simple RNG state
     uint64_t rngState_;
+    
+    // Simulation control
+    bool isPaused_;
+    double timestep_;
+    
     uint64_t nextRandom();
 };
 

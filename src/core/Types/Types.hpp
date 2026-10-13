@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -19,6 +20,13 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment operator for use with ID counters
+    NeuronId operator++(int) {
+        NeuronId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Synapse identifier
@@ -33,6 +41,13 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment operator for use with ID counters
+    SynapseId operator++(int) {
+        SynapseId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Region identifier
@@ -47,6 +62,13 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment operator for use with ID counters
+    RegionId operator++(int) {
+        RegionId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Population identifier
@@ -90,25 +112,6 @@ using FiringRate = float;
 // Connection delay in simulation steps
 using Delay = uint32_t;
 
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
-};
-
-// Typed enums for synapse types
-enum class SynapseType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Electrical,
-    GapJunction
-};
-
 // Synaptic plasticity state flags
 struct PlasticityFlags {
     bool hebbian : 1;
@@ -122,13 +125,80 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
-// Developmental state
+// Neuron type
+enum class NeuronType : uint8_t {
+    Excitatory,
+    Inhibitory,
+    Modulatory,
+    Sensory,
+    Motor,
+    Internal
+};
+
+// Synapse type
+enum class SynapseType : uint8_t {
+    Excitatory,
+    Inhibitory,
+    Modulatory,
+    Electrical,
+    GapJunction
+};
+
+// Developmental stage
 enum class DevelopmentalStage : uint8_t {
     Initial,
     CriticalPeriod,
     Maturation,
     Adult,
     Aging
+};
+
+// Action potential state
+enum class FiringState : uint8_t {
+    Resting,
+    Active,
+    Refractory,
+    Inhibited
+};
+
+// Action type
+enum class ActionType : uint8_t {
+    MoveForward,
+    MoveBackward,
+    MoveLeft,
+    MoveRight,
+    TurnLeft,
+    TurnRight,
+    Look,
+    LookUp,
+    LookDown,
+    Interact,
+    Eat,
+    Drink,
+    Rest,
+    Wait,
+    Custom
+};
+
+// Motor command
+enum class MotorCommand : uint8_t {
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    LookLeft,
+    LookRight,
+    Interact,
+    Wait
+};
+
+// World object type
+enum class WorldObjectType : uint8_t {
+    Empty,
+    Resource,
+    Hazard,
+    Wall,
+    Marker
 };
 
 // Spike event for event-driven computation
@@ -171,14 +241,6 @@ struct DelayedSpikeEvent {
         , is_excitatory(type == SynapseType::Excitatory) {}
 };
 
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
-};
-
 // Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
@@ -190,3 +252,34 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Hash specializations for ID types
+namespace std {
+    template<>
+    struct hash<::nlm::NeuronId> {
+        size_t operator()(::nlm::NeuronId id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<::nlm::SynapseId> {
+        size_t operator()(::nlm::SynapseId id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<::nlm::RegionId> {
+        size_t operator()(::nlm::RegionId id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<::nlm::PopulationId> {
+        size_t operator()(::nlm::PopulationId id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+}

@@ -90,12 +90,19 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Python property getters
+    const std::string& getPath() const;
+    bool hasLoadedData() const;
+    size_t getEntryCount() const;
+    
+    // Summary
     std::string summary() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::string path_;  // Current config file path
+    bool configLoaded_;  // Whether config has loaded data
     
     // Internal helpers
     static std::string trim(const std::string& str);

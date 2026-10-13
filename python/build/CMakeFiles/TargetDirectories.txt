@@ -1,0 +1,10 @@
+/workspace/app/python/build/CMakeFiles/nlm_core.dir
+/workspace/app/python/build/CMakeFiles/nlm_agent.dir
+/workspace/app/python/build/CMakeFiles/nlm_world.dir
+/workspace/app/python/build/CMakeFiles/pynlm.dir
+/workspace/app/python/build/CMakeFiles/edit_cache.dir
+/workspace/app/python/build/CMakeFiles/rebuild_cache.dir
+/workspace/app/python/build/CMakeFiles/list_install_components.dir
+/workspace/app/python/build/CMakeFiles/install.dir
+/workspace/app/python/build/CMakeFiles/install/local.dir
+/workspace/app/python/build/CMakeFiles/install/strip.dir

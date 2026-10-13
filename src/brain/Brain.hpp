@@ -6,14 +6,11 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Random/Random.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
 class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
@@ -190,7 +187,13 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+    // Python property getters
+    bool isInitialized() const;
+    SimulationStep getStepCount() const;
+    bool hasActiveNeurons() const;
+    std::string getVersion() const;
+    
+    // Logging for debugging and monitoring
     void logStatus() const;
     
 private:

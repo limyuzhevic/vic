@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
 #include <vector>
 #include <array>
 
@@ -8,7 +9,6 @@ namespace nlm {
 
 // Forward declarations
 class Synapse;
-class RandomGenerator;
 
 // Neuron state structure for efficient storage
 struct NeuronState {

@@ -8,9 +8,10 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    bool loadedFromFile;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()), path_(""), configLoaded_(false) { pImpl->loadedFromFile = false; }
 
 Config::~Config() = default;
 
@@ -24,8 +25,13 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        configLoaded_ = false;
         return false;
     }
+    
+    // Store the filepath for property access
+    path_ = filepath;
+    configLoaded_ = true;
     
     std::string line;
     while (std::getline(file, line)) {
@@ -168,20 +174,26 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
-std::string Config::summary() const {
+    std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\\\"" << arg << "\\\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "["; for (size_t i = 0; i < arg.size(); ++i) { if (i > 0) oss << ", "; oss << arg[i]; } oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "["; for (size_t i = 0; i < arg.size(); ++i) { if (i > 0) oss << ", "; oss << arg[i]; } oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "["; for (size_t i = 0; i < arg.size(); ++i) { if (i > 0) oss << ", "; oss << "\\\"" << arg[i] << "\\\""; } oss << "]";
             } else {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")\\n";
     }
     return oss.str();
 }
@@ -212,4 +224,16 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+const std::string& Config::getPath() const {
+    return path_;
+}
+
+bool Config::hasLoadedData() const {
+    return !pImpl->entries.empty();
+}
+
+size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
+}
+ // namespace nlm

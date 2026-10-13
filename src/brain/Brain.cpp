@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -1112,6 +1113,27 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// Python property implementations
+bool Brain::isInitialized() const {
+    return pImpl != nullptr;
+}
+
+SimulationStep Brain::getStepCount() const {
+    return pImpl ? pImpl->currentStep : 0;
+}
+
+bool Brain::hasActiveNeurons() const {
+    if (!pImpl) return false;
+    for (const auto& region : pImpl->regions) {
+        if (region->getActiveNeuronCount() > 0) return true;
+    }
+    return false;
+}
+
+std::string Brain::getVersion() const {
+    return "6.0";  // Phase 6 version
 }
 
 } // namespace nlm

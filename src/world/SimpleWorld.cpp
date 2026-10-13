@@ -28,6 +28,8 @@ SimpleWorld::SimpleWorld()
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    , isPaused_(false)
+    , timestep_(0.1)
 {
     agent_.reset();
 }
@@ -44,6 +46,22 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
 void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngSeed_ = seed;
     rngState_ = seed;
+}
+
+bool SimpleWorld::isPaused() const {
+    return isPaused_;
+}
+
+void SimpleWorld::setPaused(bool paused) {
+    isPaused_ = paused;
+}
+
+double SimpleWorld::getTickRate() const {
+    return timestep_;
+}
+
+void SimpleWorld::setTickRate(double rate) {
+    timestep_ = rate;
 }
 
 void SimpleWorld::reset() {
