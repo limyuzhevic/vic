@@ -143,6 +143,16 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
+# Test critical fixes (new comprehensive tests)
+add_library(nlm_test_critical_fixes STATIC
+    tests/test_critical_fixes.cpp
+)
+target_link_libraries(nlm_test_critical_fixes PUBLIC nlm_core)
+target_compile_features(nlm_test_critical_fixes PRIVATE cxx_std_20)
+
+# Run critical fixes tests
+add_test(NAME nlm_test_critical_fixes COMMAND nlm_test_critical_fixes)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib

@@ -18,41 +18,80 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <nlohmann/json.hpp>  // Added JSON parser
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Use nlohmann::json for proper JSON parsing
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON entries
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            std::string description = "Configuration parameter: " + key;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Determine value type and store appropriate ConfigEntry
+            const auto& value = *it;
+            
+            if (value.is_string()) {
+                set(key, value.get<std::string>(), ConfigSource::File);
+                // Try to update description from JSON if available
+                if (value.contains("_description")) {
+                    auto entryIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                        [&key](const ConfigEntry& e) { return e.key == key; });
+                    if (entryIt != pImpl->entries.end()) {
+                        entryIt->description = value["_description"].get<std::string>();
+                    }
+                }
+            } else if (value.is_number_integer()) {
+                set(key, value.get<int64_t>(), ConfigSource::File);
+            } else if (value.is_number_float()) {
+                set(key, value.get<double>(), ConfigSource::File);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), ConfigSource::File);
+            } else if (value.is_array()) {
+                // For arrays, store as JSON string representation
+                set(key, value.dump(), ConfigSource::File);
+            } else {
+                // Unknown type, store as string
+                set(key, value.dump(), ConfigSource::File);
             }
-            
-            set(key, value, ConfigSource::File);
         }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log error if logger is available
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

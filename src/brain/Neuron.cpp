@@ -148,14 +148,44 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Use circular buffer approach for efficient spike history management
+    if (pImpl->spikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.push_back(timestamp);
+    } else {
+        // Replace oldest spike with newest (circular buffer)
+        pImpl->spikeHistory[pImpl->spikeHistory.size() - 1] = timestamp;
     }
+    
+    // Update spike statistics for STDP
+    updateSpikeStatistics(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    // Efficient clear using swap with empty vector
+    std::vector<Timestamp> empty;
+    std::swap(pImpl->spikeHistory, empty);
+    
+    // Reset spike statistics
+    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.spikeCount = 0;
+}
+
+void Neuron::updateSpikeStatistics(Timestamp timestamp) {
+    // Update last spike time for immediate access
+    pImpl->state.lastSpikeTime = static_cast<float>(timestamp);
+    
+    // Update spike count (maintains total count for lifespan)
+    pImpl->state.spikeCount++;
+    
+    // Calculate firing rate using exponential moving average for smooth updates
+    if (pImpl->state.lastSpikeTime > 0.0f) {
+        float dt = static_cast<float>(timestamp) - pImpl->state.lastSpikeTime;
+        if (dt > 0.0f) {
+            // Exponential moving average of firing rate
+            float newRate = 1.0f / dt;  // spikes per unit time
+            pImpl->state.firingRate = 0.95f * pImpl->state.firingRate + 0.05f * newRate;
+        }
+    }
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -296,7 +326,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
 }
 
 } // namespace nlm

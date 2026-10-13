@@ -24,6 +24,7 @@ struct NeuronState {
     uint32_t refractoryPeriod;             // Total refractory period (steps)
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    uint32_t spikeCount;                   // Total spike count (for statistics)
     
     NeuronState()
         : membranePotential(-70.0f)
@@ -37,7 +38,8 @@ struct NeuronState {
         , refractoryRemaining(0)
         , refractoryPeriod(5)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+        , spikeCount(0) {}
 };
 
 // Neuron class representing a single neuron

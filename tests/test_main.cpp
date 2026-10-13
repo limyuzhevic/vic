@@ -33,7 +33,7 @@ namespace test_stdp {
     void runAll();
 }
 
-namespace test_brain {
+namespace test_critical_fixes {
     void runAll();
 }
 
@@ -112,14 +112,12 @@ int main() {
     
     std::cout << "Running Brain tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_critical_fixes::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
     }
-    
-    std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
         return 0;

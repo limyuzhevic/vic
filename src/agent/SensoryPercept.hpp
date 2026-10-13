@@ -40,19 +40,62 @@ public:
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
-    // Timestamp
-    double getTimestamp() const { return timestamp_; }
-    void setTimestamp(double t) { timestamp_ = t; }
+    // Get total expected signal count (for validation)
+    size_t getTotalSignalCount() const;
     
-private:
-    std::vector<float> vision_;
-    size_t visionWidth_;
-    size_t visionHeight_;
-    std::vector<float> touch_;
-    std::vector<float> internal_;
-    std::vector<float> proprioception_;
-    std::vector<float> audio_;
-    double timestamp_;
+    // Setters with bounds checking
+    void setVision(const std::vector<float>& v);
+    void setTouch(const std::vector<float>& t);
+    void setInternal(const std::vector<float>& i);
+    void setProprioception(const std::vector<float>& p);
+    void setAudio(const std::vector<float>& a);
+    
+    // Validation methods
+    bool isVisionValid(const std::vector<float>& v) const;
+    bool isTouchValid(const std::vector<float>& t) const;
+    bool isInternalValid(const std::vector<float>& i) const;
+    bool isProprioceptionValid(const std::vector<float>& p) const;
+    
+    // Configuration
+    void setVisionDimensions(size_t width, size_t height);
+    void setTouchCount(size_t count);
+    void setInternalCount(size_t count);
+    void setProprioceptionCount(size_t count);
+    
+    // Get configuration
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    size_t getTouchCount() const { return touch_.size(); }
+    size_t getInternalCount() const { return internal_.size(); }
+    size_t getProprioceptionCount() const { return proprioception_.size(); }
+    size_t getAudioCount() const { return audio_.size(); }
+    
+    // Setters with bounds checking
+    void setVision(const std::vector<float>& v);
+    void setTouch(const std::vector<float>& t);
+    void setInternal(const std::vector<float>& i);
+    void setProprioception(const std::vector<float>& p);
+    void setAudio(const std::vector<float>& a);
+    
+    // Validation methods
+    bool isVisionValid(const std::vector<float>& v) const;
+    bool isTouchValid(const std::vector<float>& t) const;
+    bool isInternalValid(const std::vector<float>& i) const;
+    bool isProprioceptionValid(const std::vector<float>& p) const;
+    
+    // Configuration
+    void setVisionDimensions(size_t width, size_t height);
+    void setTouchCount(size_t count);
+    void setInternalCount(size_t count);
+    void setProprioceptionCount(size_t count);
+    
+    // Get configuration
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    size_t getTouchCount() const { return touch_.size(); }
+    size_t getInternalCount() const { return internal_.size(); }
+    size_t getProprioceptionCount() const { return proprioception_.size(); }
+    size_t getAudioCount() const { return audio_.size(); }
 };
 
 } // namespace nlm

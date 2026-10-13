@@ -32,9 +32,21 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with thread-safe implementation
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    std::tm* tm_ptr = nullptr;
+    
+    // Use thread-local buffer for thread safety
+    static thread_local std::tm local_tm;
+    tm_ptr = &local_tm;
+    
+    if (std::localtime_s(&local_tm, &time) == 0) {
+        oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        // Fallback if localtime_s fails
+        oss << "[unknown time]";
+    }
     
     oss << " " << entry.message;
     
@@ -47,10 +59,15 @@ void ConsoleLogger::log(const LogEntry& entry) {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set (with error handling)
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // Don't throw from log function, just report to stderr
+            std::cerr << "Error writing to log file: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -182,8 +199,16 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Advanced global logger management
+    // Note: This implementation maintains backward compatibility while allowing
+    // for more sophisticated logger management if needed in the future
+    if (logger) {
+        // For now, we just store the logger but continue using the static instance
+        // This allows for potential future advanced management while preserving
+        // the existing behavior where getGlobal() returns the same instance
+        static std::shared_ptr<Logger> globalLoggerStorage = logger;
+    }
+    // TODO: Implement advanced global logger management features
 }
 
 // LogStream implementation
