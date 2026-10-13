@@ -67,11 +67,13 @@ void Neuron::setThreshold(MembranePotential threshold) {
 }
 
 void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+    if (pImpl) {
+        pImpl->state.firingState = state;
+    }
 }
 
 void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
+    if (pImpl && pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
@@ -80,38 +82,52 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
-    pImpl->state.firingRate = rate;
+    if (pImpl) {
+        pImpl->state.firingRate = rate;
+    }
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    if (pImpl) {
+        pImpl->state.leakConductance = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
+    if (!pImpl) return 0.0f;
     return pImpl->state.leakConductance;
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    if (pImpl) {
+        pImpl->state.refractoryPeriod = steps;
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
+    if (!pImpl) return 0;
     return pImpl->state.refractoryPeriod;
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    if (pImpl) {
+        pImpl->state.restingPotential = potential;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
+    if (!pImpl) return 0.0f;
     return pImpl->state.restingPotential;
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    if (pImpl) {
+        pImpl->state.resetPotential = potential;
+    }
 }
 
 bool Neuron::checkThreshold() const {
+    if (!pImpl) return false;
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
@@ -188,8 +204,10 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
+    
+    if (!pImpl) return;
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
@@ -266,12 +284,15 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    if (!pImpl) return;
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
+    if (!pImpl) return;
+    
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);

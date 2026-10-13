@@ -22,7 +22,6 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
-class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
