@@ -22,26 +22,89 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 
 ConsoleLogger::~ConsoleLogger() = default;
 
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->sessionStartTime = std::chrono::system_clock::now();
+}
+
+ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
+    pImpl->level = level;
+    pImpl->sessionStartTime = std::chrono::system_clock::now();
+}
+
+ConsoleLogger::~ConsoleLogger() = default;
+
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
         return;
     }
     
+    // Apply component filtering
+    if (!pImpl->includeComponents.empty() || !pImpl->excludeComponents.empty()) {
+        std::string component = extractComponentFromMessage(entry.message);
+        if (!component.empty()) {
+            if (!pImpl->includeComponents.empty() && 
+                std::find(pImpl->includeComponents.begin(), pImpl->includeComponents.end(), component) == pImpl->includeComponents.end()) {
+                return;
+            }
+            if (std::find(pImpl->excludeComponents.begin(), pImpl->excludeComponents.end(), component) != pImpl->excludeComponents.end()) {
+                return;
+            }
+        }
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
+    if (pImpl->enableStructuredLogging) {
+        // Structured logging format (JSON)
+        oss << "{";
+        oss << "\"timestamp\":\"" << formatTimestamp(entry.timestamp) << "\",";
+        oss << "\"level\":\"" << levelToString(entry.level) << "\",";
+        oss << "\"component\":\"" << extractComponentFromMessage(entry.message) << "\",";
+        oss << "\"message\":\"" << escapeString(entry.message) << "\"";
+        if (!entry.file.empty()) {
+            oss << ",\"file\":\"" << entry.file << "\"";
+        }
+        if (entry.line > 0) {
+            oss << ",\"line\":" << entry.line;
+        }
+        oss << "}";
+    } else {
+        // Traditional log format
+        oss << "[" << levelToString(entry.level) << "] ";
+        
+        // Add session duration for better debugging
+        auto duration = std::chrono::system_clock::now() - pImpl->sessionStartTime;
+        oss << "[+" << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << "s] ";
+        
+        // Add timestamp
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        
+        oss << " " << entry.message;
+        
+        // Add context if available
+        if (!entry.file.empty() && entry.line > 0) {
+            oss << " (" << entry.file << ":" << entry.line << ")";
+        }
+        if (!entry.function.empty()) {
+            oss << " [" << entry.function << "]";
+        }
+    }
     
     std::string output = oss.str();
     
+    // Handle file rotation if enabled
+    if (pImpl->enableFileRotation && pImpl->fileOut.is_open()) {
+        if (pImpl->currentFileSize + output.size() > pImpl->maxFileSize) {
+            rotateLogFile();
+        }
+        pImpl->currentFileSize += output.size() + 1;  // +1 for newline
+    }
+    
     // Console output
-    if (pImpl->useColors) {
+    if (pImpl->useColors && !pImpl->enableStructuredLogging) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
@@ -50,6 +113,9 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
+        if (pImpl->enableFileRotation) {
+            pImpl->currentFileSize += output.size() + 1;
+        }
         pImpl->fileOut.flush();
     }
 }

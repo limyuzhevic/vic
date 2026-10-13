@@ -51,15 +51,39 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    if (type < NeuronType::Sensory || type > NeuronType::Modulatory) {
+        NLM_LOG_ERROR("Invalid neuron type: " + std::to_string(static_cast<int>(type)));
+        return;
+    }
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential range (realistic neuron potentials are between -100mV and 50mV)
+    if (potential < -100.0f || potential > 50.0f) {
+        NLM_LOG_ERROR("Invalid membrane potential: " + std::to_string(potential) + "mV. Clamping to safe range.");
+        pImpl->state.membranePotential = std::clamp(potential, -100.0f, 50.0f);
+        return;
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+    // Validate delta to prevent extreme changes
+    if (std::abs(delta) > 50.0f) {
+        NLM_LOG_WARNING("Large membrane potential delta: " + std::to_string(delta) + "mV. May indicate instability.");
+    }
+    
+    float newPotential = pImpl->state.membranePotential + delta;
+    // Clamp to prevent instability
+    if (newPotential < -100.0f || newPotential > 50.0f) {
+        float clampedDelta = std::clamp(newPotential - pImpl->state.membranePotential, -50.0f, 50.0f);
+        pImpl->state.membranePotential += clampedDelta;
+        NLM_LOG_DEBUG("Membrane potential clamped from " + std::to_string(newPotential) + "mV to " + 
+                     std::to_string(pImpl->state.membranePotential) + "mV");
+    } else {
+        pImpl->state.membranePotential = newPotential;
+    }
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
@@ -92,6 +116,14 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period (should be between 1 and 1000 ms)
+    if (steps == 0) {
+        NLM_LOG_WARNING("Refractory period cannot be zero. Using minimum value of 1ms.");
+        steps = 1;
+    } else if (steps > 1000) {
+        NLM_LOG_WARNING("Refractory period " + std::to_string(steps) + "ms is very long. Clamping to 1000ms.");
+        steps = 1000;
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -108,6 +140,12 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Validate reset potential range (should be close to resting potential)
+    if (potential < -80.0f || potential > -40.0f) {
+        NLM_LOG_WARNING("Reset potential " + std::to_string(potential) + "mV is outside typical range. Using resting potential default.");
+        pImpl->state.resetPotential = pImpl->state.restingPotential;
+        return;
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -122,12 +160,36 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
+    
+    // Validate input amplitude
+    if (amplitude < 0.0f) {
+        NLM_LOG_ERROR("Excitatory input amplitude cannot be negative: " + std::to_string(amplitude) + ". Using absolute value.");
+        amplitude = std::abs(amplitude);
+    }
+    
+    // Warn about extremely large inputs that could indicate instability
+    if (amplitude > 100.0f) {
+        NLM_LOG_WARNING("Extremely large excitatory input: " + std::to_string(amplitude) + "mV. May indicate instability.");
+    }
+    
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
+    
+    // Validate input amplitude
+    if (amplitude < 0.0f) {
+        NLM_LOG_ERROR("Inhibitory input amplitude cannot be negative: " + std::to_string(amplitude) + ". Using absolute value.");
+        amplitude = std::abs(amplitude);
+    }
+    
+    // Warn about extremely large inputs that could indicate instability
+    if (amplitude > 100.0f) {
+        NLM_LOG_WARNING("Extremely large inhibitory input: " + std::to_string(amplitude) + "mV. May indicate instability.");
+    }
+    
     pImpl->synapticInput -= amplitude;
 }
 
@@ -140,6 +202,12 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    
+    // Validate input current
+    if (current < -100.0f || current > 100.0f) {
+        NLM_LOG_WARNING("Direct current injection " + std::to_string(current) + "mV is outside typical range. This may indicate unstable input.");
+    }
+    
     pImpl->synapticInput += current;
 }
 
@@ -148,6 +216,12 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    // Validate spike timestamp
+    if (timestamp < 0.0f) {
+        NLM_LOG_ERROR("Spike timestamp cannot be negative: " + std::to_string(timestamp) + ". Using 0.0.");
+        timestamp = 0.0f;
+    }
+    
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -175,6 +249,11 @@ PlasticityFlags& Neuron::getPlasticityFlags() {
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    // Validate plasticity flags
+    if (!hebbian && !stdp && !rewardModulated) {
+        NLM_LOG_WARNING("All plasticity flags are false. Neuron will not learn.");
+    }
+    
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
