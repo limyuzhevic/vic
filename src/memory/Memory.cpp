@@ -1,53 +1,8 @@
-#include "Memory.hpp"
-#include <algorithm>
-
-namespace nlm {
-
-// Working Memory Implementation
-struct WorkingMemory::Impl {
-    std::vector<std::pair<NeuronId, float>> items;
-    size_t capacity;
-    
-    Impl(size_t cap) : capacity(cap) {}
-};
-
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
-
-WorkingMemory::~WorkingMemory() = default;
-
-void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
-    }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
-    }
-}
-
-float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
-    }
-    return 0.0f;
-}
-
-bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void WorkingMemory::clear() {
-    pImpl->items.clear();
+// PHASE 1 REDUNDANT CODE REMOVED
+// Basic memory implementations (WorkingMemory, EpisodicMemory, etc.)
+// were placeholders superseded by Phase 2 neural memory implementations
+// (NeuralWorkingMemory, NeuralEpisodicMemory, NeuralAssociativeMemory)
+// These files have been removed to eliminate code duplication and confusion
 }
 
 size_t WorkingMemory::getCapacity() const {

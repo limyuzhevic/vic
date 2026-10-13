@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/EnhancedConfig.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -85,6 +86,7 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/AdvancedVisualizationSystem.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -94,8 +96,8 @@ target_include_directories(nlm_core PUBLIC
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AgentBody.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
