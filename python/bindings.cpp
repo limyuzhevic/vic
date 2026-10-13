@@ -27,6 +27,9 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Add Python package version
+    m.attr("__version__") = "0.1.0";
+
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")

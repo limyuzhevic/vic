@@ -49,8 +49,17 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // Error writing to file - attempt to recover by closing and reopening
+            std::string filepath = "unknown";
+            // Extract filepath from the ofstream object (platform-specific)
+            pImpl->fileOut.close();
+            NLM_LOG_ERROR(std::string("Failed to write to log file, error: ") + e.what() +
+                         std::string(" - Log file will be disabled until restart"));
+        }
     }
 }
 
@@ -71,10 +80,24 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        NLM_LOG_ERROR(std::string("Failed to open log file: ") + filepath);
+    } else {
+        NLM_LOG_INFO(std::string("Logging to file: ") + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
