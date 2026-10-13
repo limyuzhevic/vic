@@ -142,9 +142,119 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+// Load configuration from default values
+def Config::loadDefaults() {
+    // Set default configuration values for Phase 6
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    
+    // Plasticity settings
+    set("plasticity_learning_rate", 0.01f, ConfigSource::Default);
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Development settings
+    set("synaptogenesis_rate", 0.001f, ConfigSource::Default);
+    set("pruning_rate", 0.0001f, ConfigSource::Default);
+    
+    // Neuromodulation settings
+    set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    
+    // Reward settings
+    set("reward_discount_factor", 0.99f, ConfigSource::Default);
+    
+    // Environment settings
+    set("environment_name", "GridWorld", ConfigSource::Default);
+    set("environment_width", 10, ConfigSource::Default);
+    set("environment_height", 10, ConfigSource::Default);
+    
+    // Logging settings
+    set("log_level", "INFO", ConfigSource::Default);
+    set("log_to_file", false, ConfigSource::Default);
+    set("log_filename", "nlm.log", ConfigSource::Default);
+    
+    // Simulation settings
+    set("max_simulation_steps", 10000u, ConfigSource::Default);
+    set("simulation_time_limit", 0.0, ConfigSource::Default);
+    
+    // Visualization settings
+    set("visualization_enabled", false, ConfigSource::Default);
+    set("visualization_update_rate", 30.0f, ConfigSource::Default);
+}
+
+// Get values with type validation
+template<typename T>
+std::optional<T> Config::getValidated(const std::string& key) const {
+    auto value = get<T>(key);
+    if (!value.has_value()) {
+        return std::nullopt;
+    }
+    
+    // Additional type-specific validation could be added here
+    if (!validateType<T>(value.value())) {
+        NLM_LOG_WARNING("Configuration value validation failed for key: " + key);
+        return std::nullopt;
+    }
+    
+    return value;
+}
+
+// Set values with validation
+void Config::setValidated(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (validateType<decltype(value)>(value)) {
+        set(key, value, source);
+    } else {
+        NLM_LOG_ERROR("Invalid configuration value for key: " + key);
+    }
+}
+
+// Check existence and validate
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+}
+
+// Validate all configuration values
+bool Config::validate() const {
+    bool isValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!validateTypeHelper(entry.value)) {
+            NLM_LOG_ERROR("Invalid configuration value for key: " + entry.key + 
+                         " (type: " + std::to_string(static_cast<int>(entry.source)) + ")");
+            isValid = false;
+        }
+    }
+    
+    return isValid;
+}
+
+// Validation helper
+bool Config::validateTypeHelper(const ConfigValue& value) const {
+    return std::visit([](const auto& val) -> bool {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return true; // All integers are valid
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::isfinite(val); // Finite double
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return true; // All booleans are valid
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return !val.empty(); // Non-empty string
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return true; // Any vector of ints is valid
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return true; // Any vector of doubles is valid (but could check for finite values)
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return !val.empty(); // Non-empty vector
+        } else {
+            return false; // Unknown type
+        }
+    }, value);
 }
 
 void Config::remove(const std::string& key) {

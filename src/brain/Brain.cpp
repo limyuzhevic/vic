@@ -261,9 +261,13 @@ bool Brain::initialize() {
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
+        // Count spikes and optionally log detailed spike events
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Optional: Log spike activity for debugging
+        // NLM_LOG_DEBUG("Spike detected from neuron " + std::to_string(event.neuron_id) +
+        //              " at time " + std::to_string(event.spike_time));
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -726,8 +730,21 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
 }
 
 void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
+    // Update plasticity rules based on recent activity
+    // This method is called during each simulation step to update
+    // synaptic weights based on STDP and Hebbian rules
+    
+    // The plasticity is applied during step() method, but we provide
+    // this method for API compatibility and potential external calling
+    
+    // Update STDP plasticity based on recent spike timing
+    pImpl->stdp->update(pImpl->spikeSystem, pImpl->totalSpikesTotal);
+    
+    // Update Hebbian plasticity based on correlated activity
+    pImpl->hebbian->update(pImpl->spikeSystem);
+    
+    // Update structural plasticity (development)
+    pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
 void Brain::develop() {
@@ -895,9 +912,31 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match by neuron pair
+        NLM_LOG_INFO("Applying " + std::to_string(synapseData.weight.size()) + " synapse states...");
+        
+        // Reset existing synapses before applying loaded states
+        for (auto& region : pImpl->regions) {
+            for (auto& synapse : region->getSynapses()) {
+                synapse->reset();
+            }
+        }
+        
+        // We need the neural network to match loaded synapses with current neurons
+        // For now, apply to first N synapses that exist
+        size_t synapseCount = 0;
+        for (auto& region : pImpl->regions) {
+            auto& synapses = region->getSynapses();
+            for (size_t i = 0; i < synapseData.weight.size() && synapseCount < synapses.size(); ++i) {
+                if (synapses[synapseCount]) {
+                    synapses[synapseCount]->setWeight(synapseData.weight[i]);
+                    synapses[synapseCount]->enablePlasticity(true, true, false);
+                    synapseCount++;
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Applied " + std::to_string(std::min(synapseCount, synapseData.weight.size())) + " synapse states");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1112,6 +1151,81 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// Get current simulation time
+Timestamp Brain::getCurrentTime() const {
+    return pImpl->currentTime;
+}
+
+// Get current step
+SimulationStep Brain::getCurrentStep() const {
+    return pImpl->currentStep;
+}
+
+// Get random generator
+RandomGenerator* Brain::getRandomGenerator() {
+    return pImpl->rng.get();
+}
+
+// Get configuration reference
+std::shared_ptr<const Config> Brain::getConfig() const {
+    return pImpl->config;
+}
+
+// Debug: Print current brain state to log
+void Brain::debugPrintBrainState() const {
+    NLM_LOG_DEBUG("=== Brain State Debug ===");
+    NLM_LOG_DEBUG("Step: " + std::to_string(pImpl->currentStep) +
+                 ", Time: " + std::to_string(pImpl->currentTime));
+    NLM_LOG_DEBUG("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_DEBUG("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_DEBUG("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_DEBUG("Firing neurons: " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_DEBUG("Total spikes: " + std::to_string(getTotalSpikeCount()));
+    
+    for (size_t i = 0; i < std::min(size_t(5), getRegionCount()); ++i) {
+        auto region = getRegion(static_cast<RegionId>(i + 1));
+        if (region) {
+            NLM_LOG_DEBUG("Region " + std::to_string(i + 1) + ": " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
+        }
+    }
+}
+
+// Experimental: Force specific neuron type activity
+void Brain::experimentalForceNeuronsOfType(NeuronType type, float current = 50.0f) {
+    NLM_LOG_WARNING("EXPERIMENTAL: Forcing " + std::to_string(type) +
+                   " neuron activity with current " + std::to_string(current));
+    
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == type) {
+                neuron->injectCurrent(current);
+            }
+        }
+    }
+}
+
+// Experimental: Rapidly increase synapse weights
+void Brain::experimentalHyperplasticBurst(size_t count, float weightDelta = 0.1f) {
+    NLM_LOG_WARNING("EXPERIMENTAL: Hyperplastic burst - adjusting " +
+                   std::to_string(count) + " synapses by " + std::to_string(weightDelta));
+    
+    size_t adjusted = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto& synapse : region->getSynapses()) {
+            if (adjusted >= count) break;
+            
+            float newWeight = synapse->getWeight() + weightDelta;
+            synapse->setWeight(newWeight);
+            adjusted++;
+        }
+        if (adjusted >= count) break;
+    }
+    
+    NLM_LOG_WARNING("Adjusted " + std::to_string(adjusted) + " synapses");
+}
 }
 
 } // namespace nlm

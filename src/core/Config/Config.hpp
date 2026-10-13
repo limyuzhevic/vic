@@ -61,25 +61,31 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load configuration from default values
+    void loadDefaults();
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with type validation
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    std::optional<T> getValidated(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    // Set values with validation
+    void setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Check existence and validate
     bool has(const std::string& key) const;
+    
+    // Validate all configuration values
+    bool validate() const;
     
     // Remove key
     void remove(const std::string& key);
@@ -100,6 +106,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    template<typename T>
+    bool validateType(const ConfigValue& value) const;
 };
 
 } // namespace nlm
