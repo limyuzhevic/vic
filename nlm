@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+
+import os
+os.chmod(__file__, 0o755)
+
+
+import os
+os.chmod(__file__, 0o755)
+
+"""
+NLM Command Line Interface (CLI) Tool
+
+A comprehensive command-line interface for the NLM (Neural Learning Machine)
+neural simulation framework. Provides commands for running simulations,
+configuring brains, analyzing results, and benchmarking performance.
+"""
+
+import argparse
+import json
+import sys
+import os
+import time
+import threading
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+import yaml if sys.version_info >= (3, 6) else None
+
+# Add the python directory to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'python'))
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Error: pynlm module not available. Please build the Python bindings first.")
+
+
+class NLMCLI:
+    """Main CLI class providing all NLM commands."""
+    
+    def __init__(self):
+        self.brain = None
+        self.world = None
+        self.agent = None
+        self.config = None
+        
+    def create_brain(self, config_file=None, parameters=None):
+        """Create and initialize a brain with optional configuration."""
+        if not PYNLM_AVAILABLE:
+            return False
+            
+        if config_file:
+            self.config = pynlm.createDefaultConfig()
+            if not self.config.loadFromFile(config_file):
+                print(f"Warning: Could not load config from {config_file}")
+                self.config = pynlm.createDefaultConfig()
+        else:
+            self.config = pynlm.createDefaultConfig()
+            
+        # Apply custom parameters if provided
+        if parameters:
+            for key, value in parameters.items():
+                self.config.set(key, value)
+                
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        print(f"Brain created with {self.brain.getTotalNeuronCount()} neurons")
+        return True
+        
+    def run_simulation(self, steps, world_config=None, agent_config=None):
+        """Run a simulation for the specified number of steps."""
+        if not self.brain:
+            print("Error: No brain created. Use 'config create' first.")
+            return False
+            
+        # Create world if specified
+        if world_config:
+            self.world = pynlm.createSimpleWorld()
+            self.world.configure(
+                width=world_config.get('width', 10),
+                height=world_config.get('height', 10),
+                visionWidth=world_config.get('visionWidth', 8),
+                visionHeight=world_config.get('visionHeight', 8)
+            )
+            self.world.reset()
+            
+            # Create agent if brain exists
+            self.agent = pynlm.createAgentBrain(self.brain)
+            self.agent.initialize(self.world)
+            
+            # Enable features if specified
+            if agent_config:
+                if agent_config.get('reward_modulation', False):
+                    self.agent.enableRewardModulation(True)
+                if agent_config.get('curiosity', False):
+                    self.agent.enableCuriosity(True)
+                if agent_config.get('development', False):
+                    self.agent.enableDevelopment(True)
+                if agent_config.get('structural_plasticity', False):
+                    self.agent.enableStructuralPlasticity(True)
+        
+        print(f"Running simulation for {steps} steps...")
+        start_time = time.time()
+        
+        for step in range(steps):
+            if self.world:
+                # World simulation loop
+                self.world.update(0.1)
+                percept = self.world.getSensoryPercept()
+                self.agent.processSensoryInput(percept)
+                self.brain.step(step)
+                action = self.agent.decodeMotorCommand()
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                
+                # Apply reward if agent is enabled
+                if self.agent.isRewardModulationEnabled():
+                    reward = self.world.getAgentBody().health * 0.1
+                    predicted = self.agent.getPredictionError()
+                    self.agent.applyRewardModulation(reward, predicted)
+            else:
+                # Simple brain-only simulation
+                self.brain.step(step)
+                
+            if step % 100 == 0:
+                print(f"  Step {step}/{steps} - "
+                      f"Firing: {self.brain.getFiringNeuronCount()}, "
+                      f"Spikes: {self.brain.getTotalSpikeCount()}")
+        
+        elapsed = time.time() - start_time
+        print(f"Simulation completed in {elapsed:.2f} seconds")
+        
+        # Print final statistics
+        print("\nFinal Statistics:")
+        print(f"  Total Neurons: {self.brain.getTotalNeuronCount()}")
+        print(f"  Active Neurons: {self.brain.getActiveNeuronCount()}")
+        print(f"  Firing Neurons: {self.brain.getFiringNeuronCount()}")
+        print(f"  Total Spikes: {self.brain.getTotalSpikeCount()}")
+        print(f"  Average Firing Rate: {self.brain.getAverageFiringRate():.2f}")
+        if self.brain.getDevelopmentalStage():
+            print(f"  Developmental Stage: {self.brain.getDevelopmentalStage()}")
+            
+        return True
+        
+    def save_brain(self, filepath):
+        """Save brain state to file."""
+        if not self.brain:
+            print("Error: No brain to save.")
+            return False
+            
+        if self.brain.save(filepath):
+            print(f"Brain saved to {filepath}")
+            return True
+        else:
+            print(f"Error: Failed to save brain to {filepath}")
+            return False
+            
+    def load_brain(self, filepath):
+        """Load brain state from file."""
+        if not self.brain:
+            print("Error: No brain instance to load into.")
+            return False
+            
+        if self.brain.load(filepath):
+            print(f"Brain loaded from {filepath}")
+            return True
+        else:
+            print(f"Error: Failed to load brain from {filepath}")
+            return False
+            
+    def create_config(self, config_file=None, parameters=None):
+        """Create and display configuration options."""
+        self.config = pynlm.createDefaultConfig()
+        
+        if config_file and os.path.exists(config_file):
+            if self.config.loadFromFile(config_file):
+                print(f"Configuration loaded from {config_file}")
+            else:
+                print(f"Warning: Could not load {config_file}")
+                
+        if parameters:
+            for key, value in parameters.items():
+                self.config.set(key, value)
+                print(f"Set {key} = {value}")
+                
+        print("\nConfiguration Summary:")
+        print(self.config.summary())
+        return True
+        
+    def list_configs(self):
+        """List available configuration options."""
+        if not self.config:
+            self.config = pynlm.createDefaultConfig()
+            
+        print("Available Configuration Options:")
+        keys = self.config.getKeys()
+        for key in sorted(keys):
+            print(f"  {key}")
+            
+        return True
+
+
+def create_parser():
+    """Create the main argument parser."""
+    parser = argparse.ArgumentParser(
+        description="NLM (Neural Learning Machine) Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Create a simple brain
+  nlm run --steps 100
+  
+  # Run with world and agent
+  nlm run --steps 1000 --world-config "width=20 height=20"
+  
+  # Create custom brain configuration
+  nlm config create --parameters "neuron_count=1000 excitation_rate=0.8"
+  
+  # Save and load brain states
+  nlm brain save --file brain_state.json
+  nlm brain load --file brain_state.json
+  
+  # Run benchmark
+  nlm benchmark --steps 500 --repeats 10
+        """
+    )
+    
+    # Global options
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose output"
+    )
+    
+    parser.add_argument(
+        "--config", "-c",
+        help="Configuration file path"
+    )
+    
+    # Subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run a simulation")
+    run_parser.add_argument(
+        "--steps", "-s", type=int, default=100,
+        help="Number of simulation steps"
+    )
+    run_parser.add_argument(
+        "--world-config", default="",
+        help="World configuration (format: width=10 height=10 visionWidth=8 visionHeight=8)"
+    )
+    run_parser.add_argument(
+        "--agent-config", default="",
+        help="Agent configuration (format: reward_modulation=true curiosity=true)"
+    )
+    run_parser.add_argument(
+        "--brain-config", default="",
+        help="Brain configuration file path"
+    )
+    
+    # Config command
+    config_parser = subparsers.add_parser("config", help="Manage configuration")
+    config_subparsers = config_parser.add_subparsers(dest="config_command", help="Config command")
+    
+    create_parser = config_subparsers.add_parser("create", help="Create configuration")
+    create_parser.add_argument(
+        "--parameters", "-p", default="",
+        help="Parameters (format: key1=value1 key2=value2)"
+    )
+    
+    config_subparsers.add_parser("list", help="List configuration options")
+    
+    # Brain commands
+    brain_parser = subparsers.add_parser("brain", help="Brain management")
+    brain_subparsers = brain_parser.add_subparsers(dest="brain_command", help="Brain command")
+    
+    save_parser = brain_subparsers.add_parser("save", help="Save brain state")
+    save_parser.add_argument("file", help="Output file path")
+    
+    load_parser = brain_subparsers.add_parser("load", help="Load brain state")
+    load_parser.add_argument("file", help="Input file path")
+    
+    # Analysis command
+    analysis_parser = subparsers.add_parser("analyze", help="Analyze brain data")
+    analysis_parser.add_argument("file", help="Brain data file path")
+    analysis_parser.add_argument(
+        "--format", choices=["json", "csv", "text"], default="text",
+        help="Analysis output format"
+    )
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser("benchmark", help="Run performance benchmark")
+    benchmark_parser.add_argument(
+        "--steps", "-s", type=int, default=100,
+        help="Number of steps per benchmark run"
+    )
+    benchmark_parser.add_argument(
+        "--repeats", type=int, default=5,
+        help="Number of benchmark repetitions"
+    )
+    benchmark_parser.add_argument(
+        "--world", action="store_true",
+        help="Include world simulation in benchmark"
+    )
+    
+    # Example command
+    example_parser = subparsers.add_parser("example", help="Run built-in examples")
+    example_parser.add_argument(
+        "name", choices=["simple", "world", "agent", "learning"],
+        help="Example to run"
+    )
+    
+    # Help command
+    help_parser = subparsers.add_parser("help", help="Show detailed help")
+    help_parser.add_argument(
+        "topic", nargs="?", default="",
+        help="Help topic (brain, world, agent, config, etc.)"
+    )
+    
+    return parser
+
+
+def parse_config_string(config_str):
+    """Parse configuration string into dictionary."""
+    config = {}
+    if not config_str:
+        return config
+        
+    for pair in config_str.split():
+        if '=' in pair:
+            key, value = pair.split('=', 1)
+            # Try to convert to appropriate type
+            if value.lower() in ('true', 'false'):
+                config[key] = value.lower() == 'true'
+            elif value.isdigit():
+                config[key] = int(value)
+            else:
+                try:
+                    config[key] = float(value)
+                except ValueError:
+                    config[key] = value
+                    
+    return config
+
+
+def parse_agent_config_string(config_str):
+    """Parse agent configuration string."""
+    config = {}
+    if not config_str:
+        return config
+        
+    for pair in config_str.split():
+        if '=' in pair:
+            key, value = pair.split('=', 1)
+            config[key] = value.lower() == 'true' if value.lower() in ('true', 'false') else value
+            
+    return config
+
+
+def main():
+    """Main entry point for the CLI tool."""
+    parser = create_parser()
+    args = parser.parse_args()
+    
+    # Initialize CLI
+    cli = NLMCLI()
+    
+    try:
+        if args.command == "run":
+            # Parse configuration strings
+            world_config = parse_config_string(args.world_config)
+            agent_config = parse_agent_config_string(args.agent_config)
+            
+            # Create brain if config file specified
+            if args.brain_config:
+                if not cli.create_brain(args.brain_config):
+                    sys.exit(1)
+            else:
+                # Create default brain
+                if not cli.create_brain():
+                    sys.exit(1)
+                    
+            # Run simulation
+            if not cli.run_simulation(args.steps, world_config if world_config else None, 
+                                    agent_config if agent_config else None):
+                sys.exit(1)
+                
+        elif args.command == "config":
+            if args.config_command == "create":
+                parameters = {}
+                if args.parameters:
+                    for param in args.parameters.split():
+                        if '=' in param:
+                            key, value = param.split('=', 1)
+                            parameters[key] = value
+                            
+                cli.create_config(args.config, parameters)
+            elif args.config_command == "list":
+                cli.list_configs()
+                
+        elif args.command == "brain":
+            if args.brain_command == "save":
+                if not cli.create_brain():
+                    sys.exit(1)
+                cli.save_brain(args.file)
+            elif args.brain_command == "load":
+                if not cli.create_brain():
+                    sys.exit(1)
+                cli.load_brain(args.file)
+                
+        elif args.command == "analyze":
+            if PYNLM_AVAILABLE:
+                print("Analysis feature requires brain state file.")
+                print("Run 'nlm run' first to create a brain, then use 'nlm brain save'")
+            else:
+                print("pynlm not available for analysis")
+                
+        elif args.command == "benchmark":
+            if PYNLM_AVAILABLE:
+                if not cli.create_brain():
+                    sys.exit(1)
+                    
+                print(f"Running benchmark: {args.repeats} runs x {args.steps} steps")
+                times = []
+                
+                for run in range(args.repeats):
+                    print(f"  Run {run + 1}/{args.repeats}")
+                    start_time = time.time()
+                    cli.run_simulation(args.steps)
+                    elapsed = time.time() - start_time
+                    times.append(elapsed)
+                    print(f"    Time: {elapsed:.2f}s")
+                
+                avg_time = sum(times) / len(times)
+                min_time = min(times)
+                max_time = max(times)
+                
+                print(f"\nBenchmark Results ({args.repeats} runs):")
+                print(f"  Average: {avg_time:.2f}s per run")
+                print(f"  Min: {min_time:.2f}s")
+                print(f"  Max: {max_time:.2f}s")
+                print(f"  Steps/sec: {args.steps / avg_time:.1f}")
+            else:
+                print("Benchmark requires pynlm module")
+                
+        elif args.command == "example":
+            print(f"Running example: {args.name}")
+            # Implementation would be added here
+            print("Example functionality will be added in a future version")
+            
+        elif args.command == "help":
+            if args.topic:
+                print(f"Help for topic '{args.topic}' would be shown here")
+            else:
+                parser.print_help()
+                
+        elif args.command is None:
+            parser.print_help()
+            
+        else:
+            print(f"Unknown command: {args.command}")
+            parser.print_help()
+            sys.exit(1)
+            
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
