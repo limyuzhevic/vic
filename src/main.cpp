@@ -345,6 +345,14 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string checkpointFile;
+    bool enableCheckpoint = false;
+    bool enableDebug = false;
+    bool enableAdvanced = false;
+    int devStage = -1;  // -1 means use config/default, -2 means disable development
+    double customTimestep = 0.0;  // 0.0 means use config/default
+    int advancedTest = 0;  // 0 means normal tests, >0 means advanced test mode
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -352,6 +360,50 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+                enableCheckpoint = true;
+            } else {
+                NLM_LOG_WARNING("Checkpoint file not specified, using default");
+            }
+        } else if (arg == "--enable-checkpoint") {
+            enableCheckpoint = true;
+        } else if (arg == "--debug") {
+            enableDebug = true;
+        } else if (arg == "--advanced") {
+            enableAdvanced = true;
+        } else if (arg == "--dev-stage") {
+            if (i + 1 < argc) {
+                try {
+                    devStage = std::stoi(argv[++i]);
+                    if (devStage < -2 || devStage > 4) {
+                        NLM_LOG_WARNING("Invalid developmental stage, must be -2 to 4");
+                        devStage = -1;
+                    }
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid developmental stage value");
+                    devStage = -1;
+                }
+            }
+        } else if (arg == "--timestep") {
+            if (i + 1 < argc) {
+                try {
+                    customTimestep = std::stod(argv[++i]);
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid timestep value");
+                    customTimestep = 0.0;
+                }
+            }
+        } else if (arg == "--test-mode") {
+            if (i + 1 < argc) {
+                try {
+                    advancedTest = std::stoi(argv[++i]);
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid test mode value");
+                    advancedTest = 0;
+                }
             }
         }
     }
@@ -365,6 +417,12 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Apply command-line overrides
+    if (customTimestep > 0.0) {
+        config->set("simulation_timestep", customTimestep, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Override timestep: " + std::to_string(customTimestep) + "s");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,15 +440,51 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Advanced memory settings
+    config->set("memory_capacity", static_cast<size_t>(1000), ConfigSource::Default);
+    config->set("episodes_max", static_cast<size_t>(1000), ConfigSource::Default);
+    config->set("replay_interval", static_cast<size_t>(100), ConfigSource::Default);
+    
+    // Advanced neuromodulation settings
+    config->set("dopamine_scale", 1.0f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.5f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.3f, ConfigSource::Default);
+    
+    // Apply advanced settings if enabled
+    if (enableAdvanced) {
+        NLM_LOG_INFO("=== ADVANCED MODE ENABLED ===");
+        
+        // Enable advanced features
+        config->set("enable_advanced_memory", true, ConfigSource::Runtime);
+        config->set("enable_advanced_neuromodulation", true, ConfigSource::Runtime);
+        config->set("enable_advanced_planning", true, ConfigSource::Runtime);
+        config->set("enable_advanced_prediction", true, ConfigSource::Runtime);
+        
+        NLM_LOG_INFO("Advanced features enabled:");
+        NLM_LOG_INFO("  - Advanced memory systems (working + episodic)");
+        NLM_LOG_INFO("  - Advanced neuromodulation (dopamine, curiosity, novelty)");
+        NLM_LOG_INFO("  - Advanced planning (neural planner)");
+        NLM_LOG_INFO("  - Advanced prediction system");
+    }
+    
+    // Apply development stage override
+    if (devStage >= 0) {
+        NLM_LOG_INFO("Override developmental stage: " + std::to_string(devStage));
+        // Note: The actual developmental stage setting happens in the brain initialization
+        // or after initialization. For now, this is a placeholder.
+    } else if (devStage == -2) {
+        NLM_LOG_INFO("Development disabled (stage = -2)");
+    }
+    
+    // Log advanced mode settings
+    if (enableAdvanced) {
+        NLM_LOG_INFO("Advanced mode settings:");
+        NLM_LOG_INFO("  - Memory capacity: " + std::to_string(config->getOr<size_t>("memory_capacity", 1000)));
+        NLM_LOG_INFO("  - Max episodes: " + std::to_string(config->getOr<size_t>("episodes_max", 1000)));
+        NLM_LOG_INFO("  - Replay interval: " + std::to_string(config->getOr<size_t>("replay_interval", 100)));
+        NLM_LOG_INFO("  - Dopamine scale: " + std::to_string(config->getOr<float>("dopamine_scale", 1.0f)));
+        NLM_LOG_INFO("  - Curiosity threshold: " + std::to_string(config->getOr<float>("curiosity_threshold", 0.5f)));
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +503,122 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run checkpoint operations if requested
+    if (enableCheckpoint && !checkpointFile.empty()) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Checkpoint Operations ===");
+        
+        // Save current state
+        NLM_LOG_INFO("Saving brain state to: " + checkpointFile);
+        if (brain->save(checkpointFile)) {
+            NLM_LOG_INFO("Checkpoint saved successfully");
+        } else {
+            NLM_LOG_ERROR("Failed to save checkpoint");
+        }
+        
+        // Create a fresh brain and load checkpoint
+        NLM_LOG_INFO("Creating fresh brain and loading checkpoint...");
+        auto brain2 = std::make_shared<Brain>(config);
+        brain2->initialize();
+        
+        if (brain2->load(checkpointFile)) {
+            NLM_LOG_INFO("Checkpoint loaded successfully");
+            
+            // Log loaded brain status
+            brain2->logStatus();
+        } else {
+            NLM_LOG_ERROR("Failed to load checkpoint");
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests
+    if (advancedTest == 0) {
+        // Run standard tests
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } else if (advancedTest == 1) {
+        // Run advanced test
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== ADVANCED TEST MODE ===");
+        
+        // Test memory integration
+        NLM_LOG_INFO("Testing memory integration...");
+        if (brain->getWorkingMemory() != nullptr) {
+            NLM_LOG_INFO("✓ Working memory integrated");
+            
+            // Run some memory operations
+            for (int i = 0; i < 50; ++i) {
+                brain->step(i, i * 0.001);
+            }
+            
+            NLM_LOG_INFO("Active working memory traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+        } else {
+            NLM_LOG_INFO("✗ Working memory not integrated");
+        }
+        
+        // Test episodic memory
+        if (brain->getEpisodicMemory() != nullptr) {
+            NLM_LOG_INFO("✓ Episodic memory integrated");
+            NLM_LOG_INFO("Current episodes: " + std::to_string(brain->getEpisodicMemory()->getEpisodeCount()));
+        } else {
+            NLM_LOG_INFO("✗ Episodic memory not integrated");
+        }
+        
+        // Test neuromodulation
+        if (brain->getDopamine() != nullptr) {
+            NLM_LOG_INFO("✓ Neuromodulation integrated");
+            NLM_LOG_INFO("Dopamine level: " + std::to_string(brain->getDopamine()->getLevel()));
+        } else {
+            NLM_LOG_INFO("✗ Neuromodulation not integrated");
+        }
+        
+        // Test prediction system
+        if (brain->getPredictionSystem() != nullptr) {
+            NLM_LOG_INFO("✓ Prediction system integrated");
+        } else {
+            NLM_LOG_INFO("✗ Prediction system not integrated");
+        }
+        
+        // Test planning
+        if (brain->getPlanner() != nullptr) {
+            NLM_LOG_INFO("✓ Neural planner integrated");
+        } else {
+            NLM_LOG_INFO("✗ Neural planner not integrated");
+        }
+        
+        // Test concept formation
+        if (brain->getConceptFormation() != nullptr) {
+            NLM_LOG_INFO("✓ Concept formation integrated");
+        } else {
+            NLM_LOG_INFO("✗ Concept formation not integrated");
+        }
+        
+        // Test attention
+        if (brain->getAttention() != nullptr) {
+            NLM_LOG_INFO("✓ Attention system integrated");
+        } else {
+            NLM_LOG_INFO("✗ Attention system not integrated");
+        }
+        
+        NLM_LOG_INFO("=== Advanced test complete ===");
+    } else {
+        // Run custom test mode
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== CUSTOM TEST MODE ===");
+        NLM_LOG_INFO("Test mode: " + std::to_string(advancedTest));
+        NLM_LOG_INFO("(Advanced test functionality would go here)");
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

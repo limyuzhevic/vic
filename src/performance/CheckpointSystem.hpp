@@ -175,8 +175,54 @@ struct SynapseCheckpointData {
 };
 
 /**
- * Checkpoint reader
+ * Memory checkpoint item for episodic memory
  */
+struct MemoryCheckpointItem {
+    uint64_t episodeId;                      // Unique episode identifier
+    std::vector<uint64_t> activeNeurons;    // Neurons active during episode
+    std::vector<float> neuronActivations;   // Activation levels
+    float reward;                           // Reward value
+    float novelty;                          // Novelty score
+    std::vector<float> sensoryState;        // Sensory state at time
+    uint32_t actionType;                    // Action taken
+    uint64_t age;                           // Age of episode
+    
+    MemoryCheckpointItem()
+        : episodeId(0), reward(0), novelty(0), actionType(0), age(0) {}
+};
+
+/**
+ * Neuromodulation checkpoint item
+ */
+struct NeuromodulationCheckpointItem {
+    float dopamine;                         // Dopamine level
+    float serotonin;                       // Serotonin level
+    float norepinephrine;                  // Norepinephrine level
+    float acetylcholine;                   // Acetylcholine level
+    float curiosity;                        // Curiosity level
+    float novelty;                          // Novelty level
+    float predictionError;                 // Prediction error signal
+    
+    NeuromodulationCheckpointItem()
+        : dopamine(0), serotonin(0), norepinephrine(0), 
+          acetylcholine(0), curiosity(0), novelty(0), predictionError(0) {}
+};
+
+/**
+ * Development checkpoint item
+ */
+struct DevelopmentCheckpointItem {
+    uint32_t developmentalStage;            // Current developmental stage
+    float plasticityRate;                   // Plasticity rate
+    float synaptogenesisRate;               // Synaptogenesis rate
+    float pruningRate;                      // Pruning rate
+    uint64_t maturationLevel;               // Maturation level
+    float age;                              // Biological age
+    
+    DevelopmentCheckpointItem()
+        : developmentalStage(0), plasticityRate(1.0f), synaptogenesisRate(0.0001f),
+          pruningRate(0.00001f), maturationLevel(0), age(0) {}
+};
 class CheckpointReader {
 public:
     CheckpointReader();

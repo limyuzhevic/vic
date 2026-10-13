@@ -113,6 +113,11 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        // Initialize with brain reference
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
@@ -810,7 +815,7 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Write synapses
+                // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
@@ -827,6 +832,54 @@ bool Brain::save(const std::string& filepath) const {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
         }
+        
+        // Store episodic memory episodes in checkpoint
+        if (pImpl->episodicMemory) {
+            auto* em = pImpl->episodicMemory.get();
+            
+            // Get episodes for replay (this selects episodes based on relevance and recency)
+            auto episodes = em->getEpisodesForReplay(100);  // Store up to 100 most relevant episodes
+            
+            for (const auto* episode : episodes) {
+                if (!episode) continue;
+                
+                // Convert episode to checkpoint format
+                MemoryCheckpointItem memoryItem;
+                memoryItem.episodeId = episode->timestamp;
+                memoryItem.activeNeurons = episode->activeNeurons;
+                memoryItem.neuronActivations = episode->neuronActivations;
+                memoryItem.reward = episode->reward;
+                memoryItem.novelty = episode->novelty;
+                memoryItem.sensoryState = episode->sensoryState;
+                memoryItem.actionType = static_cast<uint32_t>(episode->action);
+                memoryItem.age = episode->age;
+                
+                writer.writeSection(CheckpointSection::Memory, &memoryItem, sizeof(memoryItem));
+            }
+        }
+        
+        // Store neuromodulation state
+        NeuromodulationCheckpointItem neuromodData;
+        neuromodData.dopamine = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        neuromodData.serotonin = 0.0f;  // Placeholder - not implemented yet
+        neuromodData.norepinephrine = 0.0f;  // Placeholder - not implemented yet
+        neuromodData.acetylcholine = 0.0f;  // Placeholder - not implemented yet
+        neuromodData.curiosity = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        neuromodData.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        neuromodData.predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        
+        writer.writeSection(CheckpointSection::Neuromodulation, &neuromData, sizeof(neuromData));
+        
+        // Store development state
+        DevelopmentCheckpointItem devData;
+        devData.developmentalStage = static_cast<uint32_t>(pImpl->developmentalStage);
+        devData.plasticityRate = 1.0f;  // Placeholder - should be computed
+        devData.synaptogenesisRate = 0.0001f;  // From config
+        devData.pruningRate = 0.00001f;  // From config
+        devData.maturationLevel = 0;  // Placeholder
+        devData.age = pImpl->currentStep * pImpl->timestep;  // Approximation
+        
+        writer.writeSection(CheckpointSection::Development, &devData, sizeof(devData));
         
         // Finalize
         if (!writer.finalize()) {
@@ -898,6 +951,67 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read memory episodes from checkpoint
+        auto memorySections = reader.readSection(CheckpointSection::Memory);
+        if (!memorySections.empty()) {
+            NLM_LOG_INFO("Loading " + std::to_string(memorySections.size() / sizeof(MemoryCheckpointItem)) + " memory episodes");
+            
+            // Convert data to MemoryCheckpointItem structs
+            const MemoryCheckpointItem* memoryItems = reinterpret_cast<const MemoryCheckpointItem*>(memorySections.data());
+            size_t episodeCount = memorySections.size() / sizeof(MemoryCheckpointItem);
+            
+            // Load into episodic memory
+            if (pImpl->episodicMemory) {
+                for (size_t i = 0; i < episodeCount; ++i) {
+                    const auto& item = memoryItems[i];
+                    
+                    // Create episodic memory item
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = item.episodeId;
+                    episode.activeNeurons = item.activeNeurons;
+                    episode.neuronActivations = item.neuronActivations;
+                    episode.reward = item.reward;
+                    episode.novelty = item.novelty;
+                    episode.sensoryState = item.sensoryState;
+                    episode.action = static_cast<ActionType>(item.actionType);
+                    episode.age = item.age;
+                    
+                    // Store in episodic memory
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        }
+        
+        // Read neuromodulation state
+        auto neuromodSections = reader.readSection(CheckpointSection::Neuromodulation);
+        if (!neuromSections.empty() && neuromodSections.size() == sizeof(NeuromodulationCheckpointItem)) {
+            NLM_LOG_INFO("Loading neuromodulation state");
+            const NeuromodulationCheckpointItem& neuromod = *reinterpret_cast<const NeuromodulationCheckpointItem*>(neuromSections.data());
+            
+            // Update neuromodulation systems (if implemented)
+            if (pImpl->dopamine) {
+                // Note: dopamine system doesn't have a setLevel method currently
+                // This is a placeholder for future implementation
+                NLM_LOG_INFO("Neuromodulation loaded (partial implementation)");
+            }
+        }
+        
+        // Read development state
+        auto devSections = reader.readSection(CheckpointSection::Development);
+        if (!devSections.empty() && devSections.size() == sizeof(DevelopmentCheckpointItem)) {
+            NLM_LOG_INFO("Loading development state");
+            const DevelopmentCheckpointItem& dev = *reinterpret_cast<const DevelopmentCheckpointItem*>(devSections.data());
+            
+            // Update developmental stage
+            pImpl->developmentalStage = static_cast<DevelopmentalStage>(dev.developmentalStage);
+            
+            // Update structural plasticity rates
+            if (pImpl->structuralPlasticity) {
+                pImpl->structuralPlasticity->setSynaptogenesisRate(dev.synaptogenesisRate);
+                pImpl->structuralPlasticity->setPruningRate(dev.pruningRate);
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
