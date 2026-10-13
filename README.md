@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,11 +75,30 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Advanced Configuration
+
+For advanced usage with enhanced features:
+
+```bash
+cd build
+# Build with advanced features
+make ADVANCED_FEATURES=1
+```
+
+### Performance Testing
+
+```bash
+./nlm --performance-benchmark
+```
+
+This runs comprehensive performance benchmarks of the new modular architecture.
 
 ## Project Structure
 
