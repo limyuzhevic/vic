@@ -276,19 +276,19 @@ bool ConceptFormation::isConceptStable(size_t conceptId) const {
 }
 
 float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
-    const DiscoveredConcept* concept = getConcept(conceptId);
-    if (!concept) return 0.0f;
+    const DiscoveredConcept* discoveredConcept = getConcept(conceptId);
+    if (!discoveredConcept) return 0.0f;
     
     // Generalization ability = how varied are the instances
-    if (concept->instances.size() < 2) return 0.0f;
+    if (discoveredConcept->instances.size() < 2) return 0.0f;
     
     float totalVariance = 0.0f;
-    for (const auto& instance : concept->instances) {
-        float sim = computeSimilarity(instance.pattern, concept->prototype);
+    for (const auto& instance : discoveredConcept->instances) {
+        float sim = computeSimilarity(instance.pattern, discoveredConcept->prototype);
         totalVariance += (1.0f - sim);
     }
     
-    return 1.0f - (totalVariance / concept->instances.size());
+    return 1.0f - (totalVariance / discoveredConcept->instances.size());
 }
 
 void ConceptFormation::clear() {

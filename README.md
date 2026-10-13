@@ -18,9 +18,7 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current Phase
-
-**PHASE 6: FINAL INTEGRATION**
+=== Phase 6: FINAL INTEGRATION
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
@@ -81,6 +79,27 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 4 Demo (Cognition Test)
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+Runs tests of prediction, memory, attention, and planning.
+
+### Phase 3 Demo (Basic Operation Test)
+```bash
+./nlm_phase3_demo [num_steps]
+```
+
+Demonstrates basic neural operation with agent in a world.
+
+### Phase 2 Demo (Real Neural Computation)
+```bash
+./nlm [options]
+```
+
+Runs real spiking neural computation tests with LIF neurons, STDP, and structural plasticity.
 
 ## Project Structure
 

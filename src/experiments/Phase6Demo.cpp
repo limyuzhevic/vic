@@ -5,8 +5,8 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "../experiments/Phase6IntegratedExperiment.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;

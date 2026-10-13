@@ -1,4 +1,5 @@
 #include "NeuralRegion.hpp"
+#include "core/Random/Random.hpp"
 #include <algorithm>
 #include <stdexcept>
 

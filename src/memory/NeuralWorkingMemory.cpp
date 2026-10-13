@@ -44,8 +44,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        auto& neurons = brain_->getRegion(neuron.value / 1000)->getAllNeurons();
+        if (!neurons.empty()) {
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -375,13 +376,13 @@ float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
 }
 
 void AttentionalSelection::update(TimestepDuration dt) {
-    // Decay salience and bias over time
-    for (auto& s : bottomUpSalience_) {
-        s *= 0.95f;
+    // Update attention parameters
+    for (auto& entry : bottomUpSalience_) {
+        entry.second *= 0.95f;
     }
     
-    for (auto& b : topDownBias_) {
-        b *= 0.98f;
+    for (auto& entry : topDownBias_) {
+        entry.second *= 0.98f;
     }
     
     // Decay inhibition

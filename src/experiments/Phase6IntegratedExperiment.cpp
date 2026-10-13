@@ -9,8 +9,6 @@
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
-
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {

@@ -1,0 +1,4 @@
+/workspace/app/build/CMakeFiles/nlm_core.dir
+/workspace/app/build/CMakeFiles/nlm_phase6_demo.dir
+/workspace/app/build/CMakeFiles/edit_cache.dir
+/workspace/app/build/CMakeFiles/rebuild_cache.dir

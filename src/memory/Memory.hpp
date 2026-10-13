@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <functional>
+#include <string>
 
 namespace nlm {
 

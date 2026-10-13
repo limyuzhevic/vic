@@ -1,4 +1,4 @@
-#include "Phase3Experiment.hpp"
+#include "../Phase3Experiment.hpp"
 #include "../agent/AgentBrain.hpp"
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
