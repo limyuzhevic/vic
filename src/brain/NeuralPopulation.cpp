@@ -1,20 +1,29 @@
+// NeuralPopulation.cpp - Safe implementation with proper error handling
 #include "NeuralPopulation.hpp"
 #include <algorithm>
 #include <numeric>
+#include <memory>
+#include <stdexcept>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
 struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
-    std::vector<Neuron*> neurons;
+    std::vector<std::unique_ptr<Neuron>> neurons;
+    const std::vector<Neuron*>& neurons_const_view;  // Safe view of neurons
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
-    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
+    Impl(PopulationId id, size_t size) : id(id), size(size), neurons(), neurons_const_view(neurons), neuronType(NeuronType::Internal) {}
 };
 
-NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
+NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {
+    if (size == 0) {
+        throw std::invalid_argument("NeuralPopulation size must be positive");
+    }
+}
 
 NeuralPopulation::~NeuralPopulation() = default;
 
@@ -44,28 +53,31 @@ bool NeuralPopulation::isEmpty() const {
 }
 
 Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
-    if (index >= pImpl->neurons.size()) {
+    if (!isValidNeuronIndex(index)) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->neurons[index].get();
 }
 
 const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
-    if (index >= pImpl->neurons.size()) {
+    if (!isValidNeuronIndex(index)) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->neurons[index].get();
 }
 
-void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
+void NeuralPopulation::addNeuron(std::unique_ptr<Neuron> neuron) {
+    if (!neuron) {
+        throw std::invalid_argument("Cannot add null neuron to population");
+    }
+    pImpl->neurons.push_back(std::move(neuron));
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
     }
 }
 
 const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
-    return pImpl->neurons;
+    return pImpl->neurons_const_view;
 }
 
 NeuronType NeuralPopulation::getNeuronType() const {
@@ -74,14 +86,18 @@ NeuronType NeuralPopulation::getNeuronType() const {
 
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
-    for (auto* neuron : pImpl->neurons) {
-        neuron->setType(type);
+    for (auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr) {
+            neuronPtr->setType(type);
+        }
     }
 }
 
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
             ++count;
         }
@@ -91,7 +107,9 @@ size_t NeuralPopulation::getActiveCount() const {
 
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
         if (neuron->isFiring()) {
             ++count;
         }
@@ -104,10 +122,15 @@ float NeuralPopulation::getAverageFiringRate() const {
         return 0.0f;
     }
     float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
+    size_t validCount = 0;
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
         sum += neuron->getFiringRate();
+        ++validCount;
     }
-    return sum / static_cast<float>(pImpl->neurons.size());
+    if (validCount == 0) return 0.0f;
+    return sum / static_cast<float>(validCount);
 }
 
 float NeuralPopulation::getActivityLevel() const {
@@ -118,20 +141,26 @@ float NeuralPopulation::getActivityLevel() const {
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->initializeRandom(rng);
+    for (auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr) {
+            neuronPtr->initializeRandom(rng);
+        }
     }
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+    for (auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr) {
+            neuronPtr->step(currentTime);
+        }
     }
 }
 
 void NeuralPopulation::reset() {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->reset();
+    for (auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr) {
+            neuronPtr->reset();
+        }
     }
     pImpl->membranePotentials.clear();
 }
@@ -139,7 +168,9 @@ void NeuralPopulation::reset() {
 std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
     std::vector<NeuronId> ids;
     ids.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
         ids.push_back(neuron->getId());
     }
     return ids;
@@ -148,7 +179,9 @@ std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
 void NeuralPopulation::recordActivity() {
     pImpl->membranePotentials.clear();
     pImpl->membranePotentials.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
         pImpl->membranePotentials.push_back(neuron->getMembranePotential());
     }
 }
@@ -173,6 +206,30 @@ float NeuralPopulation::getVarianceMembranePotential() const {
         sumSquares += diff * diff;
     }
     return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
+}
+
+bool NeuralPopulation::isValidNeuronIndex(NeuronIndex index) const {
+    return index < pImpl->neurons.size();
+}
+
+size_t NeuralPopulation::getSafeNeuronCount() const {
+    return pImpl->neurons.size();
+}
+
+float NeuralPopulation::getWeightedActivityLevel() const {
+    if (pImpl->neurons.empty()) {
+        return 0.0f;
+    }
+    float sum = 0.0f;
+    size_t validCount = 0;
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (!neuronPtr) continue;
+        const Neuron* neuron = neuronPtr.get();
+        sum += neuron->getMembranePotential();
+        ++validCount;
+    }
+    if (validCount == 0) return 0.0f;
+    return sum / static_cast<float>(validCount);
 }
 
 } // namespace nlm

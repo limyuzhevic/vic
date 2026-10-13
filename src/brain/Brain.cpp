@@ -65,9 +65,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Sensory neurons for input injection (references to existing neurons)
+    std::vector<std::reference_wrapper<Neuron>> sensoryNeurons;
+    std::vector<std::reference_wrapper<Neuron>> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -204,13 +204,15 @@ bool Brain::initialize() {
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                auto sensoryNeurons = sensoryPop->getNeurons();
+                for (auto* neuron : sensoryNeurons) {
+                    pImpl->sensoryNeurons.push_back(*neuron);
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                auto motorNeurons = motorPop->getNeurons();
+                for (auto* neuron : motorNeurons) {
+                    pImpl->motorNeurons.push_back(*neuron);
                 }
             }
             
@@ -606,7 +608,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
+        // Inject current into sensory neurons
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
@@ -699,7 +701,8 @@ std::unique_ptr<class Action> Brain::produceAction() {
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
+    for (auto& neuronRef : pImpl->motorNeurons) {
+        Neuron* neuron = &neuronRef;
         if (neuron->isFiring()) {
             ++firingMotor;
         }
