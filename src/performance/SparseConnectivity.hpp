@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 /**
  * SparseConnectivity - Memory-efficient neural connectivity representation

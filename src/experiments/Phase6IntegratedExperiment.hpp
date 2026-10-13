@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 /**
  * Phase6IntegratedExperiment - Phase 6 final integration test
@@ -99,7 +100,7 @@ struct Phase6Config {
 /**
  * Phase 6 integrated experiment runner
  */
-class Phase6IntegratedExperiment {
+class Phase6IntegratedExperiment : public ExperimentBase {
 public:
     Phase6IntegratedExperiment();
     ~Phase6IntegratedExperiment();

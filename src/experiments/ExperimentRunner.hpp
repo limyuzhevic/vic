@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 #include "Experiment.hpp"
 #include "../brain/Brain.hpp"

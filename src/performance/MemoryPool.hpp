@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 /**
  * MemoryPool - Lock-free memory pool for neurons and synapses

@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 /**
  * Phase5IntegratedExperiment - Comprehensive lifetime learning experiment
@@ -192,7 +193,7 @@ struct ContinualTask {
 /**
  * Phase 5 integrated experiment runner
  */
-class Phase5IntegratedExperiment {
+class Phase5IntegratedExperiment : public ExperimentBase {
 public:
     Phase5IntegratedExperiment();
     ~Phase5IntegratedExperiment();
@@ -279,7 +280,7 @@ private:
 /**
  * Multi-seed experiment runner for statistical significance
  */
-class MultiSeedExperimentRunner {
+class MultiSeedExperimentRunner : public ExperimentBase {
 public:
     MultiSeedExperimentRunner();
     ~MultiSeedExperimentRunner();

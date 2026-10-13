@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"

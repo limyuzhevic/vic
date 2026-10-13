@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 /**
  * CheckpointSystem - Brain state serialization and checkpointing

@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"

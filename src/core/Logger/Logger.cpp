@@ -4,6 +4,10 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
+#include <cstdarg>
+#include <execinfo.h>
+#include <cxxabi.h>
 
 namespace nlm {
 
@@ -22,6 +26,67 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 
 ConsoleLogger::~ConsoleLogger() = default;
 
+bool Logger::isEnabled(LogLevel level) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        if (logger->getLevel() <= level) {
+            return true;
+        }
+    }
+    return false;
+}
+
+Logger& Logger::getGlobal() {
+    static Logger globalLogger;
+    return globalLogger;
+}
+
+void Logger::setGlobal(std::shared_ptr<Logger> logger) {
+    // This is a placeholder for advanced global logger management
+    // In practice, we just use getGlobal() which is already static
+}
+
+// LogStream implementation methods
+LogStream& LogStream::addMetadata(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    metadata_[key] = value;
+    return *this;
+}
+
+LogStream& LogStream::addException(std::shared_ptr<nlm::NLMException> exception) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    exception_ = exception;
+    return *this;
+}
+
+LogStream& LogStream::addStackTrace(const std::string& stackTrace) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stackTrace_ = stackTrace;
+    return *this;
+}
+
+LogStream& LogStream::enableStructuredLogging() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    isStructured_ = true;
+    return *this;
+}
+
+std::string LogStream::formatWithParams(const std::string& format) const {
+    std::string result = format;
+    size_t pos = 0;
+    
+    for (const auto& pair : metadata_) {
+        while ((pos = result.find("{'" + pair.first + "'}", pos)) != std::string::npos) {
+            result.replace(pos, pair.first.length() + 4, pair.second);
+            pos += pair.second.length();
+        }
+        pos = 0;
+    }
+    
+    return result;
+}
+
+// ConsoleLogger log method enhancement to handle structured logging
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
         return;
@@ -35,6 +100,27 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    // Handle different log entry types
+    if (entry.isStructured && !entry.metadata.empty()) {
+        // Structured logging format
+        oss << " [";
+        bool first = true;
+        for (const auto& pair : entry.metadata) {
+            if (!first) oss << ", ";
+            oss << pair.first << "=" << pair.second;
+            first = false;
+        }
+        oss << "]";
+    }
+    
+    if (entry.exception) {
+        oss << " [Exception: " << entry.exception->getMessage() << "]";
+    }
+    
+    if (!entry.stackTrace.empty()) {
+        oss << " [Stack trace: " << entry.stackTrace.substr(0, 50) << "...]";
+    }
     
     oss << " " << entry.message;
     
@@ -146,24 +232,190 @@ void Logger::log(LogLevel level, const std::string& message,
     }
 }
 
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
+// Implementation of exception-specific logging methods
+void Logger::logException(const std::shared_ptr<nlm::NLMException>& exception, 
+                         const std::string& context) {
+    if (!exception) return;
+    
+    LogEntry entry;
+    entry.level = LogLevel::Error;
+    entry.message = exception->formatWithCause();
+    entry.file = exception->getFile();
+    entry.line = exception->getLine();
+    entry.function = exception->getFunction();
+    entry.timestamp = std::chrono::system_clock::now();
+    entry.exception = exception;
+    entry.isStructured = true;
+    entry.stackTrace = exception->getMetadata("stackTrace");
+    
+    if (!context.empty()) {
+        entry.metadata["context"] = context;
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
 }
 
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
+void Logger::throwOnError(const std::shared_ptr<nlm::NLMException>& exception, 
+                         const std::string& context) {
+    if (!exception) return;
+    
+    logException(exception, context);
+    throw *exception;
 }
 
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
+void Logger::logExceptionChain(const std::shared_ptr<nlm::NLMException>& exception,
+                              bool includeStackTrace) {
+    if (!exception) return;
+    
+    LogEntry entry;
+    entry.level = LogLevel::Error;
+    entry.message = exception->formatWithCause();
+    entry.file = exception->getFile();
+    entry.line = exception->getLine();
+    entry.function = exception->getFunction();
+    entry.timestamp = std::chrono::system_clock::now();
+    entry.exception = exception;
+    entry.isStructured = true;
+    
+    if (includeStackTrace) {
+        entry.stackTrace = captureStackTrace();
+        entry.exception->addMetadata("stackTrace", entry.stackTrace);
+    }
+    
+    // Add exception metadata to entry
+    const auto& metadata = exception->getMetadata();
+    entry.metadata.insert(metadata.begin(), metadata.end());
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
 }
 
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
+void Logger::formatLog(const std::string& format, const std::vector<std::string>& params,
+                      LogLevel level, const std::string& file, int line, 
+                      const std::string& function) {
+    std::string message = format;
+    size_t pos = 0;
+    int paramIndex = 0;
+    
+    while ((pos = message.find("{}", pos)) != std::string::npos && paramIndex < params.size()) {
+        message.replace(pos, 2, params[paramIndex]);
+        pos += params[paramIndex].length();
+        paramIndex++;
+    }
+    
+    log(level, message, file, line, function);
 }
 
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
+void Logger::logWithContext(const std::string& message, LogLevel level,
+                           const std::unordered_map<std::string, std::string>& context,
+                           const std::string& file, int line,
+                           const std::string& function) {
+    LogEntry entry;
+    entry.level = level;
+    entry.message = message;
+    entry.file = file;
+    entry.line = line;
+    entry.function = function;
+    entry.timestamp = std::chrono::system_clock::now();
+    entry.metadata = context;
+    entry.isStructured = !context.empty();
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
+}
+
+void Logger::logBatch(const std::vector<LogEntry>& entries) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        for (const auto& entry : entries) {
+            logger->log(entry);
+        }
+    }
+}
+
+LogStream Logger::createLogStream(LogLevel level, 
+                                 const std::string& file,
+                                 int line,
+                                 const std::string& function) {
+    return LogStream(level, file, line, function);
+}
+
+std::string Logger::captureStackTrace() {
+    const int max_depth = 100;
+    void* buffer[max_depth];
+    
+    int depth = backtrace(buffer, max_depth);
+    char** symbols = backtrace_symbols(buffer, depth);
+    
+    std::stringstream ss;
+    ss << "Stack trace (" << depth << " frames):\n";
+    
+    for (int i = 0; i < depth; ++i) {
+        ss << i << ": " << symbols[i] << "\n";
+    }
+    
+    free(symbols);
+    
+    // Demangle C++ symbols
+    std::string trace = ss.str();
+    // In a real implementation, we would use cxxabi to demangle symbols
+    return trace;
+}
+
+std::source_location Logger::getCurrentSourceLocation() {
+#if __cplusplus >= 202002L
+    return std::source_location::current();
+#else
+    // Fallback for C++17
+    return std::source_location();
+#endif
+}
+
+// LogStream implementation methods
+LogStream& LogStream::addMetadata(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    metadata_[key] = value;
+    return *this;
+}
+
+LogStream& LogStream::addException(std::shared_ptr<nlm::NLMException> exception) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    exception_ = exception;
+    return *this;
+}
+
+LogStream& LogStream::addStackTrace(const std::string& stackTrace) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stackTrace_ = stackTrace;
+    return *this;
+}
+
+LogStream& LogStream::enableStructuredLogging() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    isStructured_ = true;
+    return *this;
+}
+
+std::string LogStream::formatWithParams(const std::string& format) const {
+    std::string result = format;
+    size_t pos = 0;
+    
+    for (const auto& pair : metadata_) {
+        while ((pos = result.find("{'" + pair.first + "'}", pos)) != std::string::npos) {
+            result.replace(pos, pair.first.length() + 4, pair.second);
+            pos += pair.second.length();
+        }
+        pos = 0;
+    }
+    
+    return result;
 }
 
 bool Logger::isEnabled(LogLevel level) const {

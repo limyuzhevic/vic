@@ -26,9 +26,11 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigurationManager.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Exceptions/NLMErrors.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -55,11 +57,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -74,15 +72,12 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
+    src/motor/Action.cpp
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
+    src/experiments/ExperimentBase.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -91,6 +86,18 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# CommandLineInterface library
+add_library(nlm_cli STATIC
+    src/core/cli/CommandLineInterface.cpp
+)
+
+target_include_directories(nlm_cli PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(nlm_cli PUBLIC nlm_core)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -121,23 +128,27 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
+# Demo executables
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+add_executable(demo_cli
+    src/demo_cli_main.cpp
+)
+target_link_libraries(demo_cli PUBLIC nlm_core nlm_cli)
+
+# Main executable
+add_executable(nlm
+    src/main.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
 
 # Testing
 enable_testing()

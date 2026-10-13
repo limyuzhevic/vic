@@ -1,4 +1,5 @@
 #pragma once
+#include "../Exceptions/NLMErrors.hpp"
 
 #include <string>
 #include <memory>
@@ -6,12 +7,12 @@
 #include <variant>
 #include <optional>
 
+// Include the new ConfigurationManager for backward compatibility
+#include "ConfigurationManager.hpp"
+
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
+// Configuration value types (backward compatibility)
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -23,27 +24,15 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+// Configuration source (backward compatibility)
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default = 0,
+    File = 1,
+    CommandLine = 2,
+    Runtime = 3
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
+// Main configuration class (backward compatibility wrapper)
 class Config {
 public:
     Config();
@@ -96,10 +85,6 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Exceptions/NLMErrors.hpp"
 
 #include <cstdint>
 #include <type_traits>
@@ -122,13 +123,14 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
+// Component type enumeration for brain component factory
+enum class ComponentType : uint8_t {
+    Unknown = 0,
+    Neuron = 1,
+    Synapse = 2,
+    NeuralPopulation = 3,
+    NeuralRegion = 4,
+    Brain = 5
 };
 
 // Spike event for event-driven computation

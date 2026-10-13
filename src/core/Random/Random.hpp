@@ -1,4 +1,5 @@
 #pragma once
+#include "../Exceptions/NLMErrors.hpp"
 
 #include <cstdint>
 #include <random>

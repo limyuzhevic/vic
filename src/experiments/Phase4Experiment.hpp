@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 #include "../agent/AgentBody.hpp"
 #include "../brain/Brain.hpp"
@@ -249,10 +250,15 @@ private:
 
 // Integrated Phase 4 Experiment
 // Combines all Phase 4 mechanisms in a complex environment
-class Phase4IntegratedExperiment {
+class Phase4IntegratedExperiment : public ExperimentBase {
 public:
     Phase4IntegratedExperiment();
     ~Phase4IntegratedExperiment();
+    
+    // Override experiment lifecycle
+    bool initialize() override;
+    bool run() override;
+    bool finalize() override;
     
     // Run integrated experiment
     Phase4Results run(Brain* brain, size_t numEpisodes = 100, size_t stepsPerEpisode = 200);
@@ -263,13 +269,20 @@ public:
     // Get before/after comparison
     Phase4Results compareBeforeAfter() const;
     
+    // Override hooks for experiment-specific customization
+    void onInitialize() override;
+    void onSetup() override;
+    void onRun() override;
+    void onTeardown() override;
+    void onFinalize() override;
+    
 private:
     std::vector<Phase4Results> episodeResults_;
 };
 
 // Ablation Experiment
 // Tests which mechanisms contribute to performance
-class AblationExperiment {
+class AblationExperiment : public ExperimentBase {
 public:
     AblationExperiment();
     ~AblationExperiment();
@@ -281,8 +294,20 @@ public:
         float contribution;
     };
     
+    // Override experiment lifecycle
+    bool initialize() override;
+    bool run() override;
+    bool finalize() override;
+    
     // Run ablation study
     std::vector<AblationResult> run(Brain* brain, size_t numTrials = 30);
+    
+    // Override hooks for experiment-specific customization
+    void onInitialize() override;
+    void onSetup() override;
+    void onRun() override;
+    void onTeardown() override;
+    void onFinalize() override;
     
 private:
     std::vector<AblationResult> results_;

@@ -1,4 +1,5 @@
 #pragma once
+#include "../core/Exceptions/NLMErrors.hpp"
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
