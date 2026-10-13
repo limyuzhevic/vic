@@ -1,13 +1,7 @@
-#pragma once
-
-#include "Action.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // Motor system: converts neural activity to actions
 // PLACEHOLDER - Phase 2 will implement real action selection
+
+class Brain;
 
 class MotorSystem {
 public:
@@ -27,6 +21,9 @@ public:
     // Get action history
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
 private:
     struct Impl;

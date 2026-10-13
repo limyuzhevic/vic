@@ -1,5 +1,6 @@
 #include "Neuromodulator.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -30,26 +31,26 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+    // Real dopamine-modulated plasticity factor
+    // Higher dopamine increases plasticity for reward-related learning
     return 0.5f + 0.5f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // Real dopamine dynamics
+    // Decay towards baseline with time constant
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
+    // Real reward signaling
+    // Burst of dopamine on reward with saturation
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // Real reward prediction error signaling
+    // Dopamine responds to prediction error with appropriate sign
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 

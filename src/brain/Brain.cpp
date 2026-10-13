@@ -46,9 +46,15 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    
+    // ========== MOTOR SYSTEM ==========
+    std::unique_ptr<MotorSystem> motorSystem;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -121,14 +127,17 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize motor system
+        motorSystem = std::make_unique<MotorSystem>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -255,9 +264,16 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+// Initialize neuromodulation
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
+    // Initialize motor system
+    pImpl->motorSystem->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +527,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state
+        // TODO: Integrate with actual sensory processing
+        // For now, use placeholder
+        SensoryInput currentSensoryState;
+        currentSensoryState.setData(std::vector<float>(10, 0.0f));  // Placeholder
+        
+        // Make prediction
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentSensoryState);
+        
+        // Update prediction system with actual observation
+        pImpl->predictionSystem->updatePredictions(*predictedState, currentSensoryState);
+        
+        // Get prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error for curiosity and learning
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(predictionError, pImpl->predictionError->getError(), pImpl->timestep);
+        }
+        
+        // Use prediction error to drive dopamine for reward learning
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
+        
+        // Use prediction error to drive acetylcholine for attention
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->setLevel(std::min(1.0f, predictionError * 2.0f));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1053,23 +1096,33 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
+    Acetylcholine* Brain::getAcetylcholine() {
+        return pImpl->acetylcholine.get();
+    }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
+    Norepinephrine* Brain::getNorepinephrine() {
+        return pImpl->norepinephrine.get();
+    }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    Serotonin* Brain::getSerotonin() {
+        return pImpl->serotonin.get();
+    }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
     return pImpl->config;
 }
 
@@ -1100,6 +1153,21 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
     }
     
     // Development status
