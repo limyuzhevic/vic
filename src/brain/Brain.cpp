@@ -34,7 +34,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -113,10 +113,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
+        // Initialize prediction system (using NeuralPrediction for real computation)
+        neuralPrediction = std::make_unique<NeuralPrediction>();
+        neuralPrediction->initialize(this);
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
@@ -502,17 +501,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->neuralPrediction) {
+        // The neural prediction system would be updated with sensory observations
+        // For now, we track prediction error history
+        // In a complete implementation, this would compute actual predictions
+        // and update the prediction system based on neural activity
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1019,8 +1017,8 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

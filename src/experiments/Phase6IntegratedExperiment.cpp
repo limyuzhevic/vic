@@ -115,7 +115,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
+    result.predictionIntegrated = (brain->getNeuralPrediction() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
@@ -206,10 +206,10 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     }
     
     // Test 3: Prediction system exists
-    if (brain->getPredictionSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+    if (brain->getNeuralPrediction() != nullptr) {
+        NLM_LOG_INFO("[PASS] Neural prediction system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Neural prediction system is NOT integrated");
         success = false;
     }
     

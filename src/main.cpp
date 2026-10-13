@@ -14,7 +14,7 @@
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
+#include "prediction/NeuralPrediction.hpp"
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
