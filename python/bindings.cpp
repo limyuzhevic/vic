@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +353,613 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Advanced Brain System Access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getSemanticMemory", &Brain::getSemanticMemory,
+             py::return_value_policy::reference_internal,
+             "Get semantic memory system")
+        .def("getProceduralMemory", &Brain::getProceduralMemory,
+             py::return_value_policy::reference_internal,
+             "Get procedural memory system")
+
+        // Working Memory - Direct Access Methods
+        .def("wmStore", &Brain::getWorkingMemory().store,
+             py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store pattern in working memory")
+        .def("wmRetrieve", &Brain::getWorkingMemory().retrieve,
+             "Retrieve working memory content")
+        .def("wmContains", &Brain::getWorkingMemory().contains,
+             py::arg("neuron"), "Check if neuron is in working memory")
+        .def("wmClear", &Brain::getWorkingMemory().clear,
+             "Clear working memory")
+        .def("wmDecay", &Brain::getWorkingMemory().decay,
+             py::arg("decayRate"), "Decay working memory traces")
+        .def("wmUpdate", &Brain::getWorkingMemory().update,
+             py::arg("dt"), "Update working memory dynamics")
+        .def("wmStrengthen", &Brain::getWorkingMemory().strengthenMemory,
+             py::arg("factor"), "Strengthen memory traces")
+        .def("wmRunCompetition", &Brain::getWorkingMemory().runCompetition,
+             "Run competition between memory traces")
+        .def("wmIsWinning", &Brain::getWorkingMemory().isWinning,
+             py::arg("neuron"), "Check if neuron is a winner")
+        .def("wmGetActivity", &Brain::getWorkingMemory().getMemoryActivity,
+             "Get overall memory activity level")
+        .def("wmGetCapacity", &Brain::getWorkingMemory().getCapacity,
+             "Get working memory capacity")
+        .def("wmSetCapacity", &Brain::getWorkingMemory().setCapacity,
+             py::arg("capacity"), "Set working memory capacity")
+        .def("wmGetDecayRate", &Brain::getWorkingMemory().getDecayRate,
+             "Get working memory decay rate")
+        .def("wmSetDecayRate", &Brain::getWorkingMemory().setDecayRate,
+             py::arg("rate"), "Set working memory decay rate")
+        .def("wmGetActiveTraces", &Brain::getWorkingMemory().getActiveTraces,
+             "Get number of active memory traces")
+        .def("wmGetMemoryNeurons", &Brain::getWorkingMemory().getMemoryNeurons,
+             "Get neurons in working memory")
+
+        // Episodic Memory - Direct Access Methods
+        .def("emStoreEpisode", &Brain::getEpisodicMemory().storeEpisode,
+             py::arg("episode"), "Store an episodic memory")
+        .def("emRetrieveSimilar", &Brain::getEpisodicMemory().retrieveSimilar,
+             py::arg("pattern"), py::arg("maxResults") = 5,
+             "Retrieve similar episodes")
+        .def("emRetrieveTemporal", &Brain::getEpisodicMemory().retrieveTemporal,
+             py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10,
+             "Retrieve episodes from time window")
+        .def("emRetrieveByLocation", &Brain::getEpisodicMemory().retrieveByLocation,
+             py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5,
+             "Retrieve episodes by location")
+        .def("emRetrieveAfterAction", &Brain::getEpisodicMemory().retrieveAfterAction,
+             py::arg("action"), py::arg("maxResults") = 5,
+             "Retrieve episodes after specific action")
+        .def("emReplayEpisode", &Brain::getEpisodicMemory().replayEpisode,
+             py::arg("episode"), "Replay an episode")
+        .def("emUpdateRelevance", &Brain::getEpisodicMemory().updateRelevance,
+             py::arg("index"), py::arg("delta"), "Update episode relevance")
+        .def("emGetEpisode", &Brain::getEpisodicMemory().getEpisode,
+             py::arg("index"), "Get episode by index")
+        .def("emGetRecentEpisodes", &Brain::getEpisodicMemory().getRecentEpisodes,
+             py::arg("count"), "Get recent episodes")
+        .def("emGetAverageReward", &Brain::getEpisodicMemory().getAverageReward,
+             "Get average reward from episodes")
+        .def("emConsolidate", &Brain::getEpisodicMemory().consolidate,
+             py::arg("threshold"), "Consolidate episodes")
+        .def("emClear", &Brain::getEpisodicMemory().clear,
+             "Clear episodic memory")
+        .def("emEnableReplay", &Brain::getEpisodicMemory().enableReplay,
+             py::arg("enable"), "Enable/disable replay")
+        .def("emIsReplayEnabled", &Brain::getEpisodicMemory().isReplayEnabled,
+             "Check if replay is enabled")
+        .def("emGetEpisodesForReplay", &Brain::getEpisodicMemory().getEpisodesForReplay,
+             py::arg("count"), "Get episodes for replay")
+        .def("emReplaySequence", &Brain::getEpisodicMemory().replaySequence,
+             py::arg("episodeIds"), "Replay episode sequence")
+
+        // Semantic Memory - Direct Access Methods
+        .def("smStoreFact", &Brain::getSemanticMemory().storeFact,
+             py::arg("key"), py::arg("value"), "Store a semantic fact")
+        .def("smRetrieveFact", &Brain::getSemanticMemory().retrieveFact,
+             py::arg("key"), "Retrieve semantic fact")
+        .def("smHasFact", &Brain::getSemanticMemory().hasFact,
+             py::arg("key"), "Check if semantic fact exists")
+        .def("smGetAllFacts", &Brain::getSemanticMemory().getAllFacts,
+             "Get all semantic facts")
+        .def("smClear", &Brain::getSemanticMemory().clear,
+             "Clear semantic memory")
+
+        // Procedural Memory - Direct Access Methods
+        .def("pmLearnSkill", &Brain::getProceduralMemory().learnSkill,
+             py::arg("name"), py::arg("pattern"), "Learn a new skill")
+        .def("pmGetSkill", &Brain::getProceduralMemory().getSkill,
+             py::arg("name"), "Get procedural skill")
+        .def("pmGetAllSkills", &Brain::getProceduralMemory().getAllSkills,
+             "Get all procedural skills")
+        .def("pmUpdateProficiency", &Brain::getProceduralMemory().updateProficiency,
+             py::arg("name"), py::arg("delta"), "Update skill proficiency")
+        .def("pmClear", &Brain::getProceduralMemory().clear,
+             "Clear procedural memory")
+
+        // Associative Memory - Direct Access Methods
+        .def("amAssociate", &Brain::getAssociativeMemory().associate,
+             py::arg("patternA"), py::arg("patternB"), py::arg("strength") = 1.0f,
+             "Create association between patterns")
+        .def("amAssociateFromExperience", &Brain::getAssociativeMemory().associateFromExperience,
+             py::arg("episode"), "Create association from episode")
+        .def("amRetrieve", &Brain::getAssociativeMemory().retrieve,
+             py::arg("pattern"), py::arg("maxResults") = 5,
+             "Retrieve associated patterns")
+        .def("amGetAssociationStrength", &Brain::getAssociativeMemory().getAssociationStrength,
+             py::arg("patternA"), py::arg("patternB"), "Get association strength")
+        .def("amUpdateAssociation", &Brain::getAssociativeMemory().updateAssociation,
+             py::arg("patternA"), py::arg("patternB"), py::arg("delta"),
+             "Update association based on outcome")
+        .def("amSpreadActivation", &Brain::getAssociativeMemory().spreadActivation,
+             py::arg("cuePattern"), py::arg("steps") = 2,
+             "Spread activation through associations")
+        .def("amClear", &Brain::getAssociativeMemory().clear,
+             "Clear associative memory")
+        .def("amGetAssociationCount", &Brain::getAssociativeMemory().getAssociationCount,
+             "Get number of associations")
+        
+        // Prediction System - Direct Access Methods
+        .def("predictNextState", &Brain::getPredictionSystem().predictNextState,
+             py::arg("currentState"), "Predict next state from current state")
+        .def("updatePredictions", &Brain::getPredictionSystem().updatePredictions,
+             py::arg("predicted"), py::arg("actual"), "Update predictions with actual observation")
+        .def("getPredictionError", &Brain::getPredictionSystem().getPredictionError,
+             "Get prediction error")
+        .def("getPredictionConfidence", &Brain::getPredictionSystem().getConfidence,
+             "Get prediction confidence")
+        .def("getPredictionErrorHistory", &Brain::getPredictionSystem().getErrorHistory,
+             "Get prediction error history")
+        .def("clearPredictionHistory", &Brain::getPredictionSystem().clearHistory,
+             "Clear prediction history")
+        .def("trainPrediction", &Brain::getPredictionSystem().train,
+             py::arg("observation"), "Train prediction model with observation")
+        
+        // Cognition Systems - Direct Access Methods
+        // Neural Planner
+        .def("planAction", &Brain::getPlanner().planAction,
+             py::arg("currentState"), py::arg("targetReward") = 0.5f,
+             "Plan next action given current state and goal")
+        .def("evaluateSequence", &Brain::getPlanner().evaluateSequence,
+             py::arg("actions"), py::arg("startState"),
+             "Evaluate a potential action sequence")
+        .def("setPlanningDepth", &Brain::getPlanner().setPlanningDepth,
+             py::arg("depth"), "Set planning depth")
+        .def("getPlanningDepth", &Brain::getPlanner().getPlanningDepth,
+             "Get planning depth")
+        .def("getPlanningConfidence", &Brain::getPlanner().getPlanningConfidence,
+             "Get planning confidence")
+        .def("updatePlanQuality", &Brain::getPlanner().updatePlanQuality,
+             py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"),
+             "Update plans based on actual outcome")
+        .def("clearPlanningCache", &Brain::getPlanner().clearCache,
+             "Clear planning cache")
+        .def("setActionQuality", &Brain::getPlanner().setActionQuality,
+             py::arg("action"), py::arg("quality"), "Set action quality from experience")
+        .def("getCurrentGoal", &Brain::getPlanner().getCurrentGoal,
+             "Get current goal")
+        .def("setCurrentGoal", &Brain::getPlanner().setCurrentGoal,
+             py::arg("goal"), "Set current goal")
+        .def("wasRecentPlanSuccessful", &Brain::getPlanner().wasRecentPlanSuccessful,
+             "Check if recent planning was successful")
+
+        // Concept Formation
+        .def("learnConcept", &Brain::getConceptFormation().presentExperience,
+             py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("currentTime"),
+             "Present a new experience to concept formation system")
+        .def("retrieveConcept", &Brain::getConceptFormation().getMatchingConcept,
+             py::arg("pattern"), py::arg("similarityThreshold") = 0.7f,
+             "Get the concept that best matches a pattern")
+        .def("getConcepts", &Brain::getConceptFormation().getConcepts,
+             "Get all concepts discovered")
+        .def("getConcept", &Brain::getConceptFormation().getConcept,
+             py::arg("conceptId"), "Get specific concept")
+        .def("getConceptPrototype", &Brain::getConceptFormation().getConceptPrototype,
+             py::arg("conceptId"), "Get concept prototype")
+        .def("getConceptInstances", &Brain::getConceptFormation().getConceptInstances,
+             py::arg("conceptId"), "Get concept instances")
+        .def("getConceptStability", &Brain::getConceptFormation().getConceptStability,
+             py::arg("conceptId"), "Get concept stability")
+        .def("getConceptCount", &Brain::getConceptFormation().getConceptCount,
+             "Get number of concepts discovered")
+        .def("mergeConcepts", &Brain::getConceptFormation().mergeConcepts,
+             py::arg("conceptA"), py::arg("conceptB"), "Merge two concepts")
+        .def("updateConcept", &Brain::getConceptFormation().updateConcept,
+             py::arg("conceptId"), py::arg("newPattern"), py::arg("features"), py::arg("reward"),
+             "Update concept with new instance")
+        .def("computeSimilarity", &Brain::getConceptFormation().computeSimilarity,
+             py::arg("a"), py::arg("b"), "Compute similarity between patterns")
+        .def("isNovel", &Brain::getConceptFormation().isNovel,
+             py::arg("pattern"), py::arg("similarityThreshold") = 0.7f,
+             "Check if pattern is novel")
+        .def("findConceptForPattern", &Brain::getConceptFormation().findConceptForPattern,
+             py::arg("pattern"), "Get concept for given pattern")
+        .def("clearConcepts", &Brain::getConceptFormation().clear,
+             "Clear all concepts")
+        .def("getGeneralizationAbility", &Brain::getConceptFormation().getGeneralizationAbility,
+             py::arg("conceptId"), "Get concept generalization ability")
+        .def("setFormationThreshold", &Brain::getConceptFormation().setFormationThreshold,
+             py::arg("threshold"), "Set concept formation threshold")
+        .def("setStabilityWindow", &Brain::getConceptFormation().setStabilityWindow,
+             py::arg("window"), "Set stability window")
+
+        // Attention System
+        .def("focusAttention", &Brain::getAttention().focusOnRegion,
+             py::arg("region"), "Focus attention on specific region")
+        .def("getAttentionalFocus", &Brain::getAttention().getAttendedRegions,
+             "Get current attentional focus")
+        .def("releaseAttention", &Brain::getAttention().releaseAttention,
+             "Release attention (allow all regions equal processing)")
+        .def("setInhibitionStrength", &Brain::getAttention().setInhibitionStrength,
+             py::arg("strength"), "Set inhibition strength")
+        .def("setExcitationStrength", &Brain::getAttention().setExcitationStrength,
+             py::arg("strength"), "Set excitation strength")
+        .def("setCompetitionThreshold", &Brain::getAttention().setCompetitionThreshold,
+             py::arg("threshold"), "Set competition threshold")
+        .def("getInhibitionFor", &Brain::getAttention().getInhibitionFor,
+             py::arg("neuron"), "Get inhibition level for neuron")
+        .def("getExcitationFor", &Brain::getAttention().getExcitationFor,
+             py::arg("neuron"), "Get excitation level for neuron")
+        .def("updateAttentionWeights", &Brain::getAttention().update,
+             py::arg("dt"), "Update attention dynamics")
+        .def("isAttended", &Brain::getAttention().isAttended,
+             py::arg("neuron"), "Check if neuron is currently attended")
+        .def("getAttentionWinners", &Brain::getAttention().getWinners,
+             "Get attention winners")
+        .def("applyTopDownBias", &Brain::getAttention().applyTopDownBias,
+             py::arg("neuron"), py::arg("biasStrength"), "Apply top-down attention bias")
+        .def("applyBottomUpSalience", &Brain::getAttention().applyBottomUpSalience,
+             py::arg("neuron"), py::arg("salienceStrength"), "Apply bottom-up attention salience")
+        .def("resetAttention", &Brain::getAttention().reset,
+             "Reset attention")
+        
+        // Neuromodulation Systems - Direct Access Methods
+        .def("dopamineSignalReward", &Brain::getDopamine().signalReward,
+             py::arg("reward"), "Signal reward to dopamine system")
+        .def("dopamineSignalPredictionError", &Brain::getDopamine().signalRewardPredictionError,
+             py::arg("error"), "Signal prediction error to dopamine system")
+        .def("dopamineGetLevel", &Brain::getDopamine().getLevel,
+             "Get dopamine level")
+        .def("dopamineSetLevel", &Brain::getDopamine().setLevel,
+             py::arg("level"), "Set dopamine level")
+        .def("dopamineGetPlasticityFactor", &Brain::getDopamine().getPlasticityFactor,
+             "Get dopamine plasticity factor")
+        .def("curiosityGetLevel", &Brain::getCuriosity().getLevel,
+             "Get curiosity level")
+        .def("curiositySetLevel", &Brain::getCuriosity().setLevel,
+             py::arg("level"), "Set curiosity level")
+        .def("curiosityGetPlasticityFactor", &Brain::getCuriosity().getPlasticityFactor,
+             "Get curiosity plasticity factor")
+        .def("noveltyGetLevel", &Brain::getNovelty().getLevel,
+             "Get novelty level")
+        .def("noveltySetLevel", &Brain::getNovelty().setLevel,
+             py::arg("level"), "Set novelty level")
+        .def("noveltyGetPlasticityFactor", &Brain::getNovelty().getPlasticityFactor,
+             "Get novelty plasticity factor")
+        .def("predictionErrorGetLevel", &Brain::getPredictionErrorSignal().getLevel,
+             "Get prediction error signal level")
+        .def("predictionErrorSetLevel", &Brain::getPredictionErrorSignal().setLevel,
+             py::arg("level"), "Set prediction error signal level")
+        .def("predictionErrorGetPlasticityFactor", &Brain::getPredictionErrorSignal().getPlasticityFactor,
+             "Get prediction error signal plasticity factor")
+        
+        // Development System - Direct Access Methods
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"), "Set developmental stage")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("developmentGetStage", &Brain::getDevelopmentSystem().getStage,
+             "Get current developmental stage via system")
+        .def("developmentSetStage", &Brain::getDevelopmentSystem().setStage,
+             py::arg("stage"), "Set developmental stage via system")
+        .def("developmentAdvanceStage", &Brain::getDevelopmentSystem().advanceStage,
+             "Advance developmental stage")
+        .def("developmentGetStageName", &Brain::getDevelopmentSystem().getStageName,
+             "Get current stage name")
+        .def("developmentUpdate", &Brain::getDevelopmentSystem().update,
+             py::arg("brain"), py::arg("currentStep"), "Update development (simple)")
+        .def("developmentUpdateFull", &Brain::getDevelopmentSystem().update,
+             py::arg("brain"), py::arg("rng"), py::arg("dt"), "Update development with full parameters")
+        .def("developmentGetPlasticityModifier", &Brain::getDevelopmentSystem().getPlasticityModifier,
+             "Get plasticity modifier for current stage")
+        .def("developmentIsCriticalPeriod", &Brain::getDevelopmentSystem().isCriticalPeriod,
+             "Check if in critical period")
+        .def("developmentGetCriticalPeriodProgress", &Brain::getDevelopmentSystem().getCriticalPeriodProgress,
+             "Get critical period progress")
+        .def("developmentGetDevelopmentalAge", &Brain::getDevelopmentSystem().getDevelopmentalAge,
+             "Get developmental age")
+        .def("developmentSetDevelopmentalAge", &Brain::getDevelopmentSystem().setDevelopmentalAge,
+             py::arg("age"), "Set developmental age")
+        
+        // Plasticity Systems
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        
+        // Spike System (advanced access)
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        
+        // Convenience methods for common workflows
+        .def("runMultipleBrainsParallel", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                             const std::vector<size_t>& steps,
+                                             double timestep = 0.001) {
+            py::list results;
+            for (size_t i = 0; i < brains.size(); ++i) {
+                if (brains[i]) {
+                    py::dict brain_stats;
+                    brain_stats["brain_index"] = static_cast<int>(i);
+                    brain_stats["steps"] = steps[i];
+                    brain_stats["timestep"] = timestep;
+                    results.append(brain_stats);
+                    
+                    for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(steps[i]); ++step) {
+                        brains[i]->step(step, step * timestep);
+                    }
+                }
+            }
+            return results;
+        }, py::arg("brains"), py::arg("steps"), py::arg("timestep") = 0.001,
+              "Run multiple brains in parallel")
+        
+        .def("monitorSimulationRealTime", [](std::shared_ptr<Brain> brain,
+                                             const std::vector<size_t>& steps,
+                                             double timestep = 0.001) {
+            py::list monitoring_data;
+            size_t max_steps = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+            
+            for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+                if (!steps.empty() && step < steps.size()) {
+                    brain->step(step, step * timestep);
+                }
+                
+                py::dict snapshot;
+                snapshot["step"] = static_cast<int>(step);
+                snapshot["time"] = step * timestep;
+                snapshot["total_neurons"] = brain->getTotalNeuronCount();
+                snapshot["firing_neurons"] = brain->getFiringNeuronCount();
+                snapshot["total_spikes"] = brain->getTotalSpikeCount();
+                snapshot["avg_firing_rate"] = brain->getAverageFiringRate();
+                snapshot["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+                snapshot["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+                
+                monitoring_data.append(snapshot);
+            }
+            
+            return monitoring_data;
+        }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+              "Real-time simulation monitoring with comprehensive metrics")
+        
+        .def("detectAnomalies", [](std::shared_ptr<Brain> brain,
+                                  const std::vector<size_t>& steps,
+                                  double timestep = 0.001) {
+            py::dict anomalies;
+            py::list spike_anomalies;
+            py::list firing_rate_anomalies;
+            py::list connectivity_anomalies;
+            
+            float expected_avg_rate = 0.1f;
+            float spike_growth_threshold = 5.0f;
+            float connection_threshold = 0.01f;
+            
+            size_t max_steps = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+            
+            float baseline_spike_rate = 0.0f;
+            size_t baseline_samples = 0;
+            
+            for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+                if (!steps.empty() && step < steps.size()) {
+                    brain->step(step, step * timestep);
+                }
+                
+                float firing_rate = brain->getAverageFiringRate();
+                size_t total_connections = brain->getTotalSynapseCount();
+                float e_i_ratio = brain->getExcitationInhibitionRatio();
+                
+                if (step < 10) {
+                    baseline_spike_rate += firing_rate;
+                    baseline_samples++;
+                }
+                
+                if (baseline_samples > 0 && firing_rate > expected_avg_rate * 10.0f) {
+                    py::dict anomaly;
+                    anomaly["type"] = "high_firing_rate";
+                    anomaly["step"] = static_cast<int>(step);
+                    anomaly["firing_rate"] = firing_rate;
+                    anomaly["expected"] = expected_avg_rate;
+                    firing_rate_anomalies.append(anomaly);
+                }
+                
+                if (step > 5 && !steps.empty() && step < steps.size()) {
+                    float prev_rate = brain->getAverageFiringRate();
+                    if (prev_rate > spike_growth_threshold) {
+                        py::dict anomaly;
+                        anomaly["type"] = "sudden_spike_increase";
+                        anomaly["step"] = static_cast<int>(step);
+                        anomaly["firing_rate"] = firing_rate;
+                        anomaly["threshold"] = spike_growth_threshold;
+                        spike_anomalies.append(anomaly);
+                    }
+                }
+                
+                if (total_connections == 0) {
+                    py::dict anomaly;
+                    anomaly["type"] = "no_connections";
+                    anomaly["step"] = static_cast<int>(step);
+                    anomaly["connection_count"] = total_connections;
+                    connectivity_anomalies.append(anomaly);
+                }
+                
+                if (e_i_ratio < 0.5f || e_i_ratio > 1.5f) {
+                    py::dict anomaly;
+                    anomaly["type"] = "unbalanced_e_i";
+                    anomaly["step"] = static_cast<int>(step);
+                    anomaly["e_i_ratio"] = e_i_ratio;
+                    anomaly["status"] = (e_i_ratio < 0.5f) ? "inhibitory_dominant" : "excitatory_dominant";
+                    connectivity_anomalies.append(anomaly);
+                }
+            }
+            
+            anomalies["spike_anomalies"] = spike_anomalies;
+            anomalies["firing_rate_anomalies"] = firing_rate_anomalies;
+            anomalies["connectivity_anomalies"] = connectivity_anomalies;
+            
+            return anomalies;
+        }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+              "Detect various simulation anomalies and potential issues")
+        
+        .def("analyzeConnectivity", [](std::shared_ptr<Brain> brain) {
+            py::dict analysis;
+            analysis["total_neurons"] = brain->getTotalNeuronCount();
+            analysis["total_synapses"] = brain->getTotalSynapseCount();
+            analysis["regions"] = brain->getRegionCount();
+            
+            float ei_ratio = brain->getExcitationInhibitionRatio();
+            analysis["e_i_ratio"] = ei_ratio;
+            analysis["e_i_balance"] = (ei_ratio > 1.0f) ? "Excitatory Dominant" : 
+                                    (ei_ratio < 0.9f) ? "Inhibitory Dominant" : "Balanced";
+            
+            analysis["avg_firing_rate"] = brain->getAverageFiringRate();
+            analysis["spike_density"] = (brain->getTotalNeuronCount() > 0) ? 
+                static_cast<float>(brain->getTotalSpikeCount()) / brain->getTotalNeuronCount() : 0.0f;
+            analysis["network_efficiency"] = (ei_ratio > 0.5f && ei_ratio < 1.5f) ? "Good" : "Poor";
+            analysis["stability_indication"] = (analysis["spike_density"] < 0.5f) ? "Stable" : "Unstable";
+            
+            return analysis;
+        }, py::arg("brain"), "Analyze brain connectivity and provide diagnostic information")
+        
+        .def("getSystemHealth", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                  const std::vector<std::string>& names,
+                                  bool include_detailed_analysis = true) {
+            py::list health_reports;
+            
+            for (size_t i = 0; i < brains.size(); ++i) {
+                py::dict health;
+                if (i < names.size()) {
+                    health["name"] = names[i];
+                } else {
+                    health["name"] = "brain_" + std::to_string(i);
+                }
+                
+                if (brains[i]) {
+                    health["status"] = "active";
+                    health["neuron_count"] = brains[i]->getTotalNeuronCount();
+                    health["synapse_count"] = brains[i]->getTotalSynapseCount();
+                    health["spike_count"] = brains[i]->getTotalSpikeCount();
+                    health["firing_neurons"] = brains[i]->getFiringNeuronCount();
+                    health["avg_firing_rate"] = brains[i]->getAverageFiringRate();
+                    health["developmental_stage"] = static_cast<int>(brains[i]->getDevelopmentalStage());
+                    
+                    float ei_ratio = brains[i]->getExcitationInhibitionRatio();
+                    health["e_i_ratio"] = ei_ratio;
+                    health["e_i_status"] = (ei_ratio > 1.5f) ? "Unbalanced_Excitatory" :
+                                          (ei_ratio < 0.5f) ? "Unbalanced_Inhibitory" : "Balanced";
+                    
+                    // Check for potential issues
+                    std::vector<std::string> issues;
+                    if (brains[i]->getTotalNeuronCount() == 0) issues.push_back("No_neurons");
+                    if (brains[i]->getTotalSynapseCount() == 0) issues.push_back("No_connections");
+                    if (brains[i]->getFiringNeuronCount() == 0 && brains[i]->getTotalSpikeCount() > 0) issues.push_back("No_firing_neurons");
+                    if (ei_ratio < 0.5f || ei_ratio > 1.5f) issues.push_back("Unbalanced_EI");
+                    if (brains[i]->getAverageFiringRate() < 0.01f) issues.push_back("Low_activity");
+                    
+                    if (!issues.empty()) {
+                        health["issues"] = issues;
+                        health["status"] = "warning";
+                    }
+                    
+                    if (include_detailed_analysis) {
+                        // Add detailed analysis
+                        health["detailed_analysis"] = nlm::analyzeConnectivity(brains[i]);
+                    }
+                } else {
+                    health["status"] = "error";
+                    health["error"] = "Brain_pointer_is_null";
+                }
+                
+                health_reports.append(health);
+            }
+            
+            return health_reports;
+        }, py::arg("brains"), py::arg("names"), py::arg("include_detailed_analysis") = true,
+              "Comprehensive system health monitoring with detailed analysis")
+        
+        .def("profilePerformance", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                     const std::vector<size_t>& steps,
+                                     double timestep = 0.001) {
+            py::dict performance_report;
+            
+            auto start_time = std::chrono::high_resolution_clock::now();
+            
+            for (size_t i = 0; i < brains.size(); ++i) {
+                if (brains[i]) {
+                    size_t max_steps = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+                    
+                    for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+                        if (!steps.empty() && step < steps.size()) {
+                            brains[i]->step(step, step * timestep);
+                        }
+                    }
+                }
+            }
+            
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            
+            performance_report["total_execution_time_ms"] = total_duration.count();
+            performance_report["brains_processed"] = static_cast<int>(brains.size());
+            performance_report["total_steps"] = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+            performance_report["timestep"] = timestep;
+            
+            if (total_duration.count() > 0 && !steps.empty()) {
+                double steps_per_second = (steps.size() * timestep) > 0 ? 
+                    static_cast<double>(steps.size()) / ((steps.size() * timestep) / 1000.0) : 0.0;
+                performance_report["steps_per_second"] = steps_per_second;
+            }
+            
+            performance_report["avg_neuron_count"] = 0;
+            performance_report["avg_synapse_count"] = 0;
+            performance_report["avg_spike_count"] = 0;
+            
+            // Collect performance metrics from each brain
+            py::list brain_performance;
+            for (size_t i = 0; i < brains.size(); ++i) {
+                py::dict brain_perf;
+                brain_perf["brain_index"] = static_cast<int>(i);
+                
+                if (brains[i]) {
+                    brain_perf["neuron_count"] = brains[i]->getTotalNeuronCount();
+                    brain_perf["synapse_count"] = brains[i]->getTotalSynapseCount();
+                    brain_perf["final_spike_count"] = brains[i]->getTotalSpikeCount();
+                    brain_perf["final_firing_neurons"] = brains[i]->getFiringNeuronCount();
+                    brain_perf["avg_firing_rate"] = brains[i]->getAverageFiringRate();
+                    brain_perf["memory_usage_kb"] = 0;  // Would need actual memory measurement
+                    brain_perf["e_i_ratio"] = brains[i]->getExcitationInhibitionRatio();
+                    brain_perf["developmental_stage"] = static_cast<int>(brains[i]->getDevelopmentalStage());
+                }
+                
+                brain_performance.append(brain_perf);
+            }
+            
+            performance_report["brain_performance"] = brain_performance;
+            
+            return performance_report;
+        }, py::arg("brains"), py::arg("steps"), py::arg("timestep") = 0.001,
+              "Comprehensive performance monitoring and profiling")
+        .def("simulateEpisode", [](Brain& self, size_t steps, double timestep, 
+                                  std::shared_ptr<SensoryInput> input = nullptr) {
+            for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(steps); ++step) {
+                if (input) {
+                    self.receiveSensoryInput(*input);
+                }
+                self.step(step, step * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep"), py::arg("input") = nullptr,
+             "Simulate an episode with optional sensory input at each step");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -416,10 +1024,601 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced Factory Functions
+    m.def("createBasicBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.05f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a basic configured brain (500 neurons, 1 region)");
+
+    m.def("createAdvancedBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create an advanced configured brain with plasticity (2000 neurons, 3 regions)");
+
+    m.def("createQuickTestBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a quick test brain (100 neurons) with fixed seed for reproducibility");
+
+    // World Factory Functions
+    m.def("createStandardWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->setRandomSeed(42);
+        return world;
+    }, "Create a standard 20x20 world with 8x8 vision");
+
+    m.def("createLargeWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(50, 50, 12, 12);
+        world->setRandomSeed(123);
+        return world;
+    }, "Create a large 50x50 world with 12x12 vision");
+
+    // Agent Factory Functions
+    m.def("createSimpleAgentBrain", [](std::shared_ptr<Brain> brain) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        return agent;
+    }, py::arg("brain"), "Create a simple agent brain with default subsystems enabled");
+
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        agent->enableNovelty(true);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an advanced agent brain with all subsystems enabled");
+
+    // Example world configurations
+    m.def("createArenaWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(30, 30, 10, 10);
+        world->setAgentStart(15.0, 15.0);
+        world->setMaxEnergy(100.0);
+        return world;
+    }, "Create an arena-style world with agent start position");
+
+    m.def("createMazeWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(25, 25, 8, 8);
+        world->setAgentStart(5.0, 5.0);
+        world->setMaxEnergy(50.0);
+        return world;
+    }, "Create a maze-style world with limited energy");
+
+    // Batch and utility functions
+    m.def("runSimulationBatch", [](const std::vector<std::shared_ptr<Brain>>& brains, 
+                                  const std::vector<size_t>& steps,
+                                  double timestep = 0.001) {
+        py::list results;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            if (brains[i]) {
+                py::dict brain_stats;
+                brain_stats["brain_index"] = static_cast<int>(i);
+                brain_stats["steps"] = steps[i];
+                brain_stats["timestep"] = timestep;
+                results.append(brain_stats);
+                
+                for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(steps[i]); ++step) {
+                    brains[i]->step(step, step * timestep);
+                }
+            }
+        }
+        return results;
+    }, py::arg("brains"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Run simulation batch for multiple brains");
+
+    m.def("compareBrains", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                             const std::vector<size_t>& steps,
+                             double timestep = 0.001) {
+        py::list comparison;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            if (brains[i]) {
+                py::dict stats;
+                stats["brain_index"] = static_cast<int>(i);
+                stats["final_spike_count"] = brains[i]->getTotalSpikeCount();
+                stats["firing_neurons"] = brains[i]->getFiringNeuronCount();
+                stats["avg_firing_rate"] = brains[i]->getAverageFiringRate();
+                stats["steps_run"] = steps[i];
+                comparison.append(stats);
+            }
+        }
+        return comparison;
+    }, py::arg("brains"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Compare performance of multiple brains after running simulation");
+
+    // Brain network utilities
+    m.def("createBrainNetwork", [](const std::vector<std::shared_ptr<Config>>& configs) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        for (const auto& config : configs) {
+            if (config) {
+                brains.push_back(std::make_shared<Brain>(*config));
+            }
+        }
+        return brains;
+    }, py::arg("configs"), "Create a network of brains from multiple configurations");
+
+    m.def("resetBrainNetwork", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        for (const auto& brain : brains) {
+            if (brain) {
+                brain->reset();
+                brain->initialize(brain->getConfig());
+            }
+        }
+    }, py::arg("brains"), "Reset a network of brains");
+
+    // Performance and debugging utilities
+    m.def("profileBrainPerformance", [](std::shared_ptr<Brain> brain, 
+                                       const std::vector<size_t>& steps,
+                                       double timestep = 0.001) {
+        py::dict profile;
+        profile["brain_index"] = 0;  // Will be set in implementation
+        profile["steps_total"] = steps.size();
+        profile["timestep"] = timestep;
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps.size(); ++i) {
+            for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(steps[i]); ++step) {
+                brain->step(step, step * timestep);
+            }
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        profile["execution_time_ms"] = duration.count();
+        profile["steps_per_second"] = (steps.size() * timestep) > 0 ? 
+            static_cast<double>(steps.size()) / ((steps.size() * timestep) / 1000.0) : 0.0;
+        
+        profile["final_spike_count"] = brain->getTotalSpikeCount();
+        profile["final_firing_neurons"] = brain->getFiringNeuronCount();
+        profile["final_avg_firing_rate"] = brain->getAverageFiringRate();
+        
+        return profile;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Profile brain performance and return execution statistics");
+
+    // Serialization utilities
+    m.def("saveBrainNetwork", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                const std::string& basePath) {
+        py::list results;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            if (brains[i]) {
+                std::string filepath = basePath + "_brain_" + std::to_string(i) + ".bin";
+                bool success = brains[i]->save(filepath);
+                py::dict result;
+                result["brain_index"] = static_cast<int>(i);
+                result["filepath"] = filepath;
+                result["success"] = success;
+                results.append(result);
+            }
+        }
+        return results;
+    }, py::arg("brains"), py::arg("basePath"), "Save multiple brains to files");
+
+    m.def("loadBrainNetwork", [](const std::vector<std::string>& filepaths,
+                                const std::vector<std::shared_ptr<Config>>& configs) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        for (size_t i = 0; i < filepaths.size(); ++i) {
+            if (configs.size() > i && configs[i]) {
+                auto brain = std::make_shared<Brain>(configs[i]);
+                brain->load(filepaths[i]);
+                brains.push_back(brain);
+            }
+        }
+        return brains;
+    }, py::arg("filepaths"), py::arg("configs"), "Load multiple brains from files");
+
+    // Convenience presets for common simulation scenarios
+    m.def("createExplorationScenario", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.08f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->setAgentStart(10.0, 10.0);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        py::dict scenario;
+        scenario["brain"] = brain;
+        scenario["agent"] = agent;
+        scenario["world"] = world;
+        return scenario;
+    }, "Create an exploration scenario with curiosity and reward modulation");
+
+    m.def("createLearningScenario", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1200), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.12f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(456), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(30, 30, 10, 10);
+        world->setAgentStart(15.0, 15.0);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        py::dict scenario;
+        scenario["brain"] = brain;
+        scenario["agent"] = agent;
+        scenario["world"] = world;
+        return scenario;
+    }, "Create a learning scenario with structural plasticity and reward-based learning");
+
+    m.def("createDevelopmentScenario", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(789), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("development.age_rate", 1.0f, ConfigSource::Default);
+        config->set("development.plasticity_modifier", 0.8f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(25, 25, 8, 8);
+        world->setAgentStart(12.5, 12.5);
+        agent->initialize(*world);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        py::dict scenario;
+        scenario["brain"] = brain;
+        scenario["agent"] = agent;
+        scenario["world"] = world;
+        return scenario;
+    }, "Create a development scenario with age-dependent plasticity");
+
+    // Simulation helper functions
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain, 
+                         std::shared_ptr<AgentBrain> agent,
+                         std::shared_ptr<SimpleWorld> world,
+                         size_t steps,
+                         double timestep = 0.1) {
+        py::dict results;
+        results["brain"] = brain;
+        results["agent"] = agent;
+        results["world"] = world;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            // Update world
+            world->update(timestep);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            auto internalSignals = percept.getInternal();
+            float reward = internalSignals.empty() ? 0.0f : internalSignals[0];
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(timestep);
+        }
+        
+        results["final_spike_count"] = brain->getTotalSpikeCount();
+        results["final_firing_neurons"] = brain->getFiringNeuronCount();
+        results["curiosity_level"] = agent->getCuriosityLevel();
+        results["novelty_level"] = agent->getNoveltyLevel();
+        results["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        return results;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), 
+             py::arg("steps"), py::arg("timestep") = 0.1,
+             "Run a complete episode with agent and world interaction");
+
+    m.def("runBatchEpisodes", [](const std::vector<py::dict>& episodes,
+                                size_t stepsPerEpisode,
+                                double timestep = 0.1) {
+        py::list results;
+        for (size_t i = 0; i < episodes.size(); ++i) {
+            auto episode = episodes[i];
+            auto brain = episode["brain"].cast<std::shared_ptr<Brain>>();
+            auto agent = episode["agent"].cast<std::shared_ptr<AgentBrain>>();
+            auto world = episode["world"].cast<std::shared_ptr<SimpleWorld>>();
+            
+            if (brain && agent && world) {
+                py::dict episode_results = nlm::runEpisode(brain, agent, world, stepsPerEpisode, timestep);
+                episode_results["episode_index"] = static_cast<int>(i);
+                results.append(episode_results);
+                
+                // Reset for next episode
+                brain->reset();
+                brain->initialize(brain->getConfig());
+                agent->reset();
+            }
+        }
+        return results;
+    }, py::arg("episodes"), py::arg("stepsPerEpisode"), py::arg("timestep") = 0.1,
+             "Run multiple episodes in batch");
+
+    // Diagnostic and debugging utilities
+    m.def("analyzeBrainConnectivity", [](std::shared_ptr<Brain> brain) {
+        py::dict analysis;
+        analysis["total_neurons"] = brain->getTotalNeuronCount();
+        analysis["total_synapses"] = brain->getTotalSynapseCount();
+        analysis["regions"] = brain->getRegionCount();
+        
+        float ei_ratio = brain->getExcitationInhibitionRatio();
+        analysis["e_i_ratio"] = ei_ratio;
+        analysis["e_i_balance"] = (ei_ratio > 1.0f) ? "Excitatory Dominant" : 
+                                (ei_ratio < 0.9f) ? "Inhibitory Dominant" : "Balanced";
+        
+        analysis["avg_firing_rate"] = brain->getAverageFiringRate();
+        analysis["spike_density"] = (brain->getTotalNeuronCount() > 0) ? 
+            static_cast<float>(brain->getTotalSpikeCount()) / brain->getTotalNeuronCount() : 0.0f;
+        
+        return analysis;
+    }, py::arg("brain"), "Analyze brain connectivity and provide diagnostic information");
+
+    m.def("monitorSimulation", [](std::shared_ptr<Brain> brain,
+                                  const std::vector<size_t>& steps,
+                                  double timestep = 0.001) {
+        py::list monitoring_data;
+        size_t max_steps = 0;
+        if (!steps.empty()) {
+            max_steps = *std::max_element(steps.begin(), steps.end());
+        }
+        
+        for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+            if (step < steps.size()) {
+                brain->step(step, step * timestep);
+            }
+            
+            py::dict snapshot;
+            snapshot["step"] = static_cast<int>(step);
+            snapshot["time"] = step * timestep;
+            snapshot["spike_count"] = brain->getTotalSpikeCount();
+            snapshot["firing_neurons"] = brain->getFiringNeuronCount();
+            snapshot["avg_firing_rate"] = brain->getAverageFiringRate();
+            snapshot["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+            
+            monitoring_data.append(snapshot);
+        }
+        
+        return monitoring_data;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Monitor simulation progress and return time-series data");
+
+    m.def("detectAnomalies", [](std::shared_ptr<Brain> brain,
+                               const std::vector<size_t>& steps,
+                               double timestep = 0.001) {
+        py::dict anomalies;
+        py::list spike_anomalies;
+        py::list firing_rate_anomalies;
+        
+        float expected_avg_rate = 0.1f;  // Normal firing rate threshold
+        float spike_growth_threshold = 5.0f;  // Sudden spike increase threshold
+        
+        size_t max_steps = (!steps.empty()) ? *std::max_element(steps.begin(), steps.end()) : 0;
+        
+        float baseline_spike_rate = 0.0f;
+        size_t baseline_samples = 0;
+        
+        for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+            if (step < steps.size()) {
+                brain->step(step, step * timestep);
+            }
+            
+            float firing_rate = brain->getAverageFiringRate();
+            
+            if (step < 10) {
+                baseline_spike_rate += firing_rate;
+                baseline_samples++;
+            }
+            
+            // Detect firing rate anomalies
+            if (baseline_samples > 0 && firing_rate > expected_avg_rate * 10.0f) {
+                py::dict anomaly;
+                anomaly["type"] = "high_firing_rate";
+                anomaly["step"] = static_cast<int>(step);
+                anomaly["firing_rate"] = firing_rate;
+                anomaly["expected"] = expected_avg_rate;
+                firing_rate_anomalies.append(anomaly);
+            }
+            
+            // Detect sudden spike increases
+            if (step > 5 && step < steps.size()) {
+                float prev_rate = brain->getAverageFiringRate();
+                if (prev_rate > spike_growth_threshold) {
+                    py::dict anomaly;
+                    anomaly["type"] = "sudden_spike_increase";
+                    anomaly["step"] = static_cast<int>(step);
+                    anomaly["firing_rate"] = firing_rate;
+                    anomaly["threshold"] = spike_growth_threshold;
+                    spike_anomalies.append(anomaly);
+                }
+            }
+        }
+        
+        anomalies["spike_anomalies"] = spike_anomalies;
+        anomalies["firing_rate_anomalies"] = firing_rate_anomalies;
+        
+        return anomalies;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Detect simulation anomalies and potential issues");
+
+    // System status and health monitoring
+    m.def("getSystemHealth", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                              const std::vector<std::string>& names) {
+        py::list health_reports;
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            py::dict health;
+            if (i < names.size()) {
+                health["name"] = names[i];
+            } else {
+                health["name"] = "brain_" + std::to_string(i);
+            }
+            
+            if (brains[i]) {
+                health["status"] = "active";
+                health["neuron_count"] = brains[i]->getTotalNeuronCount();
+                health["synapse_count"] = brains[i]->getTotalSynapseCount();
+                health["spike_count"] = brains[i]->getTotalSpikeCount();
+                health["firing_neurons"] = brains[i]->getFiringNeuronCount();
+                health["avg_firing_rate"] = brains[i]->getAverageFiringRate();
+                health["developmental_stage"] = static_cast<int>(brains[i]->getDevelopmentalStage());
+                
+                float ei_ratio = brains[i]->getExcitationInhibitionRatio();
+                health["e_i_ratio"] = ei_ratio;
+                health["e_i_status"] = (ei_ratio > 1.5f) ? "Unbalanced_Excitatory" :
+                                      (ei_ratio < 0.5f) ? "Unbalanced_Inhibitory" : "Balanced";
+                
+                // Check for potential issues
+                std::vector<std::string> issues;
+                if (brains[i]->getTotalNeuronCount() == 0) issues.push_back("No_neurons");
+                if (brains[i]->getTotalSynapseCount() == 0) issues.push_back("No_connections");
+                if (brains[i]->getFiringNeuronCount() == 0 && brains[i]->getTotalSpikeCount() > 0) issues.push_back("No_firing_neurons");
+                if (ei_ratio < 0.5f || ei_ratio > 1.5f) issues.push_back("Unbalanced_EI");
+                
+                if (!issues.empty()) {
+                    health["issues"] = issues;
+                    health["status"] = "warning";
+                }
+            } else {
+                health["status"] = "error";
+                health["error"] = "Brain_pointer_is_null";
+            }
+            
+            health_reports.append(health);
+        }
+        
+        return health_reports;
+    }, py::arg("brains"), py::arg("names"), "Get health status of multiple brains");
+
+    m.def("monitorPerformance", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                   const std::vector<size_t>& steps,
+                                   double timestep = 0.001) {
+        py::dict performance_report;
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            if (brains[i]) {
+                size_t max_steps = (!steps.empty()) ? *std::max_element(steps.begin(), steps.end()) : 0;
+                
+                for (nlm::SimulationStep step = 0; step < static_cast<nlm::SimulationStep>(max_steps); ++step) {
+                    if (step < steps.size()) {
+                        brains[i]->step(step, step * timestep);
+                    }
+                }
+            }
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        performance_report["total_execution_time_ms"] = total_duration.count();
+        performance_report["brains_processed"] = static_cast<int>(brains.size());
+        performance_report["total_steps"] = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+        performance_report["timestep"] = timestep;
+        
+        if (total_duration.count() > 0 && !steps.empty()) {
+            double steps_per_second = (steps.size() * timestep) > 0 ? 
+                static_cast<double>(steps.size()) / ((steps.size() * timestep) / 1000.0) : 0.0;
+            performance_report["steps_per_second"] = steps_per_second;
+        }
+        
+        // Collect performance metrics from each brain
+        py::list brain_performance;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            py::dict brain_perf;
+            brain_perf["brain_index"] = static_cast<int>(i);
+            
+            if (brains[i]) {
+                brain_perf["neuron_count"] = brains[i]->getTotalNeuronCount();
+                brain_perf["synapse_count"] = brains[i]->getTotalSynapseCount();
+                brain_perf["final_spike_count"] = brains[i]->getTotalSpikeCount();
+                brain_perf["final_firing_neurons"] = brains[i]->getFiringNeuronCount();
+                brain_perf["avg_firing_rate"] = brains[i]->getAverageFiringRate();
+                brain_perf["memory_usage_kb"] = 0;  // Would need actual memory measurement
+            }
+            
+            brain_performance.append(brain_perf);
+        }
+        
+        performance_report["brain_performance"] = brain_performance;
+        
+        return performance_report;
+    }, py::arg("brains"), py::arg("steps"), py::arg("timestep") = 0.001,
+             "Monitor and report performance metrics for brain simulations");
+
+    // Add version and metadata
+    m.attr("__version__") = "2.0.0";
+    m.attr("__description__") = "NLM Python Bindings - Advanced Neural Simulation Framework";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__license__") = "MIT";
+    
+    m.def("getInfo", []() {
+        py::dict info;
+        info["version"] = "2.0.0";
+        info["description"] = "NLM Python Bindings - Advanced Neural Simulation Framework";
+        info["author"] = "NLM Research Team";
+        info["license"] = "MIT";
+        info["python_version"] = PY_VERSION;
+        info["built_with"] = "pybind11 " PYBIND11_VERSION;
+        return info;
+    }, "Get library information and version details");
 
 } // namespace nlm
