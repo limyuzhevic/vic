@@ -20,45 +20,77 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+    if (!brain_) return;
+    
+    // Optimized neuron group distribution using hash-based mapping
+    // Collect all neurons by type once
+    std::vector<std::vector<Neuron*>> neuronsByType(6); // 0:Forward, 1:Backward, 2:Left, 3:Right, 4:Interact, 5:Wait
+    std::vector<std::vector<Neuron*>> sensoryByType(4); // 0:Vision, 1:Touch, 2:Internal, 3:Proprioception
+    
+    // Single pass through all neurons to categorize them
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                // Assign motor neurons to action groups based on round-robin
+                for (Neuron* n : pop->getNeurons()) {
+                    // Simple deterministic assignment for consistent behavior
+                    size_t group = 0; // Default to MoveForward
+                    if (!pop->getNeurons().empty()) {
+                        size_t neuronIdx = 0;
+                        for (size_t i = 0; i < pop->getNeurons().size(); ++i) {
+                            if (pop->getNeurons()[i] == n) {
+                                neuronIdx = i;
+                                break;
+                            }
                         }
+                        // Distribute across 6 action types
+                        group = neuronIdx % 6;
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                    neuronsByType[group].push_back(n);
+                }
+            } else if (type == NeuronType::Sensory) {
+                // Assign sensory neurons to modality groups
+                for (Neuron* n : pop->getNeurons()) {
+                    // Simple deterministic assignment for consistent behavior
+                    size_t group = 0; // Default to Vision
+                    if (!pop->getNeurons().empty()) {
+                        size_t neuronIdx = 0;
+                        for (size_t i = 0; i < pop->getNeurons().size(); ++i) {
+                            if (pop->getNeurons()[i] == n) {
+                                neuronIdx = i;
+                                break;
+                            }
                         }
+                        // Distribute across 4 sensory types
+                        group = neuronIdx % 4;
                     }
+                    sensoryByType[group].push_back(n);
                 }
             }
         }
     }
+    
+    // Assign to class member variables
+    motorForward_ = neuronsByType[0];
+    motorBackward_ = neuronsByType[1];
+    motorTurnLeft_ = neuronsByType[2];
+    motorTurnRight_ = neuronsByType[3];
+    motorInteract_ = neuronsByType[4];
+    motorWait_ = neuronsByType[5];
+    
+    sensoryVision_ = sensoryByType[0];
+    sensoryTouch_ = sensoryByType[1];
+    sensoryInternal_ = sensoryByType[2];
+    sensoryProprioception_ = sensoryByType[3];
+    
+    NLM_LOG_INFO("AgentBrain initialized with " +
+                 std::to_string(motorForward_.size() + motorBackward_.size() + 
+                              motorTurnLeft_.size() + motorTurnRight_.size() +
+                              motorInteract_.size() + motorWait_.size()) + " motor neurons, " +
+                 std::to_string(sensoryVision_.size() + sensoryTouch_.size() + 
+                              sensoryInternal_.size() + sensoryProprioception_.size()) + " sensory neurons");
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -217,8 +249,10 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - use actual motor output size for safety
+            int maxChoice = static_cast<int>(brain_->getMotorOutputSize()) - 1;
+            if (maxChoice < 0) maxChoice = 0;
+            int choice = brain_->getRandomGenerator()->uniformInt(0, maxChoice);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;

@@ -412,14 +412,51 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("run_batch_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent, size_t numSteps, double timestep) {
+    if (!brain || !world || !agent) {
+        throw std::runtime_error("Invalid simulation components");
+    }
+    
+    brain->initialize();
+    world->reset();
+    agent->initialize(*world);
+    
+    for (size_t step = 0; step < numSteps; ++step) {
+        // Update world
+        world->update(timestep);
+        
+        // Get sensory input and process
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        
+        // Brain processes
+        brain->step(step);
+        
+        // Get action and apply
+        auto action = agent->decodeMotorCommand();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Apply reward modulation
+        auto rewardPercept = world->getSensoryPercept();
+        float reward = 0.0f;
+        if (rewardPercept.getInternal().size() > 0) {
+            reward = rewardPercept.getInternal()[0];
+        }
+        agent->applyRewardModulation(reward, 0.0f);
+        
+        // Update development
+        agent->updateDevelopment(timestep);
+    }
+    
+    // Return final statistics
+    return std::make_tuple(
+        brain->getTotalSpikeCount(),
+        brain->getAverageFiringRate(),
+        brain->getTotalNeuronCount()
+    );
+}, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("timestep"),
+    "Run a complete batch simulation with brain, world, and agent.\n\n"
+    "Returns a tuple of (total_spikes, average_firing_rate, neuron_count)")
 
 } // namespace nlm

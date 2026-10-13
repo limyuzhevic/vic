@@ -30,21 +30,12 @@ SimpleWorld::SimpleWorld()
     , rngState_(42)
 {
     agent_.reset();
+    
+    // Initialize spatial index with 0.1f cell size (good balance of accuracy and performance)
+    spatialIndex_ = std::make_unique<SpatialIndex>(width_, height_, 0.1f);
 }
 
 SimpleWorld::~SimpleWorld() = default;
-
-void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
-    width_ = width;
-    height_ = height;
-    visionWidth_ = visionWidth;
-    visionHeight_ = visionHeight;
-}
-
-void SimpleWorld::setRandomSeed(uint64_t seed) {
-    rngSeed_ = seed;
-    rngState_ = seed;
-}
 
 void SimpleWorld::reset() {
     simTime_ = 0.0;
@@ -70,8 +61,111 @@ void SimpleWorld::reset() {
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
     }
     
+    // Rebuild spatial index with new objects
+    if (spatialIndex_) {
+        spatialIndex_->update();
+    }
+    
     generateVision();
 }
+
+void SimpleWorld::setAgentStart(float x, float y) {
+    agent_.x = x;
+    agent_.y = y;
+}
+
+void SimpleWorld::setRandomSeed(uint64_t seed) {
+    rngSeed_ = seed;
+    rngState_ = seed;
+}
+
+// Spatial indexing structures
+struct SpatialIndex {
+    struct Cell {
+        std::vector<WorldObject*> objects;
+        Cell() = default;
+    };
+    
+    size_t gridWidth;
+    size_t gridHeight;
+    float cellSize;
+    std::vector<std::vector<Cell>> grid;
+    
+    SpatialIndex(float worldWidth, float worldHeight, float cellSize)
+        : gridWidth(static_cast<size_t>(std::ceil(worldWidth / cellSize)))
+        , gridHeight(static_cast<size_t>(std::ceil(worldHeight / cellSize)))
+        , cellSize(cellSize)
+        , grid(gridWidth, std::vector<Cell>(gridHeight)) {}
+    
+    size_t getCellX(float x) const {
+        return static_cast<size_t>(std::floor(x / cellSize));
+    }
+    
+    size_t getCellY(float y) const {
+        return static_cast<size_t>(std::floor(y / cellSize));
+    }
+    
+    void addObject(WorldObject* obj) {
+        if (!obj || !obj->active) return;
+        
+        size_t xCell = getCellX(obj->x);
+        size_t yCell = getCellY(obj->y);
+        
+        if (xCell < gridWidth && yCell < gridHeight) {
+            grid[xCell][yCell].objects.push_back(obj);
+        }
+    }
+    
+    void removeObject(WorldObject* obj) {
+        if (!obj || !obj->active) return;
+        
+        size_t xCell = getCellX(obj->x);
+        size_t yCell = getCellY(obj->y);
+        
+        if (xCell < gridWidth && yCell < gridHeight) {
+            auto& cell = grid[xCell][yCell];
+            for (auto it = cell.objects.begin(); it != cell.objects.end(); ++it) {
+                if (*it == obj) {
+                    cell.objects.erase(it);
+                    return;
+                }
+            }
+        }
+    }
+    
+    std::vector<WorldObject*> getObjectsInRange(float minX, float minY, float maxX, float maxY) {
+        std::vector<WorldObject*> result;
+        
+        size_t minXCell = getCellX(minX);
+        size_t maxXCell = getCellX(maxX);
+        size_t minYCell = getCellY(minY);
+        size_t maxYCell = getCellY(maxY);
+        
+        for (size_t x = minXCell; x <= maxXCell && x < gridWidth; ++x) {
+            for (size_t y = minYCell; y <= maxYCell && y < gridHeight; ++y) {
+                for (WorldObject* obj : grid[x][y].objects) {
+                    if (obj && obj->active) {
+                        result.push_back(obj);
+                    }
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    void update() {
+        // Rebuild spatial index - simple optimization for small grids
+        grid.clear();
+        grid.resize(gridWidth, std::vector<Cell>(gridHeight));
+        
+        for (auto& obj : objects_) {
+            if (obj.active) {
+                addObject(&obj);
+            }
+        }
+    }
+};
 
 void SimpleWorld::setAgentStart(float x, float y) {
     agent_.x = x;
@@ -219,27 +313,52 @@ ActionResult SimpleWorld::interact() {
     result.reward = 0.0f;
     result.success = false;
     
-    // Check for objects in interaction range
+    // Check for objects in interaction range using spatial index for better performance
     const float interactRange = 1.0f;
+    std::vector<WorldObject*> nearbyObjects;
     
-    for (auto& obj : objects_) {
-        if (!obj.active) continue;
+    if (spatialIndex_) {
+        // Use spatial index to find nearby objects
+        nearbyObjects = spatialIndex_->getObjectsInRange(
+            agent_.x - interactRange, agent_.y - interactRange,
+            agent_.x + interactRange, agent_.y + interactRange
+        );
+    } else {
+        // Fallback to linear search
+        for (auto& obj : objects_) {
+            if (!obj.active) continue;
+            
+            float dx = obj.x - agent_.x;
+            float dy = obj.y - agent_.y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            
+            if (dist < interactRange + obj.radius) {
+                nearbyObjects.push_back(&obj);
+            }
+        }
+    }
+    
+    for (WorldObject* obj : nearbyObjects) {
+        if (!obj->active) continue;
         
-        float dx = obj.x - agent_.x;
-        float dy = obj.y - agent_.y;
+        float dx = obj->x - agent_.x;
+        float dy = obj->y - agent_.y;
         float dist = std::sqrt(dx * dx + dy * dy);
         
-        if (dist < interactRange + obj.radius) {
-            obj.active = false;  // Consume the object
+        if (dist < interactRange + obj->radius) {
+            obj->active = false;  // Consume the object
+            if (spatialIndex_) {
+                spatialIndex_->removeObject(obj);
+            }
             
-            if (obj.type == WorldObjectType::Resource) {
+            if (obj->type == WorldObjectType::Resource) {
                 agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
-                result.reward = obj.value;  // Positive reward
+                result.reward = obj->value;  // Positive reward
                 result.success = true;
                 result.message = "consumed_resource";
-            } else if (obj.type == WorldObjectType::Hazard) {
+            } else if (obj->type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
-                result.reward = obj.value;  // Negative reward
+                result.reward = obj->value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
             }
@@ -261,6 +380,18 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
     if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
         return false;
     }
+    
+    // Check if position is occupied by an object (including agent)
+    // The agent's own position should be valid
+    if (std::abs(x - agent_.x) < 0.01f && std::abs(y - agent_.y) < 0.01f) {
+        return true;  // Allow agent's own position
+    }
+    
+    WorldObject* obj = getObjectAt(x, y);
+    if (obj != nullptr) {
+        return false;  // Position occupied by an object
+    }
+    
     return true;
 }
 
@@ -281,6 +412,9 @@ WorldObject* SimpleWorld::getObjectAt(float x, float y) {
 
 void SimpleWorld::addObject(const WorldObject& obj) {
     objects_.push_back(obj);
+    if (spatialIndex_) {
+        spatialIndex_->addObject(&objects_.back());
+    }
 }
 
 void SimpleWorld::removeObject(float x, float y) {
@@ -293,28 +427,35 @@ void SimpleWorld::removeObject(float x, float y) {
         
         if (dist < obj.radius) {
             obj.active = false;
+            if (spatialIndex_) {
+                spatialIndex_->removeObject(&obj);
+            }
             return;
         }
     }
 }
 
 void SimpleWorld::generateVision() {
-    // Simple raycasting-based vision
+    // Optimized raycasting-based vision with adaptive sampling
     // Cast rays in a cone in front of the agent
     
     const int rayCount = 16;
     const float fov = M_PI / 2.0f;  // 90 degree FOV
     const float maxRange = 8.0f;
+    const float rayStep = 0.1f;
     
     std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
     
+    // Precompute ray directions for better performance
+    std::vector<std::pair<float, float>> rayDirections(rayCount);
     for (int i = 0; i < rayCount; ++i) {
-        // Angle for this ray
         float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
-        
-        // Cast ray
-        float dx = std::cos(angle);
-        float dy = std::sin(angle);
+        rayDirections[i] = {std::cos(angle), std::sin(angle)};
+    }
+    
+    for (int i = 0; i < rayCount; ++i) {
+        float dx = rayDirections[i].first;
+        float dy = rayDirections[i].second;
         
         float t = 0.0f;
         while (t < maxRange) {
@@ -342,7 +483,7 @@ void SimpleWorld::generateVision() {
                 break;
             }
             
-            t += 0.1f;
+            t += rayStep;
         }
     }
     
