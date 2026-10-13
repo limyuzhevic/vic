@@ -131,10 +131,10 @@ private:
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
-                        const std::vector<float>* sensoryQuery,
-                        SimulationStep* startTime,
-                        SimulationStep* endTime,
-                        ActionType* actionQuery) const;
+                        const std::vector<float>* sensoryQuery = nullptr,
+                        const SimulationStep* startTime = nullptr,
+                        const SimulationStep* endTime = nullptr,
+                        const ActionType* actionQuery = nullptr) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

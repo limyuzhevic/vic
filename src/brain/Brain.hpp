@@ -1,53 +1,20 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../brain/NeuralCore.hpp"
+#include "../brain/MemorySystem.hpp"
+#include "../brain/PredictionSystem.hpp"
+#include "../brain/CognitiveSystem.hpp"
+#include "../brain/NeuromodulationSystem.hpp"
+#include "../brain/DevelopmentSystem.hpp"
+#include "../brain/PlasticitySystem.hpp"
+#include "../brain/CheckpointSystem.hpp"
 #include <memory>
-#include <string>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
-
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+// Brain: Central coordinator of the neural system
+// Coordinates specialized system classes while maintaining backward compatibility
 class Brain {
 public:
     // Create brain with configuration
@@ -71,7 +38,6 @@ public:
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron

@@ -36,6 +36,11 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
+    // Handle case when memoryNeurons_ is empty
+    if (memoryNeurons_.empty()) {
+        return; // Cannot store without available neurons
+    }
+    
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
@@ -43,9 +48,16 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
+        // Get the region containing this neuron
+        auto* region = brain_->getRegion(RegionId(neuron.getId() / 1000));
+        if (!region) {
+            continue; // Region not found, skip this neuron
+        }
+        
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        auto* neurons = region->getAllNeurons();
+        if (neurons) {
+            for (auto* nn : *neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -64,8 +76,10 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     }
     
     // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    if (memoryNeurons_.size() >= 2) {
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
     }
 }
 
@@ -158,10 +172,11 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
     }
 }
 
+// Competition between memory traces
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
-    if (memoryActivations_.empty()) return;
+    if (memoryActivations_.empty() || memoryNeurons_.empty()) return;
     
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
