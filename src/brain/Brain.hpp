@@ -80,7 +80,7 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
+        // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
     
@@ -194,6 +194,25 @@ public:
     void logStatus() const;
     
 private:
+    // Step method implementation
+    void step(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Extracted step methods for better modularity
+    void updateNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory(SimulationStep currentStep, Timestamp currentTime);
+    void applyNeuromodulation(SimulationStep currentStep, Timestamp currentTime);
+    void applyPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    void updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    void integratePredictionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void integrateAttentionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void integrateConceptFormation(SimulationStep currentStep, Timestamp currentTime);
+    void applyStructuralPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    void replayMemories(SimulationStep currentStep, Timestamp currentTime);
+    void applyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime);
+    void consolidateMemories(SimulationStep currentStep, Timestamp currentTime);
+    void manageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    
     struct Impl;
     Impl* pImpl;
 };
