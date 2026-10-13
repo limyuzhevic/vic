@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # CLI Framework
+    src/cli/CLIFramework.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -143,9 +145,23 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
+# Advanced NLM Python Bindings
+add_library(nlm_python_bindings MODULE
+    python/bindings.cpp
+)
+
+set_target_properties(nlm_python_bindings PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX ".so"
+    CXX_VISIBILITY_PRESET "hidden"
+    VISIBILITY_INLINES_HIDDEN ON
+)
+
+target_include_directories(nlm_python_bindings PRIVATE python)
+target_link_libraries(nlm_python_bindings PUBLIC nlm_core pybind11::module)
+
+install(TARGETS nlm_python_bindings
     LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION lib
 )

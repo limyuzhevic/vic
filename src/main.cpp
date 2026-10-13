@@ -18,6 +18,8 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "cli/CLIFramework.hpp"
+#include "utils/ErrorHandling.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,10 +27,130 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
-void printBanner() {
+// Runtime introspection and system information utilities
+namespace nlm {
+namespace introspection {
+
+// System information collector
+struct SystemInfo {
+    std::string platform;
+    std::string compiler;
+    size_t cpuCores;
+    uint64_t totalMemory;
+    std::string buildDate;
+    std::string gitCommit;
+    
+    std::string toString() const {
+        std::stringstream ss;
+        ss << "=== NLM System Information ===\n";
+        ss << "Platform: " << platform << "\n";
+        ss << "Compiler: " << compiler << "\n";
+        ss << "CPU Cores: " << cpuCores << "\n";
+        ss << "Total Memory: " << (totalMemory / (1024 * 1024)) << " MB\n";
+        ss << "Build Date: " << buildDate << "\n";
+        ss << "Git Commit: " << gitCommit << "\n";
+        return ss.str();
+    }
+};
+
+// Configuration introspection
+class ConfigurationIntrospector {
+public:
+    static std::map<std::string, std::string> extractConfigInfo(const Config& config) {
+        std::map<std::string, std::string> info;
+        
+        // Get all configuration keys
+        auto keys = config.getKeys();
+        
+        for (const auto& key : keys) {
+            // Try to get value as different types
+            try {
+                if (config.has(key)) {
+                    // Get value based on type detection
+                    if (config.has(std::string("stdp_") + key)) {
+                        info[key] = "float";
+                    } else if (config.has(std::string("neuron_") + key)) {
+                        info[key] = "int64";
+                    } else {
+                        info[key] = "unknown";
+                    }
+                }
+            } catch (...) {
+                info[key] = "error";
+            }
+        }
+        
+        return info;
+    }
+    
+    static std::string formatConfigSummary(const Config& config) {
+        std::stringstream ss;
+        ss << "=== Configuration Summary ===\n";
+        
+        auto keys = config.getKeys();
+        for (const auto& key : keys) {
+            try {
+                if (config.has(key)) {
+                    // Get value as string
+                    ss << key << ": ";
+                    
+                    // Try different types
+                    if (config.has(key)) {
+                        try {
+                            ss << config.getOr<double>(key, 0.0);
+                        } catch (...) {
+                            ss << "<unreadable>";
+                        }
+                    }
+                    ss << "\n";
+                }
+            } catch (...) {
+                ss << key << ": <error>\n";
+            }
+        }
+        
+        return ss.str();
+    }
+};
+
+// Brain state introspector
+class BrainIntrospector {
+public:
+    static std::string analyzeBrainState(const Brain& brain) {
+        std::stringstream ss;
+        ss << "=== Brain State Analysis ===\n";
+        
+        ss << "Total Neurons: " << brain.getTotalNeuronCount() << "\n";
+        ss << "Total Synapses: " << brain.getTotalSynapseCount() << "\n";
+        ss << "Active Neurons: " << brain.getActiveNeuronCount() << "\n";
+        ss << "Firing Neurons: " << brain.getFiringNeuronCount() << "\n";
+        ss << "Average Firing Rate: " << brain.getAverageFiringRate() << " Hz\n";
+        ss << "Total Spikes: " << brain.getTotalSpikeCount() << "\n";
+        ss << "Excitatory/Inhibitory Ratio: " << brain.getExcitationInhibitionRatio() << "\n";
+        ss << "Developmental Stage: " << static_cast<int>(brain.getDevelopmentalStage()) << "\n";
+        
+        // Analyze regions
+        auto regionIds = brain.getRegionIds();
+        ss << "Regions: " << regionIds.size() << "\n";
+        
+        for (const auto& regionId : regionIds) {
+            auto region = brain.getRegion(regionId);
+            if (region) {
+                ss << "  - " << regionId.value() << ": " << region->getNeuronCount() << " neurons, " 
+                   << region->getSynapseCount() << " synapses\n";
+            }
+        }
+        
+        return ss.str();
+    }
+};
+
+} // namespace introspection
+} // namespace nlm
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -44,7 +166,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -322,13 +444,52 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    nlm::cli::ArgumentParser parser("nlm");
+    
+    // Add more arguments
+    parser.addArgument("--num-episodes", '\0', "Number of learning episodes", true);
+    parser.addArgument("--steps-per-episode", '\0', "Steps per learning episode", true);
+    parser.addArgument("--max-steps", '\0', "Maximum simulation steps", true);
+    parser.addArgument("--benchmark", '\0', "Enable benchmarking mode", false);
+    parser.addArgument("--benchmark-output", '\0', "Benchmark output file", true);
+    parser.addArgument("--benchmark-duration", '\0', "Benchmark duration in seconds", true);
+    
+    auto options = parser.parse(argc, argv);
+    
+    // Check for help/version requests
+    if (options.helpRequested) {
+        parser.printHelp();
+        return 0;
+    }
+    
+    if (options.versionRequested) {
+        parser.printVersion();
+        return 0;
+    }
+    
+    // Print banner
     printBanner();
+    
+    // Set up benchmarking if requested
+    std::chrono::steady_clock::time_point startTime;
+    if (options.benchmarkMode) {
+        std::cout << "Benchmark mode enabled. Starting benchmark..." << std::endl;
+        startTime = std::chrono::steady_clock::now();
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with appropriate level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto logLevel = LogLevel::Info;
+    if (options.logLevel == "trace") logLevel = LogLevel::Trace;
+    else if (options.logLevel == "debug") logLevel = LogLevel::Debug;
+    else if (options.logLevel == "warn") logLevel = LogLevel::Warn;
+    else if (options.logLevel == "error") logLevel = LogLevel::Error;
+    else if (options.logLevel == "fatal") logLevel = LogLevel::Fatal;
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -345,15 +506,8 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (!options.configFile.empty() && options.configFile != "configs/default.cfg") {
+        configFile = options.configFile;
     }
     
     // Load config from file (ignore if not found)
@@ -444,6 +598,19 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Report benchmark results if requested
+    if (options.benchmarkMode) {
+        auto endTime = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+        
+        std::cout << std::endl;
+        std::cout << "=== BENCHMARK RESULTS ===" << std::endl;
+        std::cout << "Total execution time: " << duration.count() << " seconds" << std::endl;
+        std::cout << "Performance metrics would be recorded to: " << options.benchmarkOutput << std::endl;
+        
+        // TODO: Write detailed benchmark results
+    }
     
     return 0;
 }
