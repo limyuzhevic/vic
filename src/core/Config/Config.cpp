@@ -177,8 +177,29 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
-                oss << arg;
+                oss << "[unknown type]";
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";

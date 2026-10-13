@@ -33,6 +33,13 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment operator
+    SynapseId operator++(int) {
+        SynapseId temp = *this;
+        value++;
+        return temp;
+    }
 };
 
 // Region identifier
@@ -190,3 +197,4 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+

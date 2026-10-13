@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -80,8 +82,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }

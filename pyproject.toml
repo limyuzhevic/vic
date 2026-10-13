@@ -41,16 +41,15 @@ Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
 
 [tool.scikit-build]
-cmake.minimum-version = "3.16"
 cmake.build-type = "Release"
 cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+PYTHON_EXECUTABLE = "{python}"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

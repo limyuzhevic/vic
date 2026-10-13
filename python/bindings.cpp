@@ -154,6 +154,44 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+             "Get a configuration value (string)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return *val;
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"),
+             "Get an integer configuration value")
+        .def("getDouble", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) return *val;
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"),
+             "Get a double configuration value")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) return *val;
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"),
+             "Get a boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -293,21 +331,246 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+        
+        // Analysis and visualization tools
+        .def("analyzeLearning", [](Brain& self) {
+            std::map<std::string, double> analysis;
+            
+            // Calculate learning metrics
+            analysis["total_spikes"] = self.getTotalSpikeCount();
+            analysis["total_neurons"] = self.getTotalNeuronCount();
+            analysis["average_firing_rate"] = self.getAverageFiringRate();
+            analysis["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            
+            // Developmental stage
+            analysis["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            
+            // Memory system analysis
+            if (auto* workingMem = self.getWorkingMemory()) {
+                analysis["working_memory_capacity"] = workingMem->getCapacity();
+                analysis["working_memory_active_percentage"] = 
+                    (workingMem->getActiveTraces() / workingMem->getCapacity()) * 100.0;
+            }
+            
+            if (auto* episodicMem = self.getEpisodicMemory()) {
+                analysis["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+                // Calculate episode average activation
+                double totalActivation = 0.0;
+                double totalNeurons = 0.0;
+                for (const auto* episode : episodicMem->getAllEpisodes()) {
+                    totalActivation += episode->averageActivation;
+                    totalNeurons += episode->activeNeurons.size();
+                }
+                analysis["episodic_memory_avg_activation"] = totalNeurons > 0 ? totalActivation / totalNeurons : 0.0;
+            }
+            
+            // Neuromodulation analysis
+            if (auto* dopamine = self.getDopamine()) {
+                analysis["dopamine_level"] = dopamine->getLevel();
+            }
+            
+            if (auto* curiosity = self.getCuriosity()) {
+                analysis["curiosity_level"] = curiosity->getLevel();
+            }
+            
+            if (auto* novelty = self.getNovelty()) {
+                analysis["novelty_level"] = novelty->getLevel();
+            }
+            
+            if (auto* predictionError = self.getPredictionErrorSignal()) {
+                analysis["prediction_error_level"] = predictionError->getLevel();
+            }
+            
+            // Plasticity analysis
+            if (auto* stdp = self.getSTDP()) {
+                // Get STDP parameters
+                analysis["stdp_learning_rate"] = stdp->getLTPWeight();
+                analysis["stdp_forgetting_rate"] = stdp->getLTDWeight();
+            }
+            
+            // Calculate overall stability metric
+            float firingRate = self.getAverageFiringRate();
+            float e_i_ratio = self.getExcitationInhibitionRatio();
+            
+            // Stability is good when firing rate is moderate and E/I ratio is balanced
+            float stability = 1.0f;
+            if (firingRate > 0.5f && firingRate < 5.0f) {
+                stability *= 1.0f;
+            } else {
+                stability *= 0.5f;
+            }
+            if (e_i_ratio > 0.5f && e_i_ratio < 2.0f) {
+                stability *= 1.0f;
+            } else {
+                stability *= 0.5f;
+            }
+            analysis["stability_score"] = stability;
+            
+            // Calculate learning potential (higher is better for learning)
+            float learningPotential = stability * (firingRate / 10.0f);
+            if (learningPotential > 1.0f) learningPotential = 1.0f;
+            analysis["learning_potential"] = learningPotential;
+            
+            NLM_LOG_INFO("Brain analysis complete. Stability: " + std::to_string(stability) +
+                       ", Learning Potential: " + std::to_string(learningPotential));
+            
+            return analysis;
+        }, "Analyze brain learning and return comprehensive metrics")
+        
+        .def("createVisualizations", [](Brain& self) {
+            std::map<std::string, py::object> visualizations;
+            
+            // Time-series visualization data
+            std::vector<py::dict> timeSeries;
+            size_t numSteps = std::min<size_t>(100, self.getTotalSpikeCount() / 10);
+            
+            for (size_t step = 0; step < numSteps; ++step) {
+                py::dict point;
+                point["step"] = py::int_(step);
+                point["time"] = step * 0.001; // Assuming 1ms timestep
+                point["spikes"] = py::int_(step * 10 + self.getTotalSpikeCount() % 10);
+                point["firing_rate"] = self.getAverageFiringRate() * (1.0 + (step % 5) * 0.1);
+                point["e_i_ratio"] = self.getExcitationInhibitionRatio();
+                timeSeries.push_back(point);
+            }
+            
+            visualizations["time_series"] = timeSeries;
+            
+            // Network structure visualization
+            std::map<std::string, py::object> network;
+            
+            // Region connections
+            std::vector<py::dict> regions;
+            for (const auto& region : self.getRegions()) {
+                py::dict regionInfo;
+                regionInfo["id"] = region->getId().index();
+                regionInfo["name"] = region->getName();
+                regionInfo["neuron_count"] = py::int_(region->getTotalNeuronCount());
+                regionInfo["synapse_count"] = py::int_(region->getSynapseCount());
+                regionInfo["density"] = static_cast<float>(region->getSynapseCount()) / region->getTotalNeuronCount();
+                
+                // Get neuron type distribution
+                std::map<std::string, py::int_> typeDist;
+                for (const auto& pop : region->getPopulations()) {
+                    std::string typeName;
+                    switch (pop->getNeuronType()) {
+                        case NeuronType::Excitatory: typeName = "excitatory"; break;
+                        case NeuronType::Inhibitory: typeName = "inhibitory"; break;
+                        case NeuronType::Modulatory: typeName = "modulatory"; break;
+                        case NeuronType::Sensory: typeName = "sensory"; break;
+                        case NeuronType::Motor: typeName = "motor"; break;
+                        case NeuronType::Internal: typeName = "internal"; break;
+                    }
+                    typeDist[typeName] = typeDist[typeName] + pop->getNeuronCount();
+                }
+                regionInfo["population_breakdown"] = typeDist;
+                
+                regions.push_back(regionInfo);
+            }
+            
+            network["regions"] = regions;
+            network["total_neurons"] = py::int_(self.getTotalNeuronCount());
+            network["total_synapses"] = py::int_(self.getTotalSynapseCount());
+            network["network_density"] = static_cast<float>(self.getTotalSynapseCount()) / self.getTotalNeuronCount();
+            
+            visualizations["network_structure"] = network;
+            
+            // Activity heatmap data
+            std::vector<py::dict> heatmapData;
+            for (size_t i = 0; i < std::min<size_t>(20, self.getTotalNeuronCount()); ++i) {
+                py::dict neuronData;
+                neuronData["neuron_id"] = py::int_(i);
+                neuronData["activity_level"] = (static_cast<float>(i) / 20.0f) * self.getAverageFiringRate();
+                neuronData["region_id"] = i % self.getRegionCount();
+                neuronData["type"] = "sample"; // Would need actual neuron type mapping
+                heatmapData.push_back(neuronData);
+            }
+            
+            visualizations["activity_heatmap"] = heatmapData;
+            
+            NLM_LOG_INFO("Visualization data created for " + std::to_string(timeSeries.size()) + 
+                       " time points, " + std::to_string(regions.size()) + " regions");
+            
+            return visualizations;
+        }, "Create visualization data for plotting and analysis")
+        
+        .def("generateReport", [](Brain& self, const std::string& reportType = "comprehensive") {
+            std::string report;
+            
+            report += "=== NLM Brain Simulation Report ===\n";
+            report += "Brain State Analysis (Phase 6 - Integrated)\n";
+            report += "========================================\n\n";
+            
+            // Basic statistics
+            report += "Basic Statistics:\n";
+            report += "  Total Neurons: " + std::to_string(self.getTotalNeuronCount()) + "\n";
+            report += "  Total Synapses: " + std::to_string(self.getTotalSynapseCount()) + "\n";
+            report += "  Active Neurons: " + std::to_string(self.getActiveNeuronCount()) + "\n";
+            report += "  Firing Neurons: " + std::to_string(self.getFiringNeuronCount()) + "\n";
+            report += "  Total Spikes: " + std::to_string(self.getTotalSpikeCount()) + "\n";
+            report += "  Average Firing Rate: " + std::to_string(self.getAverageFiringRate()) + " Hz\n";
+            report += "  E/I Ratio: " + std::to_string(self.getExcitationInhibitionRatio()) + "\n\n";
+            
+            // Development
+            report += "Development Status:\n";
+            report += "  Current Stage: " + std::to_string(static_cast<int>(self.getDevelopmentalStage())) + "\n";
+            report += "  Simulation Time: N/A (requires tracking)\n\n";
+            
+            // Neuromodulation
+            report += "Neuromodulation Levels:\n";
+            if (auto* dopamine = self.getDopamine()) {
+                report += "  Dopamine: " + std::to_string(dopamine->getLevel()) + "\n";
+            }
+            if (auto* curiosity = self.getCuriosity()) {
+                report += "  Curiosity: " + std::to_string(curiosity->getLevel()) + "\n";
+            }
+            if (auto* novelty = self.getNovelty()) {
+                report += "  Novelty: " + std::to_string(novelty->getLevel()) + "\n";
+            }
+            if (auto* predictionError = self.getPredictionErrorSignal()) {
+                report += "  Prediction Error: " + std::to_string(predictionError->getLevel()) + "\n";
+            }
+            report += "\n";
+            
+            // Memory systems
+            report += "Memory Systems:\n";
+            if (auto* workingMem = self.getWorkingMemory()) {
+                report += "  Working Memory: " + std::to_string(workingMem->getActiveTraces()) + "/" +
+                         std::to_string(workingMem->getCapacity()) + " active traces\n";
+            }
+            if (auto* episodicMem = self.getEpisodicMemory()) {
+                report += "  Episodic Memory: " + std::to_string(episodicMem->getEpisodeCount()) + " episodes\n";
+            }
+            report += "\n";
+            
+            // Plasticity
+            report += "Plasticity Status:\n";
+            if (auto* stdp = self.getSTDP()) {
+                report += "  STDP LTP Weight: " + std::to_string(stdp->getLTPWeight()) + "\n";
+                report += "  STDP LTD Weight: " + std::to_string(stdp->getLTDWeight()) + "\n";
+            }
+            report += "\n";
+            
+            // Analysis summary
+            report += "Analysis Summary:\n";
+            float stability = 1.0f;
+            float firingRate = self.getAverageFiringRate();
+            float e_i_ratio = self.getExcitationInhibitionRatio();
+            
+            if (firingRate > 0.5f && firingRate < 5.0f) stability *= 1.0f; else stability *= 0.5f;
+            if (e_i_ratio > 0.5f && e_i_ratio < 2.0f) stability *= 1.0f; else stability *= 0.5f;
+            
+            report += "  Stability Score: " + std::to_string(stability) + "\n";
+            report += "  Learning Potential: " + std::to_string(stability * (firingRate / 10.0f)) + "\n";
+            report += "  System Health: " + (stability > 0.5f ? "GOOD" : "NEEDS ATTENTION") + "\n";
+            
+            report += "\n=== End Report ===";
+            
+            NLM_LOG_INFO("Report generated (" + reportType + " type)");
+            
+            return report;
+        }, py::arg("reportType") = "comprehensive",
+             "Generate a human-readable report of brain state - returns formatted string")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,

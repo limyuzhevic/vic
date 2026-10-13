@@ -60,8 +60,6 @@ add_library(nlm_core STATIC
     src/memory/SemanticMemory.cpp
     src/memory/ProceduralMemory.cpp
     src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -78,7 +76,7 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
