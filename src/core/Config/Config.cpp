@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <string>
+#include <cctype>
 
 namespace nlm {
 
@@ -18,10 +21,37 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from file (JSON/YAML/simple format)
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Detect file format
+    std::string format = detectFileFormat(filepath);
     
+    if (format == "json") {
+        return loadFromJSONFile(filepath);
+    } else if (format == "yaml") {
+        return loadFromYAMLFile(filepath);
+    } else {
+        // Fallback to simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+// Load from string (JSON/YAML/simple format)
+bool Config::loadFromString(const std::string& content) {
+    std::string format = detectStringFormat(content);
+    
+    if (format == "json") {
+        return loadFromJSONString(content);
+    } else if (format == "yaml") {
+        return loadFromYAMLString(content);
+    } else {
+        // Fallback to simple key=value format
+        return loadFromSimpleString(content);
+    }
+}
+
+// Simple key=value file loader
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +73,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -55,6 +85,59 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Simple key=value string loader
+bool Config::loadFromSimpleString(const std::string& content) {
+    std::istringstream stream(content);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+// Placeholder JSON file loader (to be implemented)
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // TODO: Implement JSON parsing
+    return loadFromSimpleFile(filepath); // fallback for now
+}
+
+// Placeholder JSON string loader (to be implemented)
+bool Config::loadFromJSONString(const std::string& content) {
+    // TODO: Implement JSON parsing
+    return loadFromSimpleString(content); // fallback for now
+}
+
+// Placeholder YAML file loader (to be implemented)
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Implement YAML parsing
+    return loadFromSimpleFile(filepath); // fallback for now
+}
+
+// Placeholder YAML string loader (to be implemented)
+bool Config::loadFromYAMLString(const std::string& content) {
+    // TODO: Implement YAML parsing
+    return loadFromSimpleString(content); // fallback for now
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -63,9 +146,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
+                // Fix: substr takes start position and length, not end position
+                std::string key = arg.substr(2, pos - 3);  // pos-3 gives correct length
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --key flag without value (boolean)
+                std::string key = arg.substr(2);
+                set(key, true, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
@@ -73,6 +161,11 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle standalone -key flag
+        else if (arg[0] == '-') {
+            std::string key = arg.substr(1);
+            set(key, true, ConfigSource::CommandLine);
         }
     }
     return true;
@@ -86,7 +179,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Fix: Use actual value instead of placeholder
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                               std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format as fixed precision to avoid scientific notation
+                file << entry.key << " = " << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << entry.key << " = <unknown>";
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -186,6 +317,7 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Helper function to trim whitespace
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -193,6 +325,7 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
+// Helper function to convert string to lowercase
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);

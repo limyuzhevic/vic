@@ -6,6 +6,11 @@
 #include <variant>
 #include <optional>
 
+// Optional JSON support (can be conditionally included)
+#if defined(NLM_JSON_SUPPORT)
+#include "json.hpp"
+#endif
+
 namespace nlm {
 
 // Forward declarations
@@ -55,8 +60,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from string (JSON/YAML/simple format)
+    bool loadFromString(const std::string& content);
+    
+    // Get format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    static std::string detectStringFormat(const std::string& content);
+    
+    // Helper functions for simple format
+    bool loadFromSimpleFile(const std::string& filepath);
+    bool loadFromSimpleString(const std::string& content);
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromJSONString(const std::string& content);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromYAMLString(const std::string& content);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
