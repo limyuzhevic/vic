@@ -160,9 +160,113 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Pythonic property access
+        .def("__contains__", &Config::has,
+             "Check if key exists (supports 'in' operator)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        
+        // Safe get methods with defaults
+        .def("get", [](Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            return std::make_tuple(true, value);
+        }, py::arg("key"),
+           "Get value for key (returns tuple of success and value)")
+        .def("get_or", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get value or default if key doesn't exist")
+        .def("get_int", [](Config& self, const std::string& key) {
+            auto value = self.get<int64_t>(key);
+            return std::make_tuple(true, value);
+        }, py::arg("key"),
+           "Get integer value for key (returns tuple of success and value)")
+        .def("get_int_or", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get integer value or default if key doesn't exist")
+        .def("get_float", [](Config& self, const std::string& key) {
+            auto value = self.get<float>(key);
+            return std::make_tuple(true, value);
+        }, py::arg("key"),
+           "Get float value for key (returns tuple of success and value)")
+        .def("get_float_or", [](Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get float value or default if key doesn't exist")
+        .def("get_bool", [](Config& self, const std::string& key) {
+            auto value = self.get<bool>(key);
+            return std::make_tuple(true, value);
+        }, py::arg("key"),
+           "Get boolean value for key (returns tuple of success and value)")
+        .def("get_bool_or", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get boolean value or default if key doesn't exist")
+        
+        // Configuration setters with validation
+        .def("set_int", &Config::set, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("set_float", [](Config& self, const std::string& key, float value) {
+            return self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set float configuration value")
+        .def("set_string", [](Config& self, const std::string& key, const std::string& value) {
+            return self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            return self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        
+        // Configuration validation and info
+        .def("validate", [](Config& self) {
+            std::string errors;
+            bool valid = true;
+            
+            // Validate common configuration keys
+            auto neuronCount = self.getOr<size_t>("neuron_count", 0);
+            if (neuronCount == 0) {
+                valid = false;
+                errors += "neuron_count must be > 0; ";
+            } else if (neuronCount > 100000) {
+                valid = false;
+                errors += "neuron_count must be <= 100000; ";
+            }
+            
+            auto regionCount = self.getOr<size_t>("region_count", 0);
+            if (regionCount == 0) {
+                valid = false;
+                errors += "region_count must be > 0; ";
+            } else if (regionCount > 100) {
+                valid = false;
+                errors += "region_count must be <= 100; ";
+            }
+            
+            auto connProb = self.getOr<float>("connection_probability", 0.0f);
+            if (connProb < 0.0f || connProb > 1.0f) {
+                valid = false;
+                errors += "connection_probability must be between 0.0 and 1.0; ";
+            }
+            
+            return std::make_tuple(valid, errors.empty() ? "Configuration is valid" : errors);
+        }, "Validate configuration and return (is_valid, error_message)")
+        .def("get_config_info", [](Config& self) {
+            std::stringstream ss;
+            ss << "Configuration Info:" << std::endl;
+            ss << "Keys: " << self.getKeys().size() << std::endl;
+            ss << "Summary: " << self.summary() << std::endl;
+            
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                ss << "  " << key << std::endl;
+            }
+            
+            return ss.str();
+        }, "Get detailed configuration information");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -351,75 +455,304 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic property access
+        .def("region_count", &Brain::getRegionCount,
+             "Get the number of regions (Pythonic property access)")
+        .def("total_neuron_count", &Brain::getTotalNeuronCount,
+             "Get total neuron count (Pythonic property access)")
+        .def("total_synapse_count", &Brain::getTotalSynapseCount,
+             "Get total synapse count (Pythonic property access)")
+        .def("average_firing_rate", &Brain::getAverageFiringRate,
+             "Get average firing rate (Pythonic property access)")
+        
+        // Convenience methods for common operations
+        .def("add_sensory_region", &Brain::addRegion, py::arg("name") = "Sensory",
+             "Add a sensory region (convenience method)")
+        .def("add_motor_region", &Brain::addRegion, py::arg("name") = "Motor",
+             "Add a motor region (convenience method)")
+        .def("add_internal_region", &Brain::addRegion, py::arg("name") = "Internal",
+             "Add an internal region (convenience method)")
+        
+        // Batch operations
+        .def("inject_current_to_type", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current to all neurons of specific type (alias for injectCurrentToNeurons)")
+        .def("get_region_by_index", [](const Brain& brain, size_t index) {
+            auto ids = brain.getRegionIds();
+            if (index < ids.size()) {
+                return brain.getRegion(ids[index]);
+            }
+            return (const NeuralRegion*)nullptr;
+        }, py::arg("index"),
+             "Get region by index (Pythonic access)")
+        .def("get_region_count", &Brain::getRegionCount,
+             "Get region count (alias for getRegionCount)")
+        .def("get_total_spikes", &Brain::getTotalSpikeCount,
+             "Get total spike count (alias for getTotalSpikeCount)")
+        
+        // Training helpers
+        .def("enable_learning", [](Brain& brain, bool enable) {
+            if (auto* region = brain.getRegion(RegionId(1))) {
+                for (auto& syn : region->getSynapses()) {
+                    syn->enablePlasticity(true, true, false);
+                }
+            }
+        }, py::arg("enable") = true,
+             "Enable synaptic learning across all synapses")
+        .def("set_learning_rate", [](Brain& brain, float rate) {
+            if (auto* region = brain.getRegion(RegionId(1))) {
+                for (auto& syn : region->getSynapses()) {
+                    float currentWeight = syn->getWeight();
+                    syn->setWeight(currentWeight * rate);
+                }
+            }
+        }, py::arg("rate"),
+             "Scale all synaptic weights by learning rate")
+        
+        // Simulation helpers
+        .def("run_simulation_step", &Brain::step,
+             py::arg("currentStep"),
+             "Run a single simulation step (convenience method)")
+        .def("run_simulation_steps", [](Brain& brain, size_t numSteps) {
+            for (size_t i = 0; i < numSteps; ++i) {
+                brain.step(i, i * 0.001);
+            }
+        }, py::arg("numSteps"),
+             "Run multiple simulation steps (convenience method)")
+        
+        // Context manager support for resource management
+        .def("__enter__", [](Brain& brain) { return &brain; })
+        .def("__exit__", [](Brain& brain, py::args) {
+            brain.reset();
+        });
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    // Pythonic property access for AgentBrain
+    .def("get_brain", &AgentBrain::getBrain,
+         py::return_value_policy::reference_internal,
+         "Get the underlying brain (Pythonic property access)")
+    
+    // Enable/disable systems with convenience methods
+    .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
+         py::arg("enable") = true,
+         "Enable/disable reward modulation")
+    .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
+         py::arg("enable") = true,
+         "Enable/disable structural plasticity")
+    .def("enable_development", &AgentBrain::enableDevelopment,
+         py::arg("enable") = true,
+         "Enable/disable development")
+    .def("enable_curiosity", &AgentBrain::enableCuriosity,
+         py::arg("enable") = true,
+         "Enable/disable curiosity system")
+    
+    // Neuromodulation level queries
+    .def("get_neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
+         "Get current neuromodulation level")
+    .def("get_curiosity_level", &AgentBrain::getCuriosityLevel,
+         "Get current curiosity level")
+    .def("get_novelty_level", &AgentBrain::getNoveltyLevel,
+         "Get current novelty level")
+    .def("get_prediction_error", &AgentBrain::getPredictionError,
+         "Get current prediction error")
+    
+    // System state queries
+    .def("get_developmental_stage", &AgentBrain::getDevelopmentalStage,
+         "Get current developmental stage")
+    .def("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled,
+         "Check if reward modulation is enabled")
+    .def("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled,
+         "Check if structural plasticity is enabled")
+    .def("is_development_enabled", &AgentBrain::isDevelopmentEnabled,
+         "Check if development is enabled")
+    .def("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled,
+         "Check if curiosity is enabled")
+    
+    // Convenience methods for common operations
+    .def("apply_reward", &AgentBrain::applyRewardModulation,
+         py::arg("reward"), py::arg("predicted_reward"),
+         "Apply reward-based neuromodulation (convenience method)")
+    .def("reset_agent", &AgentBrain::reset,
+         "Reset agent for new episode (convenience method)")
+    
+    // Training helpers
+    .def("train_step", [](AgentBrain& agent, const SensoryPercept& percept) {
+        agent.processSensoryInput(percept);
+        return agent.getBrain()->produceAction();
+    }, py::arg("percept"),
+         "Perform a single training step (convenience method)")
+    
+    .def("episode_train", [](AgentBrain& agent, const std::vector<SensoryPercept>& percepts) {
+        agent.reset();
+        std::vector<std::unique_ptr<Action>> actions;
+        
+        for (const auto& percept : percepts) {
+            agent.processSensoryInput(percept);
+            auto action = agent.decodeMotorCommand();
+            if (action) {
+                actions.push_back(std::move(action));
+            }
+        }
+        
+        return actions;
+    }, py::arg("percepts"),
+         "Train over an entire episode (convenience method)")
+    
+    // Context manager support
+    .def("__enter__", [](AgentBrain& agent) { return &agent; })
+    .def("__exit__", [](AgentBrain& agent, py::args) {
+        agent.reset();
+    });
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Convenience functions for creating common brain configurations
+    m.def("create_default_brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    }, "Create a brain with default configuration");
+    
+    m.def("create_small_brain", [](size_t neuronCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount") = 100,
+       "Create a small brain with specified neuron count");
+    
+    m.def("create_experimental_brain", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount") = 500, py::arg("regionCount") = 1,
+       "Create an experimental brain with specified neuron count and regions");
+    
+    m.def("create_demo_brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Enable all learning systems for demonstration
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a demo brain with all learning systems enabled");
+    
+    // Error handling and validation helpers
+    m.def("validate_brain_config", [](std::shared_ptr<Config> config) {
+        bool valid = true;
+        std::string errors;
+        
+        auto neuronCount = config->getOr<size_t>("neuron_count", 0);
+        if (neuronCount == 0) {
+            valid = false;
+            errors += "neuron_count must be > 0; ";
+        } else if (neuronCount > 100000) {
+            valid = false;
+            errors += "neuron_count must be <= 100000; ";
+        }
+        
+        auto regionCount = config->getOr<size_t>("region_count", 0);
+        if (regionCount == 0) {
+            valid = false;
+            errors += "region_count must be > 0; ";
+        } else if (regionCount > 100) {
+            valid = false;
+            errors += "region_count must be <= 100; ";
+        }
+        
+        auto connProb = config->getOr<float>("connection_probability", 0.0f);
+        if (connProb < 0.0f || connProb > 1.0f) {
+            valid = false;
+            errors += "connection_probability must be between 0.0 and 1.0; ";
+        }
+        
+        return std::make_tuple(valid, errors.empty() ? "Configuration is valid" : errors);
+    }, py::arg("config"),
+       "Validate brain configuration and return validation result");
+    
+    // Simulation utilities
+    m.def("run_brain_simulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"),
+       "Run simulation for specified number of steps and return spike count");
+    
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for benchmarking");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        size_t totalSpikes = brain->getTotalSpikeCount();
+        
+        return std::make_tuple(
+            totalSpikes,
+            static_cast<double>(steps) / duration.count() * 1000.0,
+            duration.count()
+        );
+    }, py::arg("brain"), py::arg("steps"),
+       "Benchmark brain simulation performance");
+    
+    // Convenience functions for getting brain statistics
+    m.def("get_brain_summary", [](std::shared_ptr<Brain> brain) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for summary");
+        }
+        
+        std::stringstream ss;
+        ss << "Brain Summary:" << std::endl;
+        ss << "  Regions: " << brain->getRegionCount() << std::endl;
+        ss << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        ss << "  Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        ss << "  Active Neurons: " << brain->getActiveNeuronCount() << std::endl;
+        ss << "  Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        ss << "  Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+        ss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        
+        return ss.str();
+    }, py::arg("brain"),
+       "Get comprehensive summary of brain state");
+    
+    // Utility functions
+    m.def("compare_brains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2, size_t steps) {
+        if (!brain1->initialize() || !brain2->initialize()) {
+            throw std::runtime_error("Failed to initialize brains for comparison");
+        }
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain1->step(i, i * 0.001);
+            brain2->step(i, i * 0.001);
+        }
+        
+        double spikeRatio = static_cast<double>(brain1->getTotalSpikeCount()) / 
+                           static_cast<double>(brain2->getTotalSpikeCount());
+        
+        return std::make_tuple(
+            brain1->getTotalSpikeCount(),
+            brain2->getTotalSpikeCount(),
+            spikeRatio,
+            brain1->getAverageFiringRate() / brain2->getAverageFiringRate()
+        );
+    }, py::arg("brain1"), py::arg("brain2"), py::arg("steps"),
+       "Compare two brains over specified steps");
 }
 
 } // namespace nlm
