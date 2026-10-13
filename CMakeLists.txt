@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/Config_Validation.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -121,9 +122,9 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (core neural simulation)
 add_executable(nlm
-    src/main.cpp
+    src/main_core.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
@@ -139,9 +140,24 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 2 demo executable (neural computation demonstration)
+add_executable(nlm_phase2_demo
+    src/experiments/Phase2Demo.cpp
+)
+target_link_libraries(nlm_phase2_demo PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Python bindings
+add_subdirectory(python)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

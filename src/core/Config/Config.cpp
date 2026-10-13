@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "Config_Validation.cpp"
 
 namespace nlm {
 
@@ -199,17 +200,67 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Configuration validation implementation
+namespace ConfigValidation {
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool validate(const Config& config) {
+    return ConfigValidator::validateDefault(config);
+}
+
+bool validate(const Config& config, const std::vector<ConfigSchema>& schema) {
+    return ConfigValidator::validate(config, schema);
+}
+
+std::vector<std::string> getErrors(const Config& config) {
+    return ConfigValidator::getValidationErrors(config, ConfigValidator::getDefaultSchema());
+}
+
+std::vector<std::string> getErrors(const Config& config, const std::vector<ConfigSchema>& schema) {
+    return ConfigValidator::getValidationErrors(config, schema);
+}
+
+bool isValid(const Config& config) {
+    return validate(config);
+}
+
+bool validateFile(const std::string& filepath) {
+    return ConfigValidator::validateFileFormat(filepath);
+}
+
+std::vector<ConfigSchema> getDefaultSchema() {
+    return ConfigValidator::getDefaultSchema();
+}
+
+bool loadFromFileWithValidation(Config& config, const std::string& filepath) {
+    if (!ConfigValidator::validateFile(filepath)) {
+        std::cout << "Invalid configuration file format: " << filepath << std::endl;
+        return false;
+    }
+    
+    bool loaded = config.loadFromFile(filepath);
+    if (loaded && !validate(config)) {
+        std::cout << "Configuration loaded but validation failed: " << filepath << std::endl;
+        return false;
+    }
+    
+    return loaded;
+}
+
+} // namespace ConfigValidation
+
+// Explicit template instantiations
+namespace nlm {
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+}
 
 } // namespace nlm

@@ -43,63 +43,76 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
+// Configuration validation and schema definition
+struct ConfigSchema {
+    std::string key;
+    ConfigSource source;
+    bool required;
+    std::string description;
+    std::string type; // "int", "double", "bool", "string", "list"
+    
+    // Validation constraints
+    std::optional<int> minInt;
+    std::optional<int> maxInt;
+    std::optional<double> minDouble;
+    std::optional<double> maxDouble;
+    std::vector<std::string> allowedValues;
+    
+    ConfigSchema() : key(), source(ConfigSource::Default), required(false), description() {}
+};
+
+namespace ConfigValidation {
+
+    // Validate configuration against default schema
+    bool validate(const Config& config);
+    
+    // Validate configuration against custom schema
+    bool validate(const Config& config, const std::vector<ConfigSchema>& schema);
+    
+    // Get validation errors
+    std::vector<std::string> getErrors(const Config& config);
+    
+    // Get validation errors with custom schema
+    std::vector<std::string> getErrors(const Config& config, const std::vector<ConfigSchema>& schema);
+    
+    // Check if configuration is valid
+    bool isValid(const Config& config);
+    
+    // Validate configuration file
+    bool validateFile(const std::string& filepath);
+    
+    // Get default schema
+    std::vector<ConfigSchema> getDefaultSchema();
+    
+    // Add validation to Config::loadFromFile
+    bool loadFromFileWithValidation(Config& config, const std::string& filepath);
+}
+
+// Configuration methods with validation
 public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
+    // Load configuration from file with validation
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load configuration from file with validation and error checking
+    bool loadFromFileWithValidation(const std::string& filepath);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Validate configuration against default schema
+    bool validate() const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Validate configuration against custom schema
+    bool validate(const std::vector<ConfigSchema>& schema) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Get validation errors with custom schema
+    std::vector<std::string> getValidationErrors(const std::vector<ConfigSchema>& schema) const;
     
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Check if configuration is valid
+    bool isValid() const;
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    // Internal validation helper
+    std::vector<std::string> validateInternal(const std::vector<ConfigSchema>& schema) const;
 
 } // namespace nlm
