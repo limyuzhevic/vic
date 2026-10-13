@@ -349,7 +349,13 @@ int main(int argc, char** argv) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                // FIX: Add length validation for safety
+                size_t eqPos = arg.find('=');
+                if (eqPos + 1 < arg.size()) {
+                    configFile = arg.substr(eqPos + 1);
+                } else {
+                    NLM_LOG_WARNING("Invalid --config argument format: " + arg);
+                }
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
@@ -360,7 +366,7 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_ERROR("Failed to load configuration: " + configFile);
     }
     
     // Override with command line args

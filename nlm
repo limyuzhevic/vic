@@ -1,0 +1,444 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) - Command Line Interface
+
+A command-line interface for the NLM brain simulation framework.
+Provides basic commands for running simulations, managing configurations,
+and interacting with the brain system.
+"""
+
+import sys
+import os
+import json
+import argparse
+from typing import Optional, List
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Error: pynlm module not found. Please install NLM Python bindings.")
+    print("pip install pynlm")
+
+class NLMCLI:
+    def __init__(self):
+        self.brain = None
+        self.world = None
+        self.agent = None
+    
+    def create_brain(self, config_file: Optional[str] = None, neuron_count: int = 1000):
+        """Create a brain with optional configuration file."""
+        if not PYNLM_AVAILABLE:
+            return False
+        
+        try:
+            config = pynlm.createDefaultConfig()
+            
+            if config_file and os.path.exists(config_file):
+                config.loadFromFile(config_file)
+                print(f"✓ Loaded configuration from: {config_file}")
+            else:
+                print("✓ Using default configuration")
+            
+            # Set neuron count
+            config.set("brain.neuron_count", neuron_count)
+            
+            self.brain = pynlm.createBrain(config)
+            self.brain.initialize()
+            
+            print(f"✓ Created brain with {self.brain.getTotalNeuronCount()} neurons")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error creating brain: {e}")
+            return False
+    
+    def create_world(self, width: int = 20, height: int = 20, 
+                    vision_width: int = 8, vision_height: int = 8):
+        """Create a simple world."""
+        if not PYNLM_AVAILABLE:
+            return False
+        
+        try:
+            self.world = pynlm.createSimpleWorld()
+            self.world.configure(width, height, vision_width, vision_height)
+            self.world.reset()
+            
+            print(f"✓ Created world {width}x{height} with vision {vision_width}x{vision_height}")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error creating world: {e}")
+            return False
+    
+    def create_agent(self):
+        """Create agent brain interface."""
+        if not PYNLM_AVAILABLE or not self.brain:
+            return False
+        
+        try:
+            self.agent = pynlm.createAgentBrain(self.brain)
+            print("✓ Created agent brain interface")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error creating agent: {e}")
+            return False
+    
+    def initialize_agent(self):
+        """Initialize agent with world."""
+        if not self.agent or not self.world:
+            return False
+        
+        try:
+            self.agent.initialize(self.world)
+            print("✓ Initialized agent with world")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error initializing agent: {e}")
+            return False
+    
+    def enable_features(self, reward: bool = False, curiosity: bool = False,
+                       development: bool = False, plasticity: bool = False):
+        """Enable brain subsystems."""
+        if not self.agent:
+            return False
+        
+        try:
+            if reward:
+                self.agent.enableRewardModulation(True)
+                print("✓ Enabled reward modulation")
+            
+            if curiosity:
+                self.agent.enableCuriosity(True)
+                print("✓ Enabled curiosity")
+            
+            if development:
+                self.agent.enableDevelopment(True)
+                print("✓ Enabled development")
+            
+            if plasticity:
+                self.agent.enableStructuralPlasticity(True)
+                print("✓ Enabled structural plasticity")
+                
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error enabling features: {e}")
+            return False
+    
+    def run_simulation(self, steps: int = 100, verbose: bool = False):
+        """Run simulation for specified number of steps."""
+        if not all([self.brain, self.world, self.agent]):
+            print("✗ Brain, world, and agent must be created first")
+            return False
+        
+        try:
+            print(f"Running simulation for {steps} steps...")
+            
+            for step in range(steps):
+                # Update world
+                self.world.update(0.1)
+                
+                # Get sensory input
+                percept = self.world.getSensoryPercept()
+                
+                # Process sensory input
+                self.agent.processSensoryInput(percept)
+                
+                # Run brain step
+                self.brain.step(step)
+                
+                # Get action
+                action = self.agent.decodeMotorCommand()
+                
+                # Apply action in world
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                
+                # Apply reward modulation if enabled
+                reward = 0.0
+                if self.agent.isRewardModulationEnabled():
+                    internal = percept.getInternal()
+                    if internal and len(internal) > 0:
+                        reward = internal[0]
+                    self.agent.applyRewardModulation(reward, 0.0)
+                
+                # Update development if enabled
+                if self.agent.isDevelopmentEnabled():
+                    self.agent.updateDevelopment(0.1)
+                
+                # Print status if verbose
+                if verbose and step % 10 == 0:
+                    firing = self.brain.getFiringNeuronCount()
+                    print(f"  Step {step}: {firing} neurons firing, "
+                          f"Curiosity: {self.agent.getCuriosityLevel():.3f}, "
+                          f"Novelty: {self.agent.getNoveltyLevel():.3f}")
+            
+            print(f"✓ Simulation completed {steps} steps")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error during simulation: {e}")
+            return False
+    
+    def print_stats(self):
+        """Print current brain and agent statistics."""
+        if not self.brain or not self.agent:
+            print("✗ No brain or agent available")
+            return False
+        
+        try:
+            print("\n=== NLM Statistics ===")
+            print(f"Neurons: {self.brain.getTotalNeuronCount()}")
+            print(f"Synapses: {self.brain.getTotalSynapseCount()}")
+            print(f"Firing neurons: {self.brain.getFiringNeuronCount()}")
+            print(f"Average firing rate: {self.brain.getAverageFiringRate():.3f}")
+            print(f"Total spikes: {self.brain.getTotalSpikeCount()}")
+            print(f"E/I ratio: {self.brain.getExcitationInhibitionRatio():.3f}")
+            print(f"Developmental stage: {self.brain.getDevelopmentalStage()}")
+            print(f"Curiosity level: {self.agent.getCuriosityLevel():.3f}")
+            print(f"Novelty level: {self.agent.getNoveltyLevel():.3f}")
+            print(f"Prediction error: {self.agent.getPredictionError():.3f}")
+            print(f"Neuromodulation level: {self.agent.getNeuromodulationLevel():.3f}")
+            print("==================\n")
+            
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error printing stats: {e}")
+            return False
+    
+    def save_brain(self, filepath: str):
+        """Save brain state to file."""
+        if not self.brain:
+            print("✗ No brain available")
+            return False
+        
+        try:
+            self.brain.save(filepath)
+            print(f"✓ Saved brain state to: {filepath}")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error saving brain: {e}")
+            return False
+    
+    def load_brain(self, filepath: str):
+        """Load brain state from file."""
+        if not self.brain:
+            print("✗ No brain available")
+            return False
+        
+        try:
+            self.brain.load(filepath)
+            print(f"✓ Loaded brain state from: {filepath}")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error loading brain: {e}")
+            return False
+    
+    def run_demo(self, steps: int = 100, enable_learning: bool = True):
+        """Run complete demonstration with brain and world."""
+        print("=== NLM Demo ===")
+        
+        # Create brain
+        if not self.create_brain(neuron_count=500):
+            return False
+        
+        # Create world
+        if not self.create_world(15, 15, 8, 8):
+            return False
+        
+        # Create agent
+        if not self.create_agent():
+            return False
+        
+        # Initialize agent
+        if not self.initialize_agent():
+            return False
+        
+        # Enable learning features if requested
+        if enable_learning:
+            self.enable_features(reward=True, curiosity=True, development=True)
+        
+        # Print initial stats
+        self.print_stats()
+        
+        # Run simulation
+        if not self.run_simulation(steps, verbose=True):
+            return False
+        
+        # Print final stats
+        self.print_stats()
+        
+        print("✓ Demo completed successfully")
+        return True
+    
+    def cleanup(self):
+        """Clean up resources."""
+        self.brain = None
+        self.world = None
+        self.agent = None
+        print("✓ Cleaned up resources")
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="NLM (Neural Learning Machine) Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s demo --steps 200 --learning
+  %(prog)s create --neurons 1000
+  %(prog)s simulate --steps 50 --verbose
+  %(prog)s stats
+        """
+    )
+    
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Enable verbose output"
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    
+    # Demo command
+    demo_parser = subparsers.add_parser("demo", help="Run NLM demo")
+    demo_parser.add_argument("--steps", type=int, default=100,
+                             help="Number of simulation steps")
+    demo_parser.add_argument("--learning", action="store_true",
+                             help="Enable learning features (reward, curiosity, development)")
+    
+    # Create command
+    create_parser = subparsers.add_parser("create", help="Create brain and world")
+    create_parser.add_argument("--neurons", type=int, default=1000,
+                               help="Number of neurons in brain")
+    create_parser.add_argument("--config", help="Configuration file path")
+    create_parser.add_argument("--world-size", nargs=2, type=int, default=[20, 20],
+                               metavar=("WIDTH", "HEIGHT"),
+                               help="World dimensions (width height)")
+    
+    # Simulate command
+    simulate_parser = subparsers.add_parser("simulate", help="Run simulation")
+    simulate_parser.add_argument("--steps", type=int, default=100,
+                                 help="Number of simulation steps")
+    simulate_parser.add_argument("--enable-reward", action="store_true",
+                                 help="Enable reward modulation")
+    simulate_parser.add_argument("--enable-curiosity", action="store_true",
+                                 help="Enable curiosity")
+    simulate_parser.add_argument("--enable-development", action="store_true",
+                                 help="Enable development")
+    simulate_parser.add_argument("--enable-plasticity", action="store_true",
+                                 help="Enable structural plasticity")
+    
+    # Stats command
+    subparsers.add_parser("stats", help="Print current statistics")
+    
+    # Save command
+    save_parser = subparsers.add_parser("save", help="Save brain state")
+    save_parser.add_argument("filepath", help="File path to save brain state")
+    
+    # Load command
+    load_parser = subparsers.add_parser("load", help="Load brain state")
+    load_parser.add_argument("filepath", help="File path to load brain state")
+    
+    # Interactive mode
+    subparsers.add_parser("interactive", help="Enter interactive mode")
+    
+    args = parser.parse_args()
+    
+    # Create CLI instance
+    cli = NLMCLI()
+    
+    try:
+        if args.command == "demo":
+            success = cli.run_demo(args.steps, args.learning)
+            
+        elif args.command == "create":
+            success = cli.create_brain(args.config, args.neurons)
+            width, height = args.world_size
+            if success:
+                success = cli.create_world(width, height)
+            if success:
+                success = cli.create_agent()
+                if success:
+                    success = cli.initialize_agent()
+            
+        elif args.command == "simulate":
+            # First create components
+            if not cli.create_brain():
+                sys.exit(1)
+            if not cli.create_world():
+                sys.exit(1)
+            if not cli.create_agent():
+                sys.exit(1)
+            if not cli.initialize_agent():
+                sys.exit(1)
+            
+            # Enable features
+            cli.enable_features(
+                args.enable_reward,
+                args.enable_curiosity,
+                args.enable_development,
+                args.enable_plasticity
+            )
+            
+            success = cli.run_simulation(args.steps, args.verbose)
+            
+        elif args.command == "stats":
+            # Try to get stats if we have existing objects
+            if cli.brain:
+                success = cli.print_stats()
+            else:
+                print("No brain created. Use 'create' or 'demo' first.")
+                success = False
+                
+        elif args.command == "save":
+            success = cli.save_brain(args.filepath)
+            
+        elif args.command == "load":
+            success = cli.load_brain(args.filepath)
+            
+        elif args.command == "interactive":
+            print("\n=== NLM Interactive Mode ===")
+            print("Available commands:")
+            print("  create --neurons <n>     Create brain with n neurons")
+            print("  world --width <w> --height <h> Create world with dimensions")
+            print("  agent                        Create agent brain")
+            print("  init                         Initialize agent with world")
+            print("  enable --reward|--curiosity|--dev|--plastic  Enable features")
+            print("  simulate --steps <n>       Run simulation for n steps")
+            print("  stats                        Print statistics")
+            print("  save <file>                 Save brain state")
+            print("  load <file>                 Load brain state")
+            print("  quit                        Exit interactive mode")
+            print("\nUse 'help' for more information.")
+            
+            # Interactive mode would go here
+            # For now, just exit
+            print("Interactive mode not fully implemented yet.")
+            success = False
+            
+        else:
+            parser.print_help()
+            success = False
+        
+        return success
+        
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+        return False
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return False
+    finally:
+        cli.cleanup()
+
+if __name__ == "__main__":
+    if not PYNLM_AVAILABLE:
+        sys.exit(1)
+    
+    success = main()
+    sys.exit(0 if success else 1)

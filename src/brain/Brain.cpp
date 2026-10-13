@@ -75,8 +75,8 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Thread safety
+    mutable std::mutex step_mutex;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -270,8 +270,10 @@ bool Brain::initialize() {
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
         for (auto& region : pImpl->regions) {
+            if (!region) continue;  // FIX: Add null check for region
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
+                if (!neuron) continue;  // FIX: Add null check for neuron
                 if (neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
@@ -324,6 +326,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 13. Apply development effects
      * 14. Collect statistics
      */
+     
+    // FIX: Thread-safe step execution with mutex protection
+    std::lock_guard<std::mutex> lock(pImpl->step_mutex);
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
@@ -732,11 +737,18 @@ void Brain::updatePlasticity() {
 
 void Brain::develop() {
     // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->structuralPlasticity && pImpl->rng) {  // FIX: Add null checks
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    } else {
+        NLM_LOG_WARNING("Cannot develop: structuralPlasticity or rng is null");
+    }
 }
 
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
+    
+    // FIX: Thread-safe reset execution with mutex protection
+    std::lock_guard<std::mutex> lock(pImpl->step_mutex);
     
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
@@ -757,6 +769,7 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->predictionSystem) pImpl->predictionSystem->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -797,7 +810,7 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.threshold.push_back(state.threshold);
                     neuronData.resetPotential.push_back(state.resetPotential);
                     neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    neuronData.firingState.push_back(static_cast<uint8_t>(static_cast<uint8_t>(state.firingState)));
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
@@ -870,7 +883,12 @@ bool Brain::load(const std::string& filepath) {
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
+                    // FIX: Proper bounds checking to prevent off-by-one error
+                    if (idx < neuronData.membranePotential.size() && idx < neuronData.restingPotential.size() &&
+                        idx < neuronData.threshold.size() && idx < neuronData.resetPotential.size() &&
+                        idx < neuronData.leakConductance.size() && idx < neuronData.firingState.size() &&
+                        idx < neuronData.refractoryRemaining.size() && idx < neuronData.refractoryPeriod.size() &&
+                        idx < neuronData.lastSpikeTime.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
                         neuron->setThreshold(neuronData.threshold[idx]);
