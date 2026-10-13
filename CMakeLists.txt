@@ -15,7 +15,34 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Find and include external dependencies
+option(NLM_USE_JSON_LIB "Use nlohmann/json library for JSON parsing" ON)
+option(NLM_USE_YAML_LIB "Use yaml-cpp library for YAML parsing" ON)
+
+if(NLM_USE_JSON_LIB)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+if(NLM_USE_YAML_LIB)
+    find_package(yaml-cpp QUIET)
+    if(NOT yaml-cpp_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(
+            yaml_cpp
+            GIT_REPOSITORY https://github.com/jbederos/yasm-cpp.git
+            GIT_TAG yaml-cpp-0.7.0
+        )
+        FetchContent_MakeAvailable(yaml_cpp)
+    endif()
 endif()
 
 # Source directory

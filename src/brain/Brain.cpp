@@ -79,7 +79,7 @@ struct Brain::Impl {
     std::unique_ptr<CheckpointManager> checkpointManager;
     
     Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
+        : config(std::move(cfg))
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)

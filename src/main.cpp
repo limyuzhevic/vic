@@ -18,15 +18,214 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <sstream>
+#include <algorithm>
+#include <functional>
+#include <chrono>
 
 using namespace nlm;
+
+// Simple argument parser for CLI
+class CLIParser {
+public:
+    struct Argument {
+        std::string name;
+        std::string value;
+        std::string help;
+        char shortOpt;
+        bool required;
+        bool hasValue;
+    };
+    
+    struct Option {
+        std::string name;
+        std::string description;
+        std::function<void()> action;
+        char shortOpt;
+    };
+    
+    CLIParser(int argc, char** argv) : argc_(argc), argv_(argv) {}
+    
+    void addArgument(const std::string& name, char shortOpt = 0, const std::string& help = "", bool required = false, bool hasValue = true) {
+        arguments_.push_back({name, "", help, shortOpt, required, hasValue});
+    }
+    
+    void addOption(const std::string& name, const std::string& description, std::function<void()> action, char shortOpt = 0) {
+        options_.push_back({name, description, action, shortOpt});
+    }
+    
+    void printHelp(const std::string& programName, const std::vector<std::string>& subcommands = {}) {
+        std::cout << "NLM - Neural Learning Machine" << std::endl;
+        std::cout << "Usage: " << programName << " [OPTIONS] <COMMAND> [ARGS]..." << std::endl << std::endl;
+        
+        if (!subcommands.empty()) {
+            std::cout << "COMMANDS:" << std::endl;
+            for (const auto& cmd : subcommands) {
+                std::cout << "  " << cmd << std::endl;
+            }
+            std::cout << std::endl;
+        }
+        
+        if (!arguments_.empty()) {
+            std::cout << "ARGUMENTS:" << std::endl;
+            for (const auto& arg : arguments_) {
+                std::cout << "  ";
+                if (arg.shortOpt) {
+                    std::cout << "-" << arg.shortOpt << ", ";
+                }
+                std::cout << "--" << arg.name;
+                if (arg.hasValue) {
+                    std::cout << "=<value>";
+                }
+                std::cout << " - " << arg.help;
+                if (arg.required) {
+                    std::cout << " (required)";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+        
+        if (!options_.empty()) {
+            std::cout << "OPTIONS:" << std::endl;
+            for (const auto& opt : options_) {
+                std::cout << "  ";
+                if (opt.shortOpt) {
+                    std::cout << "-" << opt.shortOpt << ", ";
+                }
+                std::cout << "--" << opt.name << " - " << opt.description << std::endl;
+            }
+            std::cout << std::endl;
+        }
+        
+        std::cout << "Global options:" << std::endl;
+        std::cout << "  --help, -h - Print this help message" << std::endl;
+        std::cout << "  --version, -v - Print version information" << std::endl;
+        std::cout << "  --verbose, -V - Enable verbose output" << std::endl;
+    }
+    
+    bool parse() {
+        for (int i = 1; i < argc_; ++i) {
+            std::string arg = argv_[i];
+            
+            if (arg == "--help" || arg == "-h") {
+                printHelp(argv_[0], subcommand_);
+                return false;
+            } else if (arg == "--version" || arg == "-v") {
+                std::cout << "NLM Phase 2 - Version 0.1.0" << std::endl;
+                return false;
+            } else if (arg == "--verbose" || arg == "-V") {
+                verbose_ = true;
+            } else if (arg.substr(0, 2) == "--" && arg.find('=') != std::string::npos) {
+                // --key=value format
+                size_t pos = arg.find('=');
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                parseArgument(key, value);
+            } else if (arg.substr(0, 2) == "--") {
+                // Long option without value
+                parseOption(arg.substr(2));
+            } else if (arg[0] == '-' && arg.size() > 1) {
+                // Short option (could be with or without value)
+                parseShortOption(arg.substr(1));
+            } else {
+                // Positional argument (subcommand or value)
+                if (subcommand_.empty()) {
+                    subcommand_ = arg;
+                } else {
+                    // Additional positional arguments for the subcommand
+                    parsePositional(arg);
+                }
+            }
+        }
+        return true;
+    }
+    
+    std::string getSubcommand() const { return subcommand_; }
+    std::string getArgument(const std::string& name) const {
+        for (const auto& arg : arguments_) {
+            if (arg.name == name && !arg.value.empty()) {
+                return arg.value;
+            }
+        }
+        return "";
+    }
+    bool hasArgument(const std::string& name) const {
+        return getArgument(name).empty();
+    }
+    bool isVerbose() const { return verbose_; }
+    
+private:
+    void parseArgument(const std::string& key, const std::string& value) {
+        for (auto& arg : arguments_) {
+            if (arg.name == key && arg.hasValue) {
+                arg.value = value;
+                break;
+            }
+        }
+    }
+    
+    void parseOption(const std::string& opt) {
+        for (const auto& option : options_) {
+            if (option.name == opt) {
+                option.action();
+                break;
+            }
+        }
+    }
+    
+    void parseShortOption(const std::string& opt) {
+        if (opt.size() == 1) {
+            // Single character option, check if it's a flag or needs a value
+            char c = opt[0];
+            bool found = false;
+            for (auto& option : options_) {
+                if (option.shortOpt == c) {
+                    option.action();
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Check if it's an argument
+                for (auto& arg : arguments_) {
+                    if (arg.shortOpt == c && arg.hasValue && arg.value.empty()) {
+                        // Need to find the next argument
+                        if (i_ + 1 < argc_) {
+                            arg.value = argv_[++i_];
+                            found = true;
+                        }
+                        break;
+                    } else if (arg.shortOpt == c && !arg.hasValue) {
+                        // Boolean flag
+                        arg.value = "true";
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    void parsePositional(const std::string& arg) {
+        positionalArgs_.push_back(arg);
+    }
+    
+    int argc_;
+    char** argv_;
+    std::vector<Argument> arguments_;
+    std::vector<Option> options_;
+    std::string subcommand_;
+    std::vector<std::string> positionalArgs_;
+    bool verbose_ = false;
+    size_t i_ = 1; // Current position in argv for parsing short options with values
+};
 
 void printBanner() {
     std::cout << R"(
@@ -48,7 +247,50 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Test command implementations
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    
+    // Inject current into a few neurons and see if spikes propagate
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_INFO("  No neurons found!");
+        return;
+    }
+    
+    // Get initial spike count
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    
+    // Inject strong current into first 10 neurons
+    NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    }
+    
+    // Run a few steps
+    for (SimulationStep step = 0; step < 50; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+    
+    if (spikes > 0) {
+        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+    } else {
+        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+        }
+    }
+}
+
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -158,49 +400,6 @@ struct LearningExperiment {
         }
     }
 };
-
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
-    
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    auto neurons = region->getAllNeurons();
-    if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
-        return;
-    }
-    
-    // Get initial spike count
-    size_t initialSpikes = brain->getTotalSpikeCount();
-    
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
-    
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
-    }
-    
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
-    
-    if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
-    } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
-        }
-    }
-}
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -321,10 +520,109 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void runBatchExperiment(const Config& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Batch Experiment Mode ===");
+    
+    int numExperiments = config.getOr<int>("batch_experiment_count", 3);
+    int duration = config.getOr<int>("batch_experiment_duration", 1000);
+    
+    NLM_LOG_INFO("Running " + std::to_string(numExperiments) + " experiments for " + std::to_string(duration) + " steps each");
+    
+    for (int exp = 0; exp < numExperiments; ++exp) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Experiment " + std::to_string(exp + 1) + "/" + std::to_string(numExperiments));
+        
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", 42 + exp, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", 200, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain for experiment " + std::to_string(exp));
+            continue;
+        }
+        
+        // Run basic connectivity test
+        runBasicConnectivityTest(brain);
+        
+        // Reset for plasticity test
+        brain->reset();
+        brain->initialize();
+        
+        // Run plasticity experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset for STDP test
+        brain->reset();
+        brain->initialize();
+        
+        // Run STDP verification
+        runStdpVerification(brain);
+    }
+}
+
+void runBenchmark(const Config& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Performance Benchmark ===");
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    int steps = config.getOr<int>("benchmark_steps", 5000);
+    auto configCopy = std::make_shared<Config>(config);
+    
+    for (SimulationStep step = 0; step < steps; ++step) {
+        // Simulate a brain for benchmarking
+        auto brain = std::make_shared<Brain>(configCopy);
+        brain->step(step, step * 0.001);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    double stepsPerSecond = (steps * 1000.0) / duration.count();
+    NLM_LOG_INFO("Benchmark completed:");
+    NLM_LOG_INFO("  Steps: " + std::to_string(steps));
+    NLM_LOG_INFO("  Time: " + std::to_string(duration.count()) + " ms");
+    NLM_LOG_INFO("  Performance: " + std::to_string(stepsPerSecond) + " steps/sec");
+}
+
+void runSimulation(const Config& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Simulation Mode ===");
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    int maxSteps = config.getOr<int>("max_simulation_steps", 1000);
+    
+    auto brain = std::make_shared<Brain>(std::make_shared<Config>(config));
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain for simulation");
+        return;
+    }
+    
+    for (SimulationStep step = 0; step < maxSteps; ++step) {
+        brain->step(step, step * 0.001);
+        
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+        }
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Simulation completed in " + std::to_string(duration.count()) + " ms");
+    brain->logStatus();
+}
+
 int main(int argc, char** argv) {
     printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -340,10 +638,46 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Initialize CLI parser
+    CLIParser parser(argc, argv);
+    
+    // Add global options
+    parser.addOption("help", "Print help message", []() {
+        std::cout << "Use '--help' with a command for more specific help." << std::endl;
+    }, 'h');
+    
+    parser.addOption("verbose", "Enable verbose output", []() {
+        // Will be set during parsing
+    }, 'V');
+    
+    // Parse command line
+    if (!parser.parse()) {
+        return 0;
+    }
+    
+    // Check for subcommand
+    std::string subcommand = parser.getSubcommand();
+    if (subcommand.empty()) {
+        std::cout << "Error: No command specified. Use '--help' for usage information." << std::endl;
+        return 1;
+    }
+    
+    // Initialize configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Load default configuration
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("batch_experiment_count", 3, ConfigSource::Default);
+    config->set("batch_experiment_duration", 1000, ConfigSource::Default);
+    config->set("benchmark_steps", 5000, ConfigSource::Default);
+    config->set("max_simulation_steps", 10000, ConfigSource::Default);
+    config->set("max_simulation_time", 60.0, ConfigSource::Default);
+    
+    // Load configuration file if specified
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -356,7 +690,6 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
@@ -366,25 +699,9 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration loaded:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
@@ -392,58 +709,96 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Configure schema for validation
+    ConfigSchema schema;
+    schema.addField("random_seed", static_cast<int64_t>(42), "Random seed for reproducible experiments", nullptr, true);
+    schema.addField("simulation_timestep", 0.001, "Simulation timestep in seconds", nullptr, true);
+    schema.addField("neuron_count", static_cast<int64_t>(100), "Number of neurons in the brain", nullptr, true);
+    schema.addField("region_count", static_cast<int64_t>(1), "Number of brain regions", nullptr, true);
+    schema.addField("connection_probability", 0.1f, "Connection probability for random connectivity", [](const ConfigValue& v) {
+        return std::get<float>(v) >= 0.0f && std::get<float>(v) <= 1.0f;
+    }, true);
+    
+    // Validate configuration
+    if (!config->validate(schema)) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        return 1;
+    }
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    // Execute subcommands
+    if (subcommand == "basic") {
+        NLM_LOG_INFO("=== Basic Connectivity Test ===");
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        brain->logStatus();
+        runBasicConnectivityTest(brain);
+        
+    } else if (subcommand == "plasticity" || subcommand == "learning") {
+        NLM_LOG_INFO("=== Plasticity Learning Experiment ===");
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        brain->logStatus();
+        runPlasticityExperiment(brain);
+        
+    } else if (subcommand == "stdp") {
+        NLM_LOG_INFO("=== STDP Verification ===");
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        brain->logStatus();
+        runStdpVerification(brain);
+        
+    } else if (subcommand == "batch") {
+        runBatchExperiment(*config);
+        
+    } else if (subcommand == "benchmark") {
+        runBenchmark(*config);
+        
+    } else if (subcommand == "simulation" || subcommand == "sim") {
+        runSimulation(*config);
+        
+    } else if (subcommand == "config") {
+        std::string format = parser.getArgument("format");
+        if (format.empty()) {
+            format = "simple";
+        }
+        
+        bool saveFormat = (format == "json");
+        std::string outputFile = parser.getArgument("output");
+        if (outputFile.empty()) {
+            outputFile = "config_output.json";
+        }
+        
+        if (config->saveToFile(outputFile, saveFormat)) {
+            NLM_LOG_INFO("Configuration saved to: " + outputFile);
+        } else {
+            NLM_LOG_ERROR("Failed to save configuration to: " + outputFile);
+        }
+        
+    } else {
+        std::cout << "Error: Unknown command: " << subcommand << std::endl;
+        std::cout << "Available commands: basic, plasticity, learning, stdp, batch, benchmark, simulation, sim, config" << std::endl;
         return 1;
     }
     
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
+    // Final status
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Execution Complete ===");
+    NLM_LOG_INFO("All operations completed successfully.");
+    NLM_LOG_INFO("For more information, check the log file or use --verbose flag.");
     
     return 0;
 }
