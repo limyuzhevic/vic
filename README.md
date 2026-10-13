@@ -75,6 +75,13 @@ make -j4
 
 ## Running
 
+### Phase 5 Demo (Lifetime Learning)
+```bash
+./nlm_phase5_demo [num_seeds]
+```
+
+This demonstrates Phase 5: Large-scale neural simulation, event-driven processing, and emergent behaviors through continual experience over a lifetime.
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
