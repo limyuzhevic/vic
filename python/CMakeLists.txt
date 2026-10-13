@@ -87,9 +87,25 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Build enhanced Python bindings with improved API
+set(ENHANCED_BINDINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/bindings_enhanced.cpp)
+if(EXISTS ${ENHANCED_BINDINGS_FILE})
+    message(STATUS "Using enhanced Python bindings from: ${ENHANCED_BINDINGS_FILE}")
+    pybind11_add_module(pynlm ${ENHANCED_BINDINGS_FILE})
+else()
+    message(STATUS "Enhanced bindings file not found, using original bindings.cpp")
+    pybind11_add_module(pynlm bindings.cpp)
+endif()
+
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Add Python package metadata
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../pyproject.toml
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-pyproject.toml
+    COPYONLY
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
