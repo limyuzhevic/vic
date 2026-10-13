@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <chrono>
 
 namespace nlm {
 
@@ -29,6 +30,11 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Enhanced error handling classes
+class NLMSimulationError;
+class NLMConfigurationError;
+class NLMBrainError;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -48,6 +54,33 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
+// Inter-regional connection (long-range connectivity)
+struct InterRegionConnection {
+    RegionId sourceRegion;
+    RegionId targetRegion;
+    float weight;
+    Delay delay;
+    PlasticityFlags plasticityFlags;
+    
+    InterRegionConnection()
+        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
+    
+    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
+        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// State validation helper class
+class StateValidator {
+public:
+    static bool validateBrainState(const Brain* brain);
+    static bool validateRegionState(const NeuralRegion* region);
+};
+
+// Brain: The central coordinator of the neural system
+// Implements real spiking neural computation with event-driven dynamics
+// and integrated memory, prediction, cognition, and neuromodulation systems
+// with enhanced error handling and recovery mechanisms
+
 class Brain {
 public:
     // Create brain with configuration
@@ -61,14 +94,19 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    // Initialize brain with enhanced error handling
     bool initialize();
     
-    // Main simulation step
+    // Main simulation step with enhanced error handling
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Enhanced error handling and recovery methods
+    bool validateBrainAfterRecovery();
+    bool enterMinimalFunctionalityMode();
+    void handleBrainInitializationError(const NLMSimulationError& error);
+    void handleSimulationError(const NLMSimulationError& error);
+    void handleStateError();
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
@@ -197,5 +235,7 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm
