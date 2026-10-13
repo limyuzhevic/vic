@@ -1,0 +1,108 @@
+{
+  "description": "NLM Phase 6 Integration Configuration",
+  "version": "2.0.0",
+  
+  "simulation": {
+    "timestep": 0.001,
+    "max_steps": 1000,
+    "neuron_count": 500,
+    "region_count": 1,
+    "connection_probability": 0.1,
+    "replay_interval": 100,
+    "consolidation_interval": 1000,
+    "random_seed": 42
+  },
+  
+  "brain": {
+    "neuron_type_distribution": {
+      "sensory": 0.2,
+      "internal": 0.6,
+      "motor": 0.2
+    },
+    "plasticity": {
+      "stdp_ltp_weight": 0.02,
+      "stdp_ltd_weight": 0.015,
+      "stdp_tau": 20.0,
+      "hebbian_rate": 0.01,
+      "structural_synaptogenesis_rate": 0.0001,
+      "structural_pruning_rate": 0.00001
+    },
+    "development": {
+      "initial_plasticity": 1.0,
+      "critical_period_plasticity": 0.8,
+      "maturation_plasticity": 0.5,
+      "adult_plasticity": 0.2
+    }
+  },
+  
+  "memory": {
+    "working_memory": {
+      "capacity": 100,
+      "decay_rate": 0.01,
+      "encoding_strength": 1.0
+    },
+    "episodic_memory": {
+      "max_episodes": 1000,
+      "replay_strength": 0.5,
+      "consolidation_threshold": 0.3
+    },
+    "associative_memory": {
+      "learning_rate": 0.1,
+      "decay_rate": 0.01
+    }
+  },
+  
+  "neuromodulation": {
+    "dopamine": {
+      "baseline_level": 0.1,
+      "learning_modulation": true,
+      "excitability_modulation": true
+    },
+    "curiosity": {
+      "novelty_sensitivity": 1.0,
+      "prediction_error_weight": 0.5,
+      "exploration_bonus": 0.2
+    },
+    "novelty": {
+      "sensitivity": 1.0,
+      "adaptation_rate": 0.01
+    }
+  },
+  
+  "cognition": {
+    "attention": {
+      "inhibition_strength": 0.5,
+      "excitation_strength": 1.5,
+      "selection_threshold": 0.8
+    },
+    "concept_formation": {
+      "similarity_threshold": 0.7,
+      "association_strength": 0.9
+    },
+    "planning": {
+      "planning_depth": 5,
+      "action_selection_method": "value"
+    }
+  },
+  
+  "environment": {
+    "simple_world": {
+      "size": 10,
+      "num_resources": 5,
+      "reward_range": [-1.0, 1.0]
+    }
+  },
+  
+  "logging": {
+    "level": "info",
+    "use_colors": true,
+    "log_file": ""
+  },
+  
+  "checkpointing": {
+    "enabled": true,
+    "directory": "./checkpoints",
+    "compression_level": "balanced",
+    "max_checkpoints": 1000
+  }
+}
