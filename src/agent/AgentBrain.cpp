@@ -152,14 +152,46 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Try to use NeuralPlanner if available
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        try {
+            // Get current state from working memory for planning
+            std::vector<float> currentState;
+            if (auto* wm = brain_->getWorkingMemory()) {
+                currentState = wm->retrieve();
+            }
+            
+            // If we have state, use NeuralPlanner
+            if (!currentState.empty()) {
+                // Set current goal based on neuromodulation
+                float currentGoal = std::max(0.0f, std::min(1.0f, 
+                    (dopamineLevel_ + curiosityLevel_) / 2.0f));
+                
+                ActionType plannedAction = planner->planAction(currentState, currentGoal);
+                
+                // Convert ActionType to MotorCommand (simplified mapping)
+                switch (plannedAction) {
+                    case ActionType::MoveForward: return MotorCommand::MoveForward;
+                    case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+                    case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+                    case ActionType::TurnRight: return MotorCommand::TurnRight;
+                    case ActionType::Look: return MotorCommand::LookLeft;  // Default to left
+                    case ActionType::LookUp: return MotorCommand::LookLeft;
+                    case ActionType::LookDown: return MotorCommand::LookRight;
+                    case ActionType::Interact: return MotorCommand::Interact;
+                    case ActionType::Wait: return MotorCommand::Wait;
+                    // Other action types default to Wait
+                    default: return MotorCommand::Wait;
+                }
+            }
+        } catch (...) {
+            // If planning fails, fall back to motor neuron decoding
+        }
     }
     
-    return decoded;
+    // Fall back to motor neuron decoding
+    return decodeFromMotorNeurons();
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

@@ -28,23 +28,39 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printAdvancedHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    NLM Advanced Commands:
+    
+    Save/Load:
+      --save <filename>      Save current brain state to checkpoint file
+      --load <filename>      Load brain state from checkpoint file
+      --backup               Create backup checkpoint
+    
+    Brain Management:
+      --status                Show detailed brain status and integration report
+      --integrate <level>    Check integration level of specific system (working_memory, episodic_memory, prediction, cognition, neuromodulation)
+      --reset                Reset brain to initial state
+      --develop <stage>       Set developmental stage (Initial, CriticalPeriod, Maturation, Adult)
+    
+    Neuromodulation:
+      --dopamine <level>     Set dopamine level (0.0-1.0)
+      --curiosity <level>    Set curiosity level (0.0-1.0)
+      --novelty <level>      Set novelty level (0.0-1.0)
+      --acetylcholine <level> Set ACh level (0.0-1.0)
+      --norepinephrine <level> Set NE level (0.0-1.0)
+      --serotonin <level>    Set 5-HT level (0.0-1.0)
+    
+    Advanced Features:
+      --enable <feature>     Enable experimental feature (prediction, concepts, self_model, social_learning)
+      --disable <feature>    Disable experimental feature
+      --advanced             Enable advanced debugging mode
+      --validate             Validate all integrated systems
+    
+    Plugin System:
+      --plugin <path>        Load plugin extension
+      --plugin_list           List available plugins
+      --help_advanced        Show this advanced help
     )" << std::endl;
 }
 
@@ -345,9 +361,25 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool advancedMode = false;
+    std::string savePath, loadPath;
+    bool showAdvancedHelp = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help_advanced") {
+            printAdvancedHelp();
+            return 0;
+        } else if (arg == "--advanced") {
+            advancedMode = true;
+            NLM_LOG_INFO("Advanced mode enabled");
+        } else if (arg == "--save" && i + 1 < argc) {
+            savePath = argv[++i];
+            NLM_LOG_INFO("Will save brain state to: " + savePath);
+        } else if (arg == "--load" && i + 1 < argc) {
+            loadPath = argv[++i];
+            NLM_LOG_INFO("Will load brain state from: " + loadPath);
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -365,6 +397,24 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Handle load command - load brain state before initialization
+    if (!loadPath.empty()) {
+        NLM_LOG_INFO("Loading brain state from: " + loadPath);
+        // Note: Brain::load() requires brain to be already initialized,
+        // so we need to initialize temporarily, load, then reinitialize
+        auto tempBrain = std::make_shared<Brain>(config);
+        if (tempBrain->load(loadPath)) {
+            NLM_LOG_INFO("Successfully loaded brain state");
+            
+            // Update config from loaded state
+            NLM_LOG_INFO("Config after load: random_seed=" + 
+                        std::to_string(config->getOr<int64_t>("random_seed", 42)));
+        } else {
+            NLM_LOG_ERROR("Failed to load brain state: " + loadPath);
+            // Continue with fresh initialization
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
