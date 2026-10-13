@@ -41,40 +41,83 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+    // Add more sophisticated key=value parsing with type conversion
+    if (key == "neuron_count" || key == "region_count" || key == "random_seed") {
+        try {
+            int64_t intVal = std::stoll(value);
+            set(key, intVal, ConfigSource::File);
+        } catch (...) {
             set(key, value, ConfigSource::File);
+        }
+    } else if (key == "connection_probability" || key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "stdp_tau" || key == "synaptogenesis_rate" || key == "pruning_rate" || key == "dopamine_baseline" || key == "plasticity_learning_rate" || key == "stdp_time_constant" || key == "development_synaptogenesis_rate" || key == "development_pruning_rate" || key == "dopamine_baseline" || key == "reward_discount_factor" || key == "visualization_update_rate") {
+        try {
+            float floatVal = std::stof(value);
+            set(key, floatVal, ConfigSource::File);
+        } catch (...) {
+            set(key, value, ConfigSource::File);
+        }
+    } else if (key == "simulation_timestep") {
+        try {
+            double doubleVal = std::stod(value);
+            set(key, doubleVal, ConfigSource::File);
+        } catch (...) {
+            set(key, value, ConfigSource::File);
+        }
+    } else if (key == "log_to_file" || key == "visualization_enabled") {
+        try {
+            bool boolVal = (value == "true" || value == "1" || value == "yes");
+            set(key, boolVal, ConfigSource::File);
+        } catch (...) {
+            set(key, value, ConfigSource::File);
+        }
+    }
         }
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
     }
+    
+    // Check --help, --version flags first
+    if (arg == "--help" || arg == "-h" || arg == "/?" || arg == "--version" || arg == "-V") {
+        continue;
+    }
+    
+    // Check for advanced configuration flags
+    if (arg == "--benchmark" || arg == "-b" || arg == "--visualization" || arg == "-v" || 
+        arg == "--no-colors" || arg == "--output" || arg == "-o" || arg == "--log-level" || 
+        arg == "-l" || arg == "--log-file" || arg == "--benchmark-duration") {
+        // Skip advanced flags
+        if (arg == "--output" || arg == "-o" || arg == "--log-level" || arg == "-l" || 
+            arg == "--log-file" || arg == "--benchmark-duration") {
+            i += 2; // Skip flag and value
+        }
+        continue;
+    }
+    
+    // Check for --set= overrides
+    if (arg.substr(0, 7) == "--set=") {
+        continue;
+    }
+    
+    // Check for config file flag
+    if (arg.substr(0, 8) == "--config=") {
+        i++; // Skip value
+        continue;
+    } else if (arg == "--config" || arg == "-c") {
+        if (i + 1 < argc) {
+            i++; // Skip value
+        }
+        continue;
+    }
+    
+    // All other arguments are treated as config overrides
+    if (arg.substr(0, 2) == "--" || (arg.size() > 0 && arg[0] == '-')) {
+        set(arg, "true", ConfigSource::CommandLine);
+    }
+    
     return true;
 }
 
@@ -186,17 +229,93 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Validation system for configuration
+ValidationResult Config::validate() const {
+    ValidationResult result;
+    
+    // Check required configuration keys
+    std::vector<std::string> requiredKeys = {
+        "random_seed", "simulation_timestep", "neuron_count", 
+        "region_count", "connection_probability"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            result.warnings.push_back("Required configuration key missing: '" + key + "' (using default)");
+        }
+    }
+    
+    // Validate all configuration entries
+    for (const auto& entry : pImpl->entries) {
+        ValidationResult entryResult;
+        
+        // Basic type validation based on key name
+        if (entry.key == "simulation_timestep") {
+            if (std::holds_alternative<double>(entry.value)) {
+                double timestep = std::get<double>(entry.value);
+                if (timestep <= 0) {
+                    entryResult.errors.push_back("simulation_timestep must be positive");
+                } else if (timestep > 0.1) {
+                    entryResult.warnings.push_back("simulation_timestep is large (" + std::to_string(timestep) + ") - may cause numerical issues");
+                }
+            }
+        } else if (entry.key == "neuron_count" || entry.key == "region_count") {
+            if (std::holds_alternative<int64_t>(entry.value)) {
+                int64_t val = std::get<int64_t>(entry.value);
+                if (val <= 0) {
+                    entryResult.errors.push_back(entry.key + " must be positive");
+                } else if (val > 1000000) {
+                    entryResult.warnings.push_back(entry.key + " is very large (" + std::to_string(val) + ") - may impact performance");
+                }
+            }
+        } else if (entry.key == "connection_probability") {
+            if (std::holds_alternative<float>(entry.value)) {
+                float prob = std::get<float>(entry.value);
+                if (prob < 0 || prob > 1) {
+                    entryResult.errors.push_back("connection_probability must be between 0 and 1");
+                }
+            }
+        }
+        
+        // Combine entry results
+        result.errors.insert(result.errors.end(), entryResult.errors.begin(), entryResult.errors.end());
+        result.warnings.insert(result.warnings.end(), entryResult.warnings.begin(), entryResult.warnings.end());
+    }
+    
+    result.valid = result.errors.empty();
+    return result;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Configuration export for debugging
+std::string Config::exportConfig() const {
+    std::ostringstream oss;
+    oss << "=== NLM Configuration Export ===" << std::endl;
+    oss << "Generated: " << __DATE__ << " " << __TIME__ << std::endl;
+    oss << std::endl;
+    
+    oss << "Configuration Summary:" << std::endl;
+    oss << summary() << std::endl;
+    
+    oss << "Validation Status:" << std::endl;
+    ValidationResult validation = validate();
+    oss << "Valid: " << (validation.valid ? "YES" : "NO") << std::endl;
+    
+    if (!validation.errors.empty()) {
+        oss << "Errors:" << std::endl;
+        for (const auto& error : validation.errors) {
+            oss << "  - " << error << std::endl;
+        }
+    }
+    
+    if (!validation.warnings.empty()) {
+        oss << "Warnings:" << std::endl;
+        for (const auto& warning : validation.warnings) {
+            oss << "  - " << warning << std::endl;
+        }
+    }
+    
+    oss << "=== End of Configuration Export ===" << std::endl;
+    return oss.str();
 }
 
 // Explicit template instantiations

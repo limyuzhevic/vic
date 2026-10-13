@@ -343,15 +343,102 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Set up comprehensive command-line interface
     std::string configFile = "configs/default.cfg";
+    bool runBenchmark = false;
+    bool enableVisualization = false;
+    std::string outputFile = "";
+    std::string logLevel = "INFO";
+    std::string logFile = "";
+    bool enableColors = true;
+    bool benchmarkMode = false;
+    size_t benchmarkDuration = 100;
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        
+        // Config file
+        if (arg == "--config" || arg == "-c") {
+            if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 8) == "--config=") {
+            configFile = arg.substr(8);
+        }
+        
+        // Benchmark mode
+        else if (arg == "--benchmark" || arg == "-b") {
+            runBenchmark = true;
+        }
+        
+        // Visualization
+        else if (arg == "--visualization" || arg == "-v") {
+            enableVisualization = true;
+        }
+        
+        // Output file
+        else if (arg == "--output" || arg == "-o") {
+            if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg.substr(0, 8) == "--output=") {
+            outputFile = arg.substr(8);
+        }
+        
+        // Log level
+        else if (arg == "--log-level" || arg == "-l") {
+            if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg.substr(0, 12) == "--log-level=") {
+            logLevel = arg.substr(12);
+        }
+        
+        // Log file
+        else if (arg == "--log-file") {
+            if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 10) == "--log-file=") {
+            logFile = arg.substr(10);
+        }
+        
+        // Colors
+        else if (arg == "--no-colors") {
+            enableColors = false;
+        }
+        
+        // Benchmark duration
+        else if (arg == "--benchmark-duration") {
+            if (i + 1 < argc) {
+                try {
+                    benchmarkDuration = std::stoul(argv[++i]);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid benchmark duration: " + std::string(argv[i]));
+                    return 1;
+                }
+            }
+        }
+        
+        // Help
+        else if (arg == "--help" || arg == "-h" || arg == "/?") {
+            printUsageAndExit();
+        }
+        
+        // Version
+        else if (arg == "--version" || arg == "-V") {
+            printVersionAndExit();
+        }
+        
+        // Override specific config values
+        else if (arg.substr(0, 7) == "--set=") {
+            std::string kv = arg.substr(7);
+            size_t pos = kv.find('=');
+            if (pos != std::string::npos) {
+                std::string key = kv.substr(0, pos);
+                std::string value = kv.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
             }
         }
     }
@@ -363,33 +450,51 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
+    // Override with command line args (traditional --key value or --key=value format)
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config" || arg == "-c") {
+            // Skip config argument
+            if (arg.find('=') != std::string::npos) {
+                i++; // Skip value if present
+            } else {
+                i++; // Skip next argument
+            }
+        } else if (arg == "--benchmark" || arg == "-b" || arg == "--visualization" || arg == "-v" || 
+                   arg == "--no-colors" || arg == "--help" || arg == "-h" || arg == "/?" || 
+                   arg == "--version" || arg == "-V") {
+            // Skip known flags
+            continue;
+        } else if (arg == "--output" || arg == "-o" || arg == "--log-level" || arg == "-l" || 
+                   arg == "--log-file" || arg == "--benchmark-duration") {
+            i += 2; // Skip flag and value
+            continue;
+        } else if (arg.substr(0, 12) == "--log-level=") {
+            i++; // Skip value
+        } else if (arg.substr(0, 10) == "--log-file=") {
+            i++; // Skip value
+        } else if (arg.substr(0, 8) == "--output=") {
+            i++; // Skip value
+        } else if (arg.substr(0, 7) == "--set=") {
+            // Skip --set= arguments as they're handled separately above
+            continue;
+        } else {
+            // Pass through to existing Config::loadFromArgs for backward compatibility
+            config->loadFromArgs(1, &argv[i]);
+        }
+    // Log configuration summary (after applying defaults)
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Final Configuration (Phase 2 defaults):");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -446,4 +551,113 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Performance monitoring functions
+namespace nlm {
+    class PerformanceMonitor {
+    public:
+        PerformanceMonitor() : startTime(std::chrono::high_resolution_clock::now()) {}
+        
+        void reset() {
+            startTime = std::chrono::high_resolution_clock::now();
+            stepCount = 0;
+        }
+        
+        double getElapsedTime() const {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            return std::chrono::duration<double>(endTime - startTime).count();
+        }
+        
+        void incrementStep() {
+            stepCount++;
+        }
+        
+        size_t getStepCount() const {
+            return stepCount;
+        }
+        
+        double getStepsPerSecond() const {
+            double elapsed = getElapsedTime();
+            return elapsed > 0 ? static_cast<double>(stepCount) / elapsed : 0.0;
+        }
+        
+        void printStats() const {
+            NLM_LOG_INFO("Performance Statistics:");
+            NLM_LOG_INFO("  Total steps: " + std::to_string(stepCount));
+            NLM_LOG_INFO("  Elapsed time: " + std::to_string(getElapsedTime()) + "s");
+            NLM_LOG_INFO("  Steps per second: " + std::to_string(getStepsPerSecond()));
+        }
+        
+    private:
+        std::chrono::high_resolution_clock::time_point startTime;
+        size_t stepCount = 0;
+    };
+}
+
+// Memory usage monitoring
+namespace nlm {
+    class MemoryMonitor {
+    public:
+        static size_t getMemoryUsage() {
+            // Simple memory monitoring - platform-specific implementation
+            // This is a placeholder - on Linux you could read from /proc/self/status
+            // On Windows, use GetProcessMemoryInfo
+            return 0; // Placeholder
+        }
+        
+        static std::string getMemoryUsageString() {
+            size_t mem = getMemoryUsage();
+            if (mem == 0) return "N/A";
+            
+            // Convert to MB
+            double memMB = mem / (1024.0 * 1024.0);
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(2) << memMB << " MB";
+            return oss.str();
+        }
+    };
+}
+
+// Configuration validation results output
+void printConfigurationValidationResults(const nlm::Config& config) {
+    NLM_LOG_INFO("Configuration Validation:");
+    
+    // Check for common configuration issues
+    std::vector<std::string> issues;
+    
+    // Check neuron count
+    auto neuronCount = config.getOr<int64_t>("neuron_count", 0);
+    if (neuronCount < 10) {
+        issues.push_back("WARNING: neuron_count is very low (" + std::to_string(neuronCount) + "). Recommended minimum is 100.");
+    } else if (neuronCount > 100000) {
+        issues.push_back("WARNING: neuron_count is very high (" + std::to_string(neuronCount) + "). Performance may be impacted.");
+    }
+    
+    // Check simulation timestep
+    auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+    if (timestep < 0.0001) {
+        issues.push_back("WARNING: simulation_timestep is very small (" + std::to_string(timestep) + "). This may slow down simulation.");
+    } else if (timestep > 0.1) {
+        issues.push_back("WARNING: simulation_timestep is large (" + std::to_string(timestep) + "). This may cause numerical instability.");
+    }
+    
+    // Check connection probability
+    auto connProb = config.getOr<float>("connection_probability", 0.15f);
+    if (connProb < 0.01) {
+        issues.push_back("INFO: connection_probability is very low (" + std::to_string(connProb) + "). Network may be too sparse.");
+    } else if (connProb > 0.5) {
+        issues.push_back("WARNING: connection_probability is high (" + std::to_string(connProb) + "). Network may be too dense.");
+    }
+    
+    // Print issues
+    for (const auto& issue : issues) {
+        NLM_LOG_INFO(issue);
+    }
+    
+    if (issues.empty()) {
+        NLM_LOG_INFO("✓ Configuration validation passed");
+    } else {
+        NLM_LOG_WARNING("Configuration validation completed with warnings");
+    }
 }

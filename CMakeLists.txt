@@ -133,11 +133,34 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Advanced features configuration
+# Plugin system
+
+# Create a directory for plugins
+file(GLOB PLUGIN_SOURCES ${NLM_SOURCE_DIR}/plugins/*.cpp)
+
+if(PLUGIN_SOURCES)
+    add_library(nlm_plugins STATIC ${PLUGIN_SOURCES})
+    target_include_directories(nlm_plugins PUBLIC ${NLM_SOURCE_DIR}/plugins)
+    target_include_directories(nlm_plugins PUBLIC src)
+    target_link_libraries(nlm_plugins PUBLIC nlm_core)
+    
+    # Link plugins to main executable
+    target_link_libraries(nlm PUBLIC nlm_plugins)
+endif()
+
+# Advanced demo executable
+add_executable(nlm_advanced_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_plugins)
+
+# Advanced configuration example
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/advanced_config_example.cfg
+    ${CMAKE_CURRENT_BINARY_DIR}/advanced_config_example.cfg
+    COPYONLY
+)
 
 # Testing
 enable_testing()

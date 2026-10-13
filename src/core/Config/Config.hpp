@@ -31,16 +31,88 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation result
+struct ValidationResult {
+    bool valid;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    ValidationResult() : valid(true) {}
+    ValidationResult(bool v) : valid(v) {}
+};
+
+// Configuration value validator interface
+class IValidator {
+public:
+    virtual ~IValidator() = default;
+    virtual ValidationResult validate(const std::string& key, const ConfigValue& value) const = 0;
+};
+
+// Range validator
+class RangeValidator : public IValidator {
+public:
+    RangeValidator(const std::string& min, const std::string& max) : min_(min), max_(max) {}
+    ValidationResult validate(const std::string& key, const ConfigValue& value) const override;
+    
+private:
+    std::string min_;
+    std::string max_;
+};
+
+// Enum validator
+class EnumValidator : public IValidator {
+public:
+    EnumValidator(const std::vector<std::string>& allowed) : allowed_(allowed) {}
+    ValidationResult validate(const std::string& key, const ConfigValue& value) const override;
+    
+private:
+    std::vector<std::string> allowed_;
+};
+
+// Pattern validator
+class PatternValidator : public IValidator {
+public:
+    PatternValidator(const std::string& pattern) : pattern_(pattern) {}
+    ValidationResult validate(const std::string& key, const ConfigValue& value) const override;
+    
+private:
+    std::string pattern_;
+};
+
+// Configuration validation rule
+struct ValidationRule {
+    std::string key;
+    std::string ruleType;  // "range", "enum", "pattern", "required"
+    std::string ruleData;  // JSON string containing rule parameters
+    std::string errorMessage;
+    
+    ValidationRule() : key(), ruleType(), ruleData(), errorMessage() {}
+    ValidationRule(const std::string& k, const std::string& type, const std::string& data, const std::string& error)
+        : key(k), ruleType(type), ruleData(data), errorMessage(error) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string name;
+    std::vector<std::string> requiredKeys;
+    std::vector<ValidationRule> validationRules;
+    std::vector<std::string> optionalKeys;
+    
+    ConfigSchema() : name() {}
+    ConfigSchema(const std::string& n) : name(n) {}
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    mutable bool validated;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), validated(false) {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), validated(false) {}
 };
 
 // Main configuration class
