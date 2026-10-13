@@ -1,8 +1,12 @@
 #include "Config.hpp"
+#include "Types.hpp"  // For error handling
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,11 +23,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first (recommended format)
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    }
     
+    // Try YAML (if available)
+    if (loadFromYAML(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from YAML file: " + filepath);
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
@@ -52,6 +67,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from simple format file: " + filepath);
     return true;
 }
 
@@ -79,17 +95,187 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save in JSON format (recommended)
+    if (saveToJSON(filepath)) {
+        NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
+        return true;
+    }
+    
+    return false;
+}
+
+// JSON parsing implementation
+bool Config::loadFromJSON(const std::string& filepath) {
+#ifdef HAVE_RAPIDJSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    rapidjson::IStreamWrapper isw(file);
+    rapidjson::Document doc;
+    
+    if (doc.ParseStream(isw).HasParseError()) {
+        return false;
+    }
+    
+    if (!doc.IsObject()) {
+        return false;
+    }
+    
+    // Clear existing entries
+    clear();
+    
+    // Parse JSON object
+    for (rapidjson::Document::ConstMemberIterator itr = doc.MemberBegin(); 
+         itr != doc.MemberEnd(); ++itr) {
+        const std::string key = itr->name.GetString();
+        const rapidjson::Value& value = itr->value;
+        
+        std::string valueStr;
+        
+        if (value.IsString()) {
+            valueStr = value.GetString();
+            set(key, valueStr, ConfigSource::File);
+        } else if (value.IsInt()) {
+            int intVal = value.GetInt();
+            set(key, intVal, ConfigSource::File);
+        } else if (value.IsInt64()) {
+            int64_t int64Val = value.GetInt64();
+            set(key, int64Val, ConfigSource::File);
+        } else if (value.IsUint()) {
+            uint64_t uintVal = value.GetUint();
+            set(key, static_cast<int64_t>(uintVal), ConfigSource::File);
+        } else if (value.IsDouble()) {
+            double doubleVal = value.GetDouble();
+            set(key, doubleVal, ConfigSource::File);
+        } else if (value.IsBool()) {
+            bool boolVal = value.GetBool();
+            set(key, boolVal, ConfigSource::File);
+        } else if (value.IsArray()) {
+            // Convert array to string representation
+            valueStr = "[";
+            for (rapidjson::SizeType i = 0; i < value.Size(); ++i) {
+                if (i > 0) valueStr += ",";
+                if (value[i].IsString()) {
+                    valueStr += "\"" + std::string(value[i].GetString()) + "\"";
+                } else {
+                    valueStr += std::to_string(value[i].GetDouble());
+                }
+            }
+            valueStr += "]";
+            set(key, valueStr, ConfigSource::File);
+        }
+    }
+    
+    return true;
+#else
+    return false; // rapidjson not available
+#endif
+}
+
+// YAML parsing implementation
+bool Config::loadFromYAML(const std::string& filepath) {
+#ifdef HAVE_YAML_CPP
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse YAML node
+        for (const auto& node : doc) {
+            const std::string key = node.first.as<std::string>();
+            const YAML::Node& value = node.second;
+            
+            std::string valueStr;
+            
+            if (value.IsScalar()) {
+                if (value.IsSequence()) {
+                    // Convert sequence to string representation
+                    valueStr = "[";
+                    bool first = true;
+                    for (const auto& item : value) {
+                        if (!first) valueStr += ",";
+                        valueStr += item.as<std::string>();
+                        first = false;
+                    }
+                    valueStr += "]";
+                    set(key, valueStr, ConfigSource::File);
+                } else {
+                    // Try to determine type
+                    try {
+                        int intVal = value.as<int>();
+                        set(key, intVal, ConfigSource::File);
+                    } catch (...) {
+                        try {
+                            double doubleVal = value.as<double>();
+                            set(key, doubleVal, ConfigSource::File);
+                        } catch (...) {
+                            try {
+                                bool boolVal = value.as<bool>();
+                                set(key, boolVal, ConfigSource::File);
+                            } catch (...) {
+                                valueStr = value.as<std::string>();
+                                set(key, valueStr, ConfigSource::File);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return true;
+    } catch (const YAML::Exception&) {
+        return false;
+    }
+#else
+    return false; // yaml-cpp not available
+#endif
+}
+
+// JSON saving implementation
+bool Config::saveToJSON(const std::string& filepath) const {
+#ifdef HAVE_RAPIDJSON
+    rapidjson::Document doc(rapidjson::kObjectType);
+    doc.SetObject();
+    
+    rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+    
+    // Add configuration entries to JSON
+    for (const auto& entry : pImpl->entries) {
+        rapidjson::Value keyStr(keyStr.data(), keyStr.size(), allocator);
+        
+        rapidjson::Value valueStr;
+        if (std::holds_alternative<std::string>(entry.value)) {
+            valueStr.SetString(std::get<std::string>(entry.value).c_str(), allocator);
+        } else if (std::holds_alternative<int>(entry.value)) {
+            valueStr.SetInt(std::get<int>(entry.value));
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            valueStr.SetInt64(std::get<int64_t>(entry.value));
+        } else if (std::holds_alternative<double>(entry.value)) {
+            valueStr.SetDouble(std::get<double>(entry.value));
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            valueStr.SetBool(std::get<bool>(entry.value));
+        }
+        
+        doc.AddMember(keyStr, valueStr, allocator);
+    }
+    
+    // Write to file
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    rapidjson::OStreamWrapper osw(file);
+    rapidjson::PrettyWriter<rapidjson::OStreamWrapper> writer(osw);
+    doc.Accept(writer);
     
     return true;
+#else
+    return false; // rapidjson not available
+#endif
 }
 
 template<typename T>

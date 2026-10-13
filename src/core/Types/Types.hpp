@@ -2,8 +2,196 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <stdexcept>
+#include <string>
+#include <memory>
+#include <vector>
+#include <sstream>
 
 namespace nlm {
+
+// ========== ERROR HANDLING SYSTEM ==========
+
+// Base exception class for NLM errors
+class NLMException : public std::runtime_error {
+public:
+    explicit NLMException(const std::string& message) : std::runtime_error(message) {}
+    NLMException(const std::string& component, const std::string& message)
+        : std::runtime_error("NLM " + component + ": " + message) {}
+};
+
+// Configuration errors
+class ConfigException : public NLMException {
+public:
+    explicit ConfigException(const std::string& message) : NLMException("Config", message) {}
+    ConfigException(const std::string& message, const std::string& context)
+        : NLMException("Config: " + context + ": " + message) {}
+};
+
+// Neural computation errors
+class NeuralException : public NLMException {
+public:
+    explicit NeuralException(const std::string& message) : NLMException("Neural", message) {}
+    NeuralException(const std::string& message, const std::string& context)
+        : NLMException("Neural: " + context + ": " + message) {}
+};
+
+// Memory system errors
+class MemoryException : public NLMException {
+public:
+    explicit MemoryException(const std::string& message) : NLMException("Memory", message) {}
+    MemoryException(const std::string& message, const std::string& context)
+        : NLMException("Memory: " + context + ": " + message) {}
+};
+
+// Neuromodulation errors
+class NeuromodulationException : public NLMException {
+public:
+    explicit NeuromodulationException(const std::string& message) : NLMException("Neuromodulation", message) {}
+    NeuromodulationException(const std::string& message, const std::string& context)
+        : NLMException("Neuromodulation: " + context + ": " + message) {}
+};
+
+// System validation errors
+class ValidationException : public NLMException {
+public:
+    explicit ValidationException(const std::string& message) : NLMException("Validation", message) {}
+    ValidationException(const std::string& message, const std::string& context)
+        : NLMException("Validation: " + context + ": " + message) {}
+};
+
+// Error context for better debugging
+struct ErrorContext {
+    std::string component;
+    std::string operation;
+    std::string details;
+    std::vector<std::string> stack_trace;
+    
+    ErrorContext(const std::string& comp, const std::string& op, const std::string& detail)
+        : component(comp), operation(op), details(detail) {}
+    
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "Component: " << component << "\n";
+        oss << "Operation: " << operation << "\n";
+        oss << "Details: " << details << "\n";
+        if (!stack_trace.empty()) {
+            oss << "Stack trace:\n";
+            for (const auto& frame : stack_trace) {
+                oss << "  " << frame << "\n";
+            }
+        }
+        return oss.str();
+    }
+};
+
+// Error handler interface
+class IErrorHandler {
+public:
+    virtual ~IErrorHandler() = default;
+    virtual void handleError(const ErrorContext& context) = 0;
+    virtual void handleWarning(const std::string& message) = 0;
+    virtual bool shouldThrow(const ErrorContext& context) const = 0;
+};
+
+// Default error handler (logs to logger)
+class DefaultErrorHandler : public IErrorHandler {
+public:
+    void handleError(const ErrorContext& context) override {
+        NLM_LOG_ERROR("Error in " + context.component + ": " + context.operation + " - " + context.details);
+        for (const auto& frame : context.stack_trace) {
+            NLM_LOG_ERROR("  " + frame);
+        }
+    }
+    
+    void handleWarning(const std::string& message) override {
+        NLM_LOG_WARNING(message);
+    }
+    
+    bool shouldThrow(const ErrorContext& context) const override {
+        // Only throw critical errors
+        return context.component == "Validation" || context.operation.find("critical") != std::string::npos;
+    }
+};
+
+// Global error handler instance
+class ErrorManager {
+public:
+    static ErrorManager& getInstance() {
+        static ErrorManager instance;
+        return instance;
+    }
+    
+    void setErrorHandler(std::shared_ptr<IErrorHandler> handler) {
+        errorHandler_ = handler;
+    }
+    
+    void handleError(const ErrorContext& context) {
+        if (errorHandler_) {
+            errorHandler_->handleError(context);
+            if (errorHandler_->shouldThrow(context)) {
+                throw NLMException("Critical error in " + context.component + ": " + context.details);
+            }
+        }
+    }
+    
+    void handleWarning(const std::string& message) {
+        if (errorHandler_) {
+            errorHandler_->handleWarning(message);
+        }
+    }
+    
+private:
+    ErrorManager() {
+        errorHandler_ = std::make_shared<DefaultErrorHandler>();
+    }
+    
+    std::shared_ptr<IErrorHandler> errorHandler_;
+};
+
+// Error recovery result
+enum class ErrorRecoveryResult {
+    Success,
+    RetryNeeded,
+    CriticalFailure
+};
+
+// Error recovery interface
+class IErrorRecovery {
+public:
+    virtual ~IErrorRecovery() = default;
+    virtual ErrorRecoveryResult recover(const ErrorContext& context) = 0;
+};
+
+// Convenience functions for error handling
+namespace Error {
+    inline void throwWithContext(const std::string& component, const std::string& operation, const std::string& message) {
+        throw NLMException(component, operation + ": " + message);
+    }
+    
+    inline void logWithContext(const std::string& component, const std::string& operation, const std::string& message) {
+        NLM_LOG_ERROR("Error in " + component + ": " + operation + " - " + message);
+    }
+    
+    inline ErrorContext createContext(const std::string& component, const std::string& operation, const std::string& details) {
+        return ErrorContext(component, operation, details);
+    }
+    
+    inline void checkCondition(bool condition, const std::string& component, const std::string& operation, const std::string& message) {
+        if (!condition) {
+            throwWithContext(component, operation, message);
+        }
+    }
+    
+    inline void validateRange(double value, double min, double max, const std::string& component, const std::string& operation) {
+        if (value < min || value > max) {
+            throw ValidationException("Value " + std::to_string(value) + " outside valid range [" + std::to_string(min) + ", " + std::to_string(max) + "]",
+                                     component + " " + operation);
+        }
+    }
+}
+
+// ========== END ERROR HANDLING SYSTEM ==========
 
 // Strongly-typed identifiers for safety
 

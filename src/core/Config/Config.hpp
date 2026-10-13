@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +93,28 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // === ADVANCED CONFIGURATION SUPPORT ===
+    
+    // Validate configuration against schema
+    bool validate(const std::string& schema) const;
+    
+    // Get configuration type information
+    std::string getType(const std::string& key) const;
+    
+    // Merge with another configuration
+    void merge(const Config& other);
+    
+    // Get configuration statistics
+    struct ConfigStats {
+        size_t totalEntries;
+        size_t entriesBySource[4]; // Default, File, CommandLine, Runtime
+        double memoryUsage;
+    };
+    
+    ConfigStats getStats() const;
+    
+    // === END ADVANCED SUPPORT ===
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +122,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
 };
-
-} // namespace nlm
