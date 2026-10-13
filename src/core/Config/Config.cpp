@@ -3,8 +3,28 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <stdexcept>
+#include <regex>
+#include <cctype>
 
 namespace nlm {
+
+// Helper function to convert string to lowercase
+static std::string toLowercase(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Global registry of configuration schema definitions
+static std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> g_configValidators;
+
+// Register configuration schema (internal use)
+static void registerConfigValidator(const std::string& key, 
+                                   std::function<bool(const ConfigValue&)> validator) {
+    g_configValidators[key] = std::move(validator);
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,11 +39,20 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Check if nlohmann_json is available
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+    // Use JSON parser if available
+    return loadFromJsonFile(filepath);
+#else
+    // Fallback to simple key=value format
+    return loadFromSimpleFile(filepath);
+#endif
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
@@ -52,7 +81,165 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO("Loaded simple config from: " + filepath);
     return true;
+}
+
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON config file: " + filepath);
+        return false;
+    }
+    
+    try {
+        // Parse JSON file
+        auto json = nlohmann::json::parse(file);
+        
+        // Clear existing entries
+        clear();
+        
+        // Load from JSON
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            
+            // Try to determine type and set value
+            const auto& value = it.value();
+            ConfigSource source = ConfigSource::File;
+            
+            // Set value based on type
+            if (value.is_string()) {
+                set(key, value.get<std::string>(), source);
+            } else if (value.is_number_integer()) {
+                set(key, value.get<int64_t>(), source);
+            } else if (value.is_number_float()) {
+                set(key, value.get<double>(), source);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), source);
+            } else if (value.is_array()) {
+                // Handle arrays
+                std::vector<int64_t> intArray;
+                std::vector<double> doubleArray;
+                std::vector<std::string> stringArray;
+                
+                for (const auto& item : value) {
+                    if (item.is_number_integer()) {
+                        intArray.push_back(item.get<int64_t>());
+                    } else if (item.is_number_float()) {
+                        doubleArray.push_back(item.get<double>());
+                    } else if (item.is_string()) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                }
+                
+                // Choose the most appropriate vector type
+                if (!intArray.empty()) {
+                    set(key, intArray, source);
+                } else if (!doubleArray.empty()) {
+                    set(key, doubleArray, source);
+                } else if (!stringArray.empty()) {
+                    set(key, stringArray, source);
+                } else {
+                    NLM_LOG_WARNING("Empty array for key: " + key);
+                    std::vector<int> emptyIntArray;
+                    set(key, emptyIntArray, source);
+                }
+            }
+            
+// Validate if validator exists
+            if (g_configValidators.find(key) != g_configValidators.end()) {
+                // Convert json value to ConfigValue for validation
+                ConfigValue configValue;
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number_float()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Convert array to appropriate vector type
+                    std::vector<int64_t> intArray;
+                    std::vector<double> doubleArray;
+                    std::vector<std::string> stringArray;
+                    
+                    for (const auto& item : value) {
+                        if (item.is_number_integer()) {
+                            intArray.push_back(item.get<int64_t>());
+                        } else if (item.is_number_float()) {
+                            doubleArray.push_back(item.get<double>());
+                        } else if (item.is_string()) {
+                            stringArray.push_back(item.get<std::string>());
+                        }
+                    }
+                    
+                    if (!intArray.empty()) {
+                        configValue = intArray;
+                    } else if (!doubleArray.empty()) {
+                        configValue = doubleArray;
+                    } else if (!stringArray.empty()) {
+                        configValue = stringArray;
+                    } else {
+                        // Empty array - use int vector
+                        configValue = std::vector<int>();
+                    }
+                } else {
+                    // Handle null or other unsupported types
+                    // For validation purposes, use an empty string
+                    configValue = std::string();
+                }
+                
+                if (!g_configValidators[key](configValue)) {
+                    NLM_LOG_WARNING("Invalid value for key " + key + ", using default");
+                    remove(key);
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+#endif
+
+std::string Config::generateJson(const std::string& filepath) const {
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+    nlohmann::json json;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Add to JSON based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                json[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                json[entry.key] = arg;
+            }
+        }, entry.value);
+    }
+    
+    return json.dump(2); // Pretty print with 2-space indentation
+#else
+    return "{}"; // Placeholder if no JSON support
+#endif
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +266,53 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+    // Save as JSON file if available
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for saving: " + filepath);
+        return false;
+    }
+    
+    try {
+        std::string jsonContent = generateJson(filepath);
+        file << jsonContent;
+        NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving config to file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+#else
+    // Fallback to simple key=value format
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for saving: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert value to string
+        std::ostringstream valueStream;
+        std::visit([&valueStream](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                valueStream << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                valueStream << (arg ? "true" : "false");
+            } else {
+                valueStream << arg;
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStream.str() << "\n";
     }
     
+    NLM_LOG_INFO("Saved configuration to simple file: " + filepath);
     return true;
+#endif
 }
 
 template<typename T>
@@ -194,9 +417,7 @@ std::string Config::trim(const std::string& str) {
 }
 
 std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+    return toLowercase(str);
 }
 
 // Explicit template instantiations

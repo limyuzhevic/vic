@@ -6,6 +6,36 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable warnings
+if(MSVC)
+    add_compile_options(/W4)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find nlohmann_json if available (for JSON configuration support)
+find_package(nlohmann_json 3.11.2 QUIET)
+if (nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+    # Define macro to indicate JSON support is available
+    add_definitions(-DNLOHMANN_JSON_VERSION_MAJOR=3 -DNLOHMANN_JSON_VERSION_MINOR=11.2)
+else()
+    message(STATUS "nlohmann_json not found, using simple config parser")
+endif()
+
+# Source directory
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find nlohmann_json if available (for JSON configuration support)
+find_package(nlohmann_json 3.11.2 QUIET)
+if (NOT nlohmann_json_FOUND)
+    # Try to find it as a module
+    find_package(nlohmann_json QUIET)
+endif()
+
+# Source directory
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
