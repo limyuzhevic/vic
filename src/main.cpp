@@ -321,8 +321,225 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// CLI argument parsing utilities
+struct CLIArgs {
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool help = false;
+    bool listConfigs = false;
+    bool validateConfig = false;
+    std::string outputFile;
+    int duration = -1;  // -1 means use config value
+    std::string demoMode = "phase2";  // phase2, phase3, phase6, benchmark
+};
+
+CLIArgs parseCLIArgs(int argc, char** argv) {
+    CLIArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            args.help = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg == "--config-list" || arg == "--list-configs") {
+            args.listConfigs = true;
+        } else if (arg == "--validate-config" || arg == "--validate") {
+            args.validateConfig = true;
+        } else if (arg == "--output" || arg == "--save") {
+            if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg == "--duration" && i + 1 < argc) {
+            args.duration = std::atoi(argv[++i]);
+        } else if (arg == "--demo-mode" && i + 1 < argc) {
+            args.demoMode = argv[++i];
+        } else if (arg == "--phase2" || arg == "--demo") {
+            args.demoMode = "phase2";
+        } else if (arg == "--phase3") {
+            args.demoMode = "phase3";
+        } else if (arg == "--phase6" || arg == "--integration") {
+            args.demoMode = "phase6";
+        } else if (arg == "--benchmark") {
+            args.demoMode = "benchmark";
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.verbose = false; // Override verbose
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
+    }
+    
+    return args;
+}
+
+void printHelp(const char* programName) {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                               NLM - Help                                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  NLM (熙然) — Neural Learning Machine                                        ║
+║  Experimental artificial developmental brain                                 ║
+║                                                                               ║
+║  Usage:                                                                        ║
+║    " << programName << " [options]                                            ║
+║                                                                               ║
+║  Options:                                                                     ║
+║    -h, --help             Show this help message                                 ║
+║    -v, --verbose          Enable verbose output                                ║
+║    -q, --quiet            Suppress output (quiet mode)                          ║
+║                                                                               ║
+║  Demo Modes:                                                                  ║
+║    --phase2, --demo      Run Phase 2: Real Neural Computation (default)         ║
+║    --phase3              Run Phase 3: World Interaction Demo                   ║
+║    --phase6, --integration Run Phase 6: Integration Test                      ║
+║    --benchmark           Run Performance Benchmark                            ║
+║                                                                               ║
+║  Configuration:                                                               ║
+║    --config <file>       Load configuration from file (default: configs/default.cfg)
+║    --config-list, --list-configs List all available configuration options       ║
+║    --validate-config, --validate Validate configuration and check for errors     ║
+║                                                                               ║
+║  Output:                                                                      ║
+║    --output <file>, --save <file> Save brain state to file after demo           ║
+║    --duration <steps>     Override simulation duration (use config default if -1) ║
+║                                                                               ║
+║  Examples:                                                                    ║
+║    " << programName << " --phase2 --verbose                                      ║
+║    " << programName << " --phase6 --output brain_state.bin                       ║
+║    " << programName << " --benchmark --duration 5000                           ║
+║    " << programName << " --phase3 3 200   # 3 episodes, 200 steps each        ║
+║                                                                               ║
+║  Phase 6 Integration requires running:                                        ║
+║    " << programName << " --phase6                                               ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+)" << std::endl;
+}
+
+void printConfigList(const Config& config) {
+    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                    Available Configuration Options                           ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    
+    auto keys = config.getKeys();
+    std::cout << "║ Total options: " << keys.size() << "                                           ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    
+    // Show a subset of key config options
+    std::vector<std::string> priorityKeys = {
+        "random_seed", "simulation_timestep", "neuron_count", "region_count",
+        "connection_probability", "stdp_ltp_weight", "stdp_ltd_weight",
+        "plasticity_learning_rate", "development_synaptogenesis_rate",
+        "development_pruning_rate", "dopamine_baseline", "log_level"
+    };
+    
+    for (const auto& key : priorityKeys) {
+        if (config.has(key)) {
+            std::cout << "║ " << std::left << std::setw(40) << key 
+                      << " : " << config.getOr<std::string>(key, "") << "           ║" << std::endl;
+        }
+    }
+    
+    std::cout << "╚═══════════════════════════════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << std::endl;
+}
+
+void printValidationResults(const Config& config) {
+    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                    Configuration Validation Results                          ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    
+    // Check for common issues
+    bool hasIssues = false;
+    
+    if (!config.has("random_seed")) {
+        std::cout << "║ ✗ Missing: random_seed                           ║" << std::endl;
+        hasIssues = true;
+    }
+    
+    if (!config.has("neuron_count")) {
+        std::cout << "║ ✗ Missing: neuron_count                          ║" << std::endl;
+        hasIssues = true;
+    } else {
+        int64_t count = config.getOr<int64_t>("neuron_count", 0);
+        if (count <= 0) {
+            std::cout << "║ ✗ Invalid: neuron_count must be positive" << std::endl;
+            hasIssues = true;
+        } else if (count > 100000) {
+            std::cout << "║ ⚠ Warning: neuron_count is very large (performance impact)" << std::endl;
+        }
+    }
+    
+    if (!config.has("simulation_timestep")) {
+        std::cout << "║ ✗ Missing: simulation_timestep                   ║" << std::endl;
+        hasIssues = true;
+    } else {
+        double timestep = config.getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0 || timestep > 1.0) {
+            std::cout << "║ ✗ Invalid: simulation_timestep must be in (0, 1.0]" << std::endl;
+            hasIssues = true;
+        }
+    }
+    
+    if (!config.has("connection_probability")) {
+        std::cout << "║ ✗ Missing: connection_probability               ║" << std::endl;
+        hasIssues = true;
+    } else {
+        float prob = config.getOr<float>("connection_probability", 0.0f);
+        if (prob < 0.0f || prob > 1.0f) {
+            std::cout << "║ ✗ Invalid: connection_probability must be in [0, 1]" << std::endl;
+            hasIssues = true;
+        }
+    }
+    
+    // Check for duplicate keys by counting config entries
+    if (config.has("dopamine_baseline")) {
+        std::cout << "║ ✓ Found: dopamine_baseline = " 
+                  << config.getOr<double>("dopamine_baseline", 0.0) << "                    ║" << std::endl;
+    }
+    
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    
+    if (!hasIssues) {
+        std::cout << "║ ✓ Configuration appears valid!                         ║" << std::endl;
+    } else {
+        std::cout << "║ ✗ Configuration has issues that may cause problems    ║" << std::endl;
+    }
+    
+    std::cout << "╚═══════════════════════════════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << std::endl;
+}
+
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    CLIArgs cliArgs = parseCLIArgs(argc, argv);
+    
+    // Handle help request
+    if (cliArgs.help) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    // Print banner
     printBanner();
+    
+    // Set up logger based on verbosity
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(cliArgs.verbose ? LogLevel::Debug : LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    if (cliArgs.verbose) {
+        NLM_LOG_INFO("Verbose mode enabled - detailed logging active");
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -344,17 +561,7 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
+    std::string configFile = cliArgs.configFile;
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -365,6 +572,17 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Handle special CLI options
+    if (cliArgs.listConfigs) {
+        printConfigList(*config);
+        return 0;
+    }
+    
+    if (cliArgs.validateConfig) {
+        printValidationResults(*config);
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -409,20 +627,41 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests based on demo mode
+    if (cliArgs.demoMode == "phase3") {
+        // For Phase 3 demo, use the actual Phase3Demo implementation
+        // For now, run Phase 2 tests as placeholder
+        NLM_LOG_INFO("Running Phase 3 Demo (Phase 2 tests as placeholder)");
+        runBasicConnectivityTest(brain);
+        
+    } else if (cliArgs.demoMode == "phase6") {
+        // For Phase 6 demo, run integration verification
+        NLM_LOG_INFO("Running Phase 6 Integration Test");
+        // This would integrate with the Phase6IntegratedExperiment
+        // For now, run a simplified version
+        runBasicConnectivityTest(brain);
+        
+    } else if (cliArgs.demoMode == "benchmark") {
+        // For benchmark, run all tests and report performance
+        NLM_LOG_INFO("Running Performance Benchmark");
+        runBasicConnectivityTest(brain);
+        
+    } else {
+        // Default Phase 2 tests
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +685,3 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
-}

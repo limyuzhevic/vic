@@ -142,14 +142,22 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)
+
+        Manages brain configuration parameters including neuron count,
+        connectivity, plasticity rules, neuromodulation settings, and
+        simulation parameters.
+
+        Configuration can be loaded from files, command line arguments,
+        or created programmatically.
+    )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -160,6 +168,38 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("get", [](Config& self, const std::string& key, const std::string& default_value) {
+            return self.getOr<std::string>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get configuration value as string with default")
+        .def("get", [](Config& self, const std::string& key, int64_t default_value) {
+            return self.getOr<int64_t>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get configuration value as int64 with default")
+        .def("get", [](Config& self, const std::string& key, double default_value) {
+            return self.getOr<double>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get configuration value as double with default")
+        .def("get", [](Config& self, const std::string& key, float default_value) {
+            return self.getOr<float>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get configuration value as float with default")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (int64)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (float)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -412,6 +452,10 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
@@ -420,6 +464,63 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // ===== Convenience Functions =====
+
+    m.def("run_complete_example", []() {
+        """Run a complete example that demonstrates all NLM features."""
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable key systems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Run simulation
+        for (int step = 0; step < 100; ++step) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = 0.0f;
+            if (world->getAgentBody().energy > 50.0f) {
+                reward = 1.0f;
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1f);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, R"pbdoc(
+        Run a complete example demonstrating all NLM features.
+
+        Returns:
+            tuple: (brain, world, agent) - The created components
+    )pbdoc");
+
+    m.def("version", []() { return "6.0.0"; }, "Get NLM Python API version");
+
+    m.def("get_system_info", []() {
+        return "NLM Phase 6 - Full Integration";},
+        "Get information about the NLM system");
 
 } // namespace nlm

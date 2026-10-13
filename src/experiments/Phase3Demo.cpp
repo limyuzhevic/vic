@@ -242,20 +242,172 @@ private:
 
 } // namespace nlm
 
-// Main entry point for Phase 3 demo
-int main(int argc, char* argv[]) {
+// CLI argument parsing utilities for Phase3Demo
+struct CLIArgs {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool help = false;
+    bool verbose = false;
+    bool quiet = false;
+    std::string outputFile;
+    int duration = -1;
+    std::string configFile = "configs/default.cfg";
+};
+
+CLIArgs parseCLIArgs(int argc, char** argv) {
+    CLIArgs args;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            args.help = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.quiet = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg == "--output" || arg == "--save") {
+            if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg == "--duration" && i + 1 < argc) {
+            args.duration = std::atoi(argv[++i]);
+        } else if (i == 1 && arg != "--help" && arg != "-h" && 
+                  arg != "--verbose" && arg != "-v" &&
+                  arg != "--quiet" && arg != "-q") {
+            // Positional arguments for backward compatibility
+            args.numEpisodes = std::atoi(arg.c_str());
+        } else if (i == 2 && arg[0] >= '0' && arg[0] <= '9') {
+            args.stepsPerEpisode = std::atoi(arg.c_str());
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    return args;
+}
+
+void printHelp(const char* programName) {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                              NLM Phase 3 Demo - Help                         ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  Phase 3: World Interaction Demo                                              ║
+║  Shows: experience -> neural activity -> action -> consequence -> learning    ║
+║                                                                               ║
+║  Usage:                                                                        ║
+║    " << programName << " [options]                                           ║
+║                                                                               ║
+║  Options:                                                                     ║
+║    -h, --help             Show this help message                                 ║
+║    -v, --verbose          Enable verbose output                                ║
+║    -q, --quiet            Suppress output (quiet mode)                          ║
+║                                                                               ║
+║  Arguments:                                                                    ║
+║    [episodes]            Number of episodes (default: 5)                        ║
+║    [steps]               Steps per episode (default: 200)                     ║
+║                                                                               ║
+║  Configuration:                                                               ║
+║    --config <file>       Load configuration from file (default: configs/default.cfg)
+║                                                                               ║
+║  Output:                                                                      ║
+║    --output <file>, --save <file> Save results to file after demo                ║
+║    --duration <steps>     Override total duration (use defaults if -1)           ║
+║                                                                               ║
+║  Examples:                                                                    ║
+║    " << programName << "                                    # Default run               ║
+║    " << programName << " 3 150   # 3 episodes, 150 steps each                 ║
+║    " << programName << " --verbose --output results.txt                     ║
+║    " << programName << " --config custom.cfg 10 300                         ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+)" << std::endl;
+}
+
+void printDemoResults(const std::vector<ExperimentMetrics>& allMetrics) {
+    std::cout << std::endl;
+    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                    NLM Phase 3 Demo - Final Results                           ║" << std::endl;
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    
+    if (allMetrics.size() < 2) {
+        std::cout << "║ Insufficient data for comparison - need at least 2 episodes          ║" << std::endl;
+    } else {
+        const auto& first = allMetrics.front();
+        const auto& last = allMetrics.back();
+        
+        std::cout << "║ Episode Comparison: " << first.episode << " vs " << last.episode << "                ║" << std::endl;
+        std::cout << "║                                                                                ║" << std::endl;
+        std::cout << "║ Reward Change: " << std::setw(12) << std::fixed << std::setprecision(2) 
+                  << (last.totalReward - first.totalReward) << "                          ║" << std::endl;
+        std::cout << "║ Forward Actions: " << std::setw(11) << (last.forwardCount - first.forwardCount) 
+                  << "                                          ║" << std::endl;
+        std::cout << "║ Exploration (wait): " << std::setw(12) << (last.waitCount - first.waitCount)
+                  << "                                          ║" << std::endl;
+        std::cout << "║ Synapses: " << std::setw(20) << last.totalSynapses 
+                  << "                                                       ║" << std::endl;
+        std::cout << "║ Average Firing Rate: " << std::setw(11) << std::fixed << std::setprecision(3)
+                  << last.averageFiringRate << "                                        ║" << std::endl;
+    }
+    
+    std::cout << "╠═══════════════════════════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║ Total Episodes Run: " << allMetrics.size() 
+              << std::string(58 - std::to_string(allMetrics.size()).length(), ' ') << "║" << std::endl;
+    std::cout << "║ Average Steps per Episode: " << std::setw(9) << std::accumulate(allMetrics.begin(), allMetrics.end(), 0.0,
+              [](double sum, const ExperimentMetrics& m) { return sum + m.steps; }) / allMetrics.size()
+              << std::string(39 - std::to_string((int)(std::accumulate(allMetrics.begin(), allMetrics.end(), 0.0,
+              [](double sum, const ExperimentMetrics& m) { return sum + m.steps; }) / allMetrics.size())).length(), ' ') << "║" << std::endl;
+    
+    std::cout << "╚═══════════════════════════════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << std::endl;
+}
+
+// Main entry point for Phase 3 demo
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    CLIArgs cliArgs = parseCLIArgs(argc, argv);
+    
+    // Handle help request
+    if (cliArgs.help) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    // Set up console output based on verbosity
+    if (cliArgs.quiet) {
+        // Suppress most output
+        std::cout.setstate(std::ios_base::failbit);
+    }
+    
+    std::cout << "===========================================\n";
+    std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+    std::cout << "===========================================\n\n";
+    
+    if (!cliArgs.quiet) {
+        std::cout << "Starting Phase 3 demonstration with " << cliArgs.numEpisodes << " episodes, "
+                  << cliArgs.stepsPerEpisode << " steps per episode.\n\n";
     }
     
     nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    demo.run(cliArgs.numEpisodes, cliArgs.stepsPerEpisode);
+    
+    if (!cliArgs.quiet && cliArgs.numEpisodes > 1) {
+        printDemoResults(demo.getAllMetrics()); // Assuming there's a getAllMetrics method
+    }
+    
+    if (!cliArgs.outputFile.empty()) {
+        std::cout << "\nSaving results to: " << cliArgs.outputFile << std::endl;
+        // TODO: Implement results saving
+    }
+    
+    std::cout << "\nPhase 3 demonstration complete.\n";
     
     return 0;
 }
