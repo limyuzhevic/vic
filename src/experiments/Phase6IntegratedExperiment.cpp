@@ -55,19 +55,63 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Run simulation - Phase 6 Integration Loop
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
+        // Get observation from world
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
-        // Process sensory input
+        // Store sensory input in working memory (Phase 6 integration)
+        if (brain->getWorkingMemory() && config.enableDevelopment) {
+            // Convert sensory percept to vector for working memory storage
+            std::vector<float> sensoryPattern;
+            
+            // Add vision data
+            const auto& vision = percept.getVision();
+            sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+            
+            // Add touch data
+            const auto& touch = percept.getTouch();
+            sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+            
+            // Add internal signals
+            const auto& internal = percept.getInternal();
+            sensoryPattern.insert(sensoryPattern.end(), internal.begin(), internal.end());
+            
+            // Add proprioception data
+            const auto& proprio = percept.getProprioception();
+            sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+            
+            // Store in working memory with appropriate strength
+            brain->getWorkingMemory()->store(sensoryPattern, 1.0f);
+        }
+        
+        // Process sensory input (convert raw data to neural representation)
         agent.processSensoryInput(percept);
         
-        // Brain step
+        // Update development system
+        if (config.enableDevelopment) {
+            agent.updateDevelopment(0.001);
+            if (brain->getDevelopmentSystem()) {
+                brain->getDevelopmentSystem()->update(step * 0.001);
+            }
+        }
+        
+        // Get observation from agent for episodic memory storage
+        // This creates the memory trace for this step
+        if (brain->getEpisodicMemory() && step % 10 == 0) {  // Store every 10 steps
+            brain->getEpisodicMemory()->storeExperience(
+                percept,
+                agent.decodeMotorCommand(),
+                0.0f,  // Will be updated below
+                step * 0.001
+            );
+        }
+        
+        // Brain step (LIF dynamics, spike propagation, basic plasticity)
         brain->step(step, step * 0.001);
         
         // Get motor command
@@ -80,25 +124,73 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
         totalReward += reward;
         
-        // Apply reward modulation
+        // Update episodic memory with actual reward after action
+        if (brain->getEpisodicMemory() && step % 10 == 0) {
+            // Note: We need to modify the stored experience with the actual reward
+            // This would require episodic memory to support updating stored experiences
+        }
+        
+        // Apply reward modulation (dopamine signal)
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+        // Update prediction system based on prediction error
+        if (brain->getPredictionSystem()) {
+            float predictionError = agent.getPredictionError();
+            if (std::abs(predictionError) > 0.01f) {  // Only update if there's prediction error
+                brain->getPredictionSystem()->updatePredictionError(predictionError);
+            }
+        }
+        
+        // Update attention system based on current neural activity
+        if (brain->getAttention()) {
+            // Focus attention on recently active neurons for planning
+            if (brain->getWorkingMemory()) {
+                auto activeNeurons = brain->getWorkingMemory()->getMemoryNeurons();
+                if (!activeNeurons.empty()) {
+                    brain->getAttention()->focusOnRegion(RegionId(1));  // Focus on main region
+                }
+            }
+        }
+        
+        // Update curiosity and novelty based on prediction error
+        if (config.enableDevelopment && agent.getCuriosityLevel() < 0.8f) {
+            float noveltyFactor = std::min(1.0f, step / 100.0f);
+            float curiosityGain = noveltyFactor * std::abs(agent.getPredictionError()) * 0.5f;
+            // Note: We can't directly access agent's internal neuromodulation without getters
+            // but this is where we would integrate curiosity with learning
+        }
+        
+        // Structural plasticity changes with development stage
+        if (config.enableDevelopment && brain->getStructuralPlasticity()) {
+            brain->getStructuralPlasticity()->update(brain.get(), *brain->getRandomGenerator());
+        }
+        
+        // Sleep/rest cycle for memory consolidation (Phase 6 integration)
+        if (step % 1000 == 0 && step > 0) {
+            // Enter resting state for consolidation
+            if (brain->getEpisodicMemory()) {
+                // Replay important episodes for consolidation
+                brain->getEpisodicMemory()->replayImportantEpisodes(10);
+            }
         }
         
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Periodic status with integrated system info
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                            brain->getWorkingMemory()->getActiveTraces() : 0) +
+                        " | Episodes: " + std::to_string(brain->getEpisodicMemory() ? 
+                            brain->getEpisodicMemory()->getEpisodeCount() : 0) +
+                        " | PredictionErr: " + std::to_string(agent.getPredictionError()) +
+                        " | Novelty: " + std::to_string(agent.getNoveltyLevel()) +
+                        " | Curiosity: " + std::to_string(agent.getCuriosityLevel()) +
+                        " | DevStage: " + std::to_string(static_cast<int>(agent.getDevelopmentalStage())));
         }
     }
     
