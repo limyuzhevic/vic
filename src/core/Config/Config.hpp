@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
