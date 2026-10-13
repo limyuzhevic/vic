@@ -8,13 +8,19 @@ namespace nlm {
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
+    // Attention-related parameters
+    float attentionGain;      // Multiplier for attention processes
+    float memoryConsolidationRate;  // Rate at which memories are consolidated
+    float encodingEfficiency; // Efficiency of new memory encoding
+    
     // Maintenance connections (recurrent)
     std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
     
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), attentionGain(1.0f), memoryConsolidationRate(1.0f), 
+             encodingEfficiency(1.0f) {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -22,6 +28,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , attentionGain_(1.0f)
+    , memoryConsolidationRate_(1.0f)
+    , encodingEfficiency_(1.0f)
+    , attentionModulationLevel_(0.0f)
+    , memoryModulationLevel_(0.0f)
+    , predictionErrorModulationLevel_(0.0f)
 {
 }
 
@@ -149,7 +161,21 @@ void NeuralWorkingMemory::clear() {
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
+    recurrentConnections_.clear();
+    
+    // Clear recurrent connections
     pImpl->maintenanceSynapses.clear();
+    pImpl->traceAges.clear();
+    
+    // Reset attention-related state
+    pImpl->attentionGain = 1.0f;
+    pImpl->memoryConsolidationRate = 1.0f;
+    pImpl->encodingEfficiency = 1.0f;
+    
+    // Clear prediction errors
+    predictionErrors_.clear();
+    
+    NLM_LOG_INFO("NeuralWorkingMemory cleared");
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {

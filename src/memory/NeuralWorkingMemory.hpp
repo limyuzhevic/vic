@@ -6,6 +6,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <algorithm>
 
 namespace nlm {
 
@@ -62,49 +63,20 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
-
-private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t capacity_;
-    float decayRate_;
+    // Boost attention to a specific neuron (ACh effect)
+    void boostAttention(NeuronId neuron, float boostAmount);
     
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
+    // Set attention modulation level (ACh effect)
+    void setAttentionModulation(float level);
     
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
+    // Store prediction error for learning
+    void storePredictionError(float error, SimulationStep step);
     
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    // Clear prediction error
+    void clearPredictionError();
     
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
-};
+    // Set neuromodulation level for ACh effects
+    void setModulationLevel(float level);
 
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation
@@ -184,4 +156,67 @@ private:
     std::unordered_map<uint64_t, float> bottomUpSalience_;
 };
 
-} // namespace nlm
+// Boost attention to a specific neuron (ACh effect)
+    void boostAttention(NeuronId neuron, float boostAmount);
+    
+    // Set attention modulation level (ACh effect)
+    void setAttentionModulation(float level);
+    
+    // Store prediction error for learning
+    void storePredictionError(float error, SimulationStep step);
+    
+    // Clear prediction error
+    void clearPredictionError();
+    
+    // Set neuromodulation level for ACh effects
+    void setModulationLevel(float level);
+    
+    // Get neuromodulation level
+    float getModulationLevel() const;
+
+private:
+    // Create recurrent connection for maintenance
+    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+    
+    // Update recurrent connections for maintenance
+    void updateRecurrentConnections();
+    
+    // Decay weak memory traces
+    void decayWeakTraces();
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    size_t capacity_;
+    float decayRate_;
+    
+    // Memory content
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    
+    // Active memory traces
+    std::vector<size_t> activeTraces_;
+    
+    // Recurrent connections for maintenance
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    
+    // Winner neurons (for competition)
+    std::vector<NeuronId> winners_;
+    
+    // Attention-related state
+    float attentionGain_;
+    
+    // Prediction error storage
+    std::unordered_map<SimulationStep, float> predictionErrors_;
+    
+    // Memory consolidation state
+    float memoryConsolidationRate_;
+    float encodingEfficiency_;
+    
+    // Neuromodulation state
+    float attentionModulationLevel_;
+    float memoryModulationLevel_;
+    float predictionErrorModulationLevel_;
+};

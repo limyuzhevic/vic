@@ -509,12 +509,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // This helps the brain predict sensory input
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error and apply it to learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError != 0.0f) {
+            // Store prediction error in working memory for learning
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storePredictionError(predictionError, currentStep);
+            }
+            
+            // Apply prediction error to neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->update(predictionError);
+            }
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,11 +540,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Get active neurons from sensory input and working memory
+        std::vector<NeuronId> activeNeurons;
+        
+        // Add sensory neurons that were recently active
+        if (pImpl->workingMemory) {
+            activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Process these patterns to form or update concepts
+        if (!activeNeurons.empty()) {
+            pImpl->conceptFormation->update(activeNeurons, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,7 +716,16 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
+    // Try to use NeuralPlanner for advanced action selection
+    if (pImpl->planner) {
+        // Neural planner can evaluate multiple action sequences
+        auto plannedAction = pImpl->planner->planAction();
+        if (plannedAction) {
+            return plannedAction;
+        }
+    }
+    
+    // Fallback to simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {
@@ -717,12 +752,63 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Apply comprehensive neuromodulation effects on neural processing
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
+    // Scale STDP learning rates for plasticity
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Apply neuromodulation effects on working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setModulationLevel(modulation);
+    }
+    
+    // Apply neuromodulation effects on episodic memory
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setModulationLevel(modulation);
+    }
+    
+    // Apply neuromodulation effects on prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->setModulationLevel(modulation);
+    }
+    
+    // Apply neuromodulation effects on attention system
+    if (pImpl->attention) {
+        pImpl->attention->setModulationLevel(modulation);
+    }
+    
+    // Apply neuromodulation effects on concept formation
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->setModulationLevel(modulation);
+    }
+    
+    // Apply neuromodulation effects on neural excitability
+    // Dopamine modulates neural excitability by adjusting effective current injection
+    // Higher dopamine increases excitability (lowers effective threshold)
+    float excitabilityMod = modulation * 0.5f;
+    if (excitabilityMod > 0.0f) {
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    neuron->injectCurrent(excitabilityMod);
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulation effects on structural plasticity
+    if (pImpl->structuralPlasticity) {
+        // Scale structural plasticity rates based on dopamine level
+        float synaptogenesisMod = modulation * 0.1f; // Dopamine encourages synaptogenesis
+        float pruningMod = 1.0f - (modulation * 0.5f); // Dopamine suppresses pruning
+        
+        pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * synaptogenesisMod);
+        pImpl->structuralPlasticity->setPruningRate(0.00001f * pruningMod);
+    }
 }
 
 void Brain::updatePlasticity() {
