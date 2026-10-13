@@ -272,33 +272,10 @@ public:
     bool isOpen() const { return stream_.is_open(); }
     
     /**
-     * Set checkpoint metadata
+     * Get checkpoint header
      */
-    void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
-    
-    /**
-     * Write checkpoint data
-     */
-    bool writeNeurons(const NeuronCheckpointData& data);
-    bool writeSynapses(const SynapseCheckpointData& data);
-    
-    /**
-     * Write raw section data
-     */
-    bool writeSection(CheckpointSection sectionType, const void* data, size_t size);
-    
-    /**
-     * Finalize and write footer
-     * @return true if successful
-     */
-    bool finalize();
-    
-    /**
-     * Abort checkpoint (cleanup partial file)
-     */
-    void abort();
-    
+    const CheckpointHeader& getHeader() const { return header_; }
+
     /**
      * Get total bytes written
      */
