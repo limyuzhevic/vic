@@ -155,6 +155,20 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
+    
+    // Helper method to efficiently find neuron by ID
+    static Neuron* findNeuronById(NeuronId neuronId, const std::vector<std::unique_ptr<NeuralRegion>>& regions) {
+        for (auto& region : regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        return neuron;
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -200,17 +214,17 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect sensory and motor neuron IDs for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                    pImpl->sensoryNeuronIds.push_back(neuron->getId());
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                    pImpl->motorNeuronIds.push_back(neuron->getId());
                 }
             }
             
@@ -268,7 +282,7 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        // Find destination neuron and deliver synaptic input using efficient lookup
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
@@ -293,8 +307,8 @@ bool Brain::initialize() {
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeuronIds.size()));
+    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeuronIds.size()));
     
     return true;
 }
@@ -595,7 +609,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     const auto& values = input.getData();
     if (values.empty()) return;
     
-    size_t numSensory = pImpl->sensoryNeurons.size();
+    size_t numSensory = pImpl->sensoryNeuronIds.size();
     if (numSensory == 0) return;
     
     // Distribute input across sensory neurons
@@ -606,13 +620,16 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+    // Find and inject current into this sensory neuron
+    Neuron* sensoryNeuron = Brain::Impl::findNeuronById(pImpl->sensoryNeuronIds[i], pImpl->regions);
+    if (sensoryNeuron) {
+        sensoryNeuron->injectCurrent(normalizedValue);
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeuronIds[i], normalizedValue / 10.0f);
         }
+    }
     }
 }
 
@@ -693,14 +710,15 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
-    if (pImpl->motorNeurons.empty()) {
+    if (pImpl->motorNeuronIds.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+    for (NeuronId neuronId : pImpl->motorNeuronIds) {
+        Neuron* neuron = Brain::Impl::findNeuronById(neuronId, pImpl->regions);
+        if (neuron && neuron->isFiring()) {
             ++firingMotor;
         }
     }

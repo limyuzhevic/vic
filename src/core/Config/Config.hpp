@@ -90,6 +90,9 @@ public:
     // Clear all
     void clear();
     
+    // Validate configuration
+    bool validate(std::vector<std::string>& errors) const;
+    
     // Get configuration summary
     std::string summary() const;
     

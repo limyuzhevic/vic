@@ -19,13 +19,15 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 2: Add JSON/YAML support for configuration files
+    // Currently only supports simple key=value format (e.g., "key = value")
     
     std::string line;
     while (std::getline(file, line)) {
@@ -86,7 +88,55 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Escape quotes in string values
+                std::string escaped = arg;
+                size_t pos = 0;
+                while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                    escaped.replace(pos, 1, "\\\"");
+                    pos += 2;
+                }
+                file << entry.key << " = \"" << escaped << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    // Escape quotes in string values
+                    std::string escaped = arg[i];
+                    size_t pos = 0;
+                    while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                        escaped.replace(pos, 1, "\\\"");
+                        pos += 2;
+                    }
+                    file << "\"" << escaped << "\"";
+                }
+                file << "]\n";
+            } else {
+                // For basic types (int, int64_t, double, bool)
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -184,6 +234,83 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+bool Config::validate(std::vector<std::string>& errors) const {
+    bool isValid = true;
+    
+    // Check for duplicate keys (though set() should prevent this)
+    std::vector<std::string> seenKeys;
+    for (const auto& entry : pImpl->entries) {
+        if (std::find(seenKeys.begin(), seenKeys.end(), entry.key) != seenKeys.end()) {
+            errors.push_back("Duplicate key found: " + entry.key);
+            isValid = false;
+        } else {
+            seenKeys.push_back(entry.key);
+        }
+    }
+    
+    // Validate specific known configuration parameters
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == "neuron_count") {
+            try {
+                size_t count = std::get<size_t>(entry.value);
+                if (count == 0) {
+                    errors.push_back("neuron_count must be greater than 0");
+                    isValid = false;
+                }
+            } catch (...) {
+                errors.push_back("neuron_count has invalid type");
+                isValid = false;
+            }
+        } else if (entry.key == "region_count") {
+            try {
+                size_t count = std::get<size_t>(entry.value);
+                if (count == 0) {
+                    errors.push_back("region_count must be greater than 0");
+                    isValid = false;
+                }
+            } catch (...) {
+                errors.push_back("region_count has invalid type");
+                isValid = false;
+            }
+        } else if (entry.key == "simulation_timestep") {
+            try {
+                double timestep = std::get<double>(entry.value);
+                if (timestep <= 0.0 || timestep > 1.0) {
+                    errors.push_back("simulation_timestep must be in range (0.0, 1.0]");
+                    isValid = false;
+                }
+            } catch (...) {
+                errors.push_back("simulation_timestep has invalid type");
+                isValid = false;
+            }
+        } else if (entry.key == "connection_probability") {
+            try {
+                double prob = std::get<double>(entry.value);
+                if (prob < 0.0 || prob > 1.0) {
+                    errors.push_back("connection_probability must be in range [0.0, 1.0]");
+                    isValid = false;
+                }
+            } catch (...) {
+                errors.push_back("connection_probability has invalid type");
+                isValid = false;
+            }
+        } else if (entry.key == "dopamine_baseline") {
+            try {
+                double level = std::get<double>(entry.value);
+                if (level < 0.0) {
+                    errors.push_back("dopamine_baseline must be >= 0.0");
+                    isValid = false;
+                }
+            } catch (...) {
+                errors.push_back("dopamine_baseline has invalid type");
+                isValid = false;
+            }
+        }
+    }
+    
+    return isValid;
 }
 
 std::string Config::trim(const std::string& str) {
