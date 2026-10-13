@@ -1,0 +1,52 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  
+  // Basic configuration
+  "model": "anthropic/claude-3-5-sonnet",
+  "default_agent": "nlm_improve",
+  
+  // Enhanced command and agent permissions
+  "permission": {
+    "bash": "allow",
+    "edit": {
+      "src/**": "allow",
+      "*.cpp": "allow", 
+      "*.hpp": "allow",
+      "*.md": "allow",
+      "*.json": "allow",
+      "*.toml": "allow",
+      "*.cfg": "allow",
+      "*.txt": "allow",
+      "*": "ask"
+    },
+    "read": "allow",
+    "skill": {
+      "nlm-cli-analyzer": "allow",
+      "nlm-performance-monitor": "allow",
+      "nlm-config-manager": "allow",
+      "nlm-debug-tools": "allow",
+      "nlm-experimental-tools": "allow"
+    }
+  },
+  
+  // Agent Manager settings
+  "snapshot": true,
+  "share": "manual",
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
+  
+  // Skills and resources
+  "skills": {
+    "paths": ["./skills", "~/.kilo/skills"]
+  },
+  
+  // Instructions for context
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md", 
+    "CONTEXT.md",
+    "SKILLS.md"
+  ]
+}
