@@ -25,7 +25,7 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
-    NeuronState()
+    constexpr NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
         , threshold(-55.0f)

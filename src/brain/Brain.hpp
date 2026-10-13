@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -28,6 +30,61 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SemanticMemory;
+class ProceduralMemory;
+
+// Abstract base classes for system interfaces
+class MemorySystem {
+public:
+    virtual ~MemorySystem() = default;
+    virtual void initialize(const Brain* brain) = 0;
+    virtual void update(SimulationStep step, float timestep) = 0;
+    virtual void reset() = 0;
+    virtual bool isEnabled() const = 0;
+};
+
+class CognitionSystem {
+public:
+    virtual ~CognitionSystem() = default;
+    virtual void initialize(const Brain* brain) = 0;
+    virtual void update(SimulationStep step, float timestep) = 0;
+    virtual void reset() = 0;
+    virtual bool isEnabled() const = 0;
+};
+
+class NeuromodulationSystem {
+public:
+    virtual ~NeuromodulationSystem() = default;
+    virtual void initialize(const Brain* brain) = 0;
+    virtual void update(SimulationStep step, float timestep) = 0;
+    virtual void reset() = 0;
+    virtual bool isEnabled() const = 0;
+};
+
+class PredictionSystemBase {
+public:
+    virtual ~PredictionSystemBase() = default;
+    virtual void initialize(const Brain* brain) = 0;
+    virtual void update(SimulationStep step, float timestep) = 0;
+    virtual void reset() = 0;
+    virtual bool isEnabled() const = 0;
+};
+
+// Brain system factory interface
+class BrainSystemFactory {
+public:
+    virtual ~BrainSystemFactory() = default;
+    
+    virtual std::unique_ptr<MemorySystem> createMemorySystem(const std::string& type, std::shared_ptr<Config> config) = 0;
+    virtual std::unique_ptr<PredictionSystemBase> createPredictionSystem(const std::string& type, std::shared_ptr<Config> config) = 0;
+    virtual std::unique_ptr<CognitionSystem> createCognitionSystem(const std::string& type, std::shared_ptr<Config> config) = 0;
+    virtual std::unique_ptr<NeuromodulationSystem> createNeuromodulationSystem(const std::string& type, std::shared_ptr<Config> config) = 0;
+    virtual std::unique_ptr<DevelopmentSystem> createDevelopmentSystem(const std::string& type, std::shared_ptr<Config> config) = 0;
+    
+    // Default factory for built-in systems
+    static BrainSystemFactory* getDefaultFactory();
+    static void setDefaultFactory(BrainSystemFactory* factory);
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -50,8 +107,8 @@ struct InterRegionConnection {
 
 class Brain {
 public:
-    // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
+    // Create brain with configuration and optional system factory
+    explicit Brain(std::shared_ptr<Config> config, BrainSystemFactory* factory = nullptr);
     
     ~Brain();
     
@@ -148,6 +205,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - abstract knowledge and concepts
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and learned behaviors
+    ProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -193,9 +256,16 @@ public:
     // Logging
     void logStatus() const;
     
+    // System management
+    bool isSystemEnabled(const std::string& systemName) const;
+    void enableSystem(const std::string& systemName, bool enabled);
+    std::vector<std::string> getEnabledSystems() const;
+    
+    // Configuration-based system creation
+    void configureSystem(const std::string& systemName, const std::string& type, 
+                        const std::unordered_map<std::string, std::string>& params);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
-
-} // namespace nlm
