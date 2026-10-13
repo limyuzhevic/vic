@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann/json>=3.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -33,6 +33,7 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "nlohmann/json>=3.11.0",
 ]
 
 [project.urls]
@@ -51,7 +52,6 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
