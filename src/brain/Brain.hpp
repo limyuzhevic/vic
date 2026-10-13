@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -25,9 +26,12 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
+    class MonkeySeeMonkeyDo;
+    class SelfModel;
+    class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -125,8 +129,14 @@ public:
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
-    // Inter-region connection management
+    // Get neural activity pattern for planning
+    void extractNeuralActivityPattern(std::vector<float>& pattern);
+    
+    // Apply planned action to motor neurons for action selection
+    void applyPlannedActionToMotorNeurons(ActionType action);
+    
     void addInterRegionConnection(RegionId source, RegionId target, 
+                                  float weight = 0.0f, Delay delay = 1); 
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
@@ -164,7 +174,15 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Self-model for self-prediction and action planning
+    nlm::SelfModel* getSelfModel();
+    
+    // SocialLearning for imitation and social learning
+    nlm::SocialLearning* getSocialLearning();
+    
     // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;

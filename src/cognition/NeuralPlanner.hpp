@@ -66,6 +66,9 @@ public:
     void setActionQuality(ActionType action, float quality) {
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
+    
+    // Get action quality function (from experience)
+    const std::vector<float>& getActionQuality() const { return actionQuality_; }
 
     // Get current goal
     std::vector<float> getCurrentGoal() const { return currentGoal_; }

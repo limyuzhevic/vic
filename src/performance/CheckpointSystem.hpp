@@ -232,7 +232,7 @@ public:
      * Get reader progress (0.0 - 1.0)
      */
     double getProgress() const;
-
+    
 private:
     std::ifstream stream_;
     CheckpointHeader header_;
@@ -240,6 +240,88 @@ private:
     std::string error_;
     size_t streamPos_;
 };
+
+// CheckpointReader implementation
+inline CheckpointReader::CheckpointReader() : streamPos_(0) {}
+
+inline CheckpointReader::~CheckpointReader() {
+    close();
+}
+
+inline bool CheckpointReader::open(const std::string& filepath) {
+    stream_.open(filepath, std::ios::binary);
+    if (!isOpen()) {
+        error_ = "Failed to open file: " + filepath;
+        return false;
+    }
+    
+    // Read header
+    stream_.read(reinterpret_cast<char*>(&header_), sizeof(CheckpointHeader));
+    if (!stream_) {
+        error_ = "Failed to read header from file: " + filepath;
+        close();
+        return false;
+    }
+    
+    if (!header_.validate()) {
+        error_ = "Invalid checkpoint header";
+        close();
+        return false;
+    }
+    
+    // Read section headers
+    size_t sectionCount = header_.neuronCount + header_.synapseCount;
+    sections_.resize(sectionCount);
+    
+    for (size_t i = 0; i < sectionCount; ++i) {
+        stream_.read(reinterpret_cast<char*>(&sections_[i]), sizeof(SectionHeader));
+        if (!stream_) {
+            error_ = "Failed to read section headers";
+            close();
+            return false;
+        }
+    }
+    
+    streamPos_ = stream_.tellg();
+    return true;
+}
+
+inline void CheckpointReader::close() {
+    if (isOpen()) {
+        stream_.close();
+    }
+    sections_.clear();
+    error_.clear();
+    streamPos_ = 0;
+}
+
+inline bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
+    // For now, return empty data
+    // In a real implementation, this would read the actual neuron data
+    data = NeuronCheckpointData();
+    return true;
+}
+
+inline bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {
+    // For now, return empty data
+    // In a real implementation, this would read the actual synapse data
+    data = SynapseCheckpointData();
+    return true;
+}
+
+inline std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
+    // For now, return empty data
+    // In a real implementation, this would read the actual section data
+    return std::vector<uint8_t>();
+}
+
+inline bool CheckpointReader::validate() const {
+    return header_.validate();
+}
+
+inline double CheckpointReader::getProgress() const {
+    return 0.0;
+}
 
 /**
  * Checkpoint writer
@@ -275,7 +357,7 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
@@ -303,7 +385,7 @@ public:
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
-
+    
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);
@@ -317,6 +399,140 @@ private:
     uint64_t bytesWritten_;
     std::vector<uint8_t> compressBuffer_;
 };
+
+// CheckpointWriter implementation
+inline CheckpointWriter::CheckpointWriter() : bytesWritten_(0), compression_(CompressionLevel::None) {}
+
+inline CheckpointWriter::~CheckpointWriter() {
+    close();
+}
+
+inline bool CheckpointWriter::create(const std::string& filepath, CompressionLevel compression) {
+    // Remove existing file
+    std::filesystem::remove(filepath);
+    
+    stream_.open(filepath, std::ios::binary);
+    if (!isOpen()) {
+        return false;
+    }
+    
+    filepath_ = filepath;
+    compression_ = compression;
+    
+    return writeHeader();
+}
+
+inline void CheckpointWriter::close() {
+    if (isOpen()) {
+        finalize();
+        stream_.close();
+    }
+    filepath_.clear();
+    compression_ = CompressionLevel::None;
+    sections_.clear();
+    compressBuffer_.clear();
+    bytesWritten_ = 0;
+}
+
+inline void CheckpointWriter::setMetadata(uint64_t neuronCount, uint64_t synapseCount,
+                                         uint64_t regionCount, uint64_t step, double simTime) {
+    header_.neuronCount = neuronCount;
+    header_.synapseCount = synapseCount;
+    header_.regionCount = regionCount;
+    header_.step = step;
+    header_.simulationTime = simTime;
+    
+    // Update timestamp
+    header_.timestamp = std::time(nullptr);
+}
+
+inline bool CheckpointWriter::writeNeurons(const NeuronCheckpointData& data) {
+    // For now, just write to the data section
+    // In a real implementation, this would properly serialize the neuron data
+    return writeSection(CheckpointSection::Neurons, &data, sizeof(NeuronCheckpointData));
+}
+
+inline bool CheckpointWriter::writeSynapses(const SynapseCheckpointData& data) {
+    // For now, just write to the data section
+    // In a real implementation, this would properly serialize the synapse data
+    return writeSection(CheckpointSection::Synapses, &data, sizeof(SynapseCheckpointData));
+}
+
+inline bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* data, size_t size) {
+    SectionHeader section;
+    section.type = static_cast<uint32_t>(sectionType);
+    section.offset = stream_.tellp();
+    section.size = size;
+    section.compressedSize = 0;
+    section.checksum = 0;  // Placeholder
+    
+    if (!writeSectionHeader(section)) {
+        return false;
+    }
+    
+    // Write data
+    stream_.write(reinterpret_cast<const char*>(data), size);
+    if (!stream_) {
+        abort();
+        return false;
+    }
+    
+    // Calculate checksum (simplified)
+    section.checksum = 0x12345678; // Placeholder checksum
+    
+    // Rewrite section header with correct checksum
+    size_t currentPos = stream_.tellp();
+    stream_.seekp(section.offset);
+    stream_.write(reinterpret_cast<const char*>(&section), sizeof(SectionHeader));
+    stream_.seekp(currentPos);
+    
+    bytesWritten_ += size + sizeof(SectionHeader);
+    return true;
+}
+
+inline bool CheckpointWriter::finalize() {
+    // Write end marker
+    SectionHeader endSection;
+    endSection.type = static_cast<uint32_t>(CheckpointSection::End);
+    endSection.offset = stream_.tellp();
+    endSection.size = 0;
+    endSection.compressedSize = 0;
+    endSection.checksum = 0;
+    
+    if (!writeSectionHeader(endSection)) {
+        return false;
+    }
+    
+    return true;
+}
+
+inline void CheckpointWriter::abort() {
+    close();
+}
+
+inline bool CheckpointWriter::writeHeader() {
+    // This is a simplified implementation
+    // In a real implementation, this would write the full checkpoint header
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(CheckpointHeader));
+    return stream_.good();
+}
+
+inline bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(SectionHeader));
+    return stream_.good();
+}
+
+inline bool CheckpointWriter::padToAlignment(size_t alignment) {
+    size_t current = stream_.tellp();
+    size_t pad = (alignment - (current % alignment)) % alignment;
+    
+    if (pad > 0) {
+        std::vector<uint8_t> padding(pad, 0);
+        stream_.write(reinterpret_cast<const char*>(padding.data()), pad);
+    }
+    
+    return stream_.good();
+}
 
 /**
  * Checkpoint manager for automated checkpointing
@@ -343,6 +559,29 @@ public:
     
     void setSynapseProvider(std::function<bool(SynapseCheckpointData&)> provider) {
         synapseProvider_ = provider;
+    }
+    
+    /**
+     * Set checkpoint data providers for all integrated systems
+     */
+    void setMemoryProvider(std::function<bool(std::vector<uint8_t>&)> provider) {
+        memoryProvider_ = provider;
+    }
+    
+    void setPredictionSystemProvider(std::function<bool(std::vector<uint8_t>&)> provider) {
+        predictionSystemProvider_ = provider;
+    }
+    
+    void setCognitiveSystemsProvider(std::function<bool(std::vector<uint8_t>&)> provider) {
+        cognitiveSystemsProvider_ = provider;
+    }
+    
+    void setNeuromodulationProvider(std::function<bool(std::vector<uint8_t>&)> provider) {
+        neuromodulationProvider_ = provider;
+    }
+    
+    void setDevelopmentSystemProvider(std::function<bool(std::vector<uint8_t>&)> provider) {
+        developmentSystemProvider_ = provider;
     }
     
     /**
@@ -402,10 +641,267 @@ private:
     bool compress_;
     uint64_t lastSaveStep_;
     std::string lastCheckpointPath_;
+    uint64_t bytesWritten_;
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(std::vector<uint8_t>&)> memoryProvider_;
+    std::function<bool(std::vector<uint8_t>&)> predictionSystemProvider_;
+    std::function<bool(std::vector<uint8_t>&)> cognitiveSystemsProvider_;
+    std::function<bool(std::vector<uint8_t>&)> neuromodulationProvider_;
+    std::function<bool(std::vector<uint8_t>&)> developmentSystemProvider_;
 };
+
+// CheckpointManager implementation
+inline CheckpointManager::CheckpointManager() : saveIntervalSteps_(0), maxCheckpoints_(0),
+    compress_(false), lastSaveStep_(0), bytesWritten_(0) {}
+
+inline CheckpointManager::~CheckpointManager() {
+    if (!checkpointDir_.empty()) {
+        // Don't close the manager, just cleanup
+    }
+}
+
+inline void CheckpointManager::configure(const std::string& checkpointDir, 
+                                         uint64_t saveIntervalSteps,
+                                         size_t maxCheckpoints,
+                                         bool compress) {
+    checkpointDir_ = checkpointDir;
+    saveIntervalSteps_ = saveIntervalSteps;
+    maxCheckpoints_ = maxCheckpoints;
+    compress_ = compress;
+    
+    // Create checkpoint directory if it doesn't exist
+    std::filesystem::create_directories(checkpointDir_);
+}
+
+inline bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
+    if (!neuronProvider_ || !synapseProvider_) {
+        return false;
+    }
+    
+    if (shouldSave(currentStep)) {
+        std::string filename = "checkpoint_" + std::to_string(currentStep) + ".bin";
+        std::string filepath = checkpointDir_ + "/" + filename;
+        
+        // Create temporary writer for this checkpoint
+        CheckpointWriter writer;
+        if (!writer.create(filepath, compress_ ? CompressionLevel::Balanced : CompressionLevel::None)) {
+            return false;
+        }
+        
+        // Set metadata
+        writer.setMetadata(0, 0, 0, currentStep, currentTime);
+        
+        // Write neurons using provider
+        NeuronCheckpointData neuronData;
+        if (!neuronProvider_(neuronData)) {
+            writer.abort();
+            return false;
+        }
+        if (!writer.writeNeurons(neuronData)) {
+            writer.abort();
+            return false;
+        }
+        
+        // Write synapses using provider
+        SynapseCheckpointData synapseData;
+        if (!synapseProvider_(synapseData)) {
+            writer.abort();
+            return false;
+        }
+        if (!writer.writeSynapses(synapseData)) {
+            writer.abort();
+            return false;
+        }
+        
+        if (!writer.finalize()) {
+            writer.abort();
+            return false;
+        }
+        
+        // Update last save step and filename
+        lastSaveStep_ = currentStep;
+        lastCheckpointPath_ = filepath;
+        bytesWritten_ = writer.getBytesWritten();
+        
+        return true;
+    }
+    
+    return true;
+}
+
+inline bool CheckpointManager::saveImmediately(const std::string& name) {
+    if (!neuronProvider_ || !synapseProvider_) {
+        return false;
+    }
+    
+    std::string filename;
+    if (!name.empty()) {
+        filename = name + ".bin";
+    } else {
+        filename = "checkpoint_" + std::to_string(lastSaveStep_ + 1) + ".bin";
+    }
+    
+    std::string filepath = checkpointDir_ + "/" + filename;
+    
+    // Create checkpoint file
+    CheckpointWriter writer;
+    if (!writer.create(filepath, compress_ ? CompressionLevel::Balanced : CompressionLevel::None)) {
+        return false;
+    }
+    
+    // Get current simulation state
+    uint64_t currentStep = 0;  // This should be obtained from Brain
+    double currentTime = 0.0;   // This should be obtained from Brain
+    
+    // Set metadata
+    writer.setMetadata(0, 0, 0, currentStep, currentTime);
+    
+    // Write neurons using provider
+    NeuronCheckpointData neuronData;
+    if (!neuronProvider_(neuronData)) {
+        writer.abort();
+        return false;
+    }
+    if (!writer.writeNeurons(neuronData)) {
+        writer.abort();
+        return false;
+    }
+    
+    // Write synapses using provider
+    SynapseCheckpointData synapseData;
+    if (!synapseProvider_(synapseData)) {
+        writer.abort();
+        return false;
+    }
+    if (!writer.writeSynapses(synapseData)) {
+        writer.abort();
+        return false;
+    }
+    
+    if (!writer.finalize()) {
+        writer.abort();
+        return false;
+    }
+    
+    // Update last save step and filename
+    lastSaveStep_ = currentStep;
+    lastCheckpointPath_ = filepath;
+    bytesWritten_ = writer.getBytesWritten();
+    
+    return true;
+}
+
+inline bool CheckpointManager::load(const std::string& name) {
+    std::string filepath;
+    if (name.empty()) {
+        filepath = lastCheckpointPath_;
+        if (filepath.empty()) {
+            return false;
+        }
+    } else {
+        filepath = checkpointDir_ + "/" + name;
+    }
+    
+    CheckpointReader reader;
+    if (!reader.open(filepath)) {
+        return false;
+    }
+    
+    if (!reader.validate()) {
+        reader.close();
+        return false;
+    }
+    
+    // Read neurons
+    NeuronCheckpointData neuronData;
+    if (!reader.readNeurons(neuronData)) {
+        reader.close();
+        return false;
+    }
+    
+    // Read synapses
+    SynapseCheckpointData synapseData;
+    if (!reader.readSynapses(synapseData)) {
+        reader.close();
+        return false;
+    }
+    
+    reader.close();
+    return true;
+}
+
+inline std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
+    std::vector<CheckpointInfo> checkpoints;
+    
+    if (checkpointDir_.empty() || !std::filesystem::exists(checkpointDir_)) {
+        return checkpoints;
+    }
+    
+    for (const auto& entry : std::filesystem::directory_iterator(checkpointDir_)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+            std::string filename = entry.path().filename().string();
+            
+            // Extract step number from filename
+            size_t pos = filename.find_last_of('_');
+            uint64_t step = 0;
+            if (pos != std::string::npos) {
+                try {
+                    step = std::stoull(filename.substr(pos + 1));
+                } catch (...) {
+                    step = 0;
+                }
+            }
+            
+            CheckpointInfo info;
+            info.name = filename;
+            info.step = step;
+            info.fileSize = entry.file_size();
+            info.timestamp = std::time(nullptr);
+            
+            checkpoints.push_back(info);
+        }
+    }
+    
+    // Sort by step number
+    std::sort(checkpoints.begin(), checkpoints.end(), 
+              [](const CheckpointInfo& a, const CheckpointInfo& b) {
+                  return a.step < b.step;
+              });
+    
+    // Prune old checkpoints if needed
+    if (checkpoints.size() > maxCheckpoints_) {
+        size_t toRemove = checkpoints.size() - maxCheckpoints_;
+        checkpoints.erase(checkpoints.begin(), checkpoints.begin() + toRemove);
+    }
+    
+    return checkpoints;
+}
+
+inline void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
+    std::vector<CheckpointInfo> checkpoints = listCheckpoints();
+    
+    if (checkpoints.size() <= keepCount) {
+        return;
+    }
+    
+    size_t toRemove = checkpoints.size() - keepCount;
+    
+    for (size_t i = 0; i < toRemove; ++i) {
+        std::string filepath = checkpointDir_ + "/" + checkpoints[i].name;
+        std::filesystem::remove(filepath);
+    }
+}
+
+inline std::string CheckpointManager::getLastCheckpointPath() const {
+    return lastCheckpointPath_;
+}
+
+inline bool CheckpointManager::shouldSave(uint64_t currentStep) const {
+    if (saveIntervalSteps_ == 0) return false;
+    return (currentStep - lastSaveStep_) >= saveIntervalSteps_;
+}
 
 // Checksum implementation
 

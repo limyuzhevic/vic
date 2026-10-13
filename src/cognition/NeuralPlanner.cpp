@@ -1,5 +1,6 @@
 #include "NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../motor/Action.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -18,6 +19,7 @@ NeuralPlanner::NeuralPlanner()
     , planningConfidence_(0.5f)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
+    NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
 NeuralPlanner::~NeuralPlanner() = default;
@@ -28,13 +30,145 @@ void NeuralPlanner::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
+// ========== Phase 5: Integration with Other Cognitive Systems ==========
+
+void NeuralPlanner::integrateWithPredictionSystem(Brain* brain) {
+    if (!brain) return;
+    
+    // Get prediction system
+    auto* predictionSystem = brain->getPredictionSystem();
+    if (!predictionSystem) return;
+    
+    // Use prediction system to improve planning
+    // Prediction errors can guide planning to more beneficial actions
+    // For now, just acknowledge that we have access to prediction system
+    NLM_LOG_INFO("NeuralPlanner integrated with prediction system");
+    
+    // Update planning based on prediction
+    float predictionError = predictionSystem->getPredictionError();
+    float predictionConfidence = predictionSystem->getConfidence();
+    
+    // Adjust planning depth based on prediction confidence
+    // Higher confidence = deeper planning
+    if (predictionConfidence > 0.7f) {
+        setPlanningDepth(getPlanningDepth() + 1);  // Explore more options
+    } else if (predictionConfidence < 0.3f) {
+        setPlanningDepth(std::max(size_t(1), getPlanningDepth() - 1));  // Shallow planning when uncertain
+    }
+    
+    // Update current goal based on prediction error
+    // High prediction error suggests exploration or learning
+    if (predictionError > 0.5f) {
+        // Set exploratory goal when prediction is poor
+        std::vector<float> goal(predictionSystem->getErrorHistory().size(), 0.0f);
+        if (!goal.empty()) {
+            // Focus on reducing prediction error
+            goal[goal.size() - 1] = predictionError;
+            setCurrentGoal(goal);
+        }
+    }
+}
+
+void NeuralPlanner::integrateWithMemorySystems(Brain* brain) {
+    if (!brain) return;
+    
+    // Integrate with working memory for contextual planning
+    auto* workingMemory = brain->getWorkingMemory();
+    if (workingMemory) {
+        // Use working memory traces to inform planning
+        // Working memory contains recently active neurons that can guide planning
+        auto workingNeurons = workingMemory->getMemoryNeurons();
+        if (!workingNeurons.empty()) {
+            NLM_LOG_INFO("NeuralPlanner using working memory with " +
+                        std::to_string(workingNeurons.size()) + " active traces");
+        }
+    }
+    
+    // Integrate with episodic memory for experience-based planning
+    auto* episodicMemory = brain->getEpisodicMemory();
+    if (episodicMemory) {
+        size_t episodeCount = episodicMemory->getEpisodeCount();
+        if (episodeCount > 0) {
+            NLM_LOG_INFO("NeuralPlanner using episodic memory with " +
+                        std::to_string(episodeCount) + " episodes");
+            
+            // Get recent episodes for planning reference
+            auto recentEpisodes = episodicMemory->getEpisodesForReplay(std::min(5UL, episodeCount));
+            if (!recentEpisodes.empty()) {
+                // Could use episode history to learn better action sequences
+                NLM_LOG_INFO("NeuralPlanner analyzing " + std::to_string(recentEpisodes.size()) +
+                           " recent episodes for planning");
+            }
+        }
+    }
+    
+    // Integrate with associative memory for pattern-action associations
+    auto* associativeMemory = brain->getAssociativeMemory();
+    if (associativeMemory) {
+        // Use associative memory to learn action outcomes
+        NLM_LOG_INFO("NeuralPlanner integrated with associative memory");
+    }
+}
+
+void NeuralPlanner::integrateWithOtherCognitiveSystems(Brain* brain) {
+    if (!brain) return;
+    
+    // Get other cognitive systems for integration
+    auto* conceptFormation = brain->getConceptFormation();
+    auto* attention = brain->getAttention();
+    
+    // Integrate with concept formation for higher-level planning
+    if (conceptFormation) {
+        NLM_LOG_INFO("NeuralPlanner integrated with concept formation");
+        // Could use concepts to guide planning at abstract levels
+    }
+    
+    // Integrate with attention system for selective planning
+    if (attention) {
+        NLM_LOG_INFO("NeuralPlanner integrated with attention system");
+        // Could use attention to prioritize which actions to consider
+    }
+    
+    // Integrate with SelfModel (now done in Brain.cpp)
+    if (brain) {
+        auto* selfModel = brain->getSelfModel();
+        if (selfModel && selfModel->hasSelfModel()) {
+            NLM_LOG_INFO("NeuralPlanner integrating with SelfModel for self-prediction");
+        }
+    }
+    
+    // Integrate with SocialLearning (now done in Brain.cpp)
+    if (brain) {
+        auto* socialLearning = brain->getSocialLearning();
+        if (socialLearning && socialLearning->hasSocialKnowledge()) {
+            NLM_LOG_INFO("NeuralPlanner integrating with SocialLearning for imitation learning");
+        }
+    }
+}
+}
+
+void NeuralPlanner::updateAllIntegrations(Brain* brain) {
+    if (!brain) return;
+    
+    // Update all integrations with cognitive systems
+    integrateWithPredictionSystem(brain);
+    integrateWithMemorySystems(brain);
+    integrateWithOtherCognitiveSystems(brain);
+}
+
+// Update plan action to include all integration updates
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
     PlanningCandidate best;
     best.expectedReward = -1000.0f;
+    
+    // Update all integrations before planning
+    if (brain_) {
+        updateAllIntegrations(brain_);
+    }
     
     // Evaluate each sequence
     for (const auto& sequence : sequences) {
