@@ -58,9 +58,77 @@ public:
     // Identity
     NeuronId getId() const;
     
-    // Type
-    NeuronType getType() const;
-    void setType(NeuronType type);
+    // Neuron model support
+    enum class NeuronModel {
+        LIF,               // Leaky Integrate-and-Fire (default)
+        IAF,               // Adaptive Integrate-and-Fire
+        HH,                // Hodgkin-Huxley (simplified)
+        STOCHASTIC,        // Stochastic LIF
+        RATE_BASED,        // Rate-based model
+        RESONANT,          // Resonant model
+        PYRAMIDAL,         // Layer-specific pyramidal neuron
+        INTERNEURON,       // Fast-spiking interneuron
+        AUTOLOCKING,       // Auto-locking neuron for working memory
+        CUSTOM             // User-defined parameters
+    };
+    
+    NeuronModel getModel() const;
+    void setModel(NeuronModel model);
+    
+    // Model-specific parameters
+    void setMembraneTimeConstant(float tau);
+    float getMembraneTimeConstant() const;
+    
+    void setMembraneCapacitance(float capacitance);
+    float getMembraneCapacitance() const;
+    
+    void setAdaptationStrength(float strength);
+    float getAdaptationStrength() const;
+    
+    void setNoiseLevel(float level);
+    float getNoiseLevel() const;
+    
+    void setRefractoriness(float refract);
+    float getRefractoriness() const;
+    
+    // Enhanced synaptic properties
+    void setReversalPotential(float potential);
+    float getReversalPotential() const;
+    
+    void setSynapticGain(float gain);
+    float getSynapticGain() const;
+    
+    // Layer-specific configuration
+    void setLayerId(int layer);
+    int getLayerId() const;
+    
+    void setIsExcitatory(bool isExc);
+    bool isExcitatory() const;
+    
+    // Dendritic properties
+    void setDendriticLength(float length);
+    float getDendriticLength() const;
+    
+    void setDendriticBranching(int branches);
+    int getDendriticBranching() const;
+    
+    // Developmental parameters
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    void setPlasticityModulation(float modulation);
+    float getPlasticityModulation() const;
+    
+    // Temperature-dependent dynamics
+    void setTemperature(float temp);
+    float getTemperature() const;
+    
+    // Custom parameters for user-defined models
+    template<typename T>
+    void setCustomParameter(const std::string& name, T value);
+    
+    template<typename T>
+    std::optional<T> getCustomParameter(const std::string& name) const;
     
     // State access
     const NeuronState& getState() const;

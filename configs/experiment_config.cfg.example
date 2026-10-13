@@ -1,0 +1,158 @@
+# NLM Experiment Configuration Example
+# This file defines multiple experiments to run with different configurations
+
+# Main experiment configurations
+experiments = [
+    {
+        name = "plasticity_experiment"
+        type = "plasticity_learning"
+        description = "Standard plasticity learning experiment with Hebbian and STDP"
+        duration = 1000
+        neuron_types = ["excitatory", "inhibitory"]
+        plasticity = {
+            hebbian_enabled = true
+            stdp_enabled = true
+            reward_modulated_enabled = false
+            learning_rate = 0.01
+        }
+        recording = {
+            step_interval = 100
+            record_metrics = ["spike_count", "firing_rate", "weight_changes"]
+        }
+    },
+    {
+        name = "connectivity_experiment"
+        type = "basic_connectivity"
+        description = "Test basic neural connectivity with strong input"
+        duration = 200
+        neuron_types = ["sensory", "internal"]
+        connectivity = {
+            connection_probability = 0.2
+            input_strength = 50.0
+        }
+        recording = {
+            step_interval = 50
+            record_metrics = ["spike_count", "membrane_potential"]
+        }
+    },
+    {
+        name = "stdp_experiment"
+        type = "stdp_verification"
+        description = "Verify spike-timing dependent plasticity"
+        duration = 500
+        neuron_types = ["excitatory", "inhibitory"]
+        plasticity = {
+            hebbian_enabled = false
+            stdp_enabled = true
+            reward_modulated_enabled = false
+            stdp_ltp_weight = 0.02
+            stdp_ltd_weight = 0.015
+        }
+        recording = {
+            step_interval = 50
+            record_metrics = ["weight_change", "ltp_events", "ltd_events"]
+        }
+    },
+    {
+        name = "scaling_experiment"
+        type = "scaling_benchmark"
+        description = "Benchmark performance with different neuron counts"
+        duration = 2000
+        neuron_counts = [100, 500, 1000, 2000]
+        plasticity = {
+            hebbian_enabled = true
+            stdp_enabled = true
+            learning_rate = 0.005
+        }
+        recording = {
+            step_interval = 200
+            record_metrics = ["spike_count", "firing_rate", "simulation_time", "memory_usage"]
+        }
+    }
+]
+
+# Global settings for all experiments
+global_settings = {
+    random_seed = 42
+    simulation_timestep = 0.001
+    log_level = "Info"
+    verbose = false
+    checkpoint_enabled = false
+    checkpoint_interval = 500
+}
+
+# Neuron configuration templates
+neuron_templates = [
+    {
+        name = "excitatory"
+        type = "excitatory"
+        resting_potential = -70.0
+        threshold = -55.0
+        refractory_period = 5
+        leak_conductance = 10.0
+        adaptation_strength = 0.1
+    },
+    {
+        name = "inhibitory"
+        type = "inhibitory"
+        resting_potential = -65.0
+        threshold = -45.0
+        refractory_period = 3
+        leak_conductance = 8.0
+        adaptation_strength = 0.05
+    },
+    {
+        name = "sensory"
+        type = "sensory"
+        resting_potential = -75.0
+        threshold = -50.0
+        refractory_period = 2
+        leak_conductance = 12.0
+        adaptation_strength = 0.15
+        input_sensitivity = 1.2
+    },
+    {
+        name = "motor"
+        type = "motor"
+        resting_potential = -68.0
+        threshold = -52.0
+        refractory_period = 4
+        leak_conductance = 9.0
+        adaptation_strength = 0.08
+        output_strength = 1.0
+    }
+]
+
+# Analysis settings
+analysis = {
+    compute_statistics = true
+    statistical_tests = ["t_test", "anova", "correlation"]
+    significance_level = 0.05
+    confidence_interval = 95.0
+    metrics_to_export = ["spike_count", "firing_rate", "weight_changes", "simulation_time"]
+    output_formats = ["csv", "json", "plot"]
+    generate_plots = true
+    plot_types = ["time_series", "histograms", "scatter_plots"]
+}
+
+# Performance monitoring
+performance = {
+    enable_profiling = true
+    profile_interval = 100
+    track_memory_usage = true
+    track_cpu_usage = true
+    enable_benchmarking = true
+    benchmark_results_file = "benchmark_results.json"
+    optimization_suggestions = true
+}
+
+# Visualization
+visualization = {
+    enable_visualization = false
+    visualization_type = "network_graph"
+    show_neurons = true
+    show_synapses = true
+    show_spikes = true
+    update_rate = 30.0
+    output_directory = "visualization_output"
+}

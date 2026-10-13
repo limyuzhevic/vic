@@ -56,12 +56,36 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Enable detailed logging with file/line/function
+    void setDetailedLogging(bool detailed);
+    bool getDetailedLogging() const;
+    
+    // Enable performance monitoring
+    void setPerformanceMonitoring(bool enabled);
+    bool getPerformanceMonitoring() const;
+    
+    // Set log file size limit and rotation
+    void setLogFileSizeLimit(size_t maxSizeBytes);
+    void setLogFileRotation(size_t maxFiles);
+    
+    // Get log statistics
+    size_t getLogCount() const;
+    size_t getCountForLevel(LogLevel level) const;
+    
+    // Clear log statistics
+    void clearStatistics();
+    
+    // Set custom format string
+    void setFormatString(const std::string& format);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatEntry(const LogEntry& entry) const;
+    void rotateLogFile();
 };
 
 // Main Logger class

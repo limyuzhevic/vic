@@ -1,7 +1,5 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
+#include <unordered_map>
+#include <variant>
 
 namespace nlm {
 
@@ -18,13 +16,38 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // Enhanced neuron model parameters
+    NeuronModel model;               // Neuron model type
+    float membraneTimeConstant;      // Membrane time constant (ms)
+    float membraneCapacitance;       // Membrane capacitance (nF)
+    float adaptationStrength;        // Spike-frequency adaptation strength
+    float noiseLevel;                // Stochastic input level
+    float refractoriness;            // Refractory period in ms
+    float reversalPotential;         // Reversal potential for synapses (mV)
+    float synapticGain;              // Synaptic efficacy factor
+    int layerId;                     // Layer identifier for cortical models
+    bool isExcitatory;              // Excitation/inhibition flag
+    float dendriticLength;           // Dendritic length (arbitrary units)
+    int dendriticBranching;          // Number of dendritic branches
+    DevelopmentalStage developmentalStage;  // Current developmental stage
+    float plasticityModulation;      // Plasticity modulation factor
+    float temperature;              // Operating temperature (Celsius)
+    
+    // Custom parameter storage
+    std::unordered_map<std::string, std::variant<int, float, bool, std::string>> customParams;
+    
+    // LIF parameters (legacy support)
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             model(NeuronModel::LIF), membraneTimeConstant(20.0f), membraneCapacitance(1.0f),
+             adaptationStrength(0.1f), noiseLevel(0.0f), refractoriness(5.0f),
+             reversalPotential(0.0f), synapticGain(1.0f), layerId(0), isExcitatory(true),
+             dendriticLength(10.0f), dendriticBranching(3), developmentalStage(DevelopmentalStage::Adult),
+             plasticityModulation(1.0f), temperature(37.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -50,12 +73,158 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+// Type methods
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+// NeuronModel methods
+Neuron::NeuronModel Neuron::getModel() const {
+    return pImpl->model;
+}
+
+void Neuron::setModel(NeuronModel model) {
+    pImpl->model = model;
+}
+
+void Neuron::setMembraneTimeConstant(float tau) {
+    pImpl->membraneTimeConstant = tau;
+}
+
+float Neuron::getMembraneTimeConstant() const {
+    return pImpl->membraneTimeConstant;
+}
+
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->membraneCapacitance = capacitance;
+}
+
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->membraneCapacitance;
+}
+
+void Neuron::setAdaptationStrength(float strength) {
+    pImpl->adaptationStrength = strength;
+}
+
+float Neuron::getAdaptationStrength() const {
+    return pImpl->adaptationStrength;
+}
+
+void Neuron::setNoiseLevel(float level) {
+    pImpl->noiseLevel = level;
+}
+
+float Neuron::getNoiseLevel() const {
+    return pImpl->noiseLevel;
+}
+
+void Neuron::setRefractoriness(float refract) {
+    pImpl->refractoriness = refract;
+}
+
+float Neuron::getRefractoriness() const {
+    return pImpl->refractoriness;
+}
+
+void Neuron::setReversalPotential(float potential) {
+    pImpl->reversalPotential = potential;
+}
+
+float Neuron::getReversalPotential() const {
+    return pImpl->reversalPotential;
+}
+
+void Neuron::setSynapticGain(float gain) {
+    pImpl->synapticGain = gain;
+}
+
+float Neuron::getSynapticGain() const {
+    return pImpl->synapticGain;
+}
+
+void Neuron::setLayerId(int layer) {
+    pImpl->layerId = layer;
+}
+
+int Neuron::getLayerId() const {
+    return pImpl->layerId;
+}
+
+void Neuron::setIsExcitatory(bool isExc) {
+    pImpl->isExcitatory = isExc;
+}
+
+bool Neuron::isExcitatory() const {
+    return pImpl->isExcitatory;
+}
+
+void Neuron::setDendriticLength(float length) {
+    pImpl->dendriticLength = length;
+}
+
+float Neuron::getDendriticLength() const {
+    return pImpl->dendriticLength;
+}
+
+void Neuron::setDendriticBranching(int branches) {
+    pImpl->dendriticBranching = branches;
+}
+
+int Neuron::getDendriticBranching() const {
+    return pImpl->dendriticBranching;
+}
+
+void Neuron::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+}
+
+DevelopmentalStage Neuron::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+void Neuron::setPlasticityModulation(float modulation) {
+    pImpl->plasticityModulation = modulation;
+}
+
+float Neuron::getPlasticityModulation() const {
+    return pImpl->plasticityModulation;
+}
+
+void Neuron::setTemperature(float temp) {
+    pImpl->temperature = temp;
+}
+
+float Neuron::getTemperature() const {
+    return pImpl->temperature;
+}
+
+template<typename T>
+void Neuron::setCustomParameter(const std::string& name, T value) {
+    pImpl->customParams[name] = value;
+}
+
+template<typename T>
+std::optional<T> Neuron::getCustomParameter(const std::string& name) const {
+    auto it = pImpl->customParams.find(name);
+    if (it != pImpl->customParams.end()) {
+        // Type-safe extraction would require more complex implementation
+        // This is a simplified version
+        try {
+            return std::get<T>(it->second);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
