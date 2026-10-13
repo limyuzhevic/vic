@@ -404,6 +404,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with attention system
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+        
+        // Store significant working memory events in episodic memory
+        if (pImpl->workingMemory && pImpl->episodicMemory && 
+            pImpl->workingMemory->getMemoryActivity() > 0.5f) {
+            // Create a brief episodic memory entry for the current working memory state
+            // This captures important cognitive content for later replay
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active working memory neurons
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (size_t i = 0; i < memoryNeurons.size() && i < 20; ++i) {
+                episode.activeNeurons.push_back(memoryNeurons[i]);
+                float activation = pImpl->workingMemory->getNeuronActivation(memoryNeurons[i]);
+                episode.neuronActivations.push_back(activation);
+            }
+            
+            // Store the working memory content as experience
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========

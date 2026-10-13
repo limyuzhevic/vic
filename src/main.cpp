@@ -39,10 +39,13 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
+    ║     - Memory systems (working, episodic)                     ║
+    ║     - Neuromodulation (dopamine, curiosity, novelty)         ║
+    ║     - Advanced commands and configuration options             ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -382,14 +385,111 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Add advanced configuration options based on command line arguments
+    bool enableAdvancedMode = false;
+    std::string outputFile = "";
+    size_t checkpointInterval = 10000;
+    bool enableMemoryTracing = false;
+    float neuromodulationIntensity = 1.0f;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--advanced" || arg == "--advanced-mode") {
+            enableAdvancedMode = true;
+        } else if (arg == "--output" || arg == "--output-file") {
+            if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg == "--checkpoint-interval") {
+            if (i + 1 < argc) {
+                checkpointInterval = static_cast<size_t>(std::stoul(argv[++i]));
+            }
+        } else if (arg == "--enable-memory-tracing") {
+            enableMemoryTracing = true;
+        } else if (arg == "--neuromodulation-intensity") {
+            if (i + 1 < argc) {
+                neuromodulationIntensity = std::stof(argv[++i]);
+                neuromodulationIntensity = std::clamp(neuromodulationIntensity, 0.0f, 5.0f);
+            }
+        }
+    }
+    
+    // Configure advanced options
+    if (enableAdvancedMode) {
+        NLM_LOG_INFO("Advanced mode enabled");
+        config->set("enable_advanced_plasticity", true, ConfigSource::CommandLine);
+        config->set("enable_memory_compression", true, ConfigSource::CommandLine);
+        config->set("enable_predictive_planning", true, ConfigSource::CommandLine);
+    }
+    
+    if (!outputFile.empty()) {
+        config->set("output_file", outputFile, ConfigSource::CommandLine);
+    }
+    
+    config->set("checkpoint_interval", static_cast<int64_t>(checkpointInterval), ConfigSource::CommandLine);
+    
+    if (enableMemoryTracing) {
+        config->set("enable_memory_tracing", true, ConfigSource::CommandLine);
+        config->set("memory_trace_rate", 0.1f, ConfigSource::CommandLine);
+    }
+    
+    config->set("neuromodulation_intensity", neuromodulationIntensity, ConfigSource::CommandLine);
+    
+    // Enhanced neuron configuration for advanced mode
+    if (enableAdvancedMode) {
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+        config->set("connection_probability", 0.25f, ConfigSource::Default);
+        
+        // Advanced plasticity parameters
+        config->set("stdp_ltp_weight", 0.03f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.025f, ConfigSource::Default);
+        config->set("stdp_tau", 25.0f, ConfigSource::Default);
+        
+        // Hebbian parameters
+        config->set("hebbian_learning_rate", 0.015f, ConfigSource::Default);
+        config->set("hebbian_max_weight", 2.0f, ConfigSource::Default);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00005f, ConfigSource::Default);
+        
+        // Memory system parameters
+        config->set("working_memory_capacity", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", static_cast<int64_t>(5000), ConfigSource::Default);
+        
+        // Neuromodulation parameters
+        config->set("dopamine_baseline", 0.5f, ConfigSource::Default);
+        config->set("curiosity_sensitivity", 1.2f, ConfigSource::Default);
+        config->set("novelty_threshold", 0.4f, ConfigSource::Default);
+        
+        // Advanced debugging and logging
+        config->set("enable_detailed_logging", true, ConfigSource::CommandLine);
+        config->set("log_plasticity_events", true, ConfigSource::CommandLine);
+        config->set("log_memory_events", true, ConfigSource::CommandLine);
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    if (enableAdvancedMode) {
+        NLM_LOG_INFO("  ADVANCED MODE ENABLED");
+        NLM_LOG_INFO("  Working memory capacity: " + std::to_string(config->getOr<int64_t>("working_memory_capacity", 500)));
+        NLM_LOG_INFO("  Episodic memory capacity: " + std::to_string(config->getOr<int64_t>("episodic_memory_max_episodes", 5000)));
+        NLM_LOG_INFO("  Neuromodulation intensity: " + std::to_string(config->getOr<float>("neuromodulation_intensity", 1.0f)));
+        if (!outputFile.empty()) {
+            NLM_LOG_INFO("  Output file: " + outputFile);
+        }
+    } else {
+        NLM_LOG_INFO("  Standard mode - use --advanced for enhanced capabilities");
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
