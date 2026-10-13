@@ -1,0 +1,150 @@
+# .gitignore for NLM Python project
+# Prevents committing build artifacts, cache files, and temporary files
+
+# Build artifacts
+build/
+dist/
+*.so
+*.pyd
+*.egg
+*.egg-info/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing and coverage
+.coverage
+htmlcov/
+pytest.xml
+.tox/
+.nox/
+.pytest_cache/
+coverage.xml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment and configuration
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Documentation build artifacts
+_build/
+docs/_build/
+
+# Temporary files
+temp/
+temp-*
+*.tmp
+*.temp
+
+# Log files
+*.log
+logs/
+
+# Network storage
+node_modules/
+
+# Project-specific
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Python bindings build artifacts
+python/pynlm*.so
+python/__pycache__/
+python/*.pyc
+
+# C++ build artifacts
+build/
+*.o
+*.obj
+*.a
+*.lib
+
+# Editor backup files
+*~
+*backup*
+*backup*/
+
+# Eclipse workspace files
+.project
+.pydevproject
+.settings/
+
+# Intellij IDEA files
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code workspace files
+.vscode/
+
+# Mac OS X
+.DS_Store
+
+# Windows thumbnail cache files
+Thumbs.db
+
+# pytest
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
