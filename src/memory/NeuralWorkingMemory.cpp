@@ -28,13 +28,28 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("NeuralWorkingMemory initialize failed: brain is null");
+        return;
+    }
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_) {
+        if (!brain_) {
+            NLM_LOG_WARNING("NeuralWorkingMemory::store: brain_ is null");
+        } else {
+            NLM_LOG_WARNING("NeuralWorkingMemory::store: pattern is empty");
+        }
+        return;
+    }
+    if (std::isnan(strength)) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::store: strength is NaN, using default value");
+        strength = 1.0f;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,11 +59,15 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // First get the region, check if it exists, then get neurons
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            auto* neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
@@ -70,6 +89,16 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Input validation
+    if (!brain_) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::storeToNeuron: brain_ is null");
+        return;
+    }
+    if (std::isnan(activation) || std::isinf(activation)) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::storeToNeuron: invalid activation value, using 0.0");
+        activation = 0.0f;
+    }
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -84,9 +113,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
+    brain_->injectCurrent(neuron, activation * 5.0f);
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
@@ -101,10 +128,21 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    // Input validation - ensure neuron ID is valid
+    if (neuron.getId() == 0) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::contains: invalid neuron ID (0)");
+        return false;
+    }
     return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    // Input validation - ensure neuron ID is valid
+    if (neuron.getId() == 0) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::getNeuronActivation: invalid neuron ID (0)");
+        return 0.0f;
+    }
+    
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
@@ -114,7 +152,15 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    // Input validation
+    if (!brain_) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::update: brain_ is null");
+        return;
+    }
+    if (dt < 0.0) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::update: negative timestep, using absolute value");
+        dt = std::abs(dt);
+    }
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -145,23 +191,41 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
 }
 
 void NeuralWorkingMemory::clear() {
+    // Clear memory content with validation
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    
+    NLM_LOG_DEBUG("NeuralWorkingMemory cleared all memory traces");
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
+    // Input validation
+    if (factor < 0.0f) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::strengthenMemory: negative factor, using absolute value");
+        factor = std::abs(factor);
+    }
+    if (factor > 2.0f) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::strengthenMemory: factor > 2.0, clamping to 2.0");
+        factor = 2.0f;
+    }
+    
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
     }
+    
+    NLM_LOG_DEBUG("NeuralWorkingMemory strengthened memory by factor " + std::to_string(factor));
 }
 
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
-    if (memoryActivations_.empty()) return;
+    if (memoryActivations_.empty()) {
+        NLM_LOG_DEBUG("NeuralWorkingMemory::runCompetition: no memory activations");
+        return;
+    }
     
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
@@ -181,6 +245,9 @@ void NeuralWorkingMemory::runCompetition() {
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
+    
+    NLM_LOG_DEBUG("NeuralWorkingMemory::runCompetition: " + std::to_string(winners_.size()) + 
+                  " winners selected from " + std::to_string(memoryNeurons_.size()) + " candidates");
 }
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {

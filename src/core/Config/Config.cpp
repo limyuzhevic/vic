@@ -19,16 +19,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    /**
+     * @brief Load configuration from a file
+     * 
+     * @param filepath Path to configuration file
+     * @return true if file loaded successfully, false otherwise
+     * 
+     * @note Currently supports simple key=value format with comments
+     * @warning Future versions will support JSON/YAML format
+     * @see saveToFile()
+     */
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config::loadFromFile: Could not open file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +61,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Store configuration entry
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Config::loadFromFile: Parsed line " + std::to_string(lineNum) + 
+                         ": " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Config::loadFromFile: Invalid syntax in line " + std::to_string(lineNum) +
+                           ": " + line);
         }
     }
     

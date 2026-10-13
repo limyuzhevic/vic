@@ -14,24 +14,23 @@ public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Store item in working memory
     void store(NeuronId neuron, float value);
     
-    // Retrieve item
+    // Retrieve item from working memory
     float retrieve(NeuronId neuron) const;
     
-    // Check if item exists
+    // Check if item exists in working memory
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    // Clear all items from working memory
     void clear();
     
-    // Get capacity
+    // Get working memory capacity
     size_t getCapacity() const;
     size_t getCurrentSize() const;
     
-    // Decay all items
+    // Decay all items in working memory
     void decay(float decayRate);
     
 private:

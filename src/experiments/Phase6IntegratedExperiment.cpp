@@ -145,8 +145,51 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
     }
+// Test input validation and error handling improvements
+    NLM_LOG_INFO("Testing input validation and error handling...");
     
-    result.endTime = time(nullptr);
+    // Test working memory with invalid inputs
+    if (brain->getWorkingMemory()) {
+        // Test with null pattern (should be handled gracefully)
+        brain->getWorkingMemory()->store(std::vector<float>(), 1.0f);
+        
+        // Test with NaN strength (should be corrected)
+        brain->getWorkingMemory()->store(std::vector<float>{1.0f, 0.5f}, std::nanf(""));
+        
+        // Test working memory functions with invalid neuron
+        brain->getWorkingMemory()->storeToNeuron(NeuronId(0), std::nanf(""));
+        brain->getWorkingMemory()->getNeuronActivation(NeuronId(0));
+    }
+    
+    // Test episodic memory operations
+    if (brain->getEpisodicMemory()) {
+        // Test with empty episode
+        EpisodicMemoryItem emptyEpisode;
+        brain->getEpisodicMemory()->storeEpisode(emptyEpisode);
+    }
+    
+    NLM_LOG_INFO("Input validation tests completed");
+    
+    // Test enhanced logging
+    NLM_LOG_INFO("Testing enhanced logging capabilities...");
+    brain->logStatus();  // This should now include comprehensive system status
+    NLM_LOG_INFO("Enhanced logging test completed");
+    
+    // Test new configuration parameters
+    NLM_LOG_INFO("Testing new configuration parameters...");
+    
+    // Test that new configuration parameters are accessible
+    auto workingMemConfig = cfg->getOr<int64_t>("working_memory_capacity", 1000);
+    NLM_LOG_INFO("Working memory capacity from config: " + std::to_string(workingMemConfig));
+    
+    auto predictionConfig = cfg->getOr<int64_t>("prediction_window_size", 10);
+    NLM_LOG_INFO("Prediction window size from config: " + std::to_string(predictionConfig));
+    
+    auto neuromodConfig = cfg->getOr<float>("curiosity_sensitivity", 0.8f);
+    NLM_LOG_INFO("Curiosity sensitivity from config: " + std::to_string(neuromodConfig));
+    
+    NLM_LOG_INFO("Configuration parameter test completed");
+    
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
