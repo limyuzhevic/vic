@@ -211,9 +211,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        // Null safety check for random generator
+        if (!brain_ || !brain_->getRandomGenerator()) {
+            return defaultCmd;
+        }
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
@@ -229,6 +234,11 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 6: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     
@@ -251,17 +261,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                if (std::abs(eligibility) > 0.001f) {
+                    // Apply reward-modulated weight change
+                    float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
             }
         }
     }
@@ -272,10 +284,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    if (brain_) {
+        auto* stdp = brain_->getSTDP();
+        if (stdp) {
+            stdp->setLTPWeight(0.01f * plasticityFactor);
+            stdp->setLTDWeight(0.012f * plasticityFactor);
+        }
     }
 }
 
@@ -302,13 +316,15 @@ void AgentBrain::updateDevelopment(double timestep) {
     
     // Structural plasticity changes with development
     if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+        if (brain_) {
+            auto* sp = brain_->getStructuralPlasticity();
+            if (sp) {
+                // Higher synaptogenesis in early development
+                float synRate = 0.0001f * plasticityModifier_;
+                float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+                sp->setSynaptogenesisRate(synRate);
+                sp->setPruningRate(pruneRate);
+            }
         }
     }
 }

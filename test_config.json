@@ -1,0 +1,10 @@
+{
+  "brain": {
+    "neuron_count": 100,
+    "synapse_density": 0.1
+  },
+  "simulation": {
+    "steps": 100,
+    "dt": 0.1
+  }
+}

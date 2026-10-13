@@ -10,9 +10,9 @@ struct Maturation::Impl {
     
     Impl() 
         : progress(0.0f)
-        , matureThreshold(-55.0f)
-        , matureRestingPotential(-70.0f)
-        , matureTimeConstant(20.0f) {}
+        , matureThreshold(NeuralConstants::THRESHOLD_POTENTIAL)
+        , matureRestingPotential(NeuralConstants::RESTING_POTENTIAL)
+        , matureTimeConstant(NeuralConstants::MEMBRANE_TIME_CONSTANT) {}
 };
 
 Maturation::Maturation() : pImpl(new Impl) {}

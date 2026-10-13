@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# JSON and YAML support
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -91,6 +95,11 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link JSON and YAML libraries to nlm_core
+# nlohmann_json is header-only, so no linking needed
+# yaml-cpp needs to be linked
+target_link_libraries(nlm_core PUBLIC yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

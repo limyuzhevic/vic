@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Experiment.hpp"
+#include "ExperimentResult.hpp"
 #include "../brain/Brain.hpp"
 #include "../environment/Environment.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -44,6 +46,21 @@ public:
     
     // Save experiment results
     bool saveResults(const std::string& filepath) const;
+    
+    // Load experiment results
+    bool loadResults(const std::string& filepath, ExperimentResult& result);
+    
+    // Analyze experiment results
+    std::string analyzeResults(const ExperimentResult& result) const;
+    
+    // Compare experiment results
+    std::string compareResults(const ExperimentResult& result1, const ExperimentResult& result2) const;
+    
+    // Export visualization data
+    std::string exportVisualizationData(const ExperimentResult& result) const;
+    
+    // Validate experiment results
+    bool validateResults(const ExperimentResult& result) const;
     
 private:
     struct Impl;

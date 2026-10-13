@@ -26,16 +26,16 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(nlm::NeuralConstants::RESTING_POTENTIAL)
+        , restingPotential(nlm::NeuralConstants::RESTING_POTENTIAL)
+        , threshold(nlm::NeuralConstants::THRESHOLD_POTENTIAL)
+        , resetPotential(nlm::NeuralConstants::RESET_POTENTIAL)
+        , leakConductance(nlm::NeuralConstants::LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(nlm::NeuralConstants::REFRACTORY_PERIOD)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };

@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include "BrainAdapter.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -9,11 +10,14 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -90,8 +94,8 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -831,15 +835,12 @@ bool Brain::save(const std::string& filepath) const {
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
         NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
+        throw nlm::NeuralError(std::string("Brain save failed: ") + e.what(), "save", "Checkpoint save operation");
     }
 }
 
@@ -895,16 +896,22 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states using SynapseLoader for proper loading
+        if (!applySynapseDataImpl(pImpl, synapseData)) {
+            NLM_LOG_ERROR("Failed to apply synapse states from checkpoint");
+            return false;
+        }
+        
+        // Store synapses for later processing if needed
+        pImpl->synapseDataLoaded = true;
+        pImpl->loadedSynapseCount = synapseData.weight.size();
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
+        throw nlm::NeuralError(std::string("Brain load failed: ") + e.what(), "load", "Checkpoint load operation");
     }
 }
 

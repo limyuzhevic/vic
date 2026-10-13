@@ -2,6 +2,7 @@
 
 namespace nlm {
 
+// Forward declaration of implementation struct for better encapsulation
 struct ExperimentRunner::Impl {
     std::vector<std::shared_ptr<Experiment>> experiments;
     uint64_t globalSeed;
@@ -110,11 +111,6 @@ void ExperimentRunner::clearExperiments() {
 
 void ExperimentRunner::setGlobalSeed(uint64_t seed) {
     pImpl->globalSeed = seed;
-}
-
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
 }
 
 } // namespace nlm

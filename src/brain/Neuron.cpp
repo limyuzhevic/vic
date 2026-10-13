@@ -1,7 +1,4 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
+#include "../core/Constants.hpp"
 
 namespace nlm {
 
@@ -20,8 +17,8 @@ struct Neuron::Impl {
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float TIME_CONSTANT = NeuralConstants::MEMBRANE_TIME_CONSTANT;  // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = Constants::MAX_SPIKE_HISTORY;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -224,12 +221,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * NeuralConstants::AMPLITUDE_ADAPTATION_RATE;
+        pImpl->state.adaptationVariable *= NeuralConstants::ADAPTATION_DECAY_FACTOR;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, NeuralConstants::MIN_VOLTAGE, NeuralConstants::MAX_VOLTAGE);
     
     // Check for spike
     if (V >= threshold) {
@@ -261,7 +258,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = Constants::SIMULATION_TIMESTEP;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
@@ -277,13 +274,13 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = NeuralConstants::THRESHOLD_POTENTIAL + rng.uniformReal(-2.0f, 2.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = NeuralConstants::RESTING_POTENTIAL + rng.uniformReal(-2.0f, 2.0f);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, NeuralConstants::RESET_POTENTIAL_RANGE);
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
