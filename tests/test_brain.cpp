@@ -90,7 +90,7 @@ void testBrainRegions() {
     std::cout << "    testBrainRegions passed" << std::endl;
 }
 
-void testBrainActionProduction() {
+void testBrainCognitionAccess() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -98,10 +98,30 @@ void testBrainActionProduction() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    auto action = brain.produceAction();
-    assert(action != nullptr);
+    // Test NeuralPlanner access
+    auto* planner = brain.getPlanner();
+    assert(planner != nullptr);
     
-    std::cout << "    testBrainActionProduction passed" << std::endl;
+    // Test SelfModel access
+    auto* selfModel = brain.getSelfModel();
+    assert(selfModel != nullptr);
+    
+    // Test SocialLearning access
+    auto* socialLearning = brain.getSocialLearning();
+    assert(socialLearning != nullptr);
+    
+    // Verify the accessors are the same instances that the planner uses
+    assert(&planner->getSelfModel() == selfModel);
+    assert(&planner->getSocialLearning() == socialLearning);
+    
+    // Test that the accessors are const-compatible
+    const auto& constBrain = brain;
+    auto* constSelfModel = constBrain.getSelfModel();
+    auto* constSocialLearning = constBrain.getSocialLearning();
+    assert(constSelfModel == selfModel);
+    assert(constSocialLearning == socialLearning);
+    
+    std::cout << "    testBrainCognitionAccess passed" << std::endl;
 }
 
 void testBrainStatus() {

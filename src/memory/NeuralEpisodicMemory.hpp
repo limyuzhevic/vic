@@ -102,20 +102,16 @@ public:
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
 
-    // Get recent episodes
-    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
+    // Set maximum number of episodes (for capacity management)
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
 
-    // Get average reward from episodes
-    float getAverageReward() const;
+    // Get current maximum episodes
+    size_t getMaxEpisodes() const { return maxEpisodes_; }
 
-    // Clear old episodes
-    void consolidate(float relevanceThreshold);
-
-    // Clear all episodes
-    void clear();
-
-    // Enable/disable replay
+    // Set replay enable/disable
     void enableReplay(bool enable) { replayEnabled_ = enable; }
+
+    // Check if replay is enabled
     bool isReplayEnabled() const { return replayEnabled_; }
 
     // Get episodes for replay (selection based on relevance and recency)

@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -108,12 +111,28 @@ public:
     
     // Reset brain state
     void reset();
-    
+
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
-    
+
     // Load brain state from file
     bool load(const std::string& filepath);
+
+    // ========== SLEEP/REST SYSTEM ==========
+    
+    // Put brain to sleep (rest state)
+    // During sleep: replay memories, consolidate, update neuromodulation
+    void sleep();
+    
+    // Wake brain from sleep
+    // Restore normal computation state
+    void wake();
+    
+    // Check if brain is currently sleeping
+    bool isSleeping() const;
+    
+    // Enable or disable sleep cycles
+    void enableSleep(bool enable);
     
     // Region management
     RegionId addRegion(const std::string& name = "");
@@ -155,9 +174,15 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
+
+    // Self model for self-awareness
+    SelfModel* getSelfModel();
     
+    // Social learning for observation-based learning
+    SocialLearning* getSocialLearning();
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
@@ -170,29 +195,38 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
+
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
+
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
-    
+
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
-    
+
 private:
     struct Impl;
     Impl* pImpl;

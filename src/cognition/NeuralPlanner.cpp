@@ -7,6 +7,8 @@ namespace nlm {
 
 struct NeuralPlanner::Impl {
     Brain* brain;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     Impl() : brain(nullptr) {}
 };
@@ -16,6 +18,8 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , selfModel(std::make_unique<SelfModel>())
+    , socialLearning(std::make_unique<SocialLearning>())
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
@@ -25,6 +29,8 @@ NeuralPlanner::~NeuralPlanner() = default;
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    pImpl->selfModel->initialize(brain);
+    pImpl->socialLearning->initialize(brain);
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
@@ -241,15 +247,20 @@ void NeuralPlanner::clearCache() {
     // Clear any planning cache
 }
 
-bool NeuralPlanner::wasRecentPlanSuccessful() const {
-    if (recentPlanSuccess_.empty()) return true;  // No data
-    
-    size_t successCount = 0;
-    for (bool success : recentPlanSuccess_) {
-        if (success) ++successCount;
-    }
-    
-    return successCount > recentPlanSuccess_.size() / 2;
+SelfModel& NeuralPlanner::getSelfModel() {
+    return *pImpl->selfModel;
+}
+
+const SelfModel& NeuralPlanner::getSelfModel() const {
+    return *pImpl->selfModel;
+}
+
+SocialLearning& NeuralPlanner::getSocialLearning() {
+    return *pImpl->socialLearning;
+}
+
+const SocialLearning& NeuralPlanner::getSocialLearning() const {
+    return *pImpl->socialLearning;
 }
 
 // SelfModel Implementation
@@ -335,9 +346,9 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                               const std::vector<float>& afterState,
+                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     

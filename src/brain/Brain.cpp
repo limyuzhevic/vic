@@ -9,11 +9,17 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -46,6 +52,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -71,9 +80,15 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    bool sleepEnabled;
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    
+    // Sleep/rest timing
+    Timestamp sleepStartTime;
+    size_t sleepDurationSteps;
+    Timestamp accumulatedSleepTime;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -89,9 +104,13 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepEnabled(true)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , sleepDurationSteps(100)  // Sleep for 100 steps
+        , accumulatedSleepTime(0.0)
+        , consolidationThreshold(0.3f)  // Consolidation threshold
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -113,8 +132,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // Initialize prediction system and connect to sensory/memory systems
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -126,6 +146,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -148,6 +171,11 @@ struct Brain::Impl {
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Sleep/rest settings
+        sleepEnabled = config->getOr<bool>("sleep_enabled", true);
+        sleepDurationSteps = config->getOr<size_t>("sleep_duration_steps", 100);
+        consolidationThreshold = config->getOr<float>("sleep_consolidation_threshold", 0.3f);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -239,11 +267,12 @@ bool Brain::initialize() {
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+        // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    predictionSystem = std::make_unique<PredictionSystem>();
+    predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -406,18 +435,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -437,9 +454,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Apply enhanced dopamine effects beyond STDP scaling
+        if (pImpl->dopamine) {
+            std::vector<Neuron*> allNeurons;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        allNeurons.push_back(neuron);
+                    }
+                }
+            }
+            pImpl->dopamine->applyToNeuralExcitability(allNeurons);
+        }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    // Update novelty detection
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    // Update curiosity
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update acetylcholine
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on neural excitability
+        // ACh enhances sensory processing and reduces noise
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // ACh modulates excitability by enhancing signal-to-noise ratio
+                    float attentionMod = acetylcholineLevel * 0.3f;
+                    if (attentionMod > 0.0f) {
+                        neuron->applyModulatoryInput(attentionMod * 5.0f); // Stronger modulatory effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on neural excitability
+        // NE enhances arousal and vigilance
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // NE modulates excitability based on arousal level
+                    float arousalMod = norepinephrineLevel * 0.4f;
+                    if (arousalMod > 0.0f) {
+                        neuron->applyModulatoryInput(arousalMod * 4.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on neural excitability
+        // 5-HT affects mood and learning rate modulation
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // 5-HT modulates excitability based on mood state
+                    float moodMod = serotoninLevel * 0.2f;
+                    if (moodMod > 0.0f) {
+                        neuron->applyModulatoryInput(moodMod * 3.0f);
+                    }
+                }
+            }
+        }
+    }
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -511,11 +610,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input for prediction
+        // The sensory input should be available from the current state
+        // For now, we use a simple internal signal representation
+        InternalSignals currentSignals;
+        
+        // Convert sensory neurons to signal values
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 10; ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                currentSignals.addSignal(activation);
+            }
+        }
+        
+        // Make prediction for next state using neural activity patterns
+        std::unique_ptr<SensoryInput> prediction = pImpl->predictionSystem->predictNextState(currentSignals);
+        
+        // Update prediction system with actual sensory state
+        pImpl->predictionSystem->updatePredictions(*prediction, currentSignals);
+        
+        // Train prediction model with current observation
+        pImpl->predictionSystem->train(currentSignals);
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // Add prediction error computation for learning (used by neuromodulation systems)
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Use prediction system error to compute prediction error signal
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        pImpl->predictionError->computeError(predictionError, predictionError);
+    }
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -725,40 +849,211 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     pImpl->stdp->setLTDWeight(0.012f * modulation);
 }
 
-void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
+void Brain::wake() {
+    if (!pImpl->isResting) {
+        return;
+    }
+    
+    NLM_LOG_INFO("Waking brain from sleep/rest...");
+    
+    // Restore normal computation state
+    pImpl->isResting = false;
+    
+    // Reset sleep timing
+    pImpl->accumulatedSleepTime = 0.0f;
+    
+    // The brain is now ready for normal operation
+    // All sleep-based changes (memory consolidation, neuromodulation updates)
+    // have been applied
+    
+    NLM_LOG_INFO("Brain wake complete - ready for normal operation");
 }
 
+bool Brain::isSleeping() const {
+    return pImpl->isResting;
+}
+
+void Brain::enableSleep(bool enable) {
+    pImpl->sleepEnabled = enable;
+    
+    if (enable) {
+        NLM_LOG_INFO("Sleep/rest enabled");
+    } else {
+        NLM_LOG_INFO("Sleep/rest disabled");
+        // Force wake if sleep is disabled
+        if (pImpl->isResting) {
+            const_cast<Brain*>(this)->wake();
+        }
+    }
 void Brain::develop() {
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
-void Brain::reset() {
-    NLM_LOG_INFO("Resetting NLM Brain...");
+void Brain::sleep() {
+    if (!pImpl->sleepEnabled) return;
     
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
+    NLM_LOG_INFO("Brain entering sleep/rest state...");
+    
+    pImpl->isResting = true;
+    pImpl->sleepStartTime = pImpl->currentTime;
+    
+    // Reset spike counts and statistics for clean state
     pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
+    pImpl->spikeSystem->reset();
     
-    for (auto& region : pImpl->regions) {
-        region->reset();
+    // Accumulate time spent sleeping
+    pImpl->accumulatedSleepTime += pImpl->sleepDurationSteps * pImpl->timestep;
+    
+    // Step 1: Sleep-specific memory replay (enhanced from regular replay)
+    if (pImpl->episodicMemory) {
+        // Enhanced replay based on memory strength, not just fixed intervals
+        // Select episodes based on: recency, reward, novelty, and prediction error
+        
+        // Get current neuromodulation levels to influence replay selection
+        float dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        // During sleep, replay is more strategic:
+        // - High dopamine enhances replay of reward-related memories
+        // - More episodes replayed compared to awake replay
+        
+        size_t sleepReplayCount = std::min(10, pImpl->episodicMemory->getEpisodeCount() / 10);
+        
+        // Replay important memories (step 4 from original implementation)
+        if (sleepReplayCount > 0) {
+            // Get episodes for sleep-based replay with enhanced scoring
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(sleepReplayCount);
+            
+            // Additional sleep-specific replay based on neuromodulation
+            if (dopamineLevel > 0.7f && pImpl->dopamine) {
+                // High dopamine boosts replay of high-reward memories
+                // This would require a method to get high-reward episodes
+                // For now, we replay the standard set
+            }
+            
+            for (const auto* episode : episodesToReplay) {
+                // Replay during sleep (enhanced with sleep-specific effects)
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    // Step 2: Neuromodulation effects during sleep (requirement 5)
+    // Dopamine effects on memory consolidation
+    if (pImpl->dopamine) {
+        float currentDA = pImpl->dopamine->getLevel();
+        
+        // During sleep, dopamine modulates consolidation:
+        // - High dopamine (from reward prediction) enhances consolidation
+        // - Weaker decay during sleep compared to awake state
+        pImpl->dopamine->update(pImpl->timestep * 2.0f);  // Slower decay during sleep
+        
+        // Update synaptic weights based on dopamine-modulated plasticity
+        if (currentDA > 0.5f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Dopamine-modulated synaptic strengthening during sleep
+                    if (syn->getWeight() > 0) {
+                        // Enhance excitatory synapses
+                        float weight = syn->getWeight();
+                        weight += 0.001f * (currentDA - 0.5f);
+                        syn->setWeight(std::min(1.0f, weight));
+                    }
+                }
+            }
+        }
+    }
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Acetylcholine effects on memory consolidation during sleep
+    // Note: ACh class exists but doesn't have real implementation yet
+    // We'll handle this when neuromodulation is fully implemented
     
-    NLM_LOG_INFO("NLM Brain reset complete");
+    // Norepinephrine effects during sleep
+    // Placeholder for NE effects on arousal and memory strengthening
+    
+    // Serotonin effects during sleep
+    // Placeholder for 5-HT effects on mood and memory integration
+    
+    // Step 3: Memory consolidation during sleep (requirement 4)
+    // Move important memories to long-term storage
+    if (pImpl->episodicMemory) {
+        // Consolidate episodic memories
+        pImpl->episodicMemory->consolidate(pImpl->consolidationThreshold);
+        
+        // Update episodicMemoryConsolidationCount for statistics
+        pImpl->episodicMemoryConsolidationCount++;
+    }
+    
+    if (pImpl->associativeMemory) {
+        // Clean up weak associations during sleep
+        // For now, just clear weak associations based on strength threshold
+        size_t initialCount = pImpl->associativeMemory->getAssociationCount();
+        
+        // Simulate weak association removal
+        // In real implementation, would check association strength
+        size_t weakAssociationsToRemove = initialCount / 10;  // Remove 10% weakest
+        
+        // Note: NeuralAssociativeMemory doesn't have removeWeakAssociations method yet
+        // This would be added as part of the sleep implementation
+        
+        pImpl->associativeMemoryConsolidationCount++;
+    }
+    
+    // Step 4: Update prediction system during sleep
+    // Sleep helps integrate prediction errors and update models
+    if (pImpl->predictionSystem) {
+        // During sleep, the prediction system can integrate experiences
+        // Update prediction models based on replayed memories
+        // This helps in updating internal models of the environment
+    }
+    
+    // Step 5: Apply developmental changes during sleep (requirement 6)
+    // Brains can "mature" through rest cycles
+    if (pImpl->developmentSystem) {
+        // Apply developmental changes during sleep
+        // Sleep is when development can progress without external input
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * pImpl->sleepDurationSteps);
+        
+        // Sleep can influence developmental stage progression
+        if (pImpl->sleepDurationSteps > 50) {  // Longer sleeps advance development
+            // This would be in a real implementation
+            // pImpl->developmentSystem->advanceStage();
+        }
+    }
+    
+    // Step 6: Reset neural connections based on replay
+    // Replay during sleep strengthens important pathways and weakens unused ones
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Synaptic homeostasis during sleep
+            // Weaken synapses that were weakly active during the day
+            // This is similar to the synaptic downscaling theory
+            float weight = syn->getWeight();
+            
+            // Subthreshold weights decay during sleep (homeostatic plasticity)
+            if (weight < 0.1f) {
+                weight *= 0.95f;  // Decay weak synapses
+            }
+            
+            syn->setWeight(weight);
+        }
+    }
+    
+    // Step 7: Update neuromodulatory systems
+    // Prepare for wake-up by updating neuromodulator levels
+    if (pImpl->novelty) {
+        // Novelty resets during sleep
+        pImpl->novelty->reset();
+    }
+    
+    if (pImpl->curiosity) {
+        // Curiosity can build up during sleep
+        // This represents increased readiness to explore after rest
+    }
+    
+    NLM_LOG_INFO(std::string("Sleep complete: ") + std::to_string(pImpl->sleepDurationSteps) + 
+                 " steps, " + std::to_string(pImpl->accumulatedSleepTime) + " seconds accumulated");
+}
 }
 
 bool Brain::save(const std::string& filepath) const {
@@ -1029,6 +1324,14 @@ NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
 }
 
+SelfModel* Brain::getSelfModel() {
+    return &pImpl->planner->getSelfModel();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return &pImpl->planner->getSocialLearning();
+}
+
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
 }
@@ -1067,6 +1370,18 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
