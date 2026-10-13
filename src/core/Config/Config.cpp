@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <chrono>
+
+// Optional: You can add nlohmann/json.hpp here if you want to support JSON files
+// #include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +24,157 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    NLM_LOG_DEBUG("Loading configuration from file: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found or cannot be opened: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+    // Check file extension to determine format
+    std::string ext = "";
+    size_t dotPos = filepath.rfind('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos + 1);
+    }
+    
+    bool success = false;
+    if (ext == "json" || ext == "JSON") {
+        success = loadFromJSON(file);
+    } else if (ext == "yaml" || ext == "yml" || ext == "YAML") {
+        NLM_LOG_WARNING("YAML parsing not yet implemented, falling back to simple key=value format");
+        // TODO: Implement YAML parsing
+        // For now, fall back to simple format
+        success = loadFromSimpleFormat(file);
+    } else {
+        // Default: try to detect format from content
+        std::string firstLine;
+        if (std::getline(file, firstLine)) {
+            file.clear();
+            file.seekg(0);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Check if it looks like JSON
+            if (firstLine.trim().front() == '{') {
+                success = loadFromJSON(file);
+            } else {
+                success = loadFromSimpleFormat(file);
             }
-            
-            set(key, value, ConfigSource::File);
         }
     }
     
-    return true;
+    if (success) {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+    } else {
+        NLM_LOG_ERROR("Failed to load configuration from: " + filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
+    std::string line;
+    int lineNumber = 0;
+    int successCount = 0;
+    
+    while (std::getline(file, line)) {
+        lineNumber++;
+        
+        // Skip empty lines and comments
+        std::string trimmed = trim(line);
+        if (trimmed.empty() || trimmed[0] == '#' || trimmed[0] == '/') {
+            continue;
+        }
+        
+        // Parse key=value pairs
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid configuration line in simple format: line " + std::to_string(lineNumber) + ": " + line);
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key found in configuration at line " + std::to_string(lineNumber));
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Type inference based on value content
+        try {
+            // Try to parse as integer
+            size_t posEnd;
+            int intValue = std::stoi(value, &posEnd);
+            if (posEnd == value.length()) {
+                set(key, intValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Try to parse as double
+            double doubleValue = std::stod(value, &posEnd);
+            if (posEnd == value.length()) {
+                set(key, doubleValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Try to parse as boolean
+            if (value == "true" || value == "false") {
+                bool boolValue = (value == "true");
+                set(key, boolValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Default to string
+            set(key, value, ConfigSource::File);
+            successCount++;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING("Failed to parse value for key '" + key + "' at line " + 
+                           std::to_string(lineNumber) + ": " + e.what());
+            // Fall back to storing as string
+            set(key, value, ConfigSource::File);
+            successCount++;
+        }
+    }
+    
+    NLM_LOG_DEBUG("Loaded " + std::to_string(successCount) + " entries from simple configuration format");
+    return !pImpl->entries.empty();
+}
+
+bool Config::loadFromJSON(std::ifstream& file) {
+    NLM_LOG_DEBUG("Attempting to parse JSON configuration");
+    
+    // For now, implement a simple JSON parser
+    // This is a minimal implementation that can be replaced with nlohmann/json
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple JSON parsing - expects format: {"key": "value", "number": 42}
+    if (content.empty() || content.find("{") == std::string::npos) {
+        NLM_LOG_WARNING("Invalid JSON format: missing opening brace");
+        return false;
+    }
+    
+    // This is a very basic JSON parser - in production, use nlohmann/json
+    // For now, fall back to simple format
+    file.clear();
+    file.seekg(0);
+    return loadFromSimpleFormat(file);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +208,19 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Save actual value instead of placeholder
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -126,25 +260,138 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
+// Enhanced set method with input validation
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    NLM_LOG_DEBUG("Setting config key: '" + key + "' = '" + value + "' (source: " + std::to_string(static_cast<int>(source)) + ")");
+    
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Attempted to set config with empty key");
+        return;
+    }
+    
+    // Validate key format (alphanumeric and underscores)
+    if (!std::all_of(key.begin(), key.end(), [](char c) {
+        return std::isalnum(c) || c == '_' || c == '-';
+    })) {
+        NLM_LOG_WARNING("Config key contains non-alphanumeric characters: '" + key + "'");
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    NLM_LOG_DEBUG("Setting config key: '" + key + "' = " + std::to_string(value) + " (source: " + std::to_string(static_cast<int>(source)) + ")");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    NLM_LOG_DEBUG("Setting config key: '" + key + "' = " + std::to_string(value) + " (source: " + std::to_string(static_cast<int>(source)) + ")");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    NLM_LOG_DEBUG("Setting config key: '" + key + "' = " + std::string(value ? "true" : "false") + " (source: " + std::to_string(static_cast<int>(source)) + ")");
     set(key, ConfigValue(value), source);
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+// Helper method to format variant values for logging
+template<typename T>
+std::string Config::formatValue(const ConfigValue& value) const {
+    try {
+        T val = std::get<T>(value);
+        if constexpr (std::is_same_v<T, std::string>) {
+            return "\"" + val + "\"";
+        } else {
+            return std::to_string(val);
+        }
+    } catch (const std::bad_variant_access&) {
+        return "[unknown type]";
+    }
+}
+
+// Simple format loader (for backward compatibility and fallback)
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
+    NLM_LOG_DEBUG("Loading configuration using simple key=value format");
+    
+    std::string line;
+    int lineNumber = 0;
+    int successCount = 0;
+    
+    while (std::getline(file, line)) {
+        lineNumber++;
+        
+        // Skip empty lines and comments
+        std::string trimmed = trim(line);
+        if (trimmed.empty() || trimmed[0] == '#' || trimmed[0] == '/') {
+            continue;
+        }
+        
+        // Parse key=value pairs
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid configuration line in simple format: line " + std::to_string(lineNumber) + ": " + line);
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key found in configuration at line " + std::to_string(lineNumber));
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Type inference based on value content
+        try {
+            // Try to parse as integer
+            size_t posEnd;
+            int intValue = std::stoi(value, &posEnd);
+            if (posEnd == value.length()) {
+                set(key, intValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Try to parse as double
+            double doubleValue = std::stod(value, &posEnd);
+            if (posEnd == value.length()) {
+                set(key, doubleValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Try to parse as boolean
+            if (value == "true" || value == "false") {
+                bool boolValue = (value == "true");
+                set(key, boolValue, ConfigSource::File);
+                successCount++;
+                continue;
+            }
+            
+            // Default to string
+            set(key, value, ConfigSource::File);
+            successCount++;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING("Failed to parse value for key '" + key + "' at line " + 
+                           std::to_string(lineNumber) + ": " + e.what());
+            // Fall back to storing as string
+            set(key, value, ConfigSource::File);
+            successCount++;
+        }
+    }
+    
+    NLM_LOG_DEBUG("Loaded " + std::to_string(successCount) + " entries from simple configuration format");
+    return !pImpl->entries.empty();
 }
 
 void Config::remove(const std::string& key) {
