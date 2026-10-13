@@ -393,8 +393,128 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+.def("getBrain", &AgentBrain::getBrain,
+                 py::return_value_policy::reference_internal,
+                 "Get the underlying brain")
+         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+              py::arg("enable"))
+         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+              py::arg("enable"))
+         .def("enableDevelopment", &AgentBrain::enableDevelopment,
+              py::arg("enable"))
+         .def("enableCuriosity", &AgentBrain::enableCuriosity,
+              py::arg("enable"))
+         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+         // Advanced brain statistics
+         .def("getNetworkDensity", &Brain::getNetworkDensity,
+              "Get network density (synapses per neuron)")
+         .def("getAverageWeight", &Brain::getAverageWeight,
+              "Get average synaptic weight")
+         .def("getWeightVariance", &Brain::getWeightVariance,
+              "Get variance of synaptic weights")
+         .def("getExcitatoryInhibitoryBalance", &Brain::getExcitationInhibitionRatio,
+              "Get excitation/inhibition balance ratio")
+         .def("getActiveNeuronPercentage", &Brain::getActiveNeuronPercentage,
+              "Get percentage of active neurons")
+         .def("getSpikeRate", &Brain::getAverageFiringRate,
+              "Get average spike rate")
+         .def("getRegionCount", &Brain::getRegionCount,
+              "Get number of regions")
+         .def("getRegionNames", &Brain::getRegionNames,
+              "Get names of all regions")
+         .def("getTotalConnections", &Brain::getTotalSynapseCount,
+              "Get total number of connections")
+         // Advanced plasticity controls
+         .def("enablePlasticity", [](Brain& self, bool hebbian, bool stdp, bool rewardModulated) {
+             auto stdp = self.getSTDP();
+             auto hebbianRule = self.getHebbian();
+             auto structural = self.getStructuralPlasticity();
+             
+             if (stdp) stdp->enablePlasticity(hebbian, stdp, rewardModulated);
+             if (hebbianRule) hebbianRule->enablePlasticity(hebbian, stdp, rewardModulated);
+             if (structural) structural->enablePlasticity(hebbian, stdp, rewardModulated);
+         }, py::arg("hebbian") = true, py::arg("stdp") = true, py::arg("rewardModulated") = false,
+              "Enable specific plasticity rules")
+         .def("disablePlasticity", [](Brain& self, bool hebbian, bool stdp, bool rewardModulated) {
+             auto stdp = self.getSTDP();
+             auto hebbianRule = self.getHebbian();
+             auto structural = self.getStructuralPlasticity();
+             
+             if (stdp) {
+                 PlasticityFlags flags;
+                 flags.hebbian = !hebbian;
+                 flags.stdp = !stdp;
+                 flags.reward_modulated = !rewardModulated;
+                 stdp->setPlasticityFlags(flags);
+             }
+             if (hebbianRule) {
+                 PlasticityFlags flags;
+                 flags.hebbian = !hebbian;
+                 flags.stdp = !stdp;
+                 flags.reward_modulated = !rewardModulated;
+                 hebbianRule->setPlasticityFlags(flags);
+             }
+             if (structural) {
+                 PlasticityFlags flags;
+                 flags.hebbian = !hebbian;
+                 flags.stdp = !stdp;
+                 flags.reward_modulated = !rewardModulated;
+                 structural->setPlasticityFlags(flags);
+             }
+         }, py::arg("hebbian") = true, py::arg("stdp") = true, py::arg("rewardModulated") = false,
+              "Disable specific plasticity rules")
+         // Development stage control
+         .def("advanceDevelopmentStage", &Brain::advanceDevelopmentStage,
+              "Advance development stage by one step")
+         .def("setDevelopmentStage", &Brain::setDevelopmentalStage,
+              py::arg("stage"), "Set development stage")
+         .def("getDevelopmentStageName", &Brain::getDevelopmentStageName,
+              "Get human-readable development stage name")
+         // Network visualization data
+         .def("getConnectionMatrix", &Brain::getConnectionMatrix,
+              py::return_value_policy::reference_internal,
+              "Get connection matrix for visualization")
+         .def("getNeuronPositions", &Brain::getNeuronPositions,
+              py::return_value_policy::reference_internal,
+              "Get neuron positions for visualization")
+         .def("getSynapticWeights", &Brain::getSynapticWeights,
+              py::return_value_policy::reference_internal,
+              "Get all synaptic weights")
+         // Checkpoint management enhancements
+         .def("saveCheckpoint", &Brain::saveCheckpoint,
+              py::arg("filepath"), py::arg("include_neurons") = true, py::arg("include_synapses") = true,
+              "Save brain state to checkpoint file")
+         .def("loadCheckpoint", &Brain::loadCheckpoint,
+              py::arg("filepath"), "Load brain state from checkpoint file")
+         .def("exportForAnalysis", [](Brain& self, const std::string& filepath) {
+             self.save(filepath + "_analysis.json");
+             self.save(filepath + "_data.bin");
+         }, py::arg("base_filepath"), "Export brain data in multiple formats for analysis")
+         // Real-time monitoring
+         .def("startMonitoring", &Brain::startMonitoring,
+              py::arg("interval_ms") = 100, "Start real-time monitoring")
+         .def("stopMonitoring", &Brain::stopMonitoring,
+              "Stop real-time monitoring")
+         .def("getMonitoringData", &Brain::getMonitoringData,
+              "Get monitoring data")
+         // Configuration management
+         .def("updateConfig", [](Brain& self, const std::string& key, const std::string& value) {
+             self.getConfig()->set(key, value);
+         }, py::arg("key"), py::arg("value"),
+              "Update configuration value")
+         .def("updateConfigInt", [](Brain& self, const std::string& key, int64_t value) {
+             self.getConfig()->set(key, value);
+         }, py::arg("key"), py::arg("value"),
+              "Update configuration integer value")
+         .def("updateConfigFloat", [](Brain& self, const std::string& key, float value) {
+             self.getConfig()->set(key, value);
+         }, py::arg("key"), py::arg("value"),
+              "Update configuration float value")
+         .def("getConfigAsString", &Brain::getConfigSummary,
+              "Get configuration as string summary");
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)

@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <algorithm>
 
 namespace nlm {
 
@@ -17,6 +19,16 @@ enum class LogLevel {
     Error = 3,
     Critical = 4
 };
+
+// Logging macros for better debugging
+#define NLM_LOG_STREAM(level, message) \
+    nlm::LogStream(nlm::LogLevel::level, __FILE__, __LINE__, __func__) << message
+
+#define NLM_LOG_DEBUG_STREAM NLM_LOG_STREAM(Debug, "")
+#define NLM_LOG_INFO_STREAM NLM_LOG_STREAM(Info, "")
+#define NLM_LOG_WARNING_STREAM NLM_LOG_STREAM(Warning, "")
+#define NLM_LOG_ERROR_STREAM NLM_LOG_STREAM(Error, "")
+#define NLM_LOG_CRITICAL_STREAM NLM_LOG_STREAM(Critical, "")
 
 // Log entry structure
 struct LogEntry {
