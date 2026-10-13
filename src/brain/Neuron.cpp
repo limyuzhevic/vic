@@ -112,39 +112,51 @@ void Neuron::setResetPotential(MembranePotential potential) {
 }
 
 bool Neuron::checkThreshold() const {
+    if (!pImpl) return false;
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
+    if (!pImpl) return -1.0f;
     return pImpl->state.lastSpikeTime;
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    if (!pImpl) return;
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    if (!pImpl) return;
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+    if (!pImpl) return;
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
+    if (!pImpl) return;
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
 }
 
 void Neuron::clearTotalCurrent() {
+    if (!pImpl) return;
     pImpl->synapticInput = 0.0f;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    if (!pImpl) return 0.0f;
+    return pImpl->synapticInput;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
