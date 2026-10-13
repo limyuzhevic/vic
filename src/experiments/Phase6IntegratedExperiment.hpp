@@ -120,9 +120,9 @@ public:
     bool testMemoryIntegration();
     
     /**
-     * Test neuromodulation integration
+     * Test neuromodulation integration with all neuromodulators
      */
-    bool testNeuromodulationIntegration();
+    bool testFullNeuromodulationIntegration();
     
     /**
      * Test checkpoint save/load

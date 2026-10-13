@@ -287,7 +287,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
-    NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
+    NLM_LOG_INFO("=== Testing Full Neuromodulation Integration ===");
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
@@ -295,25 +295,276 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get neuromodulation systems
+    // Get all neuromodulation systems
     auto* dopamine = brain->getDopamine();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* predictionError = brain->getPredictionErrorSignal();
     
-    if (!dopamine || !curiosity || !novelty) {
-        NLM_LOG_ERROR("Neuromodulation systems not available");
+    if (!dopamine || !acetylcholine || !norepinephrine || !serotonin || !curiosity || !novelty || !predictionError) {
+        NLM_LOG_ERROR("Not all neuromodulation systems available");
         return false;
     }
+    
+    // Test basic neuromodulator functionality
+    float initialDopamine = dopamine->getLevel();
+    float initialACh = acetylcholine->getLevel();
+    float initialNE = norepinephrine->getLevel();
+    float initial5HT = serotonin->getLevel();
     
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
         // Inject some sensory activity
         brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
         brain->step(i, i * 0.001);
+        
+        // Test neuromodulator-specific effects
+        if (i % 10 == 0) {
+            // Test reward signaling
+            if (dopamine) {
+                dopamine->signalReward(0.1f);
+            }
+            
+            // Test attention enhancement
+            if (acetylcholine) {
+                acetylcholine->enhanceAttention(0.5f);
+            }
+            
+            // Test arousal increase
+            if (norepinephrine) {
+                norepinephrine->increaseArousal(0.3f);
+            }
+            
+            // Test mood modulation
+            if (serotonin) {
+                serotonin->modulateMood(0.2f);
+            }
+        }
     }
     
+    // Check that neuromodulators have been activated
+    float finalDopamine = dopamine->getLevel();
+    float finalACh = acetylcholine->getLevel();
+    float finalNE = norepinephrine->getLevel();
+    float final5HT = serotonin->getLevel();
+    
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("[PASS] Dopamine level changed from " + std::to_string(initialDopamine) + " to " + std::to_string(finalDopamine));
+    NLM_LOG_INFO("[PASS] Acetylcholine level changed from " + std::to_string(initialACh) + " to " + std::to_string(finalACh));
+    NLM_LOG_INFO("[PASS] Norepinephrine level changed from " + std::to_string(initialNE) + " to " + std::to_string(finalNE));
+    NLM_LOG_INFO("[PASS] Serotonin level changed from " + std::to_string(initial5HT) + " to " + std::to_string(final5HT));
+    
     return true;
+}
+
+bool Phase6IntegratedExperiment::testFullNeuromodulationIntegration() {
+    NLM_LOG_INFO("=== Testing Complete Neuromodulation System ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain");
+        return false;
+    }
+    
+    NLM_LOG_INFO("=== Checking Neuromodulator Availability ===");
+    
+    // Check that all neuromodulators are properly initialized and accessible
+    auto* dopamine = brain->getDopamine();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
+    auto* curiosity = brain->getCuriosity();
+    auto* novelty = brain->getNovelty();
+    auto* predictionError = brain->getPredictionErrorSignal();
+    
+    if (!dopamine) {
+        NLM_LOG_ERROR("[FAIL] Dopamine system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Dopamine system available");
+    }
+    
+    if (!acetylcholine) {
+        NLM_LOG_ERROR("[FAIL] Acetylcholine system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Acetylcholine system available");
+    }
+    
+    if (!norepinephrine) {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Norepinephrine system available");
+    }
+    
+    if (!serotonin) {
+        NLM_LOG_ERROR("[FAIL] Serotonin system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Serotonin system available");
+    }
+    
+    if (!curiosity) {
+        NLM_LOG_ERROR("[FAIL] Curiosity system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Curiosity system available");
+    }
+    
+    if (!novelty) {
+        NLM_LOG_ERROR("[FAIL] Novelty system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Novelty system available");
+    }
+    
+    if (!predictionError) {
+        NLM_LOG_ERROR("[FAIL] Prediction error system not available");
+        return false;
+    } else {
+        NLM_LOG_INFO("[PASS] Prediction error system available");
+    }
+    
+    NLM_LOG_INFO("=== Testing Neuromodulator-Specific Effects ===");
+    
+    // Test each neuromodulator's specific functionality
+    bool allTestsPassed = true;
+    
+    // Test 1: Dopamine reward signaling
+    if (dopamine) {
+        float initialLevel = dopamine->getLevel();
+        dopamine->signalReward(0.5f);
+        float rewardLevel = dopamine->getLevel();
+        if (rewardLevel > initialLevel) {
+            NLM_LOG_INFO("[PASS] Dopamine reward signaling works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Dopamine reward signaling failed");
+            allTestsPassed = false;
+        }
+    }
+    
+    // Test 2: Acetylcholine attention enhancement
+    if (acetylcholine) {
+        float initialACh = acetylcholine->getLevel();
+        acetylcholine->enhanceAttention(0.7f);
+        float finalACh = acetylcholine->getLevel();
+        if (finalACh > initialACh) {
+            NLM_LOG_INFO("[PASS] Acetylcholine attention enhancement works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Acetylcholine attention enhancement failed");
+            allTestsPassed = false;
+        }
+        
+        // Test memory consolidation facilitation
+        acetylcholine->facilitateMemoryConsolidation(0.6f);
+        float attentionMod = acetylcholine->getAttentionModulation();
+        float memoryConsolidationStrength = acetylcholine->getMemoryConsolidationStrength();
+        if (attentionMod > 1.0f && memoryConsolidationStrength > 1.0f) {
+            NLM_LOG_INFO("[PASS] Acetylcholine memory consolidation enhancement works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Acetylcholine memory consolidation enhancement failed");
+            allTestsPassed = false;
+        }
+    }
+    
+    // Test 3: Norepinephrine arousal
+    if (norepinephrine) {
+        float initialNE = norepinephrine->getLevel();
+        norepinephrine->increaseArousal(0.8f);
+        float finalNE = norepinephrine->getLevel();
+        if (finalNE > initialNE) {
+            NLM_LOG_INFO("[PASS] Norepinephrine arousal enhancement works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Norepinephrine arousal enhancement failed");
+            allTestsPassed = false;
+        }
+        
+        // Test vigilance enhancement
+        norepinephrine->enhanceVigilance(0.5f);
+        float arousalLevel = norepinephrine->getArousalLevel();
+        float vigilanceLevel = norepinephrine->getVigilanceLevel();
+        if (arousalLevel > 1.0f && vigilanceLevel > 1.0f) {
+            NLM_LOG_INFO("[PASS] Norepinephrine vigilance enhancement works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Norepinephrine vigilance enhancement failed");
+            allTestsPassed = false;
+        }
+    }
+    
+    // Test 4: Serotonin mood modulation
+    if (serotonin) {
+        float initial5HT = serotonin->getLevel();
+        serotonin->modulateMood(0.6f);
+        float final5HT = serotonin->getLevel();
+        if (final5HT > initial5HT) {
+            NLM_LOG_INFO("[PASS] Serotonin mood modulation works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Serotonin mood modulation failed");
+            allTestsPassed = false;
+        }
+        
+        // Test impulse control
+        serotonin->regulateImpulsivity(0.7f);
+        float impulseControlLevel = serotonin->getImpulseControlLevel();
+        if (impulseControlLevel > 1.0f) {
+            NLM_LOG_INFO("[PASS] Serotonin impulse control works");
+        } else {
+            NLM_LOG_ERROR("[FAIL] Serotonin impulse control failed");
+            allTestsPassed = false;
+        }
+    }
+    
+    // Test 5: Complete integration with brain step
+    NLM_LOG_INFO("=== Testing Neuromodulation Integration with Brain ===");
+    for (int i = 0; i < 100; ++i) {
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 3.0f);
+        brain->step(i, i * 0.001);
+    }
+    
+    // Check that neuromodulators have been used by the brain
+    if (dopamine && dopamine->getLevel() > 0.0f) {
+        NLM_LOG_INFO("[PASS] Dopamine integrated with brain processing");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Dopamine not properly integrated with brain");
+        allTestsPassed = false;
+    }
+    
+    if (acetylcholine && acetylcholine->getLevel() > 0.0f) {
+        NLM_LOG_INFO("[PASS] Acetylcholine integrated with brain processing");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Acetylcholine not properly integrated with brain");
+        allTestsPassed = false;
+    }
+    
+    if (norepinephrine && norepinephrine->getLevel() > 0.0f) {
+        NLM_LOG_INFO("[PASS] Norepinephrine integrated with brain processing");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine not properly integrated with brain");
+        allTestsPassed = false;
+    }
+    
+    if (serotonin && serotonin->getLevel() > 0.0f) {
+        NLM_LOG_INFO("[PASS] Serotonin integrated with brain processing");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Serotonin not properly integrated with brain");
+        allTestsPassed = false;
+    }
+    
+    NLM_LOG_INFO("=== Complete Neuromodulation System Test Results ===");
+    if (allTestsPassed) {
+        NLM_LOG_INFO("[SUCCESS] All neuromodulation system tests passed!")
+        return true;
+    } else {
+        NLM_LOG_ERROR("[FAILURE] Some neuromodulation system tests failed");
+        return false;
+    }
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {

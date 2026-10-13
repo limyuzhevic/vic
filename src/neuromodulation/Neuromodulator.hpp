@@ -48,6 +48,93 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced dopamine functions for integration with brain systems
+    void updateWorkingMemory(float memoryStrength);
+    void modulateAttention(float attentionFocus);
+    void consolidateMemory(float memoryStrength);
+    void updateEpisodicMemory(float rewardValue);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Acetylcholine: Attention and memory consolidation
+class Acetylcholine : public Neuromodulator {
+public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Cholinergic effects on brain systems
+    void enhanceAttention(float stimulus salience);
+    void facilitateMemoryConsolidation(float memoryStrength);
+    void modulateSynapticPlasticity(float plasticityRate);
+    void updateWorkingMemoryEncoding(const std::vector<float>& pattern);
+    
+    // Get cholinergic state
+    float getAttentionModulation() const;
+    float getMemoryConsolidationStrength() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Norepinephrine: Arousal and vigilance
+class Norepinephrine : public Neuromodulator {
+public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Noradrenergic effects on brain systems
+    void increaseArousal(float stimulusIntensity);
+    void enhanceVigilance(float alertness);
+    void modulateBetaOscillations(float frequency);
+    void updateLocusCoeruleusActivity(float activity);
+    
+    // Get noradrenergic state
+    float getArousalLevel() const;
+    float getVigilanceLevel() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Serotonin: Mood, impulsivity, and social behavior
+class Serotonin : public Neuromodulator {
+public:
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Serotonergic effects on brain systems
+    void modulateMood(float moodState);
+    void regulateImpulsivity(float impulseControl);
+    void influenceSocialBehavior(float socialEngagement);
+    void updateSocialMemoryFormation(float socialStrength);
+    
+    // Get serotonergic state
+    float getMoodLevel() const;
+    float getImpulseControlLevel() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
