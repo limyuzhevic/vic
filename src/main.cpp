@@ -7,6 +7,15 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+// NLM (熙然) - Neural Learning Machine
+// Phase 2: Real Neural Computation
+//
+// This phase implements real spiking neural computation with:
+// - Leaky Integrate-and-Fire (LIF) neurons
+// - Event-driven spike propagation with synaptic delays
+// - STDP and Hebbian plasticity
+// - Structural plasticity (synaptogenesis/pruning)
+
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -25,8 +34,62 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <fstream>
 
 using namespace nlm;
+
+// Configuration helper functions
+namespace {
+    std::string getCurrentTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+    
+    void printUsage(const char* programName) {
+        std::cout << "Usage: " << programName << " [options]" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  --help, -h                    Show this help message" << std::endl;
+        std::cout << "  --config <file>              Load configuration from file" << std::endl;
+        std::cout << "  --neurons <count>            Set number of neurons (default: 1000)" << std::endl;
+        std::cout << "  --regions <count>            Set number of regions (default: 1)" << std::endl;
+        std::cout << "  --timestep <ms>              Set simulation timestep (default: 1.0)" << std::endl;
+        std::cout << "  --seed <value>               Set random seed for reproducible results" << std::endl;
+        std::cout << "  --log-level <level>          Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+        std::cout << "  --log-file <file>            Log to file in addition to console" << std::endl;
+        std::cout << "  --checkpoint-dir <dir>       Directory for checkpoint files" << std::endl;
+        std::cout << "  --run <steps>                Run specified number of steps (0 for interactive)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Examples:" << std::endl;
+        std::cout << "  " << programName << " --neurons 5000 --regions 4 --seed 12345" << std::endl;
+        std::cout << "  " << programName << " --config config.json --log-file simulation.log --run 10000" << std::endl;
+    }
+    
+    LogLevel parseLogLevel(const std::string& level) {
+        std::string levelLower = level;
+        std::transform(levelLower.begin(), levelLower.end(), levelLower.begin(), ::tolower);
+        
+        if (levelLower == "debug") return LogLevel::Debug;
+        if (levelLower == "info") return LogLevel::Info;
+        if (levelLower == "warning") return LogLevel::Warning;
+        if (levelLower == "error") return LogLevel::Error;
+        if (levelLower == "critical") return LogLevel::Critical;
+        
+        // Default to Info if unrecognized
+        return LogLevel::Info;
+    }
+    
+    std::string formatMemoryUsage(size_t bytes) {
+        if (bytes < 1024) return std::to_string(bytes) + " B";
+        if (bytes < 1024 * 1024) return std::to_string(bytes / 1024) + " KB";
+        if (bytes < 1024 * 1024 * 1024) return std::to_string(bytes / (1024 * 1024)) + " MB";
+        return std::to_string(bytes / (1024 * 1024 * 1024)) + " GB";
+    }
+}
 
 void printBanner() {
     std::cout << R"(

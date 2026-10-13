@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -65,7 +67,7 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
+    // Sensory neurons for input injection - store weak references for better memory management
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
@@ -78,9 +80,13 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance optimization cache
+    mutable std::unordered_map<RegionId, NeuralRegion*> regionCache;
+    mutable bool regionCacheDirty;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(nullptr)  // Will be initialized in initialize()
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -92,6 +98,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , regionCacheDirty(true)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
