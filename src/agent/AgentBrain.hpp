@@ -9,6 +9,12 @@
 
 namespace nlm {
 
+// Neural planning system
+class NeuralPlanner;
+class ConceptFormation;
+class SelfModel;
+class SocialLearning;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {

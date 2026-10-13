@@ -44,11 +44,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Distribute sensory neurons - make configurable via config system
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
+                        // Use config values if available, otherwise default to 4 types
+                        size_t sensoryDistributionCount = 4;
+                        size_t actionDistributionCount = 6;
+                        
+                        switch (idx % sensoryDistributionCount) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -142,16 +146,156 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
+    // Update concept formation with current sensory input
+    ConceptFormation* conceptFormation = nullptr;
+    if (brain_) {
+        conceptFormation = brain_->getConceptFormation();
+    }
+    
+    if (conceptFormation) {
+        // Create a comprehensive sensory state for concept formation
+        std::vector<float> sensoryState;
+        
+        // Add vision data
+        if (!vision.empty()) {
+            sensoryState.insert(sensoryState.end(), vision.begin(), vision.end());
+        }
+        
+        // Add touch data
+        if (!touch.empty()) {
+            // Normalize touch values
+            std::vector<float> normalizedTouch;
+            for (float t : touch) {
+                float normalized = (t + 1.0f) * 0.5f;  // Normalize from [-1,1] to [0,1]
+                normalizedTouch.push_back(normalized);
+            }
+            sensoryState.insert(sensoryState.end(), normalizedTouch.begin(), normalizedTouch.end());
+        }
+        
+        // Add internal signals
+        if (!intern.empty()) {
+            std::vector<float> normalizedIntern;
+            for (float i : intern) {
+                float normalized = (i + 1.0f) * 0.5f;  // Normalize from [-1,1] to [0,1]
+                normalizedIntern.push_back(normalized);
+            }
+            sensoryState.insert(sensoryState.end(), normalizedIntern.begin(), normalizedIntern.end());
+        }
+        
+        // Add proprioception
+        if (!proprio.empty()) {
+            std::vector<float> normalizedProprio;
+            for (float p : proprio) {
+                float normalized = (p + 1.0f) * 0.5f;  // Normalize from [-1,1] to [0,1]
+                normalizedProprio.push_back(normalized);
+            }
+            sensoryState.insert(sensoryState.end(), normalizedProprio.begin(), normalizedProprio.end());
+        }
+        
+        // Feed sensory state to concept formation system
+        conceptFormation->processSensoryInput(sensoryState);
+    }
+    
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
-}
+
+// Include NeuralPlanner for advanced planning
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Check if we have a NeuralPlanner available (from brain)
+    NeuralPlanner* planner = brain_->getPlanner();
+    ConceptFormation* conceptFormation = brain_->getConceptFormation();
+    SelfModel* selfModel = brain_->getSelfModel();
+    
+    // If all cognition systems are available and connected, use NeuralPlanner
+    if (planner && conceptFormation && selfModel && 
+        planner->getBrain() && planner->getBrain()->getTotalNeuronCount() > 0) {
+        
+        // Get current brain state representation for planning
+        std::vector<float> currentState;
+        
+        // Try to get a state representation from the brain
+        // For now, we use a simple representation based on neural activity
+        auto* region = brain_->getRegion(RegionId(1));
+        if (region) {
+            currentState.resize(50, 0.0f);  // Default 50-dimensional state
+            size_t idx = 0;
+            
+            // Get neural activity patterns
+            for (const auto& pop : region->getPopulations()) {
+                if (idx >= currentState.size()) break;
+                
+                float avgActivity = 0.0f;
+                for (const auto* neuron : pop->getNeurons()) {
+                    avgActivity += std::abs(neuron->getState().membranePotential - 
+                                           neuron->getState().restingPotential);
+                }
+                if (!pop->getNeurons().empty()) {
+                    avgActivity /= pop->getNeurons().size();
+                }
+                currentState[idx++] = avgActivity;
+            }
+            
+            // Add working memory content if available
+            if (brain_->getWorkingMemory()) {
+                const auto& memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+                size_t memIdx = 0;
+                for (size_t i = 0; i < std::min(currentState.size() - idx, memoryNeurons.size()); ++i) {
+                    float activation = brain_->getWorkingMemory()->getNeuronActivation(memoryNeurons[i]);
+                    currentState[idx++] = activation;
+                }
+            }
+            
+            // Add neuromodulation state
+            if (brain_->getDopamine()) {
+                float dopamineLevel = brain_->getDopamine()->getLevel();
+                currentState[std::min<size_t>(idx, currentState.size() - 1)] = dopamineLevel;
+                idx++;
+            }
+        }
+        
+        // Use the planner to select action
+        MotorCommand plannedAction = planner->planAction(currentState, expectedReward_);
+        
+        // If planning returned a valid action (not Wait), use it
+        if (plannedAction != MotorCommand::Wait) {
+            NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+            
+            // Store the planned action in self-model for learning
+            if (selfModel) {
+                // Convert current brain state to vector for self-model
+                std::vector<float> brainState = getBrainStateFromBrain(brain_);
+                std::vector<float> actionEffect;
+                
+                // Predict outcome of the action
+                if (!brainState.empty()) {
+                    actionEffect = selfModel->predictActionConsequence(
+                        plannedAction, brainState);
+                }
+                
+                // Record the planned action and its predicted effect
+                selfModel->recordSelfAction(plannedAction, brainState, actionEffect);
+            }
+            
+            // Apply curiosity-based exploration to planned action
+            if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                plannedAction = selectWithCuriosity(plannedAction);
+            }
+            
+            return plannedAction;
+        }
+    }
+    
+    // Fallback to simple motor neuron decoding if planner not available
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -348,3 +492,95 @@ void AgentBrain::reset() {
 }
 
 } // namespace nlm
+
+// Helper function to extract brain state for planning
+std::vector<float> AgentBrain::getBrainStateFromBrain(const std::shared_ptr<Brain>& brain) {
+    if (!brain) {
+        return std::vector<float>();
+    }
+    
+    // Get first region if available
+    NeuralRegion* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        return std::vector<float>();
+    }
+    
+    // Extract neural activity patterns
+    std::vector<float> state;
+    state.reserve(100);  // Pre-allocate space
+    
+    // Get population activity levels
+    for (const auto& pop : region->getPopulations()) {
+        float avgActivity = 0.0f;
+        float minActivity = 1000.0f;  // Large initial value
+        float maxActivity = 0.0f;
+        int activeNeurons = 0;
+        
+        for (const auto* neuron : pop->getNeurons()) {
+            float activity = std::abs(neuron->getState().membranePotential - 
+                                    neuron->getState().restingPotential);
+            avgActivity += activity;
+            
+            if (activity < minActivity) minActivity = activity;
+            if (activity > maxActivity) maxActivity = activity;
+            
+            if (neuron->isFiring()) {
+                activeNeurons++;
+            }
+        }
+        
+        if (!pop->getNeurons().empty()) {
+            avgActivity /= pop->getNeurons().size();
+        }
+        
+        // Add multiple features per population: avg, min, max, active ratio
+        state.push_back(avgActivity);  // Average activity
+        state.push_back(minActivity);  // Minimum activity
+        state.push_back(maxActivity);  // Maximum activity
+        state.push_back(static_cast<float>(activeNeurons) / pop->getNeurons().size());  // Active ratio
+        
+        // Add population type indicator
+        int typeId = static_cast<int>(pop->getNeuronType());
+        state.push_back(static_cast<float>(typeId));  // Neuron type
+    }
+    
+    // Add working memory state
+    if (brain->getWorkingMemory()) {
+        const auto& memoryNeurons = brain->getWorkingMemory()->getMemoryNeurons();
+        for (size_t i = 0; i < std::min(size_t(10), memoryNeurons.size()); ++i) {
+            float activation = brain->getWorkingMemory()->getNeuronActivation(memoryNeurons[i]);
+            state.push_back(activation);
+        }
+    }
+    
+    // Add neuromodulation state
+    if (brain->getDopamine()) {
+        state.push_back(brain->getDopamine()->getLevel());
+    } else {
+        state.push_back(0.0f);
+    }
+    
+    if (brain->getNovelty()) {
+        state.push_back(brain->getNovelty()->getLevel());
+    } else {
+        state.push_back(0.0f);
+    }
+    
+    // Add developmental state
+    state.push_back(static_cast<float>(brain->getDevelopmentalStage()));
+    
+    // Add temporal information
+    state.push_back(static_cast<float>(brain->getTotalSpikeCount()));  // Spike history
+    
+    // Normalize to [0, 1] range for better compatibility with learning algorithms
+    if (!state.empty()) {
+        float maxVal = *std::max_element(state.begin(), state.end());
+        if (maxVal > 0.0f) {
+            for (float& val : state) {
+                val = std::min(val / maxVal, 1.0f);  // Clamp to 1.0
+            }
+        }
+    }
+    
+    return state;
+}

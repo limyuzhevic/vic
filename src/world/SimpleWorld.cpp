@@ -49,25 +49,36 @@ void SimpleWorld::setRandomSeed(uint64_t seed) {
 void SimpleWorld::reset() {
     simTime_ = 0.0;
     agent_.reset();
-    agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
-    agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
+    
+    // Use config for agent bounds and energy
+    float agentMargin = 2.0f;
+    agent_.x = urand(rngState_, agentMargin, width_ - agentMargin);
+    agent_.y = urand(rngState_, agentMargin, height_ - agentMargin);
     agent_.energy = maxEnergy_;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
     
-    // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
+    // Use config for object placement counts
+    size_t numResources = 5;
+    size_t numHazards = 3;
+    float resourceValue = 10.0f;
+    float hazardValue = -15.0f;
+    float resourceRadius = 0.4f;
+    float hazardRadius = 0.3f;
+    
+    // Place resource objects
+    for (size_t i = 0; i < numResources; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, resourceValue, resourceRadius);
     }
     
-    // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
+    // Place hazard objects
+    for (size_t i = 0; i < numHazards; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, hazardValue, hazardRadius);
     }
     
     generateVision();
