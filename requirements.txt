@@ -1,0 +1,265 @@
+# pynlm Development Requirements
+
+This file contains the dependencies needed to develop and test the pynlm package.
+
+## Core Dependencies
+
+These are required for basic functionality:
+
+- **pybind11>=2.11.0**: C++ extension bindings
+- **numpy>=1.20**: Numerical operations and array handling
+
+## Development Dependencies
+
+These are needed for development and testing:
+
+### Testing
+- **pytest>=7.0**: Test framework
+- **pytest-cov>=3.0**: Coverage reporting
+- **coverage>=6.0**: Code coverage measurement
+
+### Code Quality
+- **black>=22.0**: Code formatting
+- **flake8>=4.0**: Linting
+- **mypy>=0.950**: Type checking
+
+### Documentation
+- **sphinx>=4.0**: Documentation generator
+- **sphinx-rtd-theme>=1.0**: ReadTheDocs theme
+- **sphinx-autodoc-typehints>=1.11**: Type hints in documentation
+- **myst-parser>=0.17**: Markdown support for documentation
+
+### Examples and Demos
+- **matplotlib>=3.5**: Plotting and visualization
+- **jupyter>=1.0**: Interactive notebooks
+
+## Optional Dependencies
+
+These can be installed for specific use cases:
+
+### Examples and Demos
+```bash
+pip install pynlm[examples]
+```
+
+### Documentation
+```bash
+pip install pynlm[docs]
+```
+
+### Full Development Environment
+```bash
+pip install pynlm[dev]
+```
+
+## Installation
+
+Install the package in development mode:
+
+```bash
+pip install -e .
+```
+
+Install with all optional dependencies:
+
+```bash
+pip install -e .[dev,examples,docs]
+```
+
+## Development Workflow
+
+1. **Install dependencies**: `pip install -r requirements.txt`
+2. **Format code**: `black python/`
+3. **Run tests**: `pytest tests/`
+4. **Type checking**: `mypy python/`
+5. **Build documentation**: `sphinx -b html docs/ docs/_build/html/`
+
+## Testing
+
+Run the test suite:
+
+```bash
+pytest tests/ -v
+pytest tests/ --cov=pynlm --cov-report=html
+```
+
+Run specific test modules:
+
+```bash
+pytest tests/test_brain.py -v
+pytest tests/test_agent.py -v
+pytest tests/test_world.py -v
+pytest tests/test_types.py -v
+```
+
+## Code Quality
+
+Check code style:
+
+```bash
+black --check python/
+flake8 python/
+mypy python/
+```
+
+Format code:
+
+```bash
+black python/
+```
+
+## Building
+
+Build the package:
+
+```bash
+cd /path/to/nlm
+python setup.py sdist bdist_wheel
+```
+
+Install from source:
+
+```bash
+pip install dist/pynlm-0.1.0-py3-none-any.whl
+```
+
+## Running Examples
+
+Run example scripts:
+
+```bash
+python examples/01_hello_brain.py
+python examples/02_brain_world.py
+python examples/03_agent_learning.py
+python examples/04_memory_systems.py
+python examples/05_plasticity_experiments.py
+```
+
+## Troubleshooting
+
+### Installation Issues
+
+If you encounter issues during installation:
+
+1. **Ensure you have the latest pip and setuptools**:
+   ```bash
+   pip install --upgrade pip setuptools wheel
+   ```
+
+2. **Check system dependencies**:
+   - Compiler toolchain (gcc, clang, or MSVC)
+   - Python development headers
+   - BLAS/LAPACK libraries (if using numpy)
+
+3. **Install with verbose output**:
+   ```bash
+   pip install -v .
+   ```
+
+### Build Issues
+
+If the C++ extensions fail to build:
+
+1. **Check for system dependencies**:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install build-essential cmake libpython3-dev
+   ```
+
+2. **Ensure CMake is available**:
+   ```bash
+   cmake --version
+   ```
+
+3. **Build with specific compiler**:
+   ```bash
+   export CXX=g++
+   python setup.py build_ext --inplace
+   ```
+
+### Runtime Issues
+
+If you encounter runtime errors:
+
+1. **Check Python version**:
+   ```bash
+   python --version
+   # Ensure it's Python 3.8 or higher
+   ```
+
+2. **Verify numpy installation**:
+   ```bash
+   python -c "import numpy; print(numpy.__version__)"
+   ```
+
+3. **Check memory usage**:
+   ```bash
+   free -h
+   ```
+   Ensure you have sufficient memory for neural simulations.
+
+## Contributing
+
+### Development Guidelines
+
+1. **Code style**: Follow PEP 8 and use black for formatting
+2. **Type hints**: Use type annotations for better code documentation
+3. **Testing**: Write comprehensive tests with good coverage
+4. **Documentation**: Keep documentation up to date
+5. **Version control**: Use meaningful commit messages
+
+### Testing Guidelines
+
+1. **Unit tests**: Test individual components
+2. **Integration tests**: Test component interactions
+3. **Performance tests**: Test with large-scale simulations
+4. **Regression tests**: Ensure no functionality is broken
+
+### Documentation Guidelines
+
+1. **API documentation**: Use docstrings with type hints
+2. **User guides**: Provide clear examples and explanations
+3. **Architecture documentation**: Explain system design and components
+4. **Developer documentation**: Guide for contributors
+
+## Support
+
+### Getting Help
+
+- **GitHub Issues**: Report bugs and request features
+- **Documentation**: Check the online documentation
+- **Examples**: Run example scripts to understand usage
+- **Community**: Join discussions on GitHub
+
+### Troubleshooting Common Issues
+
+#### "ModuleNotFoundError: No module named 'pynlm'"
+
+Ensure the package is installed:
+```bash
+pip install -e .
+```
+
+#### "ImportError: libstdc++.so.6: cannot open shared object file"
+
+Ensure system dependencies are installed:
+```bash
+sudo apt-get install libstdc++6
+```
+
+#### "numpy.core._multiarray_umath failed to import"
+
+Ensure numpy is properly installed:
+```bash
+pip install --upgrade numpy
+```
+
+## Future Enhancements
+
+This requirements file will be updated as new dependencies are added or version
+requirements are updated.
+
+## License
+
+This requirements file is part of the pynlm package and is licensed under the
+MIT License. See the LICENSE file for details.
