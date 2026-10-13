@@ -187,11 +187,20 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Enhanced neuromodulation systems
     
-    // Logging
-    void logStatus() const;
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNoradrenaline();
+    Serotonin* getSerotonin();
+    
+    // Enhanced neuromodulator functions
+    void enhanceAttention(float strength);
+    void enhanceMemoryConsolidation(float strength);
+    void increaseArousal(float intensity);
+    void enhanceVigilance(float focus);
+    void regulateMood(float moodLevel);
+    void reduceImpulsivity(float inhibition);
+    void enhanceSocialBehavior(float socialStrength);
     
 private:
     struct Impl;
