@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format or simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -75,6 +75,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -93,6 +94,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Get parameter descriptions for help
+    static const std::unordered_map<std::string, std::string> getParameterDescriptions();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +107,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper for simple file format loading
+    bool loadFromSimpleFormat(std::ifstream& file);
+    
+    // Validate specific parameter
+    bool validateParameter(const std::string& key, const ConfigValue& value) const;
+    
+    // Convert string value to target type with validation
+    template<typename T>
+    static std::optional<T> parseValue(const std::string& str);
 };
 
 } // namespace nlm

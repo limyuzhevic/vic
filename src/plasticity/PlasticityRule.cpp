@@ -48,7 +48,25 @@ void HebbianRule::update(Synapse* synapse,
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    synapse->addToWeight(delta);
+    if (!synapse) {
+        NLM_LOG_WARNING("Attempting to apply weight change to null synapse");
+        return;
+    }
+    
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Apply biophysical constraints
+    newWeight = std::clamp(newWeight, -1.0f, 1.0f);  // Synaptic weight bounds
+    
+    synapse->setWeight(newWeight);
+    
+    // Log Hebbian learning for debugging
+    if (std::abs(delta) > 1e-6f) {
+        NLM_LOG_DEBUG("Hebbian: synapse weight " + std::to_string(currentWeight) +
+                     " → " + std::to_string(newWeight) +
+                     " (Δ=" + std::to_string(delta) + ")");
+    }
 }
 
 const char* HebbianRule::getName() const {

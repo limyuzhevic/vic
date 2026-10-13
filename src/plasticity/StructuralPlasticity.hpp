@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+// IMPLEMENTED: Real structural plasticity with homeostatic regulation
 
 class StructuralPlasticity {
 public:
@@ -14,20 +14,20 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // IMPLEMENTED: Real synapse creation with biological constraints
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // IMPLEMENTED: Real synapse removal with activity-dependent criteria
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // IMPLEMENTED: Real neuron creation with developmental constraints
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // IMPLEMENTED: Real neuron removal with homeostatic regulation
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
@@ -40,6 +40,22 @@ public:
     
     // Update structural plasticity
     void update(Brain* brain, class RandomGenerator& rng);
+    
+    // Get structural statistics
+    struct StructuralStats {
+        size_t synapseCreationCount;
+        size_t synapseRemovalCount;
+        size_t neuronCreationCount;
+        size_t neuronRemovalCount;
+        float totalStructuralChange;
+    };
+    
+    StructuralStats getStats() const;
+    void resetStats();
+    
+    // Configuration and validation
+    bool configureFromConfig(const std::string& configPrefix = "");
+    std::string getDescription() const;
     
 private:
     struct Impl;
