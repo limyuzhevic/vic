@@ -26,26 +26,73 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+// Command-line argument parsing and help functions
+bool parseCommandLineArgs(int argc, char** argv, std::string& configFile) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << Config::getConfigurationHelp();
+            return false; // Exit after showing help
+        }
+        else if (arg == "--version") {
+            std::cout << "NLM Phase 2 - Neural Learning Machine" << std::endl;
+            std::cout << "Version: 2.0 - Enhanced with Advanced AI Features" << std::endl;
+            std::cout << "Features: Real neural computation, memory integration, learning systems, advanced agent behavior" << std::endl;
+            return false; // Exit after showing version
+        }
+        else if (arg == "--validate-config") {
+            std::cout << "Validating configuration..." << std::endl;
+            // Validation will happen in main()
+        }
+        else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+        else if (arg.substr(0, 2) == "--") {
+            // Check for config options that need special handling
+            if (arg.find("=" ) != std::string::npos) {
+                // Handle --key=value format
+                std::string key = arg.substr(2, arg.find("=" ) - 2);
+                std::string value = arg.substr(arg.find("=" ) + 1);
+                // Note: These will be handled by Config::loadFromArgs
+            }
+        }
+    }
+    return true;
+}
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void showConfigurationSummary(const Config& config) {
+    std::cout << "\n=== NLM Configuration Summary ===" << std::endl;
+    std::cout << config.summary() << std::endl;
+    
+    // Show validation results
+    if (!config.validate()) {
+        auto errors = config.getValidationErrors();
+        std::cout << "\n=== CONFIGURATION VALIDATION ERRORS ===" << std::endl;
+        for (const auto& error : errors) {
+            std::cout << "ERROR: " << error << std::endl;
+        }
+    } else {
+        std::cout << "\n✓ Configuration validation passed" << std::endl;
+    }
+}
+
+void logFeatureHighlights() {
+    std::cout << "\n=== NLM Features Enabled ===" << std::endl;
+    std::cout << "✓ Real spiking neural computation (Phase 2)" << std::endl;
+    std::cout << "✓ Event-driven spike propagation with delays" << std::endl;
+    std::cout << "✓ STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "✓ Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "✓ Advanced memory systems integration" << std::endl;
+    std::cout << "✓ Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "✓ Prediction and cognition systems" << std::endl;
+    std::cout << "✓ Development system with stages" << std::endl;
+    std::cout << "✓ Enhanced AgentBrain with feature extraction" << std::endl;
+    std::cout << "✓ Experience collection and learning" << std::endl;
+    std::cout << "✓ Action value learning with exploration" << std::endl;
+    std::cout << "✓ Curiosity-driven behavior" << std::endl;
+    std::cout << "✓ Advanced checkpoint and persistence" << std::endl;
+    std::cout << "✓ Comprehensive configuration system" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

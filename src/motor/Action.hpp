@@ -23,7 +23,8 @@ enum class ActionType {
     Drink,
     Rest,
     Wait,
-    Custom
+    Custom,
+    Count  // Number of action types (for iteration)
 };
 
 // Action representation

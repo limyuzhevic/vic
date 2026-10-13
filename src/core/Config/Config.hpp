@@ -93,6 +93,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Initialize with default values for all NLM features
+    void initializeDefaults();
+    
+    // Get help text for configuration options
+    static std::string getConfigurationHelp();
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Get configuration errors
+    std::vector<std::string> getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

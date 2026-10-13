@@ -70,48 +70,132 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // ========== ADVANCED FEATURE EXTRACTION ==========
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Extract and process vision features
+    void extractVisionFeatures(const std::vector<float>& vision);
     
-    std::shared_ptr<Brain> brain_;
+    // Extract and process touch features
+    void extractTouchFeatures(const std::vector<float>& touch);
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Extract and process internal features
+    void extractInternalFeatures(const std::vector<float>& intern);
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Extract and process proprioception features
+    void extractProprioceptionFeatures(const std::vector<float>& proprio);
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Fuse features from all sensory modalities
+    std::vector<float> fuseSensoryFeatures();
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Apply temporal smoothing for stability
+    void applyTemporalSmoothing(std::vector<float>& features);
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Compute novelty from feature differences
+    float computeFeatureNovelty(const std::vector<float>& current, const std::vector<float>& previous);
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Update action values using learning
+    void updateActionValues();
+    
+    // Compute curiosity signal for exploration
+    float computeCuriositySignal();
+    
+    // Inject processed features into brain neural system
+    void injectFeaturesIntoBrain(const std::vector<float>& features);
+    
+    // ========== ADVANCED ACTION SELECTION ==========
+    
+    // Select action using value-based learning with exploration
+    MotorCommand decodeActionWithValueLearning();
+    
+    // Select action based on curiosity and exploration
+    MotorCommand selectActionWithCuriosity(MotorCommand defaultCmd);
+    
+    // Compute action preferences using softmax
+    std::vector<float> computeActionPreferences() const;
+    
+    // Sample action according to preference distribution
+    MotorCommand sampleActionFromPreferences(const std::vector<float>& preferences);
+    
+    // ========== REWARD AND LEARNING ==========
+    
+    // Apply reward using temporal difference learning
+    void applyRewardWithTDLearning(float reward, float predictedReward);
+    
+    // Update prediction errors for each action
+    void updatePredictionErrors(MotorCommand action, float actualReward);
+    
+    // Compute expected future rewards
+    float computeExpectedFutureRewards(MotorCommand action) const;
+    
+    // ========== DEVELOPMENT AND ADAPTATION ==========
+    
+    // Update developmental state based on experience
+    void updateDevelopmentalAdaptation();
+    
+    // Adapt behavior based on learning progress
+    void adaptBasedOnLearningProgress();
+    
+    // Modulate exploration based on developmental stage
+    void modulateExplorationByDevelopment();
+    
+    // ========== MEMORY AND HISTORY ==========
+    
+    // Store action and outcome in memory
+    void storeExperience(MotorCommand action, float reward, const std::vector<float>& state);
+    
+    // Retrieve similar experiences for pattern completion
+    std::vector<std::pair<MotorCommand, float>> retrieveSimilarExperiences(const std::vector<float>& state, size_t maxCount) const;
+    
+    // Compute action statistics from experience
+    void computeActionStatistics();
+    
+    // ========== UTILITY AND CONFIGURATION ==========
+    
+    // Set exploration parameters
+    void setExplorationEpsilon(float epsilon) { explorationEpsilon_ = epsilon; }
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    void setDiscountFactor(float factor) { discountFactor_ = factor; }
+    
+    // Get current exploration level
+    float getExplorationLevel() const { return explorationEpsilon_; }
+    
+    // Get action value estimates
+    const std::vector<float>& getActionValues() const { return actionValues_; }
+    
+    // Get curiosity and novelty levels
+    float getCuriosityLevel() const { return curiosityLevel_; }
+    float getNoveltyLevel() const { return noveltyLevel_; }
+    
+    // Get development progress
+    float getDevelopmentalProgress() const { return developmentalAge_ / 1000.0f; } // Normalized to [0,1]
+    
+    // Get experience count
+    size_t getExperienceCount() const { return actionHistory_.size(); }
+    
+    // Clear old experiences to save memory
+    void trimExperienceHistory(size_t maxHistory = 0) {
+        if (maxHistory == 0) maxHistory_ = maxActionHistory_;
+        else maxHistory_ = maxHistory;
+        
+        while (actionHistory_.size() > maxHistory_) {
+            actionHistory_.pop_front();
+        }
+    }
 };
 
 } // namespace nlm
+
+// Experience and statistics structures for learning
+struct Experience {
+    MotorCommand action;
+    float reward;
+    std::vector<float> state;
+    float timestamp;
+};
+
+struct ActionStats {
+    MotorCommand action;
+    float meanReward;
+    float stdDevReward;
+    float frequency;
+};

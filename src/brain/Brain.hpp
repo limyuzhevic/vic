@@ -137,61 +137,38 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // Get working memory with enhanced functionality
+    class NeuralWorkingMemory* getWorkingMemory();
+    const class NeuralWorkingMemory* getWorkingMemory() const;
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Get episodic memory with enhanced functionality
+    class NeuralEpisodicMemory* getEpisodicMemory();
+    const class NeuralEpisodicMemory* getEpisodicMemory() const;
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Get associative memory with enhanced functionality
+    class NeuralAssociativeMemory* getAssociativeMemory();
+    const class NeuralAssociativeMemory* getAssociativeMemory() const;
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // ========== ADVANCED MEMORY SYSTEM ACCESS ==========
     
-    // ========== PREDICTION SYSTEM ==========
+    // Get memory statistics and metrics
+    size_t getMemoryTraceCount() const;
+    size_t getEpisodicMemoryCount() const;
+    size_t getAssociativeMemorySize() const;
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Get memory with filtering
+    std::vector<class EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    std::vector<float> getMemoryPatternSimilarity(const class EpisodicMemoryItem& pattern) const;
     
-    // ========== COGNITION SYSTEMS ==========
+    // Memory consolidation and maintenance
+    void consolidateMemory(float consolidationThreshold);
+    void performReplay(size_t numEpisodes);
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Memory-based action selection
+    std::unique_ptr<class Action> produceMemoryBasedAction();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Memory introspection and debugging
+    void logMemoryStatus() const;
     
 private:
     struct Impl;
