@@ -92,6 +92,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , testLoggerName("NLM_Test")
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -1073,11 +1074,54 @@ std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+const std::string& Brain::getTestLoggerName() const {
+    return testLoggerName;
 }
 
-void Brain::logStatus() const {
+Brain::TestStats Brain::getTestStats() const {
+    TestStats stats;
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    stats.totalSpikes = getTotalSpikeCount();
+    stats.activeNeurons = getActiveNeuronCount();
+    stats.firingNeurons = getFiringNeuronCount();
+    stats.avgFiringRate = getAverageFiringRate();
+    stats.eIRatio = getExcitationInhibitionRatio();
+    
+    // Calculate average synaptic weight
+    stats.avgSynapticWeight = 0.0f;
+    size_t synapseCount = 0;
+    for (const auto& region : getRegions()) {
+        for (const auto& syn : region->getSynapses()) {
+            stats.avgSynapticWeight += syn->getWeight();
+            synapseCount++;
+        }
+    }
+    if (synapseCount > 0) stats.avgSynapticWeight /= synapseCount;
+    
+    // Memory system statistics
+    stats.workingMemoryTraces = getWorkingMemory() ? 
+        getWorkingMemory()->getActiveTraces() : 0;
+    stats.episodicMemoryEpisodes = getEpisodicMemory() ? 
+        getEpisodicMemory()->getEpisodeCount() : 0;
+    
+    return stats;
+}
+
+void Brain::enableAllPlasticity(bool hebbian, bool stdp, bool structural) {
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(hebbian, stdp, structural);
+        }
+    }
+}
+
+void Brain::logTestProgress(const std::string& message, size_t step, size_t totalSteps) {
+    if (step % 100 == 0 || step == totalSteps) {
+        NLM_LOG_INFO("Test Progress: Step " + std::to_string(step) + "/" + 
+                    std::to_string(totalSteps) + " | " + message);
+    }
+}
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

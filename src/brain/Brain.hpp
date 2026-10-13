@@ -190,12 +190,62 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Test framework support
+    const std::string& getTestLoggerName() const;
+    
+    // Enhanced statistics collection for tests
+    struct TestStats {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t totalSpikes;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float avgFiringRate;
+        float eIRatio;
+        float avgSynapticWeight;
+        size_t workingMemoryTraces;
+        size_t episodicMemoryEpisodes;
+        
+        void calculate(const Brain& brain) {
+            totalNeurons = brain.getTotalNeuronCount();
+            totalSynapses = brain.getTotalSynapseCount();
+            totalSpikes = brain.getTotalSpikeCount();
+            activeNeurons = brain.getActiveNeuronCount();
+            firingNeurons = brain.getFiringNeuronCount();
+            avgFiringRate = brain.getAverageFiringRate();
+            eIRatio = brain.getExcitationInhibitionRatio();
+            
+            // Calculate average synaptic weight
+            avgSynapticWeight = 0.0f;
+            size_t synapseCount = 0;
+            for (const auto& region : brain.getRegions()) {
+                for (const auto& syn : region->getSynapses()) {
+                    avgSynapticWeight += syn->getWeight();
+                    synapseCount++;
+                }
+            }
+            if (synapseCount > 0) avgSynapticWeight /= synapseCount;
+            
+            // Memory system statistics
+            workingMemoryTraces = brain.getWorkingMemory() ? 
+                brain.getWorkingMemory()->getActiveTraces() : 0;
+            episodicMemoryEpisodes = brain.getEpisodicMemory() ? 
+                brain.getEpisodicMemory()->getEpisodeCount() : 0;
+        }
+    };
+    
+    TestStats getTestStats() const;
+    
     // Logging
     void logStatus() const;
     
+    // Test helper methods
+    void enableAllPlasticity(bool hebbian, bool stdp, bool structural);
+    void logTestProgress(const std::string& message, size_t step, size_t totalSteps);
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Test framework support
+    mutable std::string testLoggerName;
 };
 
 } // namespace nlm
