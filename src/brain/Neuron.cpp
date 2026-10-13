@@ -1,9 +1,23 @@
+#pragma once
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Config/Config.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
+
+/**
+ * Neuron - Single neuron model with LIF dynamics
+ * 
+ * This class has been refactored to improve:
+ * 1. Configuration management for common parameters
+ * 2. LIF implementation with better encapsulation
+ * 3. Parameter validation and error handling
+ * 4. Modular organization for easier extension
+ */
 
 struct Neuron::Impl {
     NeuronId id;
@@ -18,16 +32,69 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // Configuration
+    struct LIFParameters {
+        float membraneCapacitance;      // nF
+        float timeConstant;              // ms
+        float adaptationTimeConstant;    // ms
+        float adaptationStrength;        // mV/ms
+        size_t maxSpikeHistory;          // Number of spikes to keep
+        float voltageClampMin;           // mV - lower clamp
+        float voltageClampMax;           // mV - upper clamp
+        float adaptationMin;             // Minimum adaptation value
+        float adaptationMax;             // Maximum adaptation value
+    };
+    
+    // Default parameters with biological values
+    static LIFParameters getDefaultParameters() {
+        LIFParameters params;
+        params.membraneCapacitance = 1.0f;      // nF
+        params.timeConstant = 20.0f;            // ms
+        params.adaptationTimeConstant = 100.0f; // ms
+        params.adaptationStrength = 0.01f;     // mV/ms
+        params.maxSpikeHistory = 100;          // Number of spikes to keep
+        params.voltageClampMin = -100.0f;      // mV - lower clamp
+        params.voltageClampMax = 50.0f;        // mV - upper clamp
+        params.adaptationMin = 0.0f;           // Minimum adaptation value
+        params.adaptationMax = 10.0f;          // Maximum adaptation value
+        return params;
+    }
+    
+    LIFParameters lifParams;
+    
+    // Validation
+    static bool validateParameters(const LIFParameters& params) {
+        return params.membraneCapacitance > 0.0f &&
+               params.timeConstant > 0.0f &&
+               params.adaptationTimeConstant > 0.0f &&
+               params.adaptationStrength >= 0.0f &&
+               params.maxSpikeHistory > 0 &&
+               params.voltageClampMin < params.voltageClampMax &&
+               params.adaptationMin < params.adaptationMax;
+    }
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        lifParams = getDefaultParameters();
+    }
+    
+    Impl(const LIFParameters& params) {
+        lifParams = params;
+        if (!validateParameters(lifParams)) {
+            throw std::invalid_argument("Invalid LIF parameters provided");
+        }
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    pImpl->id = id;
+    pImpl->type = NeuronType::Internal;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+}
+
+Neuron::Neuron(NeuronId id, const Neuron::Impl::LIFParameters& params) : pImpl(new Impl(params)) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -149,7 +216,7 @@ void Neuron::clearTotalCurrent() {
 
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    if (pImpl->spikeHistory.size() > pImpl->lifParams.maxSpikeHistory) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
 }
@@ -170,6 +237,98 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    pImpl->state.membranePotential = std::clamp(potential, pImpl->lifParams.voltageClampMin, pImpl->lifParams.voltageClampMax);
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
+}
+
+void Neuron::setLeakConductance(MembranePotential conductance) {
+    pImpl->state.leakConductance = conductance;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
+}
+
+void Neuron::setRestingPotential(MembranePotential potential) {
+    pImpl->state.restingPotential = potential;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+void Neuron::setResetPotential(MembranePotential potential) {
+    pImpl->state.resetPotential = potential;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
@@ -180,14 +339,33 @@ void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
+// LIF parameters methods
+void Neuron::configureLIF(float capacitance, float timeConstant, float adaptationTime, float adaptationStrength) {
+    pImpl->lifParams.membraneCapacitance = capacitance;
+    pImpl->lifParams.timeConstant = timeConstant;
+    pImpl->lifParams.adaptationTimeConstant = adaptationTime;
+    pImpl->lifParams.adaptationStrength = adaptationStrength;
 }
 
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
+void Neuron::setVoltageClamp(float minV, float maxV) {
+    pImpl->lifParams.voltageClampMin = minV;
+    pImpl->lifParams.voltageClampMax = maxV;
+    clampVoltage();
 }
 
+void Neuron::setAdaptationLimits(float minAdapt, float maxAdapt) {
+    pImpl->lifParams.adaptationMin = minAdapt;
+    pImpl->lifParams.adaptationMax = maxAdapt;
+    pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, minAdapt, maxAdapt);
+}
+
+void Neuron::clampVoltage() {
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, 
+                                               pImpl->lifParams.voltageClampMin, 
+                                               pImpl->lifParams.voltageClampMax);
+}
+
+// Update neuron for one simulation step
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
@@ -210,8 +388,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->lifParams.timeConstant;  // ms
+    float C = pImpl->lifParams.membraneCapacitance;  // nF
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -229,7 +407,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    clampVoltage();
     
     // Check for spike
     if (V >= threshold) {
@@ -249,6 +427,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, 
+                                                     pImpl->lifParams.adaptationMin, 
+                                                     pImpl->lifParams.adaptationMax);
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -269,6 +450,7 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->state.adaptationVariable = 0.0f;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
