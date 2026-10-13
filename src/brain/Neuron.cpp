@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -36,19 +37,6 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 }
 
 Neuron::~Neuron() = default;
-
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;

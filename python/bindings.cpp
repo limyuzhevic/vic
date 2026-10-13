@@ -15,6 +15,9 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/MemoryReplaySystem.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -25,9 +28,22 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Version: 1.0.0
+        Author: NLM Development Team
+        Description: Python bindings for Neural Learning Machine simulation framework
     )pbdoc";
 
+    // Define Python-specific exception hierarchy
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "KeyError");
+    py::register_exception<std::logic_error>(m, "NLMError");
+    
+    // Module-level attributes
+    m.attr("__version__") = "1.0.0";
+    m.attr("__author__") = "NLM Development Team";
+    m.attr("__description__") = "Python bindings for Neural Learning Machine simulation framework";
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -160,6 +176,80 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Python dictionary-like interface
+        .def("__getitem__", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (!value) {
+                throw py::key_error("Key not found: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value by key (as string)")
+        .def("__setitem__", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (string)")
+        .def("__contains__", &Config::has, py::arg("key"), "Check if key exists")
+        .def("__len__", &Config::getKeys,
+             "Get number of configuration keys")
+        .def("__iter__", [](const Config& self) {
+            return py::make_iterator(self.getKeys().begin(), self.getKeys().end());
+        }, py::return_value_policy::reference_internal,
+             "Iterate over configuration keys")
+        
+        // Convenience methods
+        .def("get_or", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get value or return default")
+        
+        // Type-specific getters
+        .def("get_int", [](const Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer value")
+        .def("get_float", [](const Config& self, const std::string& key, double defaultValue) {
+            auto value = self.get<double>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get float value")
+        .def("get_bool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get boolean value")
+        
+        // Get with optional return
+        .def("get", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            return py::cast(value); // Return py::none if not found
+        }, py::arg("key"), "Get configuration value (returns None if not found)")
+        
+        // Batch operations
+        .def("update", [](Config& self, const py::dict& updates) {
+            for (auto item : updates) {
+                std::string key = py::str(item.first);
+                auto value = item.second;
+                if (value.is(py::int_())) {
+                    self.set(key, value.cast<int>());
+                } else if (value.is(py::float_())) {
+                    self.set(key, value.cast<double>());
+                } else if (value.is(py::bool_())) {
+                    self.set(key, value.cast<bool>());
+                } else {
+                    self.set(key, value.cast<std::string>());
+                }
+            }
+        }, py::arg("updates"), "Update multiple configuration values from dictionary")
+        
+        // Remove
+        .def("pop", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            if (self.has(key)) {
+                std::string value = self.get<std::string>(key);
+                self.remove(key);
+                return value;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get and remove key, return default if not found")
+        
+        // Python repr
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -261,7 +351,134 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        
+        // Dictionary conversion methods
+        .def("toDict", [](const SensoryPercept& self) {
+            py::dict result;
+            auto vision = self.getVision();
+            if (!vision.empty()) {
+                result["vision"] = vision;
+            }
+            auto touch = self.getTouch();
+            if (!touch.empty()) {
+                result["touch"] = touch;
+            }
+            auto internal = self.getInternal();
+            if (!internal.empty()) {
+                result["internal"] = internal;
+            }
+            auto proprioception = self.getProprioception();
+            if (!proprioception.empty()) {
+                result["proprioception"] = proprioception;
+            }
+            auto audio = self.getAudio();
+            if (!audio.empty()) {
+                result["audio"] = audio;
+            }
+            result["timestamp"] = self.getTimestamp();
+            return result;
+        }, "Convert sensory percept to Python dictionary")
+        .def("fromDict", [](SensoryPercept& self, const py::dict& data) {
+            if (data.contains("vision")) {
+                self.setVision(data["vision"].cast<std::vector<float>>());
+            }
+            if (data.contains("touch")) {
+                self.setTouch(data["touch"].cast<std::vector<float>>());
+            }
+            if (data.contains("internal")) {
+                self.setInternal(data["internal"].cast<std::vector<float>>());
+            }
+            if (data.contains("proprioception")) {
+                self.setProprioception(data["proprioception"].cast<std::vector<float>>());
+            }
+            if (data.contains("audio")) {
+                self.setAudio(data["audio"].cast<std::vector<float>>());
+            }
+            if (data.contains("timestamp")) {
+                self.setTimestamp(data["timestamp"].cast<double>());
+            }
+            return self;
+        }, py::arg("data"), "Update sensory percept from Python dictionary")
+        
+        // Batch processing methods
+        .def("batchUpdate", [](SensoryPercept& self, const py::dict& updates) {
+            // For each key-value pair, update the corresponding field
+            if (updates.contains("vision")) {
+                self.setVision(updates["vision"].cast<std::vector<float>>());
+            }
+            if (updates.contains("touch")) {
+                self.setTouch(updates["touch"].cast<std::vector<float>>());
+            }
+            if (updates.contains("internal")) {
+                self.setInternal(updates["internal"].cast<std::vector<float>>());
+            }
+            if (updates.contains("proprioception")) {
+                self.setProprioception(updates["proprioception"].cast<std::vector<float>>());
+            }
+            if (updates.contains("audio")) {
+                self.setAudio(updates["audio"].cast<std::vector<float>>());
+            }
+            if (updates.contains("timestamp")) {
+                self.setTimestamp(updates["timestamp"].cast<double>());
+            }
+            return self;
+        }, py::arg("updates"), "Batch update multiple sensory fields")
+        
+        // Convenience methods
+        .def("getSensorData", [](const SensoryPercept& self, const std::string& sensorType) {
+            if (sensorType == "vision") {
+                return py::make_tuple("vision", self.getVision(), 
+                                    static_cast<double>(self.getVisionWidth()),
+                                    static_cast<double>(self.getVisionHeight()));
+            } else if (sensorType == "touch") {
+                return py::make_tuple("touch", self.getTouch(), py::none(), py::none());
+            } else if (sensorType == "internal") {
+                return py::make_tuple("internal", self.getInternal(), py::none(), py::none());
+            } else if (sensorType == "proprioception") {
+                return py::make_tuple("proprioception", self.getProprioception(), py::none(), py::none());
+            } else if (sensorType == "audio") {
+                return py::make_tuple("audio", self.getAudio(), py::none(), py::none());
+            }
+            throw py::value_error("Unknown sensor type: " + sensorType);
+        }, py::arg("sensorType"), "Get sensor data as tuple (type, data, width, height)")
+        
+        // Scale vision data (common operation)
+        .def("scaleVision", [](SensoryPercept& self, float factor) {
+            auto& vision = const_cast<std::vector<float>&>(self.getVision());
+            for (auto& v : vision) {
+                v = std::max(0.0f, std::min(1.0f, v * factor));
+            }
+            return self;
+        }, py::arg("factor"), "Scale vision data by factor (0-1)")
+        
+        // Clear all data
+        .def("clear", [](SensoryPercept& self) {
+            self.setVision({});
+            self.setTouch({});
+            self.setInternal({});
+            self.setProprioception({});
+            self.setAudio({});
+            self.setTimestamp(0.0);
+            return self;
+        }, "Clear all sensory data")
+        
+        // Check if any data is present
+        .def("isEmpty", [](const SensoryPercept& self) {
+            return self.getVision().empty() && self.getTouch().empty() &&
+                   self.getInternal().empty() && self.getProprioception().empty() &&
+                   self.getAudio().empty();
+        }, "Check if sensory percept contains any data")
+        
+        // Python repr
+        .def("__repr__", [](const SensoryPercept& percept) {
+            return "<SensoryPercept: vision(" + std::to_string(percept.getVisionWidth()) + 
+                   "x" + std::to_string(percept.getVisionHeight()) + "), " +
+                   "touch(" + std::to_string(percept.getTouch().size()) + "), " +
+                   "internal(" + std::to_string(percept.getInternal().size()) + "), " +
+                   "proprioception(" + std::to_string(percept.getProprioception().size()) + "), " +
+                   "audio(" + std::to_string(percept.getAudio().size()) + ")>";
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -287,15 +504,77 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        
+        // Pythonic convenience methods
+        .def("getPosition", [](const SimpleWorld& self) {
+            return py::make_tuple(self.getAgentBody().x, self.getAgentBody().y);
+        }, "Get agent position as (x, y) tuple")
+        .def("getVelocity", [](const SimpleWorld& self) {
+            return py::make_tuple(self.getAgentBody().velocityX, self.getAgentBody().velocityY);
+        }, "Get agent velocity as (vx, vy) tuple")
+        .def("getOrientation", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent orientation (returns AgentBody)")
+        .def("getEnergy", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent energy (returns AgentBody)")
+        .def("getHealth", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent health (returns AgentBody)")
+        .def("stepWithTime", [](SimpleWorld& self, double timestep, double currentTime) {
+            self.update(timestep);
+            return self.getSensoryPercept();
+        }, py::arg("timestep"), py::arg("currentTime"), "Update world and return percept")
+        .def("createAgent", [](SimpleWorld& self, float x, float y, float orientation = 0.0f) {
+            self.setAgentStart(x, y);
+            return self;
+        }, py::arg("x"), py::arg("y"), py::arg("orientation") = 0.0f, "Set up agent in world")
+        .def("getBounds", [](const SimpleWorld& self) {
+            return py::make_tuple(0, 0, self.getWidth(), self.getHeight());
+        }, "Get world bounds as (minX, minY, maxX, maxY)")
+        .def("isActive", [](const SimpleWorld& self) {
+            return self.getAgentBody().health > 0.0f;
+        }, "Check if agent is alive")
+        .def("getState", [](const SimpleWorld& self) {
+            py::dict state;
+            auto body = self.getAgentBody();
+            state["x"] = body.x;
+            state["y"] = body.y;
+            state["orientation"] = body.orientation;
+            state["velocityX"] = body.velocityX;
+            state["velocityY"] = body.velocityY;
+            state["angularVelocity"] = body.angularVelocity;
+            state["energy"] = body.energy;
+            state["health"] = body.health;
+            state["age"] = body.age;
+            state["isMoving"] = body.isMoving;
+            state["isTurning"] = body.isTurning;
+            state["lastActionTime"] = body.lastActionTime;
+            return state;
+        }, "Get agent state as dictionary")
+        .def("setState", [](SimpleWorld& self, const py::dict& state) {
+            auto& body = const_cast<AgentBody&>(self.getAgentBody());
+            if (state.contains("x")) body.x = state["x"].cast<float>();
+            if (state.contains("y")) body.y = state["y"].cast<float>();
+            if (state.contains("orientation")) body.orientation = state["orientation"].cast<float>();
+            if (state.contains("velocityX")) body.velocityX = state["velocityX"].cast<float>();
+            if (state.contains("velocityY")) body.velocityY = state["velocityY"].cast<float>();
+            if (state.contains("angularVelocity")) body.angularVelocity = state["angularVelocity"].cast<float>();
+            if (state.contains("energy")) body.energy = state["energy"].cast<float>();
+            if (state.contains("health")) body.health = state["health"].cast<float>();
+            if (state.contains("age")) body.age = state["age"].cast<float>();
+            if (state.contains("isMoving")) body.isMoving = state["isMoving"].cast<bool>();
+            if (state.contains("isTurning")) body.isTurning = state["isTurning"].cast<bool>();
+            if (state.contains("lastActionTime")) body.lastActionTime = state["lastActionTime"].cast<float>();
+            return self;
+        }, py::arg("state"), "Set agent state from dictionary")
+        .def("__repr__", [](const SimpleWorld& world) {
+            return "<SimpleWorld: " + std::to_string(world.getWidth()) + "x" +
+                   std::to_string(world.getHeight()) + " agents: " +
+                   std::to_string(world.getAgentBody().health > 0.0f ? 1 : 0) + ">";
+        });
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
@@ -351,24 +630,108 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic convenience methods
+        .def("stepWithTime", [](Brain& self, SimulationStep currentStep, Timestamp currentTime) {
+            self.step(currentStep, currentTime);
+            return self;
+        }, py::arg("currentStep"), py::arg("currentTime"),
+           "Perform a simulation step with timestamp (returns self for chaining)")
+        .def("initializeWithConfig", [](Brain& self) {
+            // Check if config has needed parameters first
+            auto config = self.getConfig();
+            if (config->has("brain") && config->has("world")) {
+                return self.initialize();
+            }
+            throw py::value_error("Configuration missing 'brain' or 'world' sections");
+        }, "Initialize brain with configuration (throws error if config invalid)")
+        .def("saveWithTimestamp", [](Brain& self, const std::string& filepath) {
+            auto timestamp = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(timestamp);
+            std::string timestampedFilepath = filepath + "_" + std::to_string(time_t);
+            return self.save(timestampedFilepath);
+        }, py::arg("filepath"), "Save brain state with timestamp suffix")
+        .def("getRegionNames", [](const Brain& self) {
+            auto regionIds = self.getRegionIds();
+            std::vector<std::string> names;
+            for (const auto& id : regionIds) {
+                names.push_back(std::to_string(id.value));
+            }
+            return names;
+        }, "Get region names as strings")
+        .def("getNeuronStats", [](const Brain& self) {
+            py::dict stats;
+            stats["total"] = self.getTotalNeuronCount();
+            stats["active"] = self.getActiveNeuronCount();
+            stats["firing"] = self.getFiringNeuronCount();
+            stats["averageFiringRate"] = self.getAverageFiringRate();
+            stats["excitationInhibitionRatio"] = self.getExcitationInhibitionRatio();
+            stats["totalSpikeCount"] = self.getTotalSpikeCount();
+            return stats;
+        }, "Get comprehensive neuron statistics as dictionary")
+        .def("getStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neurons"] = self.getTotalNeuronCount();
+            stats["synapses"] = self.getTotalSynapseCount();
+            stats["regions"] = self.getRegionCount();
+            auto neuronStats = py::dict();
+            neuronStats["active"] = self.getActiveNeuronCount();
+            neuronStats["firing"] = self.getFiringNeuronCount();
+            neuronStats["averageFiringRate"] = self.getAverageFiringRate();
+            neuronStats["totalSpikeCount"] = self.getTotalSpikeCount();
+            neuronStats["excitationInhibitionRatio"] = self.getExcitationInhibitionRatio();
+            stats["neuronStats"] = neuronStats;
+            stats["developmentalStage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics as dictionary")
+        .def("injectCurrentBatch", [](Brain& self, const py::dict& currentMap) {
+            for (auto item : currentMap) {
+                std::string neuronIdStr = py::str(item.first);
+                float current = item.second.cast<float>();
+                
+                try {
+                    NeuronId neuronId(std::stoull(neuronIdStr));
+                    self.injectCurrent(neuronId, current);
+                } catch (const std::exception& e) {
+                    throw py::value_error("Invalid neuron ID: " + neuronIdStr);
+                }
+            }
+            return self;
+        }, py::arg("currentMap"), "Inject currents to multiple neurons (dict: neuron_id -> current)")
+        .def("injectCurrentToTypeBatch", [](Brain& self, const py::dict& typeMap) {
+            for (auto item : typeMap) {
+                std::string typeStr = py::str(item.first);
+                float current = item.second.cast<float>();
+                
+                NeuronType type;
+                if (typeStr == "Excitatory") type = NeuronType::Excitatory;
+                else if (typeStr == "Inhibitory") type = NeuronType::Inhibitory;
+                else if (typeStr == "Modulatory") type = NeuronType::Modulatory;
+                else if (typeStr == "Sensory") type = NeuronType::Sensory;
+                else if (typeStr == "Motor") type = NeuronType::Motor;
+                else if (typeStr == "Internal") type = NeuronType::Internal;
+                else {
+                    throw py::value_error("Invalid neuron type: " + typeStr);
+                }
+                
+                self.injectCurrentToNeurons(type, current);
+            }
+            return self;
+        }, py::arg("typeMap"), "Inject currents to multiple neuron types (dict: type -> current)")
+        .def("isInitialized", [](const Brain& self) {
+            return self.getRegionCount() > 0;
+        }, "Check if brain is initialized (has regions)")
+        .def("clone", [](const Brain& self) {
+            // This is a simplified clone - in real implementation might need proper deep copy
+            return std::make_shared<Brain>(self.getConfig());
+        }, "Create a copy of the brain (shallow)")
+        .def("__repr__", [](const Brain& brain) {
+            return "<Brain: " + std::to_string(brain.getTotalNeuronCount()) + " neurons, " +
+                   std::to_string(brain.getRegionCount()) + " regions, " +
+                   std::to_string(brain.getTotalSynapseCount()) + " synapses>";
+        });
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
@@ -398,7 +761,95 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Pythonic convenience methods
+        .def("getState", [](const AgentBrain& self) {
+            py::dict state;
+            auto brain = self.getBrain();
+            state["brain"] = brain;
+            state["developmentalStage"] = self.getDevelopmentalStage();
+            state["neuromodulationLevel"] = self.getNeuromodulationLevel();
+            state["curiosityLevel"] = self.getCuriosityLevel();
+            state["noveltyLevel"] = self.getNoveltyLevel();
+            state["predictionError"] = self.getPredictionError();
+            state["rewardModulationEnabled"] = self.isRewardModulationEnabled();
+            state["structuralPlasticityEnabled"] = self.isStructuralPlasticityEnabled();
+            state["developmentEnabled"] = self.isDevelopmentEnabled();
+            state["curiosityEnabled"] = self.isCuriosityEnabled();
+            return state;
+        }, "Get agent brain state as dictionary")
+        .def("setState", [](AgentBrain& self, const py::dict& state) {
+            if (state.contains("rewardModulationEnabled")) {
+                self.enableRewardModulation(state["rewardModulationEnabled"].cast<bool>());
+            }
+            if (state.contains("structuralPlasticityEnabled")) {
+                self.enableStructuralPlasticity(state["structuralPlasticityEnabled"].cast<bool>());
+            }
+            if (state.contains("developmentEnabled")) {
+                self.enableDevelopment(state["developmentEnabled"].cast<bool>());
+            }
+            if (state.contains("curiosityEnabled")) {
+                self.enableCuriosity(state["curiosityEnabled"].cast<bool>());
+            }
+            return self;
+        }, py::arg("state"), "Set agent brain state from dictionary")
+        .def("getStatus", [](const AgentBrain& self) {
+            py::dict status;
+            status["developmentalStage"] = static_cast<int>(self.getDevelopmentalStage());
+            status["neuromodulation"] = self.getNeuromodulationLevel();
+            status["curiosity"] = self.getCuriosityLevel();
+            status["novelty"] = self.getNoveltyLevel();
+            status["predictionError"] = self.getPredictionError();
+            return status;
+        }, "Get formatted status string for agent brain")
+        .def("updateWithTime", [](AgentBrain& self, double timestep) {
+            self.updateDevelopment(timestep);
+            return self;
+        }, py::arg("timestep"), "Update agent brain with timestep (returns self)")
+        .def("processSensoryBatch", [](AgentBrain& self, const py::list& percepts) {
+            for (auto item : percepts) {
+                auto percept = item.cast<std::shared_ptr<SensoryPercept>>();
+                self.processSensoryInput(*percept);
+            }
+            return self;
+        }, py::arg("percepts"), "Process multiple sensory percepts (list)")
+        .def("getEnabledFeatures", [](const AgentBrain& self) {
+            std::vector<std::string> features;
+            if (self.isRewardModulationEnabled()) features.push_back("reward_modulation");
+            if (self.isStructuralPlasticityEnabled()) features.push_back("structural_plasticity");
+            if (self.isDevelopmentEnabled()) features.push_back("development");
+            if (self.isCuriosityEnabled()) features.push_back("curiosity");
+            return features;
+        }, "Get list of enabled agent brain features")
+        .def("enableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+            return self;
+        }, "Enable all agent brain features (returns self)")
+        .def("disableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+            return self;
+        }, "Disable all agent brain features (returns self)")
+        .def("isActive", [](const AgentBrain& self) {
+            return self.getNeuromodulationLevel() > 0.0f &&
+                   self.getCuriosityLevel() > 0.0f &&
+                   self.getPredictionError() > 0.0f;
+        }, "Check if agent brain is actively learning")
+        .def("clone", [](const AgentBrain& self) {
+            return std::make_shared<AgentBrain>(self.getBrain());
+        }, "Create a copy of the agent brain (shallow)")
+        .def("__repr__", [](const AgentBrain& agentBrain) {
+            return "<AgentBrain: developmental_stage=" +
+                   std::to_string(static_cast<int>(agentBrain.getDevelopmentalStage())) +
+                   ", neuromodulation=" + std::to_string(agentBrain.getNeuromodulationLevel()) +
+                   ", curiosity=" + std::to_string(agentBrain.getCuriosityLevel()) + ">";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +867,188 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    .def("isActive", [](const AgentBrain& self) {
+        return self.getNeuromodulationLevel() > 0.0f &&
+               self.getCuriosityLevel() > 0.0f &&
+               self.getPredictionError() > 0.0f;
+    }, "Check if agent brain is actively learning")
+    .def("clone", [](const AgentBrain& self) {
+        return std::make_shared<AgentBrain>(self.getBrain());
+    }, "Create a copy of the agent brain (shallow)")
+    .def("__repr__", [](const AgentBrain& agentBrain) {
+        return "<AgentBrain: developmental_stage=" +
+               std::to_string(static_cast<int>(agentBrain.getDevelopmentalStage())) +
+               ", neuromodulation=" + std::to_string(agentBrain.getNeuromodulationLevel()) +
+               ", curiosity=" + std::to_string(agentBrain.getCuriosityLevel()) + ">";
+    });
+
+    // MemoryReplaySystem Python bindings
+    py::class_<MemoryReplaySystem>(m, "MemoryReplaySystem", 
+        R"pbdoc(Enhanced memory replay system for learning consolidation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &MemoryReplaySystem::initialize,
+            py::arg("episodicMemory"), py::arg("config"),
+            "Initialize the replay system with episodic memory and configuration")
+        .def("startReplay", &MemoryReplaySystem::startReplay,
+            py::arg("episodeIds"), py::arg("mode") = ReplayMode::SEQUENTIAL,
+            "Start replay of selected episodes with specified mode")
+        .def("stopReplay", &MemoryReplaySystem::stopReplay,
+            "Stop the replay process")
+        .def("isReplaying", &MemoryReplaySystem::isReplaying,
+            "Check if replay is currently active")
+        .def("getNextEpisode", &MemoryReplaySystem::getNextEpisode,
+            "Get the next episode to be replayed")
+        .def("advanceToNextEpisode", &MemoryReplaySystem::advanceToNextEpisode,
+            "Advance to the next episode in the replay sequence")
+        .def("setReplayRate", &MemoryReplaySystem::setReplayRate,
+            py::arg("rate"), "Set replay rate (episodes per second)")
+        .def("getReplayRate", &MemoryReplaySystem::getReplayRate,
+            "Get the current replay rate")
+        .def("setReplayStrategy", &MemoryReplaySystem::setReplayStrategy,
+            py::arg("strategy"), "Set the replay strategy for episode selection")
+        .def("getReplayStrategy", &MemoryReplaySystem::getReplayStrategy,
+            "Get the current replay strategy")
+        .def("setReplayTimeWindow", &MemoryReplaySystem::setReplayTimeWindow,
+            py::arg("startTime"), py::arg("endTime"),
+            "Set the time window for replay selection")
+        .def("setReplayRelevanceThreshold", &MemoryReplaySystem::setReplayRelevanceThreshold,
+            py::arg("threshold"), "Set relevance threshold for episode selection")
+        .def("selectEpisodesForReplay", &MemoryReplaySystem::selectEpisodesForReplay,
+            py::arg("maxEpisodes") = 10,
+            "Select episodes for replay based on strategy and thresholds")
+        .def("getReplayStats", &MemoryReplaySystem::getReplayStats,
+            "Get current replay statistics")
+        .def("enableReplay", &MemoryReplaySystem::enableReplay,
+            py::arg("enable"), "Enable or disable replay functionality")
+        .def("isReplayEnabled", &MemoryReplaySystem::isReplayEnabled,
+            "Check if replay is enabled")
+        .def("update", &MemoryReplaySystem::update,
+            py::arg("currentTime"), "Update replay system (called each simulation step)")
+        .def("getReplayProgress", &MemoryReplaySystem::getReplayProgress,
+            "Get replay progress percentage (0.0 to 1.0)")
+        .def("getCurrentEpisodeIndex", &MemoryReplaySystem::getCurrentEpisodeIndex,
+            "Get current episode index in replay sequence")
+        .def("getTotalEpisodesInReplay", &MemoryReplaySystem::getTotalEpisodesInReplay,
+            "Get total number of episodes in current replay")
+        .def("clear", &MemoryReplaySystem::clear,
+            "Clear replay state and stop replay")
+        .def("__repr__", [](const MemoryReplaySystem& replaySystem) {
+            auto stats = replaySystem.getReplayStats();
+            std::stringstream ss;
+            ss << "<MemoryReplaySystem: " << stats.totalReplayed << "/" << stats.totalEpisodes << " episodes, "
+               << stats.currentIndex << "/" << stats.totalEpisodes << " current, "
+               << "progress: " << std::fixed << std::setprecision(1) << (replaySystem.getReplayProgress() * 100) << "%>";
+            return ss.str();
+        });
+
+    // VisualizationInterface Python bindings
+    py::class_<VisualizationInterface>(m, "VisualizationInterface",
+        R"pbdoc(Enhanced visualization interface for debugging and analysis)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize,
+            "Initialize visualization system")
+        .def("update", &VisualizationInterface::update,
+            "Update visualization data")
+        .def("render", &VisualizationInterface::render,
+            "Render current state")
+        .def("close", &VisualizationInterface::close,
+            "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive,
+            "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate,
+            py::arg("hz"), "Set update rate (Hz)")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate,
+            "Get the current update rate")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork,
+            py::arg("brain"), "Visualize neural network structure")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity,
+            py::arg("brain"), "Visualize neural activity patterns")
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes,
+            py::arg("spikes"), "Create spike raster plot")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights,
+            py::arg("brain"), "Visualize synaptic weight matrices")
+        .def("visualizeMemoryReplay", &VisualizationInterface::visualizeMemoryReplay,
+            py::arg("replaySystem"), "Visualize memory replay process")
+        .def("visualizeEpisodicMemory", &VisualizationInterface::visualizeEpisodicMemory,
+            py::arg("episodicMemory"), "Visualize episodic memory structure")
+        .def("visualizeReplayStatistics", &VisualizationInterface::visualizeReplayStatistics,
+            py::arg("stats"), "Visualize replay statistics")
+        .def("visualizeBrainStatesForReplay", &VisualizationInterface::visualizeBrainStatesForReplay,
+            py::arg("brain"), "Visualize brain states optimized for replay")
+        .def("visualizeReplayTimeline", &VisualizationInterface::visualizeReplayTimeline,
+            py::arg("replaySystem"), "Visualize replay timeline")
+        .def("visualizeReplayQuality", &VisualizationInterface::visualizeReplayQuality,
+            py::arg("stats"), "Visualize replay quality metrics")
+        .def("visualizeMemoryConsolidation", &VisualizationInterface::visualizeMemoryConsolidation,
+            py::arg("episodicMemory"), "Visualize memory consolidation process")
+        .def("visualizeMemoryRetrieval", &VisualizationInterface::visualizeMemoryRetrieval,
+            py::arg("episodicMemory"), "Visualize memory retrieval patterns")
+        .def("setReplaySystem", &VisualizationInterface::setReplaySystem,
+            py::arg("replaySystem"), "Set the replay system for visualization")
+        .def("setEpisodicMemory", &VisualizationInterface::setEpisodicMemory,
+            py::arg("episodicMemory"), "Set the episodic memory for visualization")
+        .def("enableReplayVisualization", &VisualizationInterface::enableReplayVisualization,
+            py::arg("enable"), "Enable or disable replay visualization features")
+        .def("isReplayVisualizationEnabled", &VisualizationInterface::isReplayVisualizationEnabled,
+            "Check if replay visualization is enabled")
+        .def("__repr__", [](const VisualizationInterface& viz) {
+            return "<VisualizationInterface: " + std::to_string(viz.getUpdateRate()) + " Hz, " +
+                   std::string(viz.isActive() ? "active" : "inactive") + ">";
+        });
+
+    // ReplayMode enum bindings
+    py::enum_<ReplayMode>(m, "ReplayMode", R"pbdoc(Replay mode enumeration)pbdoc")
+        .value("SEQUENTIAL", ReplayMode::SEQUENTIAL)
+        .value("RANDOM", ReplayMode::RANDOM)
+        .value("PRIORITY", ReplayMode::PRIORITY)
+        .value("LOOPING", ReplayMode::LOOPING)
+        .export_values();
+
+    // ReplayStrategy enum bindings
+    py::enum_<ReplayStrategy>(m, "ReplayStrategy", R"pbdoc(Replay strategy enumeration)pbdoc")
+        .value("RELEVANCE_BASED", ReplayStrategy::RELEVANCE_BASED)
+        .value("TIME_BASED", ReplayStrategy::TIME_BASED)
+        .value("RANDOM", ReplayStrategy::RANDOM)
+        .value("QUALITY_BASED", ReplayStrategy::QUALITY_BASED)
+        .value("CONSOLIDATION", ReplayStrategy::CONSOLIDATION)
+        .export_values();
+
+    // ReplayStats struct bindings
+    py::class_<ReplayStats>(m, "ReplayStats", R"pbdoc(Statistics for replay operations)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("totalReplayed", &ReplayStats::totalReplayed)
+        .def_readwrite("successfulReplays", &ReplayStats::successfulReplays)
+        .def_readwrite("averageQuality", &ReplayStats::averageQuality)
+        .def_readwrite("currentIndex", &ReplayStats::currentIndex)
+        .def_readwrite("totalEpisodes", &ReplayStats::totalEpisodes)
+        .def("getSuccessRate", [](const ReplayStats& stats) {
+            return stats.totalEpisodes > 0 ? 
+                static_cast<double>(stats.successfulReplays) / stats.totalEpisodes : 0.0;
+        }, "Get success rate (0.0 to 1.0)")
+        .def("__repr__", [](const ReplayStats& stats) {
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(2);
+            ss << "<ReplayStats: " << stats.totalReplayed << "/" << stats.totalEpisodes << " episodes, "
+               << stats.successfulReplays << " successful, "
+               << stats.averageQuality << " avg quality, "
+               << (stats.totalEpisodes > 0 ? (stats.successfulReplays * 100 / stats.totalEpisodes) : 0) << "% success rate>";
+            return ss.str();
+        });
+
+    // Factory functions for new components
+    m.def("createMemoryReplaySystem", []() -> std::shared_ptr<MemoryReplaySystem> {
+        return std::make_shared<MemoryReplaySystem>();
+    }, "Create a new memory replay system");
+
+    m.def("createVisualizationInterface", []() -> std::shared_ptr<VisualizationInterface> {
+        return std::make_shared<VisualizationInterface>();
+    }, "Create a new visualization interface");
+
+    // Module-level attributes for new components
+    m.attr("ReplayMode") = py::module_local().attr("ReplayMode");
+    m.attr("ReplayStrategy") = py::module_local().attr("ReplayStrategy");
+
 }
 
 } // namespace nlm
+

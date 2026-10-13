@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include "Neuron.hpp"
 #include <vector>
 #include <memory>
@@ -10,7 +11,7 @@ namespace nlm {
 // NeuralPopulation: A group of neurons with shared properties
 // PLACEHOLDER - Phase 2 will implement population-level dynamics
 
-class NeuralPopulation {
+class NeuralPopulation : public PimplMoveOperations<NeuralPopulation> {
 public:
     // Create population with ID and size
     NeuralPopulation(PopulationId id, size_t size);
@@ -20,8 +21,8 @@ public:
     // Disable copying, enable moving
     NeuralPopulation(const NeuralPopulation&) = delete;
     NeuralPopulation& operator=(const NeuralPopulation&) = delete;
-    NeuralPopulation(NeuralPopulation&&) noexcept;
-    NeuralPopulation& operator=(NeuralPopulation&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<NeuralPopulation>::PimplMoveOperations;
     
     // Identity
     PopulationId getId() const;

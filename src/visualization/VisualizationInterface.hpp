@@ -3,11 +3,17 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "../memory/MemoryReplaySystem.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Forward declarations
+class Brain;
+class NeuralEpisodicMemory;
+struct SpikeEvent;
+
+// Enhanced visualization interface for debugging and analysis
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -32,21 +38,47 @@ public:
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Brain visualization methods
+    void visualizeNetwork(const Brain& brain);
     
     // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    void visualizeActivity(const Brain& brain);
     
     // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
     
     // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    void visualizeWeights(const Brain& brain);
+    
+    // Enhanced visualization methods for memory replay
+    void visualizeMemoryReplay(const MemoryReplaySystem& replaySystem);
+    void visualizeEpisodicMemory(const NeuralEpisodicMemory& episodicMemory);
+    void visualizeReplayStatistics(const ReplayStats& stats);
+    void visualizeBrainStatesForReplay(const Brain& brain);
+    void visualizeReplayTimeline(const MemoryReplaySystem& replaySystem);
+    void visualizeReplayQuality(const ReplayStats& stats);
+    
+    // Memory-specific visualization
+    void visualizeMemoryConsolidation(const NeuralEpisodicMemory& episodicMemory);
+    void visualizeMemoryRetrieval(const NeuralEpisodicMemory& episodicMemory);
+    void visualizeMemoryAssociations(const class NeuralAssociativeMemory& associativeMemory);
+    
+    // Integration methods
+    void setReplaySystem(MemoryReplaySystem* replaySystem) { replaySystem_ = replaySystem; }
+    void setEpisodicMemory(NeuralEpisodicMemory* episodicMemory) { episodicMemory_ = episodicMemory; }
+    
+    // Configuration
+    void enableReplayVisualization(bool enable) { replayVisualizationEnabled_ = enable; }
+    bool isReplayVisualizationEnabled() const { return replayVisualizationEnabled_; }
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Integration pointers
+    MemoryReplaySystem* replaySystem_;
+    NeuralEpisodicMemory* episodicMemory_;
+    bool replayVisualizationEnabled_;
 };
 
 } // namespace nlm

@@ -3,13 +3,14 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include "../PimplMoveOperations.hpp"
 
 namespace nlm {
 
 // Deterministic random number generator
 // Supports explicit seeds for reproducible experiments
 
-class RandomGenerator {
+class RandomGenerator : public PimplMoveOperations<RandomGenerator> {
 public:
     using result_type = uint32_t;
     
@@ -25,9 +26,8 @@ public:
     RandomGenerator(const RandomGenerator&) = delete;
     RandomGenerator& operator=(const RandomGenerator&) = delete;
     
-    // Enable moving
-    RandomGenerator(RandomGenerator&&) noexcept;
-    RandomGenerator& operator=(RandomGenerator&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<RandomGenerator>::PimplMoveOperations;
     
     // Seed operations
     void seed(uint64_t seed);

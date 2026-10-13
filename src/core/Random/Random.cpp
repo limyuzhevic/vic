@@ -1,4 +1,5 @@
 #include "Random.hpp"
+#include "../PimplMoveOperations.hpp"
 #include <stdexcept>
 
 namespace nlm {
@@ -15,19 +16,6 @@ RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
 RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
-
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 void RandomGenerator::seed(uint64_t seed) {
     pImpl->gen.seed(seed);

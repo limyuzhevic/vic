@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/PimplMoveOperations.hpp"
 
 namespace nlm {
 
@@ -10,7 +11,7 @@ class Neuron;
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
-class Synapse {
+class Synapse : public PimplMoveOperations<Synapse> {
 public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
@@ -20,8 +21,8 @@ public:
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<Synapse>::PimplMoveOperations;
     
     // Identity
     SynapseId getId() const;

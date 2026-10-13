@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -48,7 +49,7 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
-class Brain {
+class Brain : public PimplMoveOperations<Brain> {
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
@@ -58,8 +59,8 @@ public:
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<Brain>::PimplMoveOperations;
     
     // Initialize brain with configuration
     bool initialize();

@@ -1,4 +1,5 @@
 #include "NeuralPopulation.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include <algorithm>
 #include <numeric>
 
@@ -17,19 +18,6 @@ struct NeuralPopulation::Impl {
 NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
 
 NeuralPopulation::~NeuralPopulation() = default;
-
-NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 PopulationId NeuralPopulation::getId() const {
     return pImpl->id;

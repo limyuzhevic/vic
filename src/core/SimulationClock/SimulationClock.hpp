@@ -1,13 +1,14 @@
 #pragma once
 
-#include "Types.hpp"
+#include "../Types/Types.hpp"
+#include "../PimplMoveOperations.hpp"
 
 namespace nlm {
 
 // Simulation clock for managing time in the neural simulation
 // Provides deterministic time tracking separate from wall-clock time
 
-class SimulationClock {
+class SimulationClock : public PimplMoveOperations<SimulationClock> {
 public:
     // Create with specific timestep
     explicit SimulationClock(TimestepDuration timestep = 0.001); // 1ms default
@@ -17,8 +18,8 @@ public:
     // Disable copying, enable moving
     SimulationClock(const SimulationClock&) = delete;
     SimulationClock& operator=(const SimulationClock&) = delete;
-    SimulationClock(SimulationClock&&) noexcept;
-    SimulationClock& operator=(SimulationClock&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<SimulationClock>::PimplMoveOperations;
     
     // Time operations
     void reset();

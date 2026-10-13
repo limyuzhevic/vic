@@ -1,4 +1,5 @@
 #include "Synapse.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -63,19 +64,6 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 }
 
 Synapse::~Synapse() = default;
-
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Synapse& Synapse::operator=(Synapse&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 SynapseId Synapse::getId() const {
     return pImpl->id;

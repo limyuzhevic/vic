@@ -1,4 +1,5 @@
 #include "SpikeSystem.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include <algorithm>
 #include <limits>
 
@@ -21,19 +22,6 @@ struct SpikeSystem::Impl {
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
 SpikeSystem::~SpikeSystem() = default;
-
-SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
     pImpl->pendingSpikes.push(event);

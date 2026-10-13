@@ -179,6 +179,35 @@ enum class FiringState : uint8_t {
     Inhibited
 };
 
+// Replay modes for memory replay system
+enum class ReplayMode : uint8_t {
+    SEQUENTIAL,    // Play episodes in order
+    RANDOM,        // Random selection of episodes
+    PRIORITY,      // Higher priority episodes first
+    LOOPING        // Loop through episodes
+};
+
+// Replay strategies for episode selection
+enum class ReplayStrategy : uint8_t {
+    RELEVANCE_BASED,   // Based on relevance scores
+    TIME_BASED,        // Based on temporal proximity
+    RANDOM,            // Purely random
+    QUALITY_BASED,     // Based on replay quality metrics
+    CONSOLIDATION       // Focused on memory consolidation
+};
+
+// Statistics structure for replay system
+struct ReplayStats {
+    size_t totalReplayed;
+    size_t successfulReplays;
+    float averageQuality;
+    size_t currentIndex;
+    size_t totalEpisodes;
+    
+    ReplayStats() : totalReplayed(0), successfulReplays(0), averageQuality(0.0f),
+                   currentIndex(0), totalEpisodes(0) {}
+};
+
 // Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;

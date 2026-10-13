@@ -42,7 +42,7 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
-class Neuron {
+class Neuron : public PimplMoveOperations<Neuron> {
 public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
@@ -52,8 +52,8 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<Neuron>::PimplMoveOperations;
     
     // Identity
     NeuronId getId() const;

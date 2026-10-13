@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/PimplMoveOperations.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
 #include <vector>
@@ -12,7 +13,7 @@ namespace nlm {
 // NeuralRegion: A brain region containing multiple populations and local connectivity
 // PLACEHOLDER - Phase 2 will implement region-level dynamics
 
-class NeuralRegion {
+class NeuralRegion : public PimplMoveOperations<NeuralRegion> {
 public:
     // Create region with ID
     explicit NeuralRegion(RegionId id);
@@ -25,8 +26,8 @@ public:
     // Disable copying, enable moving
     NeuralRegion(const NeuralRegion&) = delete;
     NeuralRegion& operator=(const NeuralRegion&) = delete;
-    NeuralRegion(NeuralRegion&&) noexcept;
-    NeuralRegion& operator=(NeuralRegion&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<NeuralRegion>::PimplMoveOperations;
     
     // Identity
     RegionId getId() const;

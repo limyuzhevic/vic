@@ -1,4 +1,5 @@
 #include "SimulationClock.hpp"
+#include "../PimplMoveOperations.hpp"
 #include <chrono>
 
 namespace nlm {
@@ -17,19 +18,6 @@ struct SimulationClock::Impl {
 SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
 
 SimulationClock::~SimulationClock() = default;
-
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
 
 void SimulationClock::reset() {
     pImpl->step = 0;

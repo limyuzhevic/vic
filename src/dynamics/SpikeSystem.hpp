@@ -6,6 +6,7 @@
 #include <queue>
 #include <functional>
 #include <unordered_map>
+#include "../core/PimplMoveOperations.hpp"
 
 namespace nlm {
 
@@ -24,7 +25,7 @@ struct DetailedSpikeEvent {
 
 // Event-driven neural computation system
 // Handles spike event processing and delayed synaptic transmission
-class SpikeSystem {
+class SpikeSystem : public PimplMoveOperations<SpikeSystem> {
 public:
     SpikeSystem();
     ~SpikeSystem();
@@ -32,8 +33,8 @@ public:
     // Disable copying, enable moving
     SpikeSystem(const SpikeSystem&) = delete;
     SpikeSystem& operator=(const SpikeSystem&) = delete;
-    SpikeSystem(SpikeSystem&&) noexcept;
-    SpikeSystem& operator=(SpikeSystem&&) noexcept;
+    // Move operations are inherited from PimplMoveOperations
+    using PimplMoveOperations<SpikeSystem>::PimplMoveOperations;
     
     // Queue a spike event
     void queueSpike(const SpikeEvent& event);
