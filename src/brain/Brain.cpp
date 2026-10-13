@@ -488,22 +488,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
+            // Capture current sensory state from working memory
+            auto* workingMemory = pImpl->workingMemory;
+            if (workingMemory) {
+                // Get working memory sensory patterns (NEW FEATURE)
+                episode.sensoryState = workingMemory->retrieve();
+                
+                // Also capture any stored sensory patterns
+                auto sensoryPattern = workingMemory->retrieveSensoryPattern();
+                if (sensoryPattern) {
+                    episode.sensoryState = sensoryPattern->getData();
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store agent position and orientation from world
+            // This requires access to world state - add to AgentBrain interface
+            // For now, use placeholder values that should be set by environment
+            episode.positionX = 0.0f;  // Should come from world
+            episode.positionY = 0.0f;  // Should come from world
+            episode.orientation = 0.0f;  // Should come from world
+            
+            // Store action from motor system
+            // Action needs to be captured from AgentBrain or MotorSystem
+            // For now, use placeholder ActionType::Wait (will be replaced in Phase 2)
+            episode.action = ActionType::Wait;  // TODO: Replace with actual MotorCommand from world
             
             pImpl->episodicMemory->storeEpisode(episode);
         }

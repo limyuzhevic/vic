@@ -1,9 +1,17 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
+
+static std::unique_ptr<SensoryInput> createSensoryInputFromPercept(const SensoryPercept& percept) {
+    // Create a vision input from percept vision data
+    auto visionInput = std::make_unique<Vision>();
+    visionInput->setData(percept.getVision());
+    return visionInput;
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -84,9 +92,21 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Convert percept to sensory input
+    auto sensoryInput = createSensoryInputFromPercept(percept);
     
+    // Process sensory input through brain
+    if (brain_) {
+        brain_->receiveSensoryInput(sensoryInput);
+        
+        // Store the raw sensory pattern in working memory for direct access
+        auto* workingMemory = brain_->getWorkingMemory();
+        if (workingMemory) {
+            workingMemory->storeSensoryPattern(sensoryInput);
+        }
+    }
+    
+    // Also process the individual components for backward compatibility
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {

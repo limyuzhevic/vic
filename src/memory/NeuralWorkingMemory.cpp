@@ -1,5 +1,6 @@
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -87,6 +88,46 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
+}
+
+void NeuralWorkingMemory::storeSensoryPattern(const SensoryInput& input, float strength) {
+    if (!brain_) return;
+    
+    // Store the sensory input
+    storedSensoryPatterns_.push_back(input.clone());
+    sensoryPatternStrengths_.push_back(strength);
+    sensoryPatternTimestamps_.push_back(0);
+    
+    // Encode the sensory data as neural pattern for integration
+    const auto& data = input.getData();
+    if (!data.empty()) {
+        // Create a neural pattern based on sensory data
+        std::vector<float> pattern(data.begin(), data.end());
+        
+        // Normalize pattern to 0-1 range
+        float maxVal = *std::max_element(data.begin(), data.end());
+        if (maxVal > 0.0f) {
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                pattern[i] = pattern[i] / maxVal;
+            }
+        }
+        
+        // Store the neural pattern in working memory
+        store(pattern, strength);
+        
+        NLM_LOG_INFO("Stored sensory pattern of type " + std::string(input.getType()) + 
+                    " with strength " + std::to_string(strength));
+    }
+}
+
+std::unique_ptr<SensoryInput> NeuralWorkingMemory::retrieveSensoryPattern() const {
+    if (storedSensoryPatterns_.empty()) {
+        return nullptr;
+    }
+    
+    // Return the most recent sensory pattern
+    size_t idx = storedSensoryPatterns_.size() - 1;
+    return storedSensoryPatterns_[idx]->clone();
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {

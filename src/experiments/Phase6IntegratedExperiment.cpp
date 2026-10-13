@@ -1,13 +1,19 @@
-#include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
-#include <chrono>
-#include <cmath>
+#include "../motor/Action.hpp"
 
-namespace nlm {
+// Function to convert MotorCommand to ActionType for episodic memory storage
+ActionType convertMotorCommandToActionType(MotorCommand cmd) {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return ActionType::MoveForward;
+        case MotorCommand::MoveBackward: return ActionType::MoveBackward;
+        case MotorCommand::TurnLeft: return ActionType::TurnLeft;
+        case MotorCommand::TurnRight: return ActionType::TurnRight;
+        case MotorCommand::LookLeft: return ActionType::LookLeft;
+        case MotorCommand::LookRight: return ActionType::LookRight;
+        case MotorCommand::Interact: return ActionType::Interact;
+        case MotorCommand::Wait: return ActionType::Wait;
+        default: return ActionType::Wait;
+    }
+}
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
@@ -67,14 +73,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Process sensory input
         agent.processSensoryInput(percept);
         
-        // Brain step
+        // Brain step - this updates working memory with sensory patterns
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command (this converts neural activity to MotorCommand)
         MotorCommand cmd = agent.decodeMotorCommand();
         
+        // Store the actual action taken in the brain's episodic memory
+        if (brain->getEpisodicMemory()) {
+            // Convert MotorCommand to ActionType for episodic memory storage
+            ActionType action = convertMotorCommandToActionType(cmd);
+            
+            // Get the current episode (last one created by brain->step)
+            // The brain's episodic memory stores the most recent episode
+            // We need to update it with the actual action
+            if (brain->getEpisodicMemory()->getEpisodeCount() > 0) {
+                auto* lastEpisode = brain->getEpisodicMemory()->getEpisode(
+                    brain->getEpisodicMemory()->getEpisodeCount() - 1);
+                if (lastEpisode) {
+                    lastEpisode->action = action;
+                    // Store agent position (get from world)
+                    lastEpisode->positionX = world.getAgentBody().x;
+                    lastEpisode->positionY = world.getAgentBody().y;
+                    lastEpisode->orientation = world.getAgentBody().orientation;
+                }
+            }
+        }
+        
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyMotorCommand(cmd, world.getSimulationTime());
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());

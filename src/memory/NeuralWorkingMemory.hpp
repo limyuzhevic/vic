@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -32,6 +33,13 @@ public:
 
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);
+    
+    // Store raw sensory pattern directly (NEW INTEGRATION)
+    void storeSensoryPattern(const SensoryInput& input, float strength = 1.0f);
+    
+    // Retrieve current working memory content as sensory pattern
+    // Returns nullptr if no sensory pattern is stored
+    std::unique_ptr<SensoryInput> retrieveSensoryPattern() const;
 
     // Retrieve current working memory content as activity levels
     std::vector<float> retrieve() const;
@@ -104,6 +112,11 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Stored sensory patterns for direct retrieval
+    std::vector<std::unique_ptr<SensoryInput>> storedSensoryPatterns_;
+    std::vector<float> sensoryPatternStrengths_;
+    std::vector<SimulationStep> sensoryPatternTimestamps_;
 };
 
 // AttentionalSelection: Neural attention through competition
