@@ -11,9 +11,10 @@ namespace test_stdp {
 void testSTDPCreation() {
     nlm::STDP stdp;
     
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
+    // Configuration and check values
+    if (stdp.getLTPWeight() != 0.01f || stdp.getLTDWeight() != 0.012f || stdp.getTimeConstant() != 20.0f) {
+        throw std::runtime_error("STDP creation test failed: incorrect default values");
+    }
     
     std::cout << "    testSTDPCreation passed" << std::endl;
 }
@@ -25,9 +26,10 @@ void testSTDPConfiguration() {
     stdp.setLTDWeight(0.06f);
     stdp.setTimeConstant(30.0f);
     
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
+    // Configuration and check values
+    if (stdp.getLTPWeight() != 0.05f || stdp.getLTDWeight() != 0.06f || stdp.getTimeConstant() != 30.0f) {
+        throw std::runtime_error("STDP configuration test failed: incorrect values after configuration");
+    }
     
     std::cout << "    testSTDPConfiguration passed" << std::endl;
 }
@@ -37,9 +39,10 @@ void testSTDPConfigure() {
     
     stdp.configure(0.03f, 0.035f, 25.0f);
     
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
+    // Configuration and check values
+    if (stdp.getLTPWeight() != 0.03f || stdp.getLTDWeight() != 0.035f || stdp.getTimeConstant() != 25.0f) {
+        throw std::runtime_error("STDP configure test failed: incorrect values after configure");
+    }
     
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
@@ -47,8 +50,10 @@ void testSTDPConfigure() {
 void testSTDPName() {
     nlm::STDP stdp;
     
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
+    // Check name is not null and equals "STDP"
+    if (stdp.getName() == nullptr || std::string(stdp.getName()) != "STDP") {
+        throw std::runtime_error("STDP name test failed: name is incorrect or null");
+    }
     
     std::cout << "    testSTDPName passed" << std::endl;
 }
@@ -73,7 +78,9 @@ void testSTDPPotentiation() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have increased due to pre-before-post
-    assert(finalWeight > initialWeight);
+    if (finalWeight <= initialWeight) {
+        throw std::runtime_error("STDP potentiation test failed: finalWeight <= initialWeight");
+    }
     
     std::cout << "    testSTDPPotentiation passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -98,7 +105,9 @@ void testSTDPDepression() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have decreased due to post-before-pre
-    assert(finalWeight < initialWeight);
+    if (finalWeight >= initialWeight) {
+        throw std::runtime_error("STDP depression test failed: finalWeight >= initialWeight");
+    }
     
     std::cout << "    testSTDPDepression passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -115,13 +124,17 @@ void testSTDPEmptySpikes() {
     std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    if (synapse.getWeight() != initialWeight) {
+        throw std::runtime_error("STDP empty pre spikes test failed: weight changed");
+    }
     
     // Empty post spikes - should not change
     preSpikes = {1.0, 2.0};
     postSpikes = {};
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    if (synapse.getWeight() != initialWeight) {
+        throw std::runtime_error("STDP empty post spikes test failed: weight changed");
+    }
     
     std::cout << "    testSTDPEmptySpikes passed" << std::endl;
 }
@@ -140,7 +153,9 @@ void testSTDPWeightBounds() {
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
     // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    if (synapse.getWeight() > 1.0f) {
+        throw std::runtime_error("STDP weight bounds test failed: weight > 1.0");
+    }
     
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }

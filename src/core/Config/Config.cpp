@@ -1,6 +1,6 @@
-#include "Config.hpp"
-#include <fstream>
+#include <variant>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <filesystem>
 
@@ -18,17 +18,86 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Helper function to serialize ConfigValue to string
+std::string serializeConfigValue(const ConfigValue& value) {
+    std::stringstream ss;
+    
+    std::visit([&ss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            ss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            ss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            ss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << arg[i];
+            }
+            ss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            ss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) ss << ", ";
+                // Format double to avoid scientific notation
+                ss << std::fixed << std::setprecision(6) << arg[i];
+            }
+            ss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            ss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << "\"" << arg[i] << "\"";
+            }
+            ss << "]";
+        } else {
+            // Handle arithmetic types (int, int64_t, double)
+            ss << arg;
+        }
+    }, value);
+    
+    return ss.str();
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
+    // Validate path safety
+    if (!isSafePath(filepath)) {
+        NLM_LOG_ERROR("Unsafe file path: " + filepath);
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    struct stat st;
+    if (stat(filepath.c_str(), &st) != 0) {
+        NLM_LOG_ERROR("File not found: " + filepath);
+        return false;
+    }
+    
+    // Ensure it's a file (not directory)
+    if (!S_ISREG(st.st_mode)) {
+        NLM_LOG_ERROR("Not a regular file: " + filepath);
+        return false;
+    }
+    
+    // Check if file is readable
+    if (access(filepath.c_str(), R_OK) != 0) {
+        NLM_LOG_ERROR("Cannot read file: " + filepath);
+        return false;
+    }
+    
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,9 +117,20 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Error parsing config file " + filepath + " at line " + 
+                             std::to_string(lineNumber) + ": " + e.what());
+                // Continue parsing other lines
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config format at line " + std::to_string(lineNumber) + ": " + line);
         }
     }
+    
+    NLM_LOG_INFO("Successfully loaded " + std::to_string(pImpl->entries.size()) + 
+                " configuration entries from: " + filepath);
     
     return true;
 }
@@ -86,7 +166,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << serializeConfigValue(entry.value) << "\n";
     }
     
     return true;
@@ -184,6 +264,34 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+bool Config::isSafePath(const std::string& filepath) {
+    // Check for directory traversal patterns
+    if (filepath.find("../") != std::string::npos || 
+        filepath.find("..\\") != std::string::npos) {
+        return false;
+    }
+    
+    // Check for absolute paths (allow relative paths only)
+    if (filepath.find("/") == 0 || (filepath.size() >= 2 && filepath[1] == ':' && filepath.find("\\") == std::string::npos)) {
+        return false;
+    }
+    
+    // Ensure path is within allowed directories
+    try {
+        std::filesystem::path path(filepath);
+        std::filesystem::path baseDir = "configs/";
+        
+        if (!std::filesystem::exists(baseDir)) {
+            std::filesystem::create_directories(baseDir);
+        }
+        
+        std::filesystem::path canonicalPath = std::filesystem::canonical(path);
+        return canonicalPath.string().find(baseDir.string()) == 0;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 std::string Config::trim(const std::string& str) {
