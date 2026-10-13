@@ -404,24 +404,45 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Please check configuration file and system resources.");
+        NLM_LOG_ERROR("Current configuration:");
+        NLM_LOG_ERROR("  Neuron count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+        NLM_LOG_ERROR("  Region count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
         return 1;
     }
     
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Test Suite ===");
     runBasicConnectivityTest(brain);
     
+    // Check if test completed successfully
+    if (brain->getTotalSpikeCount() > 0) {
+        NLM_LOG_INFO("Test 1 PASSED: Neural network shows activity");
+    } else {
+        NLM_LOG_WARNING("Test 1 WARNING: No spikes detected, network may not be functioning");
+    }
+    
     // Reset brain for plasticity experiment
+    NLM_LOG_INFO("Resetting brain for plasticity experiment...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain for plasticity test!");
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
+    NLM_LOG_INFO("Resetting brain for STDP verification...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain for STDP test!");
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status
