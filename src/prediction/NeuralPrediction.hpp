@@ -134,13 +134,20 @@ public:
                          const std::vector<float>& afterState,
                          float reward);
 
-    // Predict consequence of taking an action in a given state
-    std::vector<float> predictConsequence(ActionType action,
-                                         const std::vector<float>& currentState);
+    // Predict consequences of all possible actions in current state
+    std::vector<float> predictAllActions(const std::vector<float>& currentState) const;
+    
+    // Get best action based on predicted consequences
+    ActionType predictOptimalAction(const std::vector<float>& currentState) const;
 
-    // Get prediction confidence for an action
-    float getConsequenceConfidence(ActionType action,
-                                  const std::vector<float>& currentState) const;
+    // Update based on actual observed consequence
+    void updatePrediction(ActionType action,
+                         const std::vector<float>& predicted,
+                         const std::vector<float>& actual,
+                         float reward);
+
+    // Get learned action quality (average expected reward)
+    float getActionQuality(ActionType action) const;
 
     // Update based on actual observed consequence
     void updatePrediction(ActionType action,

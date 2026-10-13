@@ -35,6 +35,8 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<ActionConsequencePredictor> autoConsequencePredictor;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -115,6 +117,12 @@ struct Brain::Impl {
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize advanced prediction systems
+        autoConsequencePredictor = std::make_unique<ActionConsequencePredictor>();
+        autoConsequencePredictor->initialize(this);
+        neuralPrediction = std::make_unique<NeuralPrediction>();
+        neuralPrediction->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -406,7 +414,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 5: Update prediction systems ==========
+    if (pImpl->neuralPrediction) {
+        // Neural prediction: record sensory state and generate predictions
+        // This enables temporal sequence learning
+        std::vector<float> currentState;
+        // TODO: Get current sensory state from neurons
+        // For now, use a simplified placeholder
+        currentState.resize(50, 0.5f);  // Placeholder sensory state
+        
+        pImpl->neuralPrediction->recordSensoryState(currentState, currentStep);
+        
+        // Generate prediction for next timestep
+        auto predictedState = pImpl->neuralPrediction->generatePrediction(currentStep);
+        
+        // Update prediction error and confidence
+        float predictionError = pImpl->neuralPrediction->getPredictionError();
+        float predictionConfidence = pImpl->neuralPrediction->getPredictionConfidence();
+        
+        // Integrate prediction error with neuromodulation
+        if (pImpl->dopamine) {
+            // Prediction error modulates dopamine release
+            float predictionErrorSignal = predictionError * 0.5f;
+            pImpl->dopamine->setLevel(predictionErrorSignal);
+        }
+        
+        if (pImpl->curiosity) {
+            // Update curiosity based on prediction error
+            // (In a full implementation, we'd also pass novelty)
+            float noveltyLevel = (pImpl->novelty) ? pImpl->novelty->getLevel() : 0.0f;
+            pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+        }
+    }
+    
+    if (pImpl->autoConsequencePredictor) {
+        // Action consequence prediction
+        // This learns what actions lead to what outcomes
+        // The predictor maintains associations between actions and consequences
+        // This information can guide action selection
+        
+        // Get action predictions for better decision making
+        // This would be used by action selection systems
+        std::vector<float> currentState;
+        currentState.resize(50, 0.5f);  // Placeholder current state
+        
+        std::vector<float> actionConsequences = pImpl->autoConsequencePredictor->predictAllActions(currentState);
+        ActionType predictedAction = pImpl->autoConsequencePredictor->predictOptimalAction(currentState);
+        
+        // Use predicted action to influence neural activity
+        // This can guide the agent's decision making
+    }
+    
+    // ========== STEP 6: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -1021,6 +1080,14 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+
+ActionConsequencePredictor* Brain::getActionConsequencePredictor() {
+    return pImpl->autoConsequencePredictor.get();
+}
+
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

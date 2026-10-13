@@ -159,6 +159,30 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Apply action consequence prediction to refine action selection
+    if (auto consequencePredictor = brain_->getActionConsequencePredictor()) {
+        // Get current sensory state for prediction
+        std::vector<float> currentState = getCurrentSensoryState();
+        
+        // Use action consequence predictor to get better action recommendation
+        std::vector<float> predictedConsequences = consequencePredictor->predictAllActions(currentState);
+        
+        if (!predictedConsequences.empty()) {
+            // Get the action with best predicted outcome
+            ActionType bestAction = getActionFromPrediction(predictedConsequences, decoded);
+            
+            if (bestAction != ActionType::Wait) {
+                // Convert action type to motor command (simplified mapping)
+                MotorCommand actionCommand = actionToMotorCommand(bestAction);
+                
+                // If prediction suggests a better action, use it
+                if (actionCommand != MotorCommand::Wait) {
+                    decoded = actionCommand;
+                }
+            }
+        }
+    }
+    
     return decoded;
 }
 
@@ -334,7 +358,81 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
+// Helper methods for action consequence prediction integration
+
+std::vector<float> AgentBrain::getCurrentSensoryState() const {
+    // Collect current sensory state for prediction
+    std::vector<float> currentState;
+    
+    // Add vision data
+    currentState.reserve(256); // Vision is 256 values (16x16)
+    for (size_t i = 0; i < sensoryVision_.size(); ++i) {
+        if (sensoryVision_[i]) {
+            currentState.push_back(std::abs(
+                sensoryVision_[i]->getState().membranePotential - 
+                sensoryVision_[i]->getState().restingPotential
+            ));
+        } else {
+            currentState.push_back(0.0f);
+        }
+    }
+    
+    // Add other sensory modalities
+    for (const auto& n : sensoryTouch_) {
+        currentState.push_back(std::abs(
+            n->getState().membranePotential - 
+            n->getState().restingPotential
+        ));
+    }
+    
+    return currentState;
+}
+
+ActionType AgentBrain::getActionFromPrediction(const std::vector<float>& predictedConsequences, 
+                                               MotorCommand neuralDecoded) const {
+    if (predictedConsequences.empty()) {
+        return ActionType::Wait;
+    }
+    
+    // Find action with best predicted consequence (highest value)
+    float bestConsequence = 0.0f;
+    ActionType bestAction = ActionType::Wait;
+    
+    for (size_t i = 0; i < predictedConsequences.size() && i < 8; ++i) {  // Actions: 0-7
+        if (predictedConsequences[i] > bestConsequence) {
+            bestConsequence = predictedConsequences[i];
+            switch (i) {
+                case 0: bestAction = ActionType::MoveForward; break;
+                case 1: bestAction = ActionType::MoveBackward; break;
+                case 2: bestAction = ActionType::TurnLeft; break;
+                case 3: bestAction = ActionType::TurnRight; break;
+                case 4: bestAction = ActionType::LookLeft; break;
+                case 5: bestAction = ActionType::LookRight; break;
+                case 6: bestAction = ActionType::Interact; break;
+                case 7: bestAction = ActionType::Wait; break;
+            }
+        }
+    }
+    
+    return bestAction;
+}
+
+MotorCommand AgentBrain::actionToMotorCommand(ActionType action) const {
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::LookLeft: return MotorCommand::LookLeft;
+        case ActionType::LookRight: return MotorCommand::LookRight;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Wait; // Not directly mapped
+        case ActionType::Drink: return MotorCommand::Wait;
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;

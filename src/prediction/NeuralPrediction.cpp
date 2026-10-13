@@ -432,6 +432,68 @@ float ActionConsequencePredictor::getActionQuality(ActionType action) const {
     return 0.0f;
 }
 
+std::vector<float> ActionConsequencePredictor::predictAllActions(const std::vector<float>& currentState) const {
+    std::vector<float> consequences;
+    
+    // Evaluate all possible actions in the current state
+    // Based on learned experiences (beforeState, action) -> afterState mappings
+    for (const auto& exp : pImpl->experiences) {
+        const auto& beforeState = exp.first.first;
+        const auto& action = exp.first.second;
+        const auto& afterState = exp.second;
+        
+        // Simple similarity check between current state and experienced state
+        if (beforeState.size() == currentState.size() && !beforeState.empty()) {
+            float similarity = 0.0f;
+            float sumSq = 0.0f;
+            
+            for (size_t i = 0; i < beforeState.size(); ++i) {
+                float diff = beforeState[i] - currentState[i];
+                similarity += (1.0f - std::abs(diff)); // Similarity: 1 - absolute difference
+                sumSq += diff * diff;
+            }
+            
+            if (sumSq < 10.0f) {  // Reasonable threshold
+                // This action is applicable to current state
+                consequences.push_back(afterState.empty() ? 0.0f : afterState[0]);  // First element as outcome
+            }
+        }
+    }
+    
+    return consequences;
+}
+
+ActionType ActionConsequencePredictor::predictOptimalAction(const std::vector<float>& currentState) const {
+    std::vector<float> consequences = predictAllActions(currentState);
+    
+    if (consequences.empty()) {
+        return ActionType::Wait;
+    }
+    
+    // Find action with best consequence (highest value)
+    // This assumes consequences are indexed by action order (0-7)
+    float bestConsequence = 0.0f;
+    ActionType bestAction = ActionType::Wait;
+    
+    for (size_t i = 0; i < std::min(consequences.size(), size_t(8)); ++i) {
+        if (consequences[i] > bestConsequence) {
+            bestConsequence = consequences[i];
+            switch (i) {
+                case 0: bestAction = ActionType::MoveForward; break;
+                case 1: bestAction = ActionType::MoveBackward; break;
+                case 2: bestAction = ActionType::TurnLeft; break;
+                case 3: bestAction = ActionType::TurnRight; break;
+                case 4: bestAction = ActionType::LookLeft; break;
+                case 5: bestAction = ActionType::LookRight; break;
+                case 6: bestAction = ActionType::Interact; break;
+                case 7: bestAction = ActionType::Wait; break;
+            }
+        }
+    }
+    
+    return bestAction;
+}
+
 void ActionConsequencePredictor::clear() {
     pImpl->experiences.clear();
     pImpl->actionQuality.clear();
