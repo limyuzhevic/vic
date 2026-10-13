@@ -3,11 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <limits>
+#include <cmath>
+#include <cctype>
+#include <regex>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationError> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -166,6 +171,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->validationErrors.clear();
 }
 
 std::string Config::summary() const {
@@ -186,6 +192,124 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// ConfigEntry validation methods
+bool ConfigEntry::isValid() const {
+    if (validationErrors.empty()) {
+        return true;
+    }
+    return false;
+}
+
+ValidationError ConfigEntry::validate(const Config& config) const {
+    ValidationError error;
+    error.key = key;
+    
+    // Check type hint
+    if (!typeHint.empty() && !matchesTypeHint()) {
+        error.result = ValidationResult::TypeMismatch;
+        error.message = "Type mismatch: expected " + typeHint + ", got " + getTypeName(value);
+        error.suggestion = "Use correct type for parameter '" + key + "'";
+        return error;
+    }
+    
+    // Check range constraints
+    if (!withinRange()) {
+        error.result = ValidationResult::RangeViolation;
+        error.message = "Value out of range for parameter '" + key + "'";
+        error.suggestion = "Value must be between " + std::to_string(minValue) + " and " + std::to_string(maxValue);
+        return error;
+    }
+    
+    // Check allowed values
+    if (!allowedValues.empty() && !matchesAllowedValues()) {
+        error.result = ValidationResult::InvalidValue;
+        error.message = "Invalid value for parameter '" + key + "'";
+        std::ostringstream oss;
+        oss << "Allowed values: ";
+        for (size_t i = 0; i < allowedValues.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << allowedValues[i];
+        }
+        error.suggestion = oss.str();
+        return error;
+    }
+    
+    // Check validation rule
+    if (!validationRule.empty() && !satisfiesValidationRule()) {
+        error.result = ValidationResult::ConsistencyError;
+        error.message = "Validation rule violated for parameter '" + key + "'";
+        error.suggestion = "Update configuration to satisfy validation rule: " + validationRule;
+        return error;
+    }
+    
+    // Check required parameters
+    if (required && !config.has(key)) {
+        error.result = ValidationResult::MissingRequired;
+        error.message = "Required parameter missing: '" + key + "'";
+        error.suggestion = "Specify parameter '" + key + "' in configuration";
+        return error;
+    }
+    
+    error.result = ValidationResult::Success;
+    error.message = "Parameter validation passed";
+    return error;
+}
+
+bool ConfigEntry::matchesTypeHint() const {
+    std::string typeName = getTypeName(value);
+    
+    if (typeHint == "int" || typeHint == "integer") {
+        return std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value);
+    } else if (typeHint == "double" || typeHint == "float" || typeHint == "number") {
+        return std::holds_alternative<double>(value);
+    } else if (typeHint == "bool" || typeHint == "boolean") {
+        return std::holds_alternative<bool>(value);
+    } else if (typeHint == "string") {
+        return std::holds_alternative<std::string>(value);
+    } else if (typeHint == "vector<int>") {
+        return std::holds_alternative<std::vector<int>>(value);
+    } else if (typeHint == "vector<double>") {
+        return std::holds_alternative<std::vector<double>>(value);
+    } else if (typeHint == "vector<string>") {
+        return std::holds_alternative<std::vector<std::string>>(value);
+    }
+    
+    return true; // Unknown type hint - assume valid
+}
+
+bool ConfigEntry::withinRange() const {
+    double value = getNumericValue(value);
+    return value >= minValue && value <= maxValue;
+}
+
+bool ConfigEntry::matchesAllowedValues() const {
+    std::string strValue = getStringValue(value);
+    return std::find(allowedValues.begin(), allowedValues.end(), strValue) != allowedValues.end();
+}
+
+bool ConfigEntry::satisfiesValidationRule() const {
+    if (validationRule.empty()) {
+        return true;
+    }
+    
+    // Simple validation rule: "positive" or "non-negative"
+    if (validationRule == "positive") {
+        double val = getNumericValue(value);
+        return val > 0.0;
+    } else if (validationRule == "non-negative") {
+        double val = getNumericValue(value);
+        return val >= 0.0;
+    } else if (validationRule == "between_0_and_1") {
+        double val = getNumericValue(value);
+        return val >= 0.0 && val <= 1.0;
+    } else if (validationRule == "integer") {
+        return std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value);
+    }
+    
+    return true; // Unknown rule - assume valid
+}
+
+// Helper functions
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +321,39 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Get type name from variant
+std::string getTypeName(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) return "int";
+    if (std::holds_alternative<int64_t>(value)) return "int64_t";
+    if (std::holds_alternative<double>(value)) return "double";
+    if (std::holds_alternative<bool>(value)) return "bool";
+    if (std::holds_alternative<std::string>(value)) return "string";
+    if (std::holds_alternative<std::vector<int>>(value)) return "vector<int>";
+    if (std::holds_alternative<std::vector<double>>(value)) return "vector<double>";
+    if (std::holds_alternative<std::vector<std::string>>(value)) return "vector<string>";
+    return "unknown";
+}
+
+// Get numeric value from variant
+double getNumericValue(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return static_cast<double>(std::get<int>(value));
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return static_cast<double>(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value);
+    }
+    return 0.0; // Default for non-numeric types
+}
+
+// Get string value from variant
+std::string getStringValue(const ConfigValue& value) {
+    if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    }
+    return ""; // Default for non-string types
 }
 
 // Explicit template instantiations

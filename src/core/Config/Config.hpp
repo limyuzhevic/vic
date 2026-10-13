@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <limits>
+#include <algorithm>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
@@ -31,6 +35,24 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation result
+enum class ValidationResult {
+    Success,
+    InvalidValue,
+    MissingRequired,
+    RangeViolation,
+    TypeMismatch,
+    ConsistencyError
+};
+
+// Configuration validation error
+struct ValidationError {
+    std::string key;
+    ValidationResult result;
+    std::string message;
+    std::string suggestion;
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -38,9 +60,30 @@ struct ConfigEntry {
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    // Validation metadata
+    std::string typeHint;
+    std::string unit;
+    std::vector<std::string> allowedValues;
+    double minValue;
+    double maxValue;
+    bool required;
+    std::string validationRule;
+    
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), 
+        typeHint(), unit(), allowedValues(), minValue(std::numeric_limits<double>::lowest()), 
+        maxValue(std::numeric_limits<double>::max()), required(false), validationRule() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc),
+        typeHint(), unit(), allowedValues(), minValue(std::numeric_limits<double>::lowest()), 
+        maxValue(std::numeric_limits<double>::max()), required(false), validationRule() {}
+    
+    // Validation helper methods
+    bool isValid() const;
+    ValidationError validate(const Config& config) const;
+    bool matchesTypeHint() const;
+    bool withinRange() const;
+    bool matchesAllowedValues() const;
+    bool satisfiesValidationRule() const;
 };
 
 // Main configuration class

@@ -87,13 +87,21 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Validate percept data
+    if (percept.getVision().empty() && percept.getTouch().empty() && 
+        percept.getInternal().empty() && percept.getProprioception().empty()) {
+        return;  // Nothing to process
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Validate current value before injecting
             float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            if (std::isfinite(current)) {
+                sensoryVision_[i]->injectCurrent(current);
+            }
         }
     }
     
@@ -102,7 +110,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            if (std::isfinite(current)) {
+                sensoryTouch_[i]->injectCurrent(current);
+            }
         }
     }
     
@@ -111,7 +121,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            if (std::isfinite(current)) {
+                sensoryInternal_[i]->injectCurrent(current);
+            }
         }
     }
     
@@ -120,20 +132,28 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            if (std::isfinite(current)) {
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    // Compute novelty (difference from previous vision) with validation
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
+        size_t validSamples = 0;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+            if (std::isfinite(diff)) {
+                totalDiff += diff;
+                validSamples++;
+            }
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize only if we have valid samples
+        if (validSamples > 0) {
+            noveltyLevel_ = totalDiff / static_cast<float>(validSamples);
+        }
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -167,11 +187,15 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
+        size_t validNeurons = 0;
         for (Neuron* n : neurons) {
+            // Check for null pointer to prevent crashes
+            if (!n) continue;
+            validNeurons++;
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
-        return sum / neurons.size();
+        return validNeurons > 0 ? sum / validNeurons : 0.0f;
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -211,14 +235,24 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
+    if (!brain_ || curiosityLevel_ <= 0.0f) {
+        return defaultCmd;
+    }
+    
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        // Safe random number generation with null checks
+        auto* randomGen = brain_->getRandomGenerator();
+        if (!randomGen) {
+            return defaultCmd;
+        }
+        
+        float r = randomGen->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - use actual number of motor commands (8)
+            int choice = randomGen->uniformInt(0, 7);  // MotorCommand enum has 8 values (0-7)
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,7 +261,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;  // Explicitly handle Wait case
+                default: return MotorCommand::Wait;  // Fallback
             }
         }
     }
