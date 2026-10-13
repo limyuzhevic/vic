@@ -28,6 +28,13 @@
 
 using namespace nlm;
 
+void printVersion() {
+    std::cout << "NLM (Neural Learning Machine) Phase 2.0" << std::endl;
+    std::cout << "Version 0.1.0 - Real Neural Computation" << std::endl;
+    std::cout << "C++20, Event-driven Spiking Neural Networks" << std::endl;
+    std::cout << "Implemented by: Neural Learning Machine Team" << std::endl;
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -322,6 +329,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
