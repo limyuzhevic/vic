@@ -25,10 +25,11 @@ using ConfigValue = std::variant<
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    // Default configuration (from source code)
+    File,       // Configuration loaded from file
+    CommandLine, // Configuration from command line arguments
+    Runtime,    // Runtime configuration (user code)
+    User        // User runtime configuration (same as Runtime but used by Python bindings)
 };
 
 // Configuration entry

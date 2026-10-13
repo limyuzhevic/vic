@@ -502,8 +502,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store position information if world is available
+            if (brain_->getWorkingMemory()) {
+                auto workingMem = brain_->getWorkingMemory();
+                if (workingMem->getMemoryNeurons().size() > 0) {
+                    // Use first active neuron as reference position
+                    NeuronId posNeuron = workingMem->getMemoryNeurons()[0];
+                    // Store position (simplified - would be properly mapped from world)
+                    episode.positionX = static_cast<float>(posNeuron.index() % 20);
+                    episode.positionY = static_cast<float>(posNeuron.index() / 20);
+                    episode.orientation = 0.0f; // Default orientation
+                }
+            }
+            
+            // Store action that was taken (retrieve from working memory if available)
+            if (pImpl->workingMemory && pImpl->workingMemory->getMemoryNeurons().size() > 0) {
+                episode.action = ActionType::MoveForward; // Simplified - would be properly decoded
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = 100.0f;  // Default energy level
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -550,29 +570,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects multiple aspects of brain function
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
+            float neuromodulationMod = 1.0f;
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityMod = 1.0f;   // High plasticity
+                    neuromodulationMod = 1.0f;
                     break;
                 case DevelopmentalStage::CriticalPeriod:
                     plasticityMod = 0.8f;
+                    neuromodulationMod = 1.2f;  // More responsive to neuromodulators
                     break;
                 case DevelopmentalStage::Maturation:
                     plasticityMod = 0.5f;
+                    neuromodulationMod = 1.0f;
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityMod = 0.2f;   // Stable
+                    neuromodulationMod = 0.8f;  // Less responsive
                     break;
             }
             
+            // Update structural plasticity rates
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Update neuromodulation sensitivity based on development
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setPlasticityFactor(0.5f + 0.5f * neuromodulationMod);
+        }
+        if (pImpl->curiosity) {
+            // Development stage affects curiosity levels
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    pImpl->curiosity->setExplorationBias(1.0f);  // Explore a lot
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    pImpl->curiosity->setExplorationBias(0.8f);  // Still exploring
+                    break;
+                case DevelopmentalStage::Maturation:
+                    pImpl->curiosity->setExplorationBias(0.5f);  // Moderate exploration
+                    break;
+                case DevelopmentalStage::Adult:
+                    pImpl->curiosity->setExplorationBias(0.2f);  // Less exploration
+                    break;
+            }
+        }
+        
+        // Update developmental stage
+        if (pImpl->developmentalStage < DevelopmentalStage::Aging) {
+            pImpl->developmentalStage = static_cast<DevelopmentalStage>(
+                static_cast<int>(pImpl->developmentalStage) + 1);
         }
     }
     

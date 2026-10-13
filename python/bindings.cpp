@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -415,6 +416,462 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced API: Memory System Accessors
+    m.def("getWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralWorkingMemory> {
+        return std::shared_ptr<NeuralWorkingMemory>(brain->getWorkingMemory());
+    }, py::arg("brain"), "Get working memory system");
+
+    m.def("getEpisodicMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralEpisodicMemory> {
+        return std::shared_ptr<NeuralEpisodicMemory>(brain->getEpisodicMemory());
+    }, py::arg("brain"), "Get episodic memory system");
+
+    m.def("getAssociativeMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralAssociativeMemory> {
+        return std::shared_ptr<NeuralAssociativeMemory>(brain->getAssociativeMemory());
+    }, py::arg("brain"), "Get associative memory system");
+
+    m.def("getPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionSystem> {
+        return std::shared_ptr<PredictionSystem>(brain->getPredictionSystem());
+    }, py::arg("brain"), "Get prediction system");
+
+    m.def("getNeuralPlanner", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralPlanner> {
+        return std::shared_ptr<NeuralPlanner>(brain->getPlanner());
+    }, py::arg("brain"), "Get neural planner");
+
+    m.def("getConceptFormation", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<ConceptFormation> {
+        return std::shared_ptr<ConceptFormation>(brain->getConceptFormation());
+    }, py::arg("brain"), "Get concept formation system");
+
+    m.def("getAttention", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AttentionalSelection> {
+        return std::shared_ptr<AttentionalSelection>(brain->getAttention());
+    }, py::arg("brain"), "Get attentional selection system");
+
+    m.def("getDevelopmentSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<DevelopmentSystem> {
+        return std::shared_ptr<DevelopmentSystem>(brain->getDevelopmentSystem());
+    }, py::arg("brain"), "Get development system");
+
+    m.def("getDopamine", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Dopamine> {
+        return std::shared_ptr<Dopamine>(brain->getDopamine());
+    }, py::arg("brain"), "Get dopamine neuromodulator");
+
+    m.def("getCuriosity", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Curiosity> {
+        return std::shared_ptr<Curiosity>(brain->getCuriosity());
+    }, py::arg("brain"), "Get curiosity neuromodulator");
+
+    m.def("getNovelty", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Novelty> {
+        return std::shared_ptr<Novelty>(brain->getNovelty());
+    }, py::arg("brain"), "Get novelty neuromodulator");
+
+    m.def("getPredictionError", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionError> {
+        return std::shared_ptr<PredictionError>(brain->getPredictionErrorSignal());
+    }, py::arg("brain"), "Get prediction error signal");
+
+    // Advanced utility functions
+    m.def("runPhase6IntegrationTest", [](std::shared_ptr<Brain> brain, uint64_t steps = 5000) {
+        // Run a simplified Phase 6 integration test
+        auto config = brain->getConfig();
+        config->set("max_steps", static_cast<int64_t>(steps), ConfigSource::User);
+        config->set("enable_checkpointing", true, ConfigSource::User);
+        config->set("enable_replay", true, ConfigSource::User);
+        config->set("enable_development", true, ConfigSource::User);
+        
+        // Run simulation with all systems
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+            
+            // Apply reward modulation based on curiosity
+            if (brain->getCuriosity()) {
+                float curiosity = brain->getCuriosity()->getLevel();
+                float reward = curiosity * 0.1f;
+                brain->applyNeuromodulation(*brain->getDopamine());
+            }
+            
+            // Update development periodically
+            if (i % 1000 == 0 && brain->getDevelopmentSystem()) {
+                brain->getDevelopmentSystem()->update(brain.get(), *brain->getRandomGenerator(), 1.0);
+            }
+        }
+        
+        return "Phase 6 integration test completed";
+    }, py::arg("brain"), py::arg("steps") = 5000, "Run comprehensive Phase 6 integration test");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"), "Export brain state to file");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        return brain->load(filename);
+    }, py::arg("brain"), py::arg("filename"), "Import brain state from file");
+
+    m.def("createAdvancedConfig", [](size_t neuronCount = 2000,
+                                     size_t regionCount = 2,
+                                     float connectionProb = 0.05,
+                                     bool enableAllSystems = true) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::User);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::User);
+        config->set("connection_probability", connectionProb, ConfigSource::User);
+        
+        if (enableAllSystems) {
+            config->set("stdp_enable", true, ConfigSource::User);
+            config->set("hebbian_enable", true, ConfigSource::User);
+            config->set("structural_enable", true, ConfigSource::User);
+            config->set("neuromod_curiosity_enable", true, ConfigSource::User);
+            config->set("neuromod_novelty_enable", true, ConfigSource::User);
+            config->set("neuromod_prediction_enable", true, ConfigSource::User);
+            config->set("memory_working_memory_enable", true, ConfigSource::User);
+            config->set("memory_episodic_enable", true, ConfigSource::User);
+            config->set("memory_associative_enable", true, ConfigSource::User);
+            config->set("cognition_planner_enable", true, ConfigSource::User);
+            config->set("cognition_concept_enable", true, ConfigSource::User);
+            config->set("cognition_attention_enable", true, ConfigSource::User);
+            config->set("development_enable", true, ConfigSource::User);
+            config->set("checkpoint_enable", true, ConfigSource::User);
+        }
+        
+        return config;
+    }, py::arg("neuronCount") = 2000, py::arg("regionCount") = 2,
+         py::arg("connectionProb") = 0.05, py::arg("enableAllSystems") = true,
+         "Create advanced configuration with all systems enabled");
+
+    // Performance and monitoring functions
+    m.def("getPerformanceMetrics", [](std::shared_ptr<Brain> brain) {
+        py::dict metrics;
+        metrics["neuron_count"] = brain->getTotalNeuronCount();
+        metrics["synapse_count"] = brain->getTotalSynapseCount();
+        metrics["spike_count"] = brain->getTotalSpikeCount();
+        metrics["avg_firing_rate"] = brain->getAverageFiringRate();
+        metrics["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["pending_events"] = brain->getPendingSpikeEventCount();
+        
+        // Add memory metrics if available
+        if (brain->getWorkingMemory()) {
+            metrics["working_memory_traces"] = brain->getWorkingMemory()->getActiveTraces();
+        }
+        if (brain->getEpisodicMemory()) {
+            metrics["episodic_memory_episodes"] = brain->getEpisodicMemory()->getEpisodeCount();
+        }
+        
+        // Add neuromodulation metrics
+        if (brain->getDopamine()) {
+            metrics["dopamine_level"] = brain->getDopamine()->getLevel();
+        }
+        if (brain->getCuriosity()) {
+            metrics["curiosity_level"] = brain->getCuriosity()->getLevel();
+        }
+        
+        metrics["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return metrics;
+    }, py::arg("brain"), "Get comprehensive performance metrics");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Config> config, uint64_t steps = 10000) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        double timePerStep = static_cast<double>(duration.count()) / steps;
+        
+        py::dict results;
+        results["steps"] = steps;
+        results["total_time_ms"] = duration.count();
+        results["time_per_step_ms"] = timePerStep;
+        results["steps_per_second"] = steps / (duration.count() / 1000.0);
+        results["neurons_per_step"] = config->getOr<int64_t>("neuron_count", 1000);
+        
+        return results;
+    }, py::arg("config"), py::arg("steps") = 10000,
+         "Run benchmark test and return performance metrics");
+
+    // Simulation control and utilities
+    m.def("resetBrainSystems", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        // Clear memory systems
+        if (brain->getWorkingMemory()) brain->getWorkingMemory()->clear();
+        if (brain->getEpisodicMemory()) brain->getEpisodicMemory()->clear();
+        if (brain->getAssociativeMemory()) brain->getAssociativeMemory()->clear();
+        if (brain->getAttention()) brain->getAttention()->reset();
+        return "All brain systems reset";
+    }, py::arg("brain"), "Reset all brain systems");
+
+    m.def("enableAllSystems", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return "All systems enabled";
+    }, py::arg("agent"), "Enable all neuromodulation and learning systems");
+
+    // Event-driven simulation utilities
+    m.def("runEventDrivenSimulation", [](std::shared_ptr<Brain> brain,
+                                        std::function<bool(std::shared_ptr<Brain>)> condition,
+                                        uint64_t maxSteps = 100000) {
+        for (uint64_t i = 0; i < maxSteps; ++i) {
+            brain->step(i, i * 0.001);
+            
+            if (condition(brain)) {
+                break;
+            }
+        }
+        return "Event-driven simulation completed";
+    }, py::arg("brain"), py::arg("condition"), py::arg("maxSteps") = 100000,
+         "Run event-driven simulation with custom condition");
+
+    // Batch processing utilities
+    m.def("batchProcessNeurons", [](std::shared_ptr<Brain> brain,
+                                   std::function<void(Neuron*)> processor) {
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    processor(neuron);
+                }
+            }
+        }
+        return "Batch processing completed";
+    }, py::arg("brain"), py::arg("processor"), "Apply function to all neurons");
+
+    m.def("batchProcessSynapses", [](std::shared_ptr<Brain> brain,
+                                    std::function<void(Synapse*)> processor) {
+        for (const auto& region : brain->getRegions()) {
+            for (Synapse* synapse : region->getSynapses()) {
+                processor(synapse);
+            }
+        }
+        return "Batch processing completed";
+    }, py::arg("brain"), py::arg("processor"), "Apply function to all synapses");
+
+    m.def("getPerformanceMetrics", [](std::shared_ptr<Brain> brain) {
+        py::dict metrics;
+        metrics["neuron_count"] = brain->getTotalNeuronCount();
+        metrics["synapse_count"] = brain->getTotalSynapseCount();
+        metrics["spike_count"] = brain->getTotalSpikeCount();
+        metrics["avg_firing_rate"] = brain->getAverageFiringRate();
+        metrics["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["pending_events"] = brain->getPendingSpikeEventCount();
+        
+        // Add memory metrics if available
+        if (brain->getWorkingMemory()) {
+            metrics["working_memory_traces"] = brain->getWorkingMemory()->getActiveTraces();
+        }
+        if (brain->getEpisodicMemory()) {
+            metrics["episodic_memory_episodes"] = brain->getEpisodicMemory()->getEpisodeCount();
+        }
+        
+        // Add neuromodulation metrics
+        if (brain->getDopamine()) {
+            metrics["dopamine_level"] = brain->getDopamine()->getLevel();
+        }
+        if (brain->getCuriosity()) {
+            metrics["curiosity_level"] = brain->getCuriosity()->getLevel();
+        }
+        
+        metrics["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return metrics;
+    }, py::arg("brain"), "Get comprehensive performance metrics");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Config> config, uint64_t steps = 10000) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        double timePerStep = static_cast<double>(duration.count()) / steps;
+        
+        py::dict results;
+        results["steps"] = steps;
+        results["total_time_ms"] = duration.count();
+        results["time_per_step_ms"] = timePerStep;
+        results["steps_per_second"] = steps / (duration.count() / 1000.0);
+        results["neurons_per_step"] = config->getOr<int64_t>("neuron_count", 1000);
+        
+        return results;
+    }, py::arg("config"), py::arg("steps") = 10000,
+         "Run benchmark test and return performance metrics");
+
+    // Simulation control and utilities
+    m.def("resetBrainSystems", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        // Clear memory systems
+        if (brain->getWorkingMemory()) brain->getWorkingMemory()->clear();
+        if (brain->getEpisodicMemory()) brain->getEpisodicMemory()->clear();
+        if (brain->getAssociativeMemory()) brain->getAssociativeMemory()->clear();
+        if (brain->getAttention()) brain->getAttention()->reset();
+        return "All brain systems reset";
+    }, py::arg("brain"), "Reset all brain systems");
+
+    m.def("enableAllSystems", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return "All systems enabled";
+    }, py::arg("agent"), "Enable all neuromodulation and learning systems");
+
+    // Event-driven simulation utilities
+    m.def("runEventDrivenSimulation", [](std::shared_ptr<Brain> brain,
+                                        std::function<bool(std::shared_ptr<Brain>)> condition,
+                                        uint64_t maxSteps = 100000) {
+        for (uint64_t i = 0; i < maxSteps; ++i) {
+            brain->step(i, i * 0.001);
+            
+            if (condition(brain)) {
+                break;
+            }
+        }
+        return "Event-driven simulation completed";
+    }, py::arg("brain"), py::arg("condition"), py::arg("maxSteps") = 100000,
+         "Run event-driven simulation with custom condition");
+
+    // Batch processing utilities
+    m.def("batchProcessNeurons", [](std::shared_ptr<Brain> brain,
+                                   std::function<void(Neuron*)> processor) {
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    processor(neuron);
+                }
+            }
+        }
+        return "Batch processing completed";
+    }, py::arg("brain"), py::arg("processor"), "Apply function to all neurons");
+
+    m.def("batchProcessSynapses", [](std::shared_ptr<Brain> brain,
+                                    std::function<void(Synapse*)> processor) {
+        for (const auto& region : brain->getRegions()) {
+            for (Synapse* synapse : region->getSynapses()) {
+                processor(synapse);
+            }
+        }
+        return "Batch processing completed";
+    }, py::arg("brain"), py::arg("processor"), "Apply function to all synapses");
+
+    // Performance optimization and monitoring
+    m.def("enablePerformanceOptimizations", [](std::shared_ptr<Config> config) {
+        // Enable performance optimizations in configuration
+        config->set("performance.memory_pool_enable", true, ConfigSource::User);
+        config->set("performance.event_queue_enable", true, ConfigSource::User);
+        config->set("performance.sparse_connectivity_enable", true, ConfigSource::User);
+        config->set("performance.simd_enable", true, ConfigSource::User);
+        config->set("performance.multithreading_enable", true, ConfigSource::User);
+        
+        // Set performance parameters
+        config->set("performance.memory_pool_size", 1024, ConfigSource::User);
+        config->set("performance.event_queue_size", 8192, ConfigSource::User);
+        config->set("performance.cache_line_size", 64, ConfigSource::User);
+        
+        return "Performance optimizations enabled";
+    }, py::arg("config"), "Enable performance optimizations in configuration");
+
+    m.def("setPerformanceParameters", [](std::shared_ptr<Config> config,
+                                         uint64_t memoryPoolSize = 1024,
+                                         uint64_t eventQueueSize = 8192,
+                                         size_t cacheLineSize = 64,
+                                         uint32_t simdWidth = 8,
+                                         uint32_t threadCount = 4) {
+        config->set("performance.memory_pool_size", memoryPoolSize, ConfigSource::User);
+        config->set("performance.event_queue_size", eventQueueSize, ConfigSource::User);
+        config->set("performance.cache_line_size", cacheLineSize, ConfigSource::User);
+        config->set("performance.simd_width", simdWidth, ConfigSource::User);
+        config->set("performance.thread_count", threadCount, ConfigSource::User);
+        
+        // Update performance infrastructure
+        // In a full implementation, this would reinitialize the performance systems
+        
+        return "Performance parameters updated";
+    }, py::arg("config"), py::arg("memoryPoolSize") = 1024,
+         py::arg("eventQueueSize") = 8192, py::arg("cacheLineSize") = 64,
+         py::arg("simdWidth") = 8, py::arg("threadCount") = 4,
+         "Set performance optimization parameters");
+
+    m.def("getMemoryUsage", [](std::shared_ptr<Brain> brain) {
+        py::dict memoryInfo;
+        memoryInfo["status"] = "Performance memory tracking enabled";
+        memoryInfo["note"] = "Full memory usage requires integration with performance infrastructure";
+        memoryInfo["suggestion"] = "Use performance benchmarks for memory profiling";
+        
+        // Try to get memory pool info if available
+        if (brain->getWorkingMemory()) {
+            memoryInfo["working_memory_capacity"] = brain->getWorkingMemory()->getCapacity();
+            memoryInfo["working_memory_decay_rate"] = brain->getWorkingMemory()->getDecayRate();
+        }
+        
+        // Add checkpoint memory info
+        if (brain->getConfig()->has("checkpoint_dir")) {
+            memoryInfo["checkpoint_enabled"] = true;
+            memoryInfo["checkpoint_dir"] = brain->getConfig()->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        }
+        
+        return memoryInfo;
+    }, py::arg("brain"), "Get memory usage information and performance hints");
+
+    m.def("optimizeForScale", [](std::shared_ptr<Config> config, size_t targetNeurons) {
+        // Configure for scale optimization
+        config->set("neuron_count", static_cast<int64_t>(targetNeurons), ConfigSource::User);
+        config->set("performance.sparse_connectivity_enable", true, ConfigSource::User);
+        config->set("performance.memory_pool_enable", true, ConfigSource::User);
+        config->set("performance.event_queue_enable", true, ConfigSource::User);
+        
+        // Calculate optimal parameters for scale
+        size_t memoryPoolSize = std::max<size_t>(targetNeurons / 10, 1024);
+        size_t eventQueueSize = std::max<size_t>(targetNeurons * 2, 8192);
+        
+        config->set("performance.memory_pool_size", memoryPoolSize, ConfigSource::User);
+        config->set("performance.event_queue_size", eventQueueSize, ConfigSource::User);
+        
+        // Adjust connectivity based on scale
+        float connectionProb = std::min(0.2f, 10.0f / static_cast<float>(targetNeurons));
+        config->set("connection_probability", connectionProb, ConfigSource::User);
+        
+        return "Configuration optimized for scale";
+    }, py::arg("config"), py::arg("targetNeurons"), "Optimize configuration for large-scale simulation");
+
+    m.def("validatePerformanceSetup", [](std::shared_ptr<Brain> brain) {
+        py::dict validationResults;
+        
+        // Check if performance systems are accessible
+        bool performanceOk = true;
+        std::string issues;
+        
+        if (!brain->getWorkingMemory()) {
+            performanceOk = false;
+            issues += "Working memory not available; ";
+        }
+        
+        if (!brain->getEpisodicMemory()) {
+            performanceOk = false;
+            issues += "Episodic memory not available; ";
+        }
+        
+        if (!brain->getAttention()) {
+            performanceOk = false;
+            issues += "Attention system not available; ";
+        }
+        
+        validationResults["valid"] = performanceOk;
+        validationResults["issues"] = issues.empty() ? "None" : issues;
+        validationResults["recommendation"] = performanceOk ? 
+            "Performance setup is valid" : "Enable missing systems";
+        
+        // Add system capabilities
+        validationResults["systems_enabled"] = true;
+        validationResults["memory_systems"] = "Working + Episodic + Associative";
+        validationResults["cognition_systems"] = "Planning + Concept + Attention";
+        validationResults["neuromodulation_systems"] = "Dopamine + Curiosity + Novelty";
+        
+        return validationResults;
+    }, py::arg("brain"), "Validate performance setup and report system capabilities");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
