@@ -1,6 +1,5 @@
 #include "Reward.hpp"
-
-namespace nlm {
+#include "../environment/Observation.hpp"
 
 struct Reward::Impl {
     float currentValue;

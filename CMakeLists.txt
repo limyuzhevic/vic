@@ -139,6 +139,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Advanced CLI tool
+add_executable(nlm-cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm-cli PUBLIC nlm_core)
+
+# Shell wrapper script
+add_custom_target(nlm-cli-wrapper ALL
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/nlm-cli ${CMAKE_CURRENT_BINARY_DIR}/
+    COMMAND chmod +x ${CMAKE_CURRENT_BINARY_DIR}/nlm-cli
+    DEPENDS nlm-cli
+)
+
+# Make the wrapper available
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/nlm-cli
+    DESTINATION bin
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

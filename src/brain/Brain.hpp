@@ -6,6 +6,10 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/NeuromodulationSystem.hpp"
+#include "../memory-consolidation/MemoryConsolidation.hpp"
+#include "../memory-replay/MemoryReplay.hpp"
+#include "../brain/SleepState.hpp"
 #include <memory>
 #include <string>
 
@@ -23,11 +27,16 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class NeuralSelfModel;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuromodulationSystem;
+class MemoryConsolidation;
+class MemoryReplay;
+class SleepState;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -89,6 +98,10 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
+    // Sensory input management
+    std::vector<Neuron*> getSensoryNeurons() const;
+    std::vector<Neuron*> getMotorNeurons() const;
+    
     // Statistics
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
@@ -148,11 +161,29 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Memory consolidation - consolidation of working memory to episodic
+    MemoryConsolidation* getMemoryConsolidation();
+    
+    // Memory replay - replay of episodic memory during sleep
+    MemoryReplay* getMemoryReplay();
+    
+    // Sleep state - sleep/rest cycle management
+    SleepState* getSleepState();
+    
+    // Sleep/rest cycle phase
+    bool isSleeping(SimulationStep currentStep) const;
+    
+    // Sleep statistics
+    size_t getSleepDuration(SimulationStep currentStep) const;
+    size_t getWakeDuration(SimulationStep currentStep) const;
+    float getSleepPercentage(SimulationStep currentStep) const;
+    
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
+// Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
+    NeuralPrediction* getNeuralPrediction();
+
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
@@ -164,14 +195,17 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Self-model for self-representation
+    NeuralSelfModel* getSelfModel();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -183,6 +217,9 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Integrated neuromodulation system
+    NeuromodulationSystem* getNeuromodulationSystem();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

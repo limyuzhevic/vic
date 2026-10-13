@@ -36,22 +36,20 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
+    // Find the brain region that contains neurons for this pattern
+    // Pattern is encoded in sensory neurons, so we map pattern elements to sensory neurons
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        // Map pattern index to sensory neuron (direct access)
+        size_t sensoryIndex = i % brain_->getSensoryNeurons().size();
+        if (sensoryIndex >= brain_->getSensoryNeurons().size()) continue;
+        
+        NeuronId sensoryNeuron = brain_->getSensoryNeurons()[sensoryIndex]->getId();
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Directly set neuron activation using brain's access method
+        brain_->injectCurrent(sensoryNeuron, activation * 10.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -59,7 +57,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            memoryNeurons_.push_back(sensoryNeuron);
         }
     }
     
