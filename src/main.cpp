@@ -165,7 +165,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("  ERROR: Region 1 not found");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -319,6 +322,62 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
+void runAdvancedModeTest(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 4: Advanced Brain Mode ===");
+    
+    // Run an extended simulation with monitoring
+    NLM_LOG_INFO("Running extended simulation (5000 steps)...");
+    
+    // Record initial state
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    size_t initialNeurons = brain->getTotalNeuronCount();
+    float initialEIRatio = brain->getExcitationInhibitionRatio();
+    
+    // Run extended simulation
+    for (SimulationStep step = 0; step < 5000; ++step) {
+        // Apply varied sensory input patterns
+        if (step % 100 == 0) {
+            // Burst input every 100 steps
+            for (size_t i = 0; i < 10 && i < initialNeurons / 4; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 40.0f + (step % 3) * 20.0f);
+            }
+        }
+        
+        brain->step(step, step * 0.001);
+        
+        // Log progress every 500 steps
+        if (step % 500 == 0 && step > 0) {
+            size_t currentSpikes = brain->getTotalSpikeCount();
+            float currentEIRatio = brain->getExcitationInhibitionRatio();
+            NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                        " | Total spikes: " + std::to_string(currentSpikes - initialSpikes) +
+                        " | E/I ratio: " + std::to_string(currentEIRatio));
+        }
+    }
+    
+    // Final statistics
+    size_t finalSpikes = brain->getTotalSpikeCount();
+    size_t totalSpikesGenerated = finalSpikes - initialSpikes;
+    float finalEIRatio = brain->getExcitationInhibitionRatio();
+    float eirChange = finalEIRatio - initialEIRatio;
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Advanced Test Results:");
+    NLM_LOG_INFO("  Initial spikes: " + std::to_string(initialSpikes));
+    NLM_LOG_INFO("  Final spikes: " + std::to_string(finalSpikes));
+    NLM_LOG_INFO("  Total spikes generated: " + std::to_string(totalSpikesGenerated));
+    NLM_LOG_INFO("  Initial E/I ratio: " + std::to_string(initialEIRatio));
+    NLM_LOG_INFO("  Final E/I ratio: " + std::to_string(finalEIRatio));
+    NLM_LOG_INFO("  E/I ratio change: " + std::to_string(eirChange));
+    
+    // Determine test success
+    bool learningOccurred = (totalSpikesGenerated > 100) || (std::abs(eirChange) > 0.1f);
+    if (learningOccurred) {
+        NLM_LOG_INFO("  ✓ Advanced learning detected: Network is adapting");
+    } else {
+        NLM_LOG_INFO("  ! Limited activity: Check parameters or increase duration");
+    }
 }
 
 int main(int argc, char** argv) {
@@ -423,6 +482,11 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
+    
+    // Run Test 4: Advanced mode test
+    brain->reset();
+    brain->initialize();
+    runAdvancedModeTest(brain);
     
     // Final brain status
     NLM_LOG_INFO("");

@@ -697,21 +697,86 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Calculate activity of motor neuron groups (simplified since we don't separate by group)
+    // Group by type using the brain regions
+    float forwardAct = 0.0f;
+    float backwardAct = 0.0f;
+    float leftAct = 0.0f;
+    float rightAct = 0.0f;
+    float interactAct = 0.0f;
+    float waitAct = 0.0f;
+    
+    // Count neurons in each group (approximate by position/index)
+    size_t forwardCount = 0;
+    size_t backwardCount = 0;
+    size_t leftCount = 0;
+    size_t rightCount = 0;
+    size_t interactCount = 0;
+    size_t waitCount = 0;
+    
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        // Simple heuristic based on neuron ID and region to approximate motor group
+        RegionId region = neuron->getRegionId();
+        NeuronId id = neuron->getId();
+        
+        // This is a simplified approximation - in real implementation you'd want
+        // better motor group separation
+        if (region.index() % 6 == 0) {
+            forwardAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            forwardCount++;
+        } else if (region.index() % 6 == 1) {
+            backwardAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            backwardCount++;
+        } else if (region.index() % 6 == 2) {
+            leftAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            leftCount++;
+        } else if (region.index() % 6 == 3) {
+            rightAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            rightCount++;
+        } else if (region.index() % 6 == 4) {
+            interactAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            interactCount++;
+        } else {
+            waitAct += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            waitCount++;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Calculate average activities
+    if (forwardCount > 0) forwardAct /= forwardCount;
+    if (backwardCount > 0) backwardAct /= backwardCount;
+    if (leftCount > 0) leftAct /= leftCount;
+    if (rightCount > 0) rightAct /= rightCount;
+    if (interactCount > 0) interactAct /= interactCount;
+    if (waitCount > 0) waitAct /= waitCount;
+    
+    // Find maximum activity
+    struct { ActionType cmd; float activity; } commands[] = {
+        {ActionType::MoveForward, forwardAct},
+        {ActionType::MoveBackward, backwardAct},
+        {ActionType::TurnLeft, leftAct},
+        {ActionType::TurnRight, rightAct},
+        {ActionType::Interact, interactAct},
+        {ActionType::Wait, waitAct}
+    };
+    
+    ActionType best = ActionType::Wait;
+    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    
+    for (const auto& c : commands) {
+        if (c.activity > bestActivity) {
+            bestActivity = c.activity;
+            best = c.cmd;
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Only act if there's meaningful activity (better than idle)
+    if (bestActivity < 0.5f) {
+        // If all activity is below threshold, stay idle
+        best = ActionType::Wait;
+    }
+    
+    auto action = std::make_unique<Action>(best);
     
     return action;
 }

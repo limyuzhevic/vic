@@ -214,6 +214,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        exploreChance = std::clamp(exploreChance, 0.0f, 1.0f);
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
