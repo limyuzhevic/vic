@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <optional>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,6 +14,9 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
@@ -19,59 +24,564 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom Python exception for NLM
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides a comprehensive Python interface for the NLM neural
+        simulation framework, enabling researchers and developers to create,
+        simulate, and experiment with artificial neural systems using Python.
+        
+        Key Features:
+        - Real spiking neural computation with LIF neurons
+        - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+        - Sensory-motor integration
+        - Memory systems (working, episodic, associative)
+        - Developmental processes
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Action planning and decision making
+        
+        Quick Start Example:
+        ```python
+        import pynlm
+        
+        # Create a default configuration
+        config = pynlm.Config()
+        
+        # Create a neural brain
+        brain = pynlm.create_brain(config)
+        brain.initialize()
+        
+        # Run simulation for 100 steps
+        for i in range(100):
+            brain.step(i, i * 0.001)
+            
+        # Check learning
+        print(f"Excitation/Inhibition ratio: {brain.get_excitation_inhibition_ratio():.3f}")
+        ```
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register NLM-specific exceptions
+    py::register_exception<NLMError>(m, "NLMError", PyExc_RuntimeError);
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+    // Neuron identifier with comprehensive functionality
+    py::class_<NeuronId>(m, "NeuronId")
+        .def(py::init<>(), R"pbdoc(
+            Create a default neuron identifier.
+            
+            Returns:
+                NeuronId: A new neuron identifier with default values.
+        )pbdoc")
+        .def(py::init<uint64_t>(), py::arg("value"), R"pbdoc(
+            Create a neuron identifier with a specific value.
+            
+            Args:
+                value: The unique identifier value for the neuron.
+                
+            Returns:
+                NeuronId: A neuron identifier with the specified value.
+                
+            Examples:
+                >>> NeuronId(123)
+                <NeuronId: 123>
+                >>> id = NeuronId()
+                >>> id.value
+                0
+        )pbdoc")
+        .def_readwrite("value", &NeuronId::value, R"pbdoc(
+            The unique identifier value for this neuron.
+            
+            Read-write property that can be directly accessed or modified.
+            
+            Returns:
+                int: The neuron identifier value.
+                
+            Examples:
+                >>> id = NeuronId(42)
+                >>> id.value
+                42
+                >>> id.value = 100
+                >>> id.value
+                100
+        )pbdoc")
+        .def("index", &NeuronId::index, R"pbdoc(
+            Get the integer index representation of this neuron identifier.
+            
+            Returns:
+                int: The integer index (same as value).
+                
+            Examples:
+                >>> id = NeuronId(999)
+                >>> id.index()
+                999
+        )pbdoc")
+        .def("__eq__", &NeuronId::operator==, py::is_operator(), R"pbdoc(
+            Check equality with another neuron identifier.
+            
+            Args:
+                other: Another NeuronId to compare with.
+                
+            Returns:
+                bool: True if identifiers have the same value.
+                
+            Examples:
+                >>> id1 = NeuronId(42)
+                >>> id2 = NeuronId(42)
+                >>> id1 == id2
+                True
+                >>> id3 = NeuronId(99)
+                >>> id1 == id3
+                False
+        )pbdoc")
+        .def("__ne__", &NeuronId::operator!=, py::is_operator(), R"pbdoc(
+            Check inequality with another neuron identifier.
+            
+            Args:
+                other: Another NeuronId to compare with.
+                
+            Returns:
+                bool: True if identifiers have different values.
+                
+            Examples:
+                >>> id1 = NeuronId(42)
+                >>> id2 = NeuronId(99)
+                >>> id1 != id2
+                True
+                >>> id3 = NeuronId(42)
+                >>> id1 != id3
+                False
+        )pbdoc")
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(
+            Return hash of the neuron identifier for use in dictionaries and sets.
+            
+            Returns:
+                int: Hash value for this identifier.
+                
+            Examples:
+                >>> id1 = NeuronId(42)
+                >>> id2 = NeuronId(42)
+                >>> hash(id1) == hash(id2)
+                True
+        )pbdoc")
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(
+            Return string representation of the neuron identifier.
+            
+            Returns:
+                str: String representation of the identifier.
+                
+            Examples:
+                >>> id = NeuronId(123)
+                >>> repr(id)
+                '<NeuronId: 123>'
+        )pbdoc")
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
+        }, R"pbdoc(
+            Return string representation of the neuron identifier value.
+            
+            Returns:
+                str: String representation of the identifier value.
+                
+            Examples:
+                >>> id = NeuronId(456)
+                >>> str(id)
+                '456'
+        )pbdoc");
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+    // Synapse identifier with comprehensive functionality
+    py::class_<SynapseId>(m, "SynapseId")
+        .def(py::init<>(), R"pbdoc(
+            Create a default synapse identifier.
+            
+            Returns:
+                SynapseId: A new synapse identifier with default values.
+        )pbdoc")
+        .def(py::init<uint64_t>(), py::arg("value"), R"pbdoc(
+            Create a synapse identifier with a specific value.
+            
+            Args:
+                value: The unique identifier value for the synapse.
+                
+            Returns:
+                SynapseId: A synapse identifier with the specified value.
+                
+            Examples:
+                >>> SynapseId(123)
+                <SynapseId: 123>
+                >>> id = SynapseId()
+                >>> id.value
+                0
+        )pbdoc")
+        .def_readwrite("value", &SynapseId::value, R"pbdoc(
+            The unique identifier value for this synapse.
+            
+            Read-write property that can be directly accessed or modified.
+            
+            Returns:
+                int: The synapse identifier value.
+                
+            Examples:
+                >>> id = SynapseId(42)
+                >>> id.value
+                42
+                >>> id.value = 100
+                >>> id.value
+                100
+        )pbdoc")
+        .def("index", &SynapseId::index, R"pbdoc(
+            Get the integer index representation of this synapse identifier.
+            
+            Returns:
+                int: The integer index (same as value).
+                
+            Examples:
+                >>> id = SynapseId(999)
+                >>> id.index()
+                999
+        )pbdoc")
+        .def("__eq__", &SynapseId::operator==, py::is_operator(), R"pbdoc(
+            Check equality with another synapse identifier.
+            
+            Args:
+                other: Another SynapseId to compare with.
+                
+            Returns:
+                bool: True if identifiers have the same value.
+                
+            Examples:
+                >>> id1 = SynapseId(42)
+                >>> id2 = SynapseId(42)
+                >>> id1 == id2
+                True
+                >>> id3 = SynapseId(99)
+                >>> id1 == id3
+                False
+        )pbdoc")
+        .def("__ne__", &SynapseId::operator!=, py::is_operator(), R"pbdoc(
+            Check inequality with another synapse identifier.
+            
+            Args:
+                other: Another SynapseId to compare with.
+                
+            Returns:
+                bool: True if identifiers have different values.
+                
+            Examples:
+                >>> id1 = SynapseId(42)
+                >>> id2 = SynapseId(99)
+                >>> id1 != id2
+                True
+                >>> id3 = SynapseId(42)
+                >>> id1 != id3
+                False
+        )pbdoc")
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(
+            Return hash of the synapse identifier for use in dictionaries and sets.
+            
+            Returns:
+                int: Hash value for this identifier.
+                
+            Examples:
+                >>> id1 = SynapseId(42)
+                >>> id2 = SynapseId(42)
+                >>> hash(id1) == hash(id2)
+                True
+        )pbdoc")
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(
+            Return string representation of the synapse identifier.
+            
+            Returns:
+                str: String representation of the identifier.
+                
+            Examples:
+                >>> id = SynapseId(123)
+                >>> repr(id)
+                '<SynapseId: 123>'
+        )pbdoc")
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
+        }, R"pbdoc(
+            Return string representation of the synapse identifier value.
+            
+            Returns:
+                str: String representation of the identifier value.
+                
+            Examples:
+                >>> id = SynapseId(456)
+                >>> str(id)
+                '456'
+        )pbdoc");
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+    // Region identifier with comprehensive functionality
+    py::class_<RegionId>(m, "RegionId")
+        .def(py::init<>(), R"pbdoc(
+            Create a default region identifier.
+            
+            Returns:
+                RegionId: A new region identifier with default values.
+        )pbdoc")
+        .def(py::init<uint64_t>(), py::arg("value"), R"pbdoc(
+            Create a region identifier with a specific value.
+            
+            Args:
+                value: The unique identifier value for the region.
+                
+            Returns:
+                RegionId: A region identifier with the specified value.
+                
+            Examples:
+                >>> RegionId(123)
+                <RegionId: 123>
+                >>> id = RegionId()
+                >>> id.value
+                0
+        )pbdoc")
+        .def_readwrite("value", &RegionId::value, R"pbdoc(
+            The unique identifier value for this region.
+            
+            Read-write property that can be directly accessed or modified.
+            
+            Returns:
+                int: The region identifier value.
+                
+            Examples:
+                >>> id = RegionId(42)
+                >>> id.value
+                42
+                >>> id.value = 100
+                >>> id.value
+                100
+        )pbdoc")
+        .def("index", &RegionId::index, R"pbdoc(
+            Get the integer index representation of this region identifier.
+            
+            Returns:
+                int: The integer index (same as value).
+                
+            Examples:
+                >>> id = RegionId(999)
+                >>> id.index()
+                999
+        )pbdoc")
+        .def("__eq__", &RegionId::operator==, py::is_operator(), R"pbdoc(
+            Check equality with another region identifier.
+            
+            Args:
+                other: Another RegionId to compare with.
+                
+            Returns:
+                bool: True if identifiers have the same value.
+                
+            Examples:
+                >>> id1 = RegionId(42)
+                >>> id2 = RegionId(42)
+                >>> id1 == id2
+                True
+                >>> id3 = RegionId(99)
+                >>> id1 == id3
+                False
+        )pbdoc")
+        .def("__ne__", &RegionId::operator!=, py::is_operator(), R"pbdoc(
+            Check inequality with another region identifier.
+            
+            Args:
+                other: Another RegionId to compare with.
+                
+            Returns:
+                bool: True if identifiers have different values.
+                
+            Examples:
+                >>> id1 = RegionId(42)
+                >>> id2 = RegionId(99)
+                >>> id1 != id2
+                True
+                >>> id3 = RegionId(42)
+                >>> id1 != id3
+                False
+        )pbdoc")
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(
+            Return hash of the region identifier for use in dictionaries and sets.
+            
+            Returns:
+                int: Hash value for this identifier.
+                
+            Examples:
+                >>> id1 = RegionId(42)
+                >>> id2 = RegionId(42)
+                >>> hash(id1) == hash(id2)
+                True
+        )pbdoc")
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(
+            Return string representation of the region identifier.
+            
+            Returns:
+                str: String representation of the identifier.
+                
+            Examples:
+                >>> id = RegionId(123)
+                >>> repr(id)
+                '<RegionId: 123>'
+        )pbdoc")
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
+        }, R"pbdoc(
+            Return string representation of the region identifier value.
+            
+            Returns:
+                str: String representation of the identifier value.
+                
+            Examples:
+                >>> id = RegionId(456)
+                >>> str(id)
+                '456'
+        )pbdoc");
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+    // Population identifier with comprehensive functionality
+    py::class_<PopulationId>(m, "PopulationId")
+        .def(py::init<>(), R"pbdoc(
+            Create a default population identifier.
+            
+            Returns:
+                PopulationId: A new population identifier with default values.
+        )pbdoc")
+        .def(py::init<uint64_t>(), py::arg("value"), R"pbdoc(
+            Create a population identifier with a specific value.
+            
+            Args:
+                value: The unique identifier value for the population.
+                
+            Returns:
+                PopulationId: A population identifier with the specified value.
+                
+            Examples:
+                >>> PopulationId(123)
+                <PopulationId: 123>
+                >>> id = PopulationId()
+                >>> id.value
+                0
+        )pbdoc")
+        .def_readwrite("value", &PopulationId::value, R"pbdoc(
+            The unique identifier value for this population.
+            
+            Read-write property that can be directly accessed or modified.
+            
+            Returns:
+                int: The population identifier value.
+                
+            Examples:
+                >>> id = PopulationId(42)
+                >>> id.value
+                42
+                >>> id.value = 100
+                >>> id.value
+                100
+        )pbdoc")
+        .def("index", &PopulationId::index, R"pbdoc(
+            Get the integer index representation of this population identifier.
+            
+            Returns:
+                int: The integer index (same as value).
+                
+            Examples:
+                >>> id = PopulationId(999)
+                >>> id.index()
+                999
+        )pbdoc")
+        .def("__eq__", &PopulationId::operator==, py::is_operator(), R"pbdoc(
+            Check equality with another population identifier.
+            
+            Args:
+                other: Another PopulationId to compare with.
+                
+            Returns:
+                bool: True if identifiers have the same value.
+                
+            Examples:
+                >>> id1 = PopulationId(42)
+                >>> id2 = PopulationId(42)
+                >>> id1 == id2
+                True
+                >>> id3 = PopulationId(99)
+                >>> id1 == id3
+                False
+        )pbdoc")
+        .def("__ne__", &PopulationId::operator!=, py::is_operator(), R"pbdoc(
+            Check inequality with another population identifier.
+            
+            Args:
+                other: Another PopulationId to compare with.
+                
+            Returns:
+                bool: True if identifiers have different values.
+                
+            Examples:
+                >>> id1 = PopulationId(42)
+                >>> id2 = PopulationId(99)
+                >>> id1 != id2
+                True
+                >>> id3 = PopulationId(42)
+                >>> id1 != id3
+                False
+        )pbdoc")
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(
+            Return hash of the population identifier for use in dictionaries and sets.
+            
+            Returns:
+                int: Hash value for this identifier.
+                
+            Examples:
+                >>> id1 = PopulationId(42)
+                >>> id2 = PopulationId(42)
+                >>> hash(id1) == hash(id2)
+                True
+        )pbdoc")
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        }, R"pbdoc(
+            Return string representation of the population identifier.
+            
+            Returns:
+                str: String representation of the identifier.
+                
+            Examples:
+                >>> id = PopulationId(123)
+                >>> repr(id)
+                '<PopulationId: 123>'
+        )pbdoc")
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        }, R"pbdoc(
+            Return string representation of the population identifier value.
+            
+            Returns:
+                str: String representation of the identifier value.
+                
+            Examples:
+                >>> id = PopulationId(456)
+                >>> str(id)
+                '456'
+        )pbdoc");
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -142,15 +652,32 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+    // Enhanced configuration class with Pythonic interface
+    py::class_<Config>(m, "Config")
+        .def(py::init<>(), R"pbdoc(
+            Create a new configuration object with default settings.
+            
+            The Config class provides a key-value storage system for neural
+            simulation parameters. It supports multiple value types including
+            integers, floats, strings, booleans, and arrays.
+            
+            Returns:
+                Config: A new configuration object.
+                
+            Examples:
+                >>> config = Config()
+                >>> config.set("neuron_count", 100)
+                >>> config.get("neuron_count")
+                100
+                >>> config.get_or("random_seed", 42)
+                42
+                
+                # Configuration can be saved and loaded
+                >>> config.save_to_file("settings.json")
+                >>> new_config = Config()
+                >>> new_config.load_from_file("settings.json")
+        )pbdoc")
+        .def("save_to_file", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
