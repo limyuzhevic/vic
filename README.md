@@ -82,36 +82,176 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+## Advanced Features
+
+NLM now includes comprehensive advanced features for experienced users:
+
+### CLI Advanced Commands
+- Parameter sweep for batch experiments
+- Configuration management with JSON/YAML support
+- Experiment result comparison and analysis
+- Batch processing with parallel execution
+- Real-time performance monitoring
+
+### Experiment Framework
+- Custom experiment templates
+- Parameter optimization algorithms
+- Cross-experiment analysis
+- Statistical analysis tools
+
+### Performance Monitoring
+- Real-time neural activity visualization
+- Bottleneck detection and analysis
+- System resource monitoring
+- Performance profiling
+
+### Debugging Tools
+- Memory leak detection
+- Performance profiling
+- Neural activity debugging
+- Connection validation
+
+### Plugin System
+- Extensible architecture for custom neural components
+- Custom plasticity rules
+- Custom neuromodulation systems
+- Plugin loading and management
+
+### Performance Optimization
+- SIMD optimizations
+- Memory pool optimizations
+- Parallel processing options
+- Custom compilation flags
+
+## Python API (pynlm)
+
+NLM provides Python bindings for easier development:
+
+### Installation
+```bash
+pip install pynlm
+```
+
+### Basic Usage
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+### Complete Agent Example
+```python
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_agent_simulation(1000)
+```
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── docs/                    # Scientific documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── PHASE6_FINAL_AUDIT.md
+├── src/                    # Core C++ source code
+│   ├── advanced/           # Advanced features
+│   │   ├── cli/           # Advanced CLI commands
+│   │   ├── experiments/   # Advanced experiment features
+│   │   ├── monitoring/    # Performance monitoring
+│   │   ├── debugging/     # Debugging tools
+│   │   ├── batch/         # Batch processing
+│   │   ├── plugins/       # Plugin system
+│   │   └── optimization/  # Performance optimization
+│   ├── brain/             # Neural components
+│   ├── environment/       # Environment simulation
+│   └── ...                # Other core components
+├── python/                 # Python bindings
+│   └── bindings.cpp
+├── tests/                  # Test suite
+├── docs/                   # Documentation
+├── ADVANCED_FEATURES.md     # Advanced features documentation
+├── ADVANCED_FEATURES_SUMMARY.md # Implementation summary
+├── easy_usage.md           # Beginner guide
+├── HOW_TO_USE.md           # Comprehensive usage guide
+├── example_advanced_features.py # Example scripts
+├── pyproject.toml         # Python package configuration
+└── LICENSE
 ```
 
 ## Phase Summary

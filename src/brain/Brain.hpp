@@ -1,33 +1,61 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations - Core components
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
+
+// Forward declarations - Neural components
+class Neuron;
+class Synapse;
+class NeuralRegion;
+class NeuralPopulation;
+
+// Forward declarations - Plasticity
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Forward declarations - Development
 class DevelopmentSystem;
+class Synaptogenesis;
+class Pruning;
+class Maturation;
+
+// Forward declarations - Neuromodulation
+class Neuromodulator;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Forward declarations - Memory systems
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+
+// Forward declarations - Cognition
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+
+// Forward declarations - Dynamics
+class SpikeSystem;
+
+// Forward declarations - Environment
+class SensoryInput;
+class Action;
+
+// Forward declarations - Performance
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

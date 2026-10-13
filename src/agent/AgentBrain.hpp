@@ -4,13 +4,30 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Types/Types.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Forward declarations for Neuron types
+class Neuron;
+class Synapse;
+
+// Forward declarations for development
+class DevelopmentSystem;
+class DevelopmentalStage;
+
+// Forward declarations for neuromodulation
+class Neuromodulator;
+
+// Forward declarations for plasticity
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Forward declarations for dynamics
+class SpikeSystem;
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
