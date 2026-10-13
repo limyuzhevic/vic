@@ -123,9 +123,10 @@ void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
     }
 }
 
-void NeuralPopulation::step(Timestamp currentTime) {
+void NeuralPopulation::step(Timestamp currentTime, TimestepDuration dt) {
     for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+        // Use stepLIF directly instead of the deprecated step method
+        neuron->stepLIF(currentTime, dt);
     }
 }
 

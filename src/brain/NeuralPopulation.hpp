@@ -12,62 +12,178 @@ namespace nlm {
 
 class NeuralPopulation {
 public:
-    // Create population with ID and size
+    /**
+     * @brief Create neural population with ID and size
+     * @param id Unique identifier for the population
+     * @param size Number of neurons in this population
+     */
     NeuralPopulation(PopulationId id, size_t size);
     
+    /**
+     * @brief Destructor
+     */
     ~NeuralPopulation();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Copy constructor deleted (populations are not copyable)
+     */
     NeuralPopulation(const NeuralPopulation&) = delete;
+    
+    /**
+     * @brief Copy assignment operator deleted (populations are not copyable)
+     */
     NeuralPopulation& operator=(const NeuralPopulation&) = delete;
+    
+    /**
+     * @brief Move constructor
+     * @param other Population to move from
+     */
     NeuralPopulation(NeuralPopulation&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator
+     * @param other Population to move from
+     * @return Reference to this population
+     */
     NeuralPopulation& operator=(NeuralPopulation&&) noexcept;
     
-    // Identity
+    /**
+     * @brief Get population identifier
+     * @return Population ID
+     */
     PopulationId getId() const;
     
-    // Size
+    /**
+     * @brief Get population size
+     * @return Number of neurons in population
+     */
     size_t getSize() const;
+    
+    /**
+     * @brief Check if population is empty
+     * @return true if population has no neurons, false otherwise
+     */
     bool isEmpty() const;
     
-    // Neuron access
+    /**
+     * @brief Get neuron by index
+     * @param index Index of neuron (0-based)
+     * @return Pointer to neuron at specified index
+     */
     Neuron* getNeuron(NeuronIndex index);
+    
+    /**
+     * @brief Get neuron by index (const version)
+     * @param index Index of neuron (0-based)
+     * @return Const pointer to neuron at specified index
+     */
     const Neuron* getNeuron(NeuronIndex index) const;
     
-    // Add neuron to population
+    /**
+     * @brief Add neuron to population
+     * @param neuron Pointer to neuron to add
+     */
     void addNeuron(Neuron* neuron);
     
-    // Get all neurons
+    /**
+     * @brief Get all neurons in population
+     * @return Const reference to vector of neuron pointers
+     */
     const std::vector<Neuron*>& getNeurons() const;
     
-    // Population type (all neurons in population share same type)
+    /**
+     * @brief Get all neurons in population (mutable version)
+     * @return Vector of neuron pointers (non-const)
+     */
+    std::vector<Neuron*> getAllNeurons();
+    
+    /**
+     * @brief Get neuron type for this population
+     * @return All neurons in population share this type
+     */
     NeuronType getNeuronType() const;
+    
+    /**
+     * @brief Set neuron type for this population
+     * @param type Neuron type to set for all neurons
+     */
     void setNeuronType(NeuronType type);
     
-    // Statistics
+    /**
+     * @brief Get number of active neurons
+     * @return Count of neurons in Active or Refractory state
+     */
     size_t getActiveCount() const;
+    
+    /**
+     * @brief Get number of firing neurons
+     * @return Count of neurons in Refractory state (just fired)
+     */
     size_t getFiringCount() const;
+    
+    /**
+     * @brief Get average firing rate
+     * @return Average firing rate in Hz across all neurons
+     */
     float getAverageFiringRate() const;
+    
+    /**
+     * @brief Get activity level
+     * @return Fraction of active neurons (0.0 to 1.0)
+     */
     float getActivityLevel() const;  // fraction of active neurons
     
-    // Initialize all neurons randomly
+    /**
+     * @brief Initialize all neurons randomly
+     * @param rng Random number generator for biological variability
+     * @details Calls initializeRandom() for each neuron in population
+     */
     void initializeRandom(class RandomGenerator& rng);
     
-    // Step all neurons
-    void step(Timestamp currentTime);
+    /**
+     * @brief Step all neurons with specific timestep
+     * @param currentTime Current simulation time
+     * @param dt Timestep duration in milliseconds
+     * @details Advances all neurons by one simulation timestep using their
+     *          LIF stepLIF() method with the specified timestep duration
+     */
+    void step(Timestamp currentTime, TimestepDuration dt);
     
-    // Reset all neurons
+    /**
+     * @brief Reset all neurons
+     * @details Calls reset() for each neuron in population
+     */
     void reset();
     
-    // Get neuron IDs in this population
+    /**
+     * @brief Get neuron IDs in this population
+     * @return Vector of neuron IDs
+     */
     std::vector<NeuronId> getNeuronIds() const;
     
-    // Statistics tracking
+    /**
+     * @brief Record current activity for statistics
+     * @details Captures current membrane potentials for statistical analysis
+     */
     void recordActivity();  // Record current state for statistics
+    
+    /**
+     * @brief Get mean membrane potential
+     * @return Mean membrane potential across all neurons
+     */
     float getMeanMembranePotential() const;
+    
+    /**
+     * @brief Get variance of membrane potential
+     * @return Variance of membrane potential across all neurons
+     */
     float getVarianceMembranePotential() const;
     
 private:
+    /**
+     * @brief Private implementation structure for NeuralPopulation
+     * @details Internal implementation details to reduce header size and improve compilation times
+     */
     struct Impl;
     Impl* pImpl;
 };

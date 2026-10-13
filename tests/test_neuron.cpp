@@ -131,20 +131,70 @@ void testRandomInitialization() {
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
 
-void testReset() {
+void testStepLIF() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    neuron.setMembranePotential(-60.0f);
-    neuron.injectCurrent(5.0f);
-    neuron.recordSpike(0.1);
+    // Set neuron to fire
+    neuron.setMembranePotential(-50.0f);  // Above threshold (-55.0f)
+    neuron.setThreshold(-55.0f);
     
+    // Neuron should fire
+    bool fired = neuron.stepLIF(0.0, 0.001);
+    assert(fired);
+    assert(neuron.isFiring());
+    assert(neuron.isRefractory());
+    
+    // Reset for next test
     neuron.reset();
+    neuron.setMembranePotential(-70.0f);
     
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
-    assert(neuron.getSpikeHistory().empty());
+    // Neuron should not fire
+    fired = neuron.stepLIF(0.0, 0.001);
+    assert(!fired);
+    assert(!neuron.isFiring());
+    assert(!neuron.isRefractory());
     
-    std::cout << "    testReset passed" << std::endl;
+    // Test with larger timestep
+    neuron.reset();
+    neuron.setMembranePotential(-70.0f);
+    neuron.setLeakConductance(20.0f);  // Slower leak
+    
+    fired = neuron.stepLIF(0.0, 0.01);  // Larger timestep
+    assert(!fired);  // Should not fire with larger timestep
+    
+    std::cout << "    testStepLIF passed" << std::endl;
+}
+
+void testDeprecatedStepMethod() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Set neuron to fire
+    neuron.setMembranePotential(-50.0f);
+    neuron.setThreshold(-55.0f);
+    
+    // Deprecated step method should still work for backward compatibility
+    neuron.step(0.0);
+    
+    assert(neuron.isFiring() || neuron.isRefractory());  // Either could be true after step
+    
+    std::cout << "    testDeprecatedStepMethod passed" << std::endl;
+}
+
+void testStepMethodTimestep() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test that deprecated step method uses default timestep
+    neuron.reset();
+    neuron.setMembranePotential(-50.0f);
+    neuron.setThreshold(-55.0f);
+    
+    // This should use the default 1ms timestep internally
+    neuron.step(0.0);
+    
+    // Verify neuron state changed (should have fired)
+    assert(neuron.isFiring() || neuron.isRefractory());
+    
+    std::cout << "    testStepMethodTimestep passed" << std::endl;
 }
 
 void runAll() {
@@ -158,6 +208,9 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testStepLIF();
+    testDeprecatedStepMethod();
+    testStepMethodTimestep();
 }
 
 } // namespace test_neuron

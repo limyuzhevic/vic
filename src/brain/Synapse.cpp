@@ -192,12 +192,19 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Real synaptic dynamics with deprecated single-parameter signature
+    // This method accepts a timestep parameter for backward compatibility
+    TimestepDuration dt = 0.001;  // Default 1ms timestep
+    
+    // Call the new implementation with timestep
+    step(currentTime, dt);
+}
+
+void Synapse::step(Timestamp currentTime, TimestepDuration dt) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {

@@ -473,7 +473,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            syn->step(currentTime, pImpl->timestep);
         }
     }
     

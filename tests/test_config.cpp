@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +80,122 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigJSONSaveLoad() {
+    nlm::Config config;
+    
+    // Set some values
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
+    config.set("string_value", "test", nlm::ConfigSource::Runtime);
+    config.set("bool_value", true, nlm::ConfigSource::Runtime);
+    
+    // Save to JSON file
+    std::string jsonFile = "test_config.json";
+    assert(config.saveToFile(jsonFile));
+    
+    // Create new config and load from JSON
+    nlm::Config config2;
+    assert(config2.loadFromFile(jsonFile));
+    
+    // Verify values
+    auto intVal = config2.get<int>("int_value");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    auto doubleVal = config2.get<double>("double_value");
+    assert(doubleVal.has_value() && *doubleVal > 3.13 && *doubleVal < 3.15);
+    
+    auto stringVal = config2.get<std::string>("string_value");
+    assert(stringVal.has_value() && *stringVal == "test");
+    
+    auto boolVal = config2.get<bool>("bool_value");
+    assert(boolVal.has_value() && *boolVal == true);
+    
+    // Clean up
+    std::remove(jsonFile.c_str());
+    
+    std::cout << "    testConfigJSONSaveLoad passed" << std::endl;
+}
+
+void testConfigSimpleFormatSaveLoad() {
+    nlm::Config config;
+    
+    // Set some values
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
+    config.set("string_value", "test", nlm::ConfigSource::Runtime);
+    
+    // Save to simple format file
+    std::string simpleFile = "test_config.txt";
+    assert(config.saveToFile(simpleFile));
+    
+    // Verify file was created and has content
+    std::ifstream file(simpleFile);
+    assert(file.good());
+    
+    // Create new config and load from simple format
+    nlm::Config config2;
+    assert(config2.loadFromFile(simpleFile));
+    
+    // Verify values (simple format preserves original types)
+    auto intVal = config2.get<int>("int_value");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    auto doubleVal = config2.get<double>("double_value");
+    assert(doubleVal.has_value() && *doubleVal > 3.13 && *doubleVal < 3.15);
+    
+    auto stringVal = config2.get<std::string>("string_value");
+    assert(stringVal.has_value() && *stringVal == "test");
+    
+    // Clean up
+    std::remove(simpleFile.c_str());
+    
+    std::cout << "    testConfigSimpleFormatSaveLoad passed" << std::endl;
+}
+
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test validation of different value types
+    config.set("int_val", 123, nlm::ConfigSource::Runtime);
+    config.set("double_val", 45.67, nlm::ConfigSource::Runtime);
+    config.set("string_val", "hello", nlm::ConfigSource::Runtime);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    
+    // Test vector types
+    config.set("int_vector", std::vector<int>{1, 2, 3}, nlm::ConfigSource::Runtime);
+    config.set("string_vector", std::vector<std::string>{"a", "b", "c"}, nlm::ConfigSource::Runtime);
+    
+    // Verify all values are accessible
+    assert(config.has("int_val"));
+    assert(config.has("double_val"));
+    assert(config.has("string_val"));
+    assert(config.has("bool_val"));
+    assert(config.has("int_vector"));
+    assert(config.has("string_vector"));
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigFileNotFound() {
+    nlm::Config config;
+    
+    // Try to load non-existent file
+    bool result = config.loadFromFile("non_existent_file_12345.json");
+    assert(!result);  // Should return false for non-existent file
+    
+    std::cout << "    testConfigFileNotFound passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigJSONSaveLoad();
+    testConfigSimpleFormatSaveLoad();
+    testConfigValidation();
+    testConfigFileNotFound();
 }
 
 } // namespace test_config
