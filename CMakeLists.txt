@@ -92,20 +92,29 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Core configuration system
+add_library(nlm_config STATIC
+    src/core/Config/Config.cpp
+    src/core/Config/ConfigPresets.cpp
+    src/core/ConfigUtils.cpp
+)
+target_include_directories(nlm_config PUBLIC src)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_agent PUBLIC nlm_core nlm_config)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_config)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -125,7 +134,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_config)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -144,7 +153,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_config nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
