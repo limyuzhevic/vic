@@ -100,6 +100,19 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format specific saving methods
+    bool saveToJsonFile(const std::string& filepath) const;
+    bool saveToYamlFile(const std::string& filepath) const;
+    
+    // File loading helper methods
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromYamlFile(const std::string& filepath);
+    
+    // Utility methods for file format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    static bool isJsonFile(const std::string& filepath);
+    static bool isYamlFile(const std::string& filepath);
 };
 
 } // namespace nlm
