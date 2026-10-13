@@ -1,21 +1,28 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 
 namespace nlm {
 
+// Forward declaration for Brain
+class Brain;
+
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// IMPLEMENTED - Real predictive coding using neural substrate
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Uses neural dynamics and learned patterns to predict future states
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -31,12 +38,32 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model using neural plasticity
     void train(const SensoryInput& observation);
+    
+    // Get predicted future state based on current brain state
+    std::vector<float> getPredictedState() const { return pImpl->predictedStates; }
+    
+    // Get last observation state
+    std::vector<float> getLastObservation() const { return pImpl->observationStates; }
+    
+    // Set prediction parameters
+    void setLearningRate(float rate) { pImpl->learningRate = rate; }
+    void setDecayRate(float rate) { pImpl->decayRate = rate; }
+    
+    // Store predicted input for comparison with actual
+    void setPredictedInput(const std::unique_ptr<SensoryInput>& input) {
+        pImpl->predictedInput = std::make_unique<SensoryInput>(*input);
+    }
+    
+    // Get stored predicted input
+    const SensoryInput& getPredictedInput() const { return *pImpl->predictedInput; }
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
 };
 
 } // namespace nlm
