@@ -90,16 +90,41 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation and metadata
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Add validation rule
+    void addValidationRule(const std::string& key, 
+                          std::function<bool(const ConfigValue&)> validator,
+                          const std::string& errorMessage = "");
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
+    // Get configuration help for key
+    std::string getHelp(const std::string& key) const;
+    
+    // Check if configuration value is valid for key
+    bool isValueValid(const std::string& key, const ConfigValue& value) const;
+    
+    // Get all possible configuration keys with descriptions
+    std::vector<std::pair<std::string, std::string>> getAllConfigInfo() const;
+    
+    // Advanced runtime configuration
+    void enableFeature(const std::string& feature, bool enable = true);
+    bool isFeatureEnabled(const std::string& feature) const;
+    
+    // Get configuration statistics
+    struct ConfigStats {
+        size_t totalEntries;
+        size_t fileEntries;
+        size_t commandLineEntries;
+        size_t runtimeEntries;
+        size_t duplicateKeys;
+    };
+    
+    ConfigStats getStats() const;

@@ -23,6 +23,7 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    pImpl->brain = nullptr;
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -44,8 +45,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        if (brain_->getRegion(RegionId(1))) {
+            auto neurons = brain_->getRegion(RegionId(1))->getAllNeurons();
+            for (auto* nn : *neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -67,6 +69,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
+    
+    winners_.clear();
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
@@ -159,6 +163,7 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
 }
 
 void NeuralWorkingMemory::runCompetition() {
+    // Clear winners from previous competition
     winners_.clear();
     
     if (memoryActivations_.empty()) return;

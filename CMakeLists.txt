@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/memory/Memory.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -54,12 +55,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    # Memory (advanced implementations)
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -85,6 +81,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance optimizations
+    src/benchmark.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -142,6 +140,25 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Performance optimization library (header-only with some implementations)
+add_library(nlm_performance INTERFACE)
+if(NLM_PERFORMANCE_ENABLED)
+    target_compile_definitions(nlm_performance INTERFACE NLM_PERFORMANCE_ENABLED)
+    target_link_libraries(nlm_performance INTERFACE nlm_core)
+endif()
+
+# Link performance library to core if enabled
+if(NLM_PERFORMANCE_ENABLED)
+    target_link_libraries(nlm_core PUBLIC nlm_performance)
+endif()
+
+# Development console
+add_library(nlm_development_console STATIC
+    src/development/DevConsole.cpp
+)
+target_include_directories(nlm_development_console PUBLIC src)
+target_link_libraries(nlm_development_console PUBLIC nlm_core nlm_agent)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

@@ -1,8 +1,10 @@
+// Include necessary headers
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -35,7 +37,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Handle simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -49,6 +51,33 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        }
+        // Handle JSON-style objects { key: value, key: value }
+        else if (line.front() == '{' && line.back() == '}') {
+            // Parse JSON-like object
+            std::string content = line.substr(1, line.size() - 2);
+            size_t commaPos = content.find(',');
+            while (commaPos != std::string::npos) {
+                std::string pair = trim(content.substr(0, commaPos));
+                content = content.substr(commaPos + 1);
+                
+                size_t colonPos = pair.find(':');
+                if (colonPos != std::string::npos) {
+                    std::string key = trim(pair.substr(0, colonPos));
+                    std::string value = trim(pair.substr(colonPos + 1));
+                    
+                    // Remove quotes
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+                
+                commaPos = content.find(',');
+            }
         }
     }
     
@@ -200,16 +229,109 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
+
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+
 template std::optional<double> Config::get<double>(const std::string&) const;
+
 template std::optional<bool> Config::get<bool>(const std::string&) const;
+
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
+
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+
 template double Config::getOr<double>(const std::string&, const double&) const;
+
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
+
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Advanced configuration methods implementation
+
+void Config::addValidationRule(const std::string& key, 
+                              std::function<bool(const ConfigValue&)> validator,
+                              const std::string& errorMessage) {
+    // TODO: Store validation rules in implementation
+    // For now, just a placeholder
+}
+
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    // TODO: Implement validation logic
+    // For now, return empty errors (no validation)
+    return errors;
+}
+
+std::string Config::getHelp(const std::string& key) const {
+    // TODO: Store and return help text for configuration keys
+    // For now, return a generic help message
+    return "Configuration key: " + key + ". See documentation for details.";
+}
+
+bool Config::isValueValid(const std::string& key, const ConfigValue& value) const {
+    // TODO: Implement validation logic
+    // For now, accept any value
+    return true;
+}
+
+std::vector<std::pair<std::string, std::string>> Config::getAllConfigInfo() const {
+    std::vector<std::pair<std::string, std::string>> result;
+    // TODO: Populate with actual configuration metadata
+    // For now, return a few example configurations
+    result.emplace_back("neuron_count", "Number of neurons in the network (64-10000)");
+    result.emplace_back("connection_probability", "Probability of synapse formation (0.0-1.0)");
+    result.emplace_back("simulation_timestep", "Time step size in seconds (0.001-0.1)");
+    result.emplace_back("random_seed", "Random seed for reproducible simulations");
+    return result;
+}
+
+void Config::enableFeature(const std::string& feature, bool enable) {
+    // Store feature flags in implementation
+    set("feature_" + toLower(feature), enable ? 1 : 0, ConfigSource::Runtime);
+}
+
+bool Config::isFeatureEnabled(const std::string& feature) const {
+    auto val = get<int>("feature_" + toLower(feature));
+    return val.has_value() ? (val.value() != 0) : false;
+}
+
+Config::ConfigStats Config::getStats() const {
+    ConfigStats stats{};
+    stats.totalEntries = pImpl->entries.size();
+    
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::File:
+                stats.fileEntries++;
+                break;
+            case ConfigSource::CommandLine:
+                stats.commandLineEntries++;
+                break;
+            case ConfigSource::Runtime:
+                stats.runtimeEntries++;
+                break;
+            default:
+                break;
+        }
+    }
+    
+    // Count duplicate keys (simplified implementation)
+    std::unordered_map<std::string, int> keyCounts;
+    for (const auto& entry : pImpl->entries) {
+        keyCounts[entry.key]++;
+    }
+    stats.duplicateKeys = 0;
+    for (const auto& pair : keyCounts) {
+        if (pair.second > 1) {
+            stats.duplicateKeys++;
+        }
+    }
+    
+    return stats;
+}
 
 } // namespace nlm
