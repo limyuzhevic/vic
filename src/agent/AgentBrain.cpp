@@ -138,6 +138,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
+        // Clamp to valid range
+        noveltyLevel_ = std::clamp(noveltyLevel_, 0.0f, 1.0f);
+        
         // Store for next time
         previousVision_ = vision;
     }
@@ -146,6 +149,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    } else {
+        // If curiosity disabled, reset to baseline
+        curiosityLevel_ = 0.0f;
     }
 }
 
@@ -218,17 +224,19 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
+            MotorCommand commands[] = {
+                MotorCommand::MoveForward,
+                MotorCommand::MoveBackward,
+                MotorCommand::TurnLeft,
+                MotorCommand::TurnRight,
+                MotorCommand::LookLeft,
+                MotorCommand::LookRight,
+                MotorCommand::Interact,
+                MotorCommand::Wait
+            };
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+            return commands[choice];
+        }
         }
     }
     
