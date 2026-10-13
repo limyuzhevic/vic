@@ -93,6 +93,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Helper methods for internal use
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    void saveToJSON(const std::string& filepath) const;
+    void saveToYAML(const std::string& filepath) const;
+    
+    // Configuration validation
+    bool validate() const;
+    std::string getValidationErrors() const;
+    static std::string getDefaultValue(const std::string& key);
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const std::string& key, const ConfigValue& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +113,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool validateRange(const std::string& key, double value, double min, double max);
+    static bool validateRange(const std::string& key, int value, int min, int max);
+    static bool validateProbability(const std::string& key, double value);
+    static bool validatePositive(const std::string& key, double value);
+    static bool validateNonNegative(const std::string& key, int value);
 };
 
 } // namespace nlm

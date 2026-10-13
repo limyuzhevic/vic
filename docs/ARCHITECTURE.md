@@ -121,11 +121,18 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Observation**: Sensory observation wrapper
 - **Action**: Action wrapper
 
-### 13. Experiments Layer
-- **Experiment**: Single experiment recording
-- **ExperimentRunner**: Experiment execution
-- **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
+### 13. Python Bindings (Phase 3 Integration)
+- **pybind11 Integration**: Python API built on pybind11 for C++/Python interop
+- **Config**: Enhanced configuration loading with JSON/YAML support
+- **Brain**: Main brain simulation interface
+- **AgentBrain**: Agent-world connection interface
+- **SimpleWorld**: Simple 2D environment simulation
+- **SensoryInput**: Base class for sensory processing (Vision, Audio, InternalSignals)
+- **Action**: Motor action representation
+- **SensoryPercept**: Percept wrapper for world observations
+- **Utility Functions**: Helper functions for creating default configs, brains, worlds
+- **Type Wrappers**: NeuronId, SynapseId, RegionId, PopulationId with Python-friendly interfaces
+- **Enum Support**: All NLM enumerations exposed to Python (NeuronType, SynapseType, etc.)
 
 ## Data Flow
 
