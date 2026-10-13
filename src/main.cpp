@@ -159,18 +159,26 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+bool runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer");
+        return false;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found!");
+        return false;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
         NLM_LOG_INFO("  No neurons found!");
-        return;
+        return false;
     }
     
     // Get initial spike count
@@ -178,7 +186,8 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
@@ -190,7 +199,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
-    if (spikes > 0) {
+    bool success = (spikes > 0);
+    
+    if (success) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
@@ -200,11 +211,18 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
                         " thresh=" + std::to_string(neurons[i]->getThreshold()));
         }
     }
+    
+    return success;
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+bool runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer");
+        return false;
+    }
     
     LearningExperiment experiment(brain, 42);
     
@@ -224,7 +242,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+        size_t sensoryNeurons = brain->getTotalNeuronCount() / 4;
+        for (size_t i = 0; i < 20 && i < sensoryNeurons; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
@@ -243,20 +262,30 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+    
+    return true;
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+bool runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer");
+        return false;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found!");
+        return false;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
         NLM_LOG_INFO("  Not enough synapses for STDP test");
-        return;
+        return false;
     }
     
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
@@ -298,11 +327,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
+    bool stdpWorking = false;
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
                     " after: " + std::to_string(synapses[i]->getWeight()) +
                     " (Δ=" + std::to_string(delta) + ")");
+        if (std::abs(delta) > 0.001f) {
+            stdpWorking = true;
+        }
     }
     
     // Check if weights increased (LTP)
@@ -314,11 +347,13 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+        return true;
     } else if (totalDelta < -0.001f) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
+    return false;
 }
 
 int main(int argc, char** argv) {
@@ -409,20 +444,31 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    bool test1Passed = true;
+    
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    test1Passed = runBasicConnectivityTest(brain);
+    if (!test1Passed) {
+        NLM_LOG_WARNING("Test 1 (Basic connectivity) failed, but continuing with other tests");
+    }
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    bool test2Passed = runPlasticityExperiment(brain);
+    if (!test2Passed) {
+        NLM_LOG_WARNING("Test 2 (Plasticity experiment) failed, but continuing with other tests");
+    }
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    
+    bool test3Passed = runStdpVerification(brain);
+    if (!test3Passed) {
+        NLM_LOG_WARNING("Test 3 (STDP verification) failed, but continuing");
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -445,5 +491,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
+    // Summary
+    NLM_LOG_INFO("=== TEST SUMMARY ===");
+    NLM_LOG_INFO("Test 1 (Basic Connectivity): " + std::string(test1Passed ? "PASSED" : "FAILED"));
+    NLM_LOG_INFO("Test 2 (Plasticity Experiment): " + std::string(test2Passed ? "PASSED" : "FAILED"));
+    NLM_LOG_INFO("Test 3 (STDP Verification): " + std::string(test3Passed ? "PASSED" : "FAILED"));
+    
+    // Return non-zero if all tests failed (indicates serious issues)
+    if (!test1Passed && !test2Passed && !test3Passed) {
+        NLM_LOG_ERROR("All critical tests failed!");
+        return 1;
+    }
+    
     return 0;
+}
 }
