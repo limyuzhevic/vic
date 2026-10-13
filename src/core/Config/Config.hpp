@@ -1,13 +1,5 @@
 #pragma once
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
