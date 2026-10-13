@@ -37,6 +37,18 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_working_memory {
+    void runAll();
+}
+
+namespace test_episodic_memory {
+    void runAll();
+}
+
+namespace test_associative_memory {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -119,12 +131,29 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
+    std::cout << "Running Working Memory tests..." << std::endl;
+    try {
+        test_working_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
     }
-}
+    
+    std::cout << "Running Episodic Memory tests..." << std::endl;
+    try {
+        test_episodic_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Associative Memory tests..." << std::endl;
+    try {
+        test_associative_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }

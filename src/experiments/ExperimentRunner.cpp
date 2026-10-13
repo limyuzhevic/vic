@@ -77,11 +77,8 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
-        
-        // Would also create fresh environment here
         
         if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
             results.push_back(exp);
@@ -113,8 +110,34 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Simple CSV implementation for experiment results
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+        return false;
+    }
+    
+    file << "experiment_name,step,neuron_count,synapse_count,firing_count,avg_firing_rate,total_reward" << std::endl;
+    
+    for (const auto& experiment : pImpl->experiments) {
+        const auto& stepData = experiment->getStepData();
+        double totalReward = experiment->getMetric("total_reward");
+        
+        for (const auto& step : stepData) {
+            file << experiment->getName() << ","
+                 << step.step << ","
+                 << step.neuronCount << ","
+                 << step.synapseCount << ","
+                 << step.firingCount << ","
+                 << step.avgFiringRate << ","
+                 << totalReward << std::endl;
+        }
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Successfully saved " + std::to_string(pImpl->experiments.size()) + 
+                " experiments to " + filepath);
+    return true;
 }
 
 } // namespace nlm

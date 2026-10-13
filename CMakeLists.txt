@@ -143,6 +143,22 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
+# Performance profiling module
+add_library(nlm_performance STATIC
+    src/performance/PerformanceProfiler.cpp
+    src/performance/PerformanceBenchmarkSuite.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/IntegrationTestProfiler.cpp
+)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
+# Performance demo executable
+add_executable(performance_demo
+    src/performance/performance_demo.cpp
+)
+target_link_libraries(performance_demo PUBLIC nlm_core nlm_performance)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib

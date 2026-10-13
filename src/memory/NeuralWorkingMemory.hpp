@@ -74,6 +74,12 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Add a note about memory operation
+    void addNote(const std::string& note);
+
+    // Get all notes about memory operations
+    const std::vector<std::string>& getNotes() const;
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -104,6 +110,9 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Operational notes for debugging and analysis
+    std::vector<std::string> notes_;
 };
 
 // AttentionalSelection: Neural attention through competition
