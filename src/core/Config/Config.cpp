@@ -19,7 +19,7 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
@@ -86,7 +86,60 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, int>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings with spaces
+                if (value.find(' ') != std::string::npos) {
+                    file << "\"" << value << "\"";
+                } else {
+                    file << value;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    // Quote strings with spaces
+                    if (value[i].find(' ') != std::string::npos) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]";
+            } else {
+                // Default case
+                file << "PLACEHOLDER_VALUE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

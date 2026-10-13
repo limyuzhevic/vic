@@ -511,8 +511,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get latest sensory observations for prediction system
+        // This would typically come from external sensory input
+        // For now, we'll simulate some basic prediction using current brain state
+        
+        // Create a simple sensory input representing current brain state
+        SensoryInput sensoryInput;
+        sensoryInput.data.reserve(pImpl->sensoryNeurons.size());
+        
+        // Convert sensory neuron activity to observation
+        for (const auto* neuron : pImpl->sensoryNeurons) {
+            sensoryInput.data.push_back(neuron->getState().membranePotential);
+        }
+        
+        // Make prediction for next state based on current activity
+        auto prediction = pImpl->predictionSystem->predictNextState(sensoryInput);
+        
+        // Calculate prediction error if prediction was made
+        if (prediction) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Use prediction error to modulate neural activity (dopamine)
+            // Prediction errors signal unexpected outcomes and drive learning
+            if (predictionError > 0.0f && pImpl->dopamine) {
+                // Update dopamine level based on prediction error
+                // Positive prediction error increases dopamine (reward prediction)
+                float dopamineUpdate = predictionError * 0.5f;
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + dopamineUpdate);
+            }
+            
+            // Apply prediction-based guidance to action selection
+            if (pImpl->conceptFormation) {
+                // Concepts can be updated based on prediction accuracy
+                // This would use the prediction error to refine conceptual understanding
+                pImpl->conceptFormation->updateWithPrediction(predictionError);
+            }
+        }
+        
+        // Train prediction system with current observations
+        // This helps the system learn patterns in neural activity
+        pImpl->predictionSystem->train(sensoryInput);
+        
+        // Update prediction system state (integrate prediction error history)
+        // This maintains a running record of prediction accuracy
+        pImpl->predictionSystem->getErrorHistory();
     }
     
     // ========== STEP 9: Update attention system ==========
