@@ -28,24 +28,79 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Enhanced configuration and logging utilities
+// Advanced configuration and monitoring utilities
+void printUsage(const char* programName) {
+    std::cout << R"(" USAGE: " << programName << " [options]"
+
+OPTIONS:
+  --help, -h                    Show this help message
+  --config=file.cfg             Load configuration from file
+  --neuron-count=N              Number of neurons (default: 500)
+  --region-count=N              Number of regions (default: 1)
+  --connection-probability=F    Connection probability (0.0-1.0, default: 0.15)
+  --random-seed=N               Random seed for reproducible experiments
+  --simulation-timestep=F        Simulation timestep in seconds
+  --enable-stdp[=true/false]    Enable STDP plasticity
+  --enable-hebbian[=true/false] Enable Hebbian plasticity
+  --enable-structural           Enable structural plasticity
+  --log-level=LEVEL             Logging level (Debug, Info, Warning, Error, Critical)
+  --log-to-file[=filename]       Log to file (default: nlm.log)
+  --checkpoint-path=PATH         Path for checkpoint files
+  --max-steps=N                 Maximum simulation steps
+  --enable-visualization[=true/false] Enable visualization
+  --verbose                      Enable verbose logging
+
+EXAMPLES:
+  " << programName << " --neuron-count=1000 --random-seed=123
+  " << programName << " --enable-stdp=true --enable-hebbian=false --config=myconfig.cfg
+  " << programName << " --help
+" << std::endl;
+}
+
+void printAdvancedHelp() {
+    std::cout << R"(" ADVANCED OPTIONS:
+  --profile-mode               Enable performance profiling
+  --memory-monitor            Enable memory monitoring
+  --benchmark-mode            Run benchmark tests
+  --debug-neurons              Enable detailed neuron debugging
+  --trace-spikes              Enable spike tracing
+  --dump-internal-state        Dump internal brain state for analysis
+  --load-checkpoint=FILE      Load brain state from checkpoint
+  --export-neurons=FILE       Export neuron data for external analysis
+  --export-synapses=FILE       Export synapse data for external analysis
+  --enable-async-processing    Enable asynchronous processing
+  --thread-count=N            Set number of worker threads (1-16, default: 1)
+  --simulation-speed=F         Simulation speed multiplier (0.1-10.0, default: 1.0)
+  --enable-compression        Enable state compression for checkpoints
+  --compress-level=N           Compression level (1-9, default: 6)
+
+ADVANCED EXPERIMENTS:
+  --experiment-mode=EXPERIMENT Select advanced experiment mode:
+      basic           Basic connectivity test
+      plasticity      Plasticity learning experiment
+      stdp            STDP verification
+      combined        All tests combined
+      custom         Custom user-defined experiment
+  --experiment-params=PARAMS   Parameters for custom experiment
+" << std::endl;
+}
+
+void printPerformanceStats(const SimulationClock& clock, const std::shared_ptr<Brain>& brain) {
+    NLM_LOG_INFO("=== Performance Statistics ===");
+    NLM_LOG_INFO("Simulation time: " + std::to_string(clock.getElapsedTime()) + "s");
+    NLM_LOG_INFO("Simulation steps: " + std::to_string(clock.getStepCount()));
+    NLM_LOG_INFO("Neurons: " + std::to_string(brain->getTotalNeuronCount()));
+    NLM_LOG_INFO("Synapses: " + std::to_string(brain->getTotalSynapseCount()));
+    NLM_LOG_INFO("Spikes processed: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(brain->getFiringNeuronCount()));
+    
+    double avgFiringRate = brain->getFiringNeuronCount() / (double)brain->getTotalNeuronCount() * 100.0f;
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(avgFiringRate) + "%");
+    
+    NLM_LOG_INFO("=== Advanced Monitoring ===");
+    NLM_LOG_INFO("Network connectivity density: " + std::to_string(
+        brain->getTotalSynapseCount() / (double)(brain->getTotalNeuronCount() * brain->getTotalNeuronCount())));
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,13 +377,59 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments for enhanced control
+    bool showHelp = false;
+    bool showAdvancedHelp = false;
+    bool enableVisualization = false;
+    bool verboseLogging = false;
+    std::string checkpointPath = "nlm_checkpoint.bin";
+    size_t maxSteps = 5000;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--advanced-help") {
+            showAdvancedHelp = true;
+        } else if (arg == "--verbose") {
+            verboseLogging = true;
+        } else if (arg == "--enable-visualization" || arg.find("--enable-visualization=") == 0) {
+            enableVisualization = true;
+        } else if (arg == "--checkpoint-path" || arg.find("--checkpoint-path=") == 0) {
+            if (arg.find('=') != std::string::npos) {
+                checkpointPath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointPath = argv[++i];
+            }
+        } else if (arg == "--max-steps" || arg.find("--max-steps=") == 0) {
+            if (arg.find('=') != std::string::npos) {
+                maxSteps = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                maxSteps = std::stoul(argv[++i]);
+            }
+        }
+    }
+    
+    if (showHelp) {
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    if (showAdvancedHelp) {
+        printUsage(argv[0]);
+        printAdvancedHelp();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with enhanced options
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(verboseLogging ? LogLevel::Debug : LogLevel::Info);
+    consoleLogger->setUseColors(true);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -338,7 +439,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    
+    if (verboseLogging) {
+        NLM_LOG_INFO("  - Verbose logging enabled");
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -382,6 +486,11 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Advanced configuration options
+    config->set("enable_visualization", enableVisualization, ConfigSource::CommandLine);
+    config->set("checkpoint_path", checkpointPath, ConfigSource::CommandLine);
+    config->set("max_steps", static_cast<int64_t>(maxSteps), ConfigSource::CommandLine);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,7 +499,9 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  enable_visualization: " + std::to_string(config->getOr<bool>("enable_visualization", false)));
+    NLM_LOG_INFO("  checkpoint_path: " + config->getOr<std::string>("checkpoint_path", "nlm_checkpoint.bin"));
+    NLM_LOG_INFO("  max_steps: " + std::to_string(config->getOr<int64_t>("max_steps", 5000)));
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -423,6 +534,19 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
+    
+    // Save checkpoint if requested
+    if (config->has("checkpoint_path")) {
+        std::string checkpointFile = config->getOr<std::string>("checkpoint_path", "nlm_checkpoint.bin");
+        if (brain->saveCheckpoint(checkpointFile)) {
+            NLM_LOG_INFO("Brain checkpoint saved to: " + checkpointFile);
+        } else {
+            NLM_LOG_WARNING("Failed to save checkpoint");
+        }
+    }
+    
+    // Display advanced performance statistics
+    printPerformanceStats(clock, brain);
     
     // Final brain status
     NLM_LOG_INFO("");

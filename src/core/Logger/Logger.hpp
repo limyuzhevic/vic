@@ -64,46 +64,71 @@ private:
     std::string levelToColor(LogLevel level) const;
 };
 
-// Main Logger class
+// Enhanced logging system with thread safety and multiple output sinks
 class Logger {
 public:
     Logger();
     ~Logger();
     
-    // Disable copying
+    // Disable copying to prevent threading issues
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     
-    // Add logger sink
+    /**
+     * Add a logger sink (e.g., ConsoleLogger, FileLogger)
+     * Multiple loggers can be added to send messages to different destinations
+     */
     void addLogger(std::shared_ptr<ILogger> logger);
     
-    // Remove all loggers
+    /**
+     * Remove all logger sinks
+     * Useful for testing or clean shutdown
+     */
     void clearLoggers();
     
-    // Set minimum level for all loggers
+    /**
+     * Set minimum log level for all loggers
+     * Messages below this level will be filtered out
+     */
     void setLevel(LogLevel level);
     
-    // Global logging functions
+    /**
+     * Log a message with detailed metadata
+     * Includes file, line number, and function name for debugging
+     */
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
     
-    // Convenience methods
+    /**
+     * Convenience methods for different log levels
+     * These methods automatically fill in file, line, and function information
+     */
     void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
-    // Check if level is enabled
+    /**
+     * Check if a log level is enabled
+     * Returns true if any logger has a level <= the specified level
+     */
     bool isEnabled(LogLevel level) const;
     
-    // Get global logger instance
+    /**
+     * Get the global logger instance (singleton)
+     * Always returns the same instance for thread safety
+     */
     static Logger& getGlobal();
     
-    // Set global logger
+    /**
+     * Set a custom global logger
+     * This is a placeholder for advanced logging configuration
+     * In practice, getGlobal() is used for thread-safe access
+     */
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -116,7 +141,7 @@ private:
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
-// Stream-style logging helper
+// Stream-style logging helper for complex log messages
 class LogStream {
 public:
     LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
