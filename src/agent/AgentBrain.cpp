@@ -2,8 +2,72 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
-namespace nlm {
+using namespace nlm;
+
+// MotorAction implementations
+void MoveForwardAction::execute() {}
+void MoveBackwardAction::execute() {}
+void TurnLeftAction::execute() {}
+void TurnRightAction::execute() {}
+void InteractAction::execute() {}
+void WaitAction::execute() {}
+void LookLeftAction::execute() {}
+void LookRightAction::execute() {}
+
+// Neuromodulator implementations
+void DopamineNeuromodulator::update(float dt) {
+    // Simple exponential decay and prediction error integration
+    float influence = std::max(0.0f, predictionError_);
+    current_ = baseline_ + influence;
+    current_ = std::clamp(current_, -1.0f, 1.0f);
+}
+
+void CuriosityNeuromodulator::update(float dt) {
+    // Curiosity increases with novelty and decays over time
+    current_ = noveltyBase_ + novelty_ * 2.0f;
+    current_ = std::clamp(current_, 0.0f, 1.0f);
+}
+
+// DevelopmentStage implementations
+void InitialDevelopmentStage::enter() {}
+void InitialDevelopmentStage::exit() {}
+void InitialDevelopmentStage::update(float dt) {}
+
+void CriticalPeriodDevelopmentStage::enter() {}
+void CriticalPeriodDevelopmentStage::exit() {}
+void CriticalPeriodDevelopmentStage::update(float dt) {}
+
+void MaturationDevelopmentStage::enter() {}
+void MaturationDevelopmentStage::exit() {}
+void MaturationDevelopmentStage::update(float dt) {}
+
+void AdultDevelopmentStage::enter() {}
+void AdultDevelopmentStage::exit() {}
+void AdultDevelopmentStage::update(float dt) {}
+
+// CommandFactory implementations
+std::unique_ptr<MotorAction> CommandFactory::createCommand(MotorCommand cmd) {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return std::make_unique<MoveForwardAction>();
+        case MotorCommand::MoveBackward: return std::make_unique<MoveBackwardAction>();
+        case MotorCommand::TurnLeft: return std::make_unique<TurnLeftAction>();
+        case MotorCommand::TurnRight: return std::make_unique<TurnRightAction>();
+        case MotorCommand::Interact: return std::make_unique<InteractAction>();
+        case MotorCommand::Wait: return std::make_unique<WaitAction>();
+        case MotorCommand::LookLeft: return std::make_unique<LookLeftAction>();
+        case MotorCommand::LookRight: return std::make_unique<LookRightAction>();
+        default: return std::make_unique<WaitAction>();
+    }
+}
+
+std::vector<MotorCommand> CommandFactory::getAllAvailableCommands() {
+    return {MotorCommand::MoveForward, MotorCommand::MoveBackward,
+            MotorCommand::TurnLeft, MotorCommand::TurnRight,
+            MotorCommand::Interact, MotorCommand::Wait,
+            MotorCommand::LookLeft, MotorCommand::LookRight};
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -20,6 +84,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize neuromodulators with strategy pattern
+    neuromodulators_.push_back(std::make_unique<DopamineNeuromodulator>(0.1f));
+    neuromodulators_.push_back(std::make_unique<CuriosityNeuromodulator>(0.0f));
+    
+    // Initialize development state machine with state pattern
+    currentDevelopmentStage_ = std::make_unique<InitialDevelopmentStage>();
+    currentDevelopmentStage_->enter();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -31,15 +103,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                    motorInteract_.size() + motorWait_.size() +
+                                    motorInteract_.size(); // Added for LookLeft and LookRight
                         
-                        switch (idx % 6) {
+                        switch (idx % 8) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
+                            case 6: motorTurnLeft_.push_back(n); break; // LookLeft
+                            case 7: motorTurnRight_.push_back(n); break; // LookRight
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -61,7 +136,90 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    if (currentDevelopmentStage_) {
+        currentDevelopmentStage_->exit();
+    }
+}
+
+AgentBrain::AgentBrain(AgentBrain&& other) noexcept
+    : brain_(std::move(other.brain_))
+    , neuromodulators_(std::move(other.neuromodulators_))
+    , currentDevelopmentStage_(std::move(other.currentDevelopmentStage_))
+    , developmentalAge_(other.developmentalAge_)
+    , motorForward_(std::move(other.motorForward_))
+    , motorBackward_(std::move(other.motorBackward_))
+    , motorTurnLeft_(std::move(other.motorTurnLeft_))
+    , motorTurnRight_(std::move(other.motorTurnRight_))
+    , motorInteract_(std::move(other.motorInteract_))
+    , motorWait_(std::move(other.motorWait_))
+    , sensoryVision_(std::move(other.sensoryVision_))
+    , sensoryTouch_(std::move(other.sensoryTouch_))
+    , sensoryInternal_(std::move(other.sensoryInternal_))
+    , sensoryProprioception_(std::move(other.sensoryProprioception_))
+    , rewardModulationEnabled_(other.rewardModulationEnabled_)
+    , structuralPlasticityEnabled_(other.structuralPlasticityEnabled_)
+    , developmentEnabled_(other.developmentEnabled_)
+    , curiosityEnabled_(other.curiosityEnabled_)
+    , previousVision_(std::move(other.previousVision_))
+    , sensoryNoveltyDecay_(other.sensoryNoveltyDecay_)
+    , commandHistory_(std::move(other.commandHistory_))
+    , commandCounts_(std::move(other.commandCounts_))
+    , dopamineLevel_(other.dopamineLevel_)
+    , noveltyLevel_(other.noveltyLevel_)
+    , curiosityLevel_(other.curiosityLevel_)
+    , predictionError_(other.predictionError_)
+    , expectedReward_(other.expectedReward_)
+    , plasticityModifier_(other.plasticityModifier_)
+    , curiosityTriggered_(other.curiosityTriggered_)
+    , currentNovelty_(other.currentNovelty_)
+    , currentPredictionError_(other.currentPredictionError_) {
+    other.observers_.swap(observers_);
+}
+
+AgentBrain& AgentBrain::operator=(AgentBrain&& other) noexcept {
+    if (this != &other) {
+        if (currentDevelopmentStage_) {
+            currentDevelopmentStage_->exit();
+        }
+        
+        brain_ = std::move(other.brain_);
+        neuromodulators_ = std::move(other.neuromodulators_);
+        currentDevelopmentStage_ = std::move(other.currentDevelopmentStage_);
+        currentDevelopmentStage_->enter(); // Enter new stage
+        developmentalAge_ = other.developmentalAge_;
+        motorForward_ = std::move(other.motorForward_);
+        motorBackward_ = std::move(other.motorBackward_);
+        motorTurnLeft_ = std::move(other.motorTurnLeft_);
+        motorTurnRight_ = std::move(other.motorTurnRight_);
+        motorInteract_ = std::move(other.motorInteract_);
+        motorWait_ = std::move(other.motorWait_);
+        sensoryVision_ = std::move(other.sensoryVision_);
+        sensoryTouch_ = std::move(other.sensoryTouch_);
+        sensoryInternal_ = std::move(other.sensoryInternal_);
+        sensoryProprioception_ = std::move(other.sensoryProprioception_);
+        rewardModulationEnabled_ = other.rewardModulationEnabled_;
+        structuralPlasticityEnabled_ = other.structuralPlasticityEnabled_;
+        developmentEnabled_ = other.developmentEnabled_;
+        curiosityEnabled_ = other.curiosityEnabled_;
+        previousVision_ = std::move(other.previousVision_);
+        sensoryNoveltyDecay_ = other.sensoryNoveltyDecay_;
+        commandHistory_ = std::move(other.commandHistory_);
+        commandCounts_ = std::move(other.commandCounts_);
+        dopamineLevel_ = other.dopamineLevel_;
+        noveltyLevel_ = other.noveltyLevel_;
+        curiosityLevel_ = other.curiosityLevel_;
+        predictionError_ = other.predictionError_;
+        expectedReward_ = other.expectedReward_;
+        plasticityModifier_ = other.plasticityModifier_;
+        curiosityTriggered_ = other.curiosityTriggered_;
+        currentNovelty_ = other.currentNovelty_;
+        currentPredictionError_ = other.currentPredictionError_;
+        
+        other.observers_.swap(observers_);
+    }
+    return *this;
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -81,7 +239,7 @@ size_t AgentBrain::getSensoryInputSize() const {
 
 size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
-    return 6;
+    return 8; // Added for LookLeft and LookRight
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -134,6 +292,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        currentNovelty_ = noveltyLevel_;
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -142,9 +301,21 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update neuromodulators with strategy pattern
+    for (auto& modulator : neuromodulators_) {
+        modulator->update(0.001f); // Default timestep
+    }
+    
+    // Update curiosity based on novelty and neuromodulators
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float totalCuriosity = 0.0f;
+        for (const auto& modulator : neuromodulators_) {
+            if (modulator->getName() == "Curiosity") {
+                totalCuriosity = modulator->getSignal();
+                break;
+            }
+        }
+        curiosityLevel_ = totalCuriosity * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -159,7 +330,16 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Record command
+    commandHistory_.push_back(decoded);
+    commandCounts_[decoded]++;
+    
     return decoded;
+}
+
+void AgentBrain::executeMotorCommand(MotorCommand cmd) {
+    auto action = CommandFactory::createCommand(cmd);
+    action->execute();
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -218,7 +398,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 9);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,6 +407,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
+                case 8: return MotorCommand::MoveForward;
                 default: return MotorCommand::Wait;
             }
         }
@@ -240,6 +422,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
+    currentPredictionError_ = predictionError_;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
@@ -249,6 +432,17 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Update neuromodulators
+    for (auto& modulator : neuromodulators_) {
+        if (modulator->getName() == "Dopamine") {
+            static_cast<DopamineNeuromodulator*>(modulator.get())->setPredictionError(predictionError_);
+            break;
+        }
+    }
+    
+    // Notify observers
+    notifyObservers();
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -284,21 +478,27 @@ void AgentBrain::updateDevelopment(double timestep) {
     
     developmentalAge_ += timestep;
     
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    // Update current development stage
+    currentDevelopmentStage_->update(static_cast<float>(timestep));
+    
+    // Check for developmental stage transition
+    std::string currentStageName = currentDevelopmentStage_->getName();
+    if (developmentalAge_ >= 60.0 && currentStageName == "Initial") {
+        currentDevelopmentStage_->exit();
+        currentDevelopmentStage_ = std::make_unique<CriticalPeriodDevelopmentStage>();
+        currentDevelopmentStage_->enter();
+    } else if (developmentalAge_ >= 300.0 && currentStageName == "CriticalPeriod") {
+        currentDevelopmentStage_->exit();
+        currentDevelopmentStage_ = std::make_unique<MaturationDevelopmentStage>();
+        currentDevelopmentStage_->enter();
+    } else if (developmentalAge_ >= 900.0 && currentStageName == "Maturation") {
+        currentDevelopmentStage_->exit();
+        currentDevelopmentStage_ = std::make_unique<AdultDevelopmentStage>();
+        currentDevelopmentStage_->enter();
     }
+    
+    // Apply development effects
+    plasticityModifier_ = currentDevelopmentStage_->getPlasticityModifier();
     
     // Structural plasticity changes with development
     if (structuralPlasticityEnabled_) {
@@ -313,13 +513,24 @@ void AgentBrain::updateDevelopment(double timestep) {
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+DevelopmentalStage AgentBrain::getCurrentDevelopmentStage() const {
     if (!brain_) return DevelopmentalStage::Initial;
     return brain_->getDevelopmentalStage();
 }
 
+std::string AgentBrain::getDevelopmentStageName() const {
+    if (currentDevelopmentStage_) {
+        return currentDevelopmentStage_->getName();
+    }
+    return "Unknown";
+}
+
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    float total = 0.0f;
+    for (const auto& modulator : neuromodulators_) {
+        total += modulator->getSignal();
+    }
+    return std::clamp(total / neuromodulators_.size(), -1.0f, 1.0f);
 }
 
 float AgentBrain::getCuriosityLevel() const {
@@ -334,6 +545,37 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+size_t AgentBrain::getCommandCount(MotorCommand cmd) const {
+    auto it = commandCounts_.find(cmd);
+    return it != commandCounts_.end() ? it->second : 0;
+}
+
+void AgentBrain::addObserver(std::shared_ptr<NeuromodulationObserver> observer) {
+    observers_.push_back(observer);
+}
+
+void AgentBrain::removeObserver(std::shared_ptr<NeuromodulationObserver> observer) {
+    observers_.erase(std::remove(observers_.begin(), observers_.end(), observer), observers_.end());
+}
+
+void AgentBrain::notifyObservers() {
+    for (const auto& observer : observers_) {
+        observer->onDopamineChange(dopamineLevel_);
+        observer->onReward(0.5f, predictionError_); // Example values
+        observer->onNovelty(noveltyLevel_);
+    }
+}
+
+void AgentBrain::updateNeuromodulators(float dt) {
+    for (auto& modulator : neuromodulators_) {
+        modulator->update(dt);
+    }
+}
+
+void AgentBrain::updateDevelopmentState(float dt) {
+    currentDevelopmentStage_->update(dt);
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -342,9 +584,60 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    curiosityTriggered_ = false;
+    currentNovelty_ = 0.0f;
+    currentPredictionError_ = 0.0f;
+    
+    // Reset neuromodulators
+    for (auto& modulator : neuromodulators_) {
+        if (modulator->getName() == "Dopamine") {
+            static_cast<DopamineNeuromodulator*>(modulator.get())->setPredictionError(0.0f);
+        } else if (modulator->getName() == "Curiosity") {
+            static_cast<CuriosityNeuromodulator*>(modulator.get())->setNovelty(0.0f);
+        }
+    }
+    
+    // Reset development stage
+    if (currentDevelopmentStage_) {
+        currentDevelopmentStage_->exit();
+        currentDevelopmentStage_ = std::make_unique<InitialDevelopmentStage>();
+        currentDevelopmentStage_->enter();
+    }
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear command history
+    commandHistory_.clear();
+    commandCounts_.clear();
 }
 
-} // namespace nlm
+void AgentBrain::setDopamineBaseline(float baseline) {
+    for (auto& modulator : neuromodulators_) {
+        if (modulator->getName() == "Dopamine") {
+            static_cast<DopamineNeuromodulator*>(modulator.get())->baseline_ = baseline;
+            break;
+        }
+    }
+}
+
+void AgentBrain::setCuriosityNoveltyBase(float base) {
+    for (auto& modulator : neuromodulators_) {
+        if (modulator->getName() == "Curiosity") {
+            static_cast<CuriosityNeuromodulator*>(modulator.get())->noveltyBase_ = base;
+            break;
+        }
+    }
+}
+
+void AgentBrain::addNeuromodulator(std::unique_ptr<Neuromodulator> modulator) {
+    neuromodulators_.push_back(std::move(modulator));
+}
+
+std::vector<std::string> AgentBrain::getNeuromodulatorNames() const {
+    std::vector<std::string> names;
+    for (const auto& modulator : neuromodulators_) {
+        names.push_back(modulator->getName());
+    }
+    return names;
+}

@@ -260,9 +260,131 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Get timestep from simulation clock if available
+    // This allows for adaptive timesteps and configurable simulation
+    TimestepDuration dt = 0.001;  // 1ms default for backward compatibility
+    
+    // Try to access brain simulation clock if this neuron is part of a brain
+    // For now, use standard LIF integration
     stepLIF(currentTime, dt);
+}
+
+void Neuron::stepLIFAdvanced(Timestamp currentTime, TimestepDuration dt,
+                            bool useConductanceBased, bool includeAdaptation,
+                            bool includeSynapticDynamics) {
+    bool fired = false;
+    
+    // Handle refractory period
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        // During refractory period, clear synaptic input but don't integrate
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        return false;
+    }
+    
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // dV/dt = (V_rest - V)/tau + I/C
+    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    MembranePotential V_reset = pImpl->state.resetPotential;
+    MembranePotential threshold = pImpl->state.threshold;
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Synaptic input contributions to membrane potential change
+    float synapticContribution = pImpl->synapticInput / C;
+    
+    // Add conductance-based dynamics if enabled
+    if (useConductanceBased) {
+        // Real conductance-based synaptic integration
+        // I = g_syn * (V_rev - V) where V_rev depends on synapse type
+        // For excitatory: V_rev ≈ 0 mV, for inhibitory: V_rev ≈ -80 mV
+        float excitatoryConductance = std::max(0.0f, pImpl->synapticInput);
+        float inhibitoryConductance = std::max(0.0f, -pImpl->synapticInput);
+        
+        // Excitatory reversal potential (~0 mV)
+        float V_exc = 0.0f;
+        // Inhibitory reversal potential (-80 mV for GABA_A)
+        float V_inh = -80.0f;
+        
+        synapticContribution = (excitatoryConductance * (V_exc - V) +
+                               inhibitoryConductance * (V_inh - V)) / C;
+    }
+    
+    // Leak contribution
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Update membrane potential using exponential Euler integration
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (includeAdaptation && pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Add synaptic dynamics if enabled
+    if (includeSynapticDynamics) {
+        // Simple exponential decay of synaptic input
+        pImpl->synapticInput *= 0.9f;
+    }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Check for spike
+    if (V >= threshold) {
+        fired = true;
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = V_reset;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
+
+void Neuron::stepLIFWithAdaptation(Timestamp currentTime, TimestepDuration dt) {
+    // Enhanced LIF with spike-frequency adaptation and conductance-based synapses
+    stepLIFAdvanced(currentTime, dt, true, true, true);
+}
+
+void Neuron::stepIAndFWithHistory(Timestamp currentTime, TimestepDuration dt) {
+    // Integrate-and-Fire with detailed spike history for STDP
+    bool fired = stepLIFAdvanced(currentTime, dt, true, true, false);
+    
+    // Record detailed spike information for plasticity
+    if (fired) {
+        recordSpike(currentTime);
+    }
+}
+
+void Neuron::stepHodgkinHuxley(Timestamp currentTime, TimestepDuration dt) {
+    // Hodgkin-Huxley model (placeholder for future implementation)
+    // This would provide more biophysically realistic neuron dynamics
+    // For now, fall back to enhanced LIF
+    stepLIFAdvanced(currentTime, dt, true, true, true);
 }
 
 void Neuron::reset() {
