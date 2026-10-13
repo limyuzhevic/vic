@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
 
 namespace nlm {
 
@@ -18,7 +19,8 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
+// TODO PHASE 2: Implement proper JSON/YAML parser
+// PLACEHOLDER - Phase 1 uses a simple key=value format
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -27,6 +29,12 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Try JSON parser first, fall back to simple key=value format
+    if (tryLoadFromJSON(filepath)) {
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -43,12 +51,112 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+// Add the tryLoadFromJSON function declaration and implementation
+
+bool Config::tryLoadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parser implementation
+    // Note: This is a simplified implementation for phase 2
+    // Full implementation would use a proper JSON library like nlohmann::json
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Find all key=value or "key": "value" patterns
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Skip whitespace
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        // Find key (quoted or unquoted)
+        std::string key;
+        if (content[pos] == '\"' || content[pos] == \'\') {
+            char quote = content[pos++];
+            while (pos < content.length() && content[pos] != quote) {
+                if (content[pos] == '\\\\' && pos + 1 < content.length()) {
+                    // Skip escaped character
+                    pos += 2;
+                    if (pos < content.length()) key += content[pos++];
+                } else {
+                    key += content[pos++];
+                }
+            }
+            if (pos < content.length()) pos++; // Skip closing quote
+        } else {
+            while (pos < content.length() && content[pos] != '\"' && content[pos] != \'\' && content[pos] != ':' && content[pos] != ',' && content[pos] != '}' && content[pos] != ']' && !std::isspace(content[pos])) {
+                key += content[pos++];
+            }
+        }
+        
+        if (key.empty()) continue;
+        
+        // Skip whitespace
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length() || content[pos] != ':' && content[pos] != '=') {
+            continue;
+        }
+        
+        pos++; // Skip ':' or '='
+        
+        // Skip whitespace
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        // Find value
+        std::string value;
+        if (content[pos] == '\"' || content[pos] == \'\') {
+            char quote = content[pos++];
+            while (pos < content.length() && content[pos] != quote) {
+                if (content[pos] == '\\\\' && pos + 1 < content.length()) {
+                    // Skip escaped character
+                    pos += 2;
+                    if (pos < content.length()) value += content[pos++];
+                } else {
+                    value += content[pos++];
+                }
+            }
+            if (pos < content.length()) pos++; // Skip closing quote
+        } else {
+            while (pos < content.length() && content[pos] != '\"' && content[pos] != \'\' && content[pos] != ',' && content[pos] != '}' && content[pos] != ']' && !std::isspace(content[pos])) {
+                value += content[pos++];
+            }
+        }
+        
+        // Trim value
+        value = trim(value);
+        
+        if (!key.empty()) {
+            set(key, value, ConfigSource::File);
+        }
+        
+        // Skip comma or closing brace
+        while (pos < content.length() && (content[pos] == ',' || content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
         }
     }
     

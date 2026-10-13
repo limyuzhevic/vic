@@ -57,6 +57,7 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    bool tryLoadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
