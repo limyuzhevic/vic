@@ -221,9 +221,202 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## Python Bindings
+
+The NLM project provides Python bindings for interacting with the neural simulation framework:
+
+### Installation
+
+```bash
+# Build Python bindings from the project root
+cd python
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Available Modules
+
+#### Original API (`pynlm_original`)
+
+For backward compatibility and production use:
+
+```python
+import pynlm_original as nlm
+
+# Create a brain
+brain = nlm.createBrain(nlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+```
+
+#### Enhanced API (`pynlm`)
+
+The enhanced Python bindings provide a more Pythonic interface:
+
+```python
+import pynlm as nlm
+
+# Enhanced configuration with dictionary-like interface
+config = nlm.Config()
+config.update({
+    "neuron_count": 1000,
+    "region_count": 2,
+    "random_seed": 42
+})
+
+# Use context manager for automatic lifecycle management
+with nlm.Brain(config) as brain:
+    results = brain.run_simulation(steps=100)
+```
+
+### Features Comparison
+
+| Feature | Original API | Enhanced API |
+|---------|-------------|--------------|
+| Configuration Interface | `config.set("key", "value")` | `config["key"] = "value"` |
+| Resource Management | Manual initialize/reset | Automatic context manager |
+| Simulation Control | Basic step-by-step | Built-in simulation runners |
+| Error Handling | Basic | Robust with recovery |
+| Result Reporting | None | Detailed metrics and statistics |
+| Documentation | Minimal | Comprehensive with examples |
+
+### Usage Examples
+
+#### Basic Usage
+
+See `python/easy_usage.md` for comprehensive Python usage examples.
+
+#### Enhanced API Features
+
+The enhanced Python API provides:
+
+1. **Pythonic Configuration Interface**: Dictionary-like syntax for configuration
+2. **Context Managers**: Automatic resource management
+3. **Simulation Runners**: Step-by-step execution with detailed results
+4. **Enhanced Agent Brain**: Better abstraction and usability
+5. **Error Handling**: Robust error recovery
+6. **Performance Monitoring**: Built-in metrics collection
+
+### Quick Start
+
+```python
+import pynlm as nlm
+
+# Create enhanced configuration
+config = nlm.Config()
+config.update({
+    "neuron_count": 500,
+    "region_count": 2,
+    "random_seed": 42
+})
+
+# Create brain with context manager (automatic lifecycle)
+with nlm.Brain(config) as brain:
+    # Run simulation
+    results = brain.run_simulation(steps=100)
+    
+    # Get statistics
+    stats = brain.get_stats()
+    print(f"Neurons: {stats['total_neurons']}")
+    print(f"Firing rate: {stats['average_firing_rate']:.2f} Hz")
+```
+
+### Documentation
+
+- `python/easy_usage.md`: Beginner-friendly guide
+- `python/enhanced_api_guide.md`: Comprehensive enhanced API documentation
+- `python/enhanced_examples.py`: Complete working examples
+
+### Building Python Bindings
+
+The Python bindings are built using CMake with pybind11:
+
+```bash
+# From the python directory
+cd python
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+This will build both the original bindings (`pynlm_original`) and the enhanced bindings (`pynlm`).
+
+### Testing Python Bindings
+
+```bash
+# Run Python tests
+cd python
+python -m pytest tests/ -v
+
+# Run example scripts
+python python/enhanced_examples.py
+```
+
+## Testing
+
+### Unit Tests
+
+```bash
+# From build directory
+cd build
+ctest
+```
+
+### Python Tests
+
+```bash
+cd python
+python -m pytest tests/ -v
+```
+
+## Configuration
+
+### Core Configuration Options
+
+```json
+{
+    "neuron_count": 1000,                    // Total neurons
+    "region_count": 1,                       // Number of brain regions
+    "connection_probability": 0.1,            // Connection probability
+    "random_seed": 42,                        // Random number seed
+    "simulation_timestep": 0.001,             // Simulation time step
+    "working_memory_capacity": 100,           // Working memory size
+    "episodic_memory_max_episodes": 1000,     // Max stored episodes
+    "dopamine_learning_rate": 0.01,           // Neuromodulation strength
+    "developmental_duration": 1000,           // Total development time
+    "synaptogenesis_rate": 0.0001,           // Structural plasticity rate
+    "pruning_rate": 0.00001                  // Memory pruning rate
+}
+```
+
+### Configuration File Format
+
+The config system supports:
+- **Key=value format** (legacy)
+- **Command line arguments** (`--key=value`)
+- **JSON/YAML** (Phase 2 planned)
+
+Example config file:
+
+```
+# NLM Configuration File
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+random_seed = 42
+development_enabled = true
+reward_modulation_enabled = true
+structural_plasticity_enabled = true
+curiosity_enabled = true
+```
+
 ## License
 
-MIT
+MIT License
 
 ## Authors
 
