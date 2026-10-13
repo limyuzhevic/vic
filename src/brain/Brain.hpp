@@ -148,6 +148,11 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Check if memory systems are initialized
+    bool hasWorkingMemory() const;
+    bool hasEpisodicMemory() const;
+    bool hasAssociativeMemory() const;
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

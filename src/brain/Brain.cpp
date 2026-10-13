@@ -1017,6 +1017,19 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+// Check if memory systems are initialized
+bool Brain::hasWorkingMemory() const {
+    return pImpl->workingMemory != nullptr;
+}
+
+bool Brain::hasEpisodicMemory() const {
+    return pImpl->episodicMemory != nullptr;
+}
+
+bool Brain::hasAssociativeMemory() const {
+    return pImpl->associativeMemory != nullptr;
+}
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
