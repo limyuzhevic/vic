@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -19,9 +20,9 @@ struct Neuron::Impl {
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float MEMBRANE_CAPACITANCE = Constants::NeuronParameters::MEMBRANE_CAPACITANCE;  // nF
+    static constexpr float TIME_CONSTANT = Constants::NeuronParameters::TIME_CONSTANT;  // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = Constants::NeuronParameters::SPIKE_HISTORY_MAX;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -224,12 +225,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * Constants::NeuromodulationParameters::ADAPTATION_INCREMENT;
+        pImpl->state.adaptationVariable *= Constants::NeuromodulationParameters::ADAPTATION_DECAY;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, Constants::NeuronParameters::MIN_MEMBRANE_POTENTIAL, Constants::NeuronParameters::MAX_MEMBRANE_POTENTIAL);
     
     // Check for spike
     if (V >= threshold) {
@@ -261,7 +262,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = Constants::SimulationParameters::DEFAULT_TIMESTEP;  // 1ms default
     stepLIF(currentTime, dt);
 }
 

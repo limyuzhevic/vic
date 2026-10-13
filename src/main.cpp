@@ -11,6 +11,8 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Constants.hpp"
+#include "cli/CLIInterface.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -27,6 +29,9 @@
 #include <numeric>
 
 using namespace nlm;
+
+// Forward declarations for CLI functions
+int runNLMWithCLI(int argc, char** argv);
 
 void printBanner() {
     std::cout << R"(
@@ -130,8 +135,8 @@ struct LearningExperiment {
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
+            if (delta > Constants::PlasticityParameters::STDP_LTD_WEIGHT) ++strengthened;
+            else if (delta < -Constants::PlasticityParameters::STDP_LTD_WEIGHT) ++weakened;
             else ++unchanged;
         }
         
@@ -179,7 +184,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(Constants::SensoryParameters::VISION_SCALE);  // Strong excitatory input
     }
     
     // Run a few steps
@@ -225,7 +230,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, Constants::SensoryParameters::TOUCH_SCALE);
         }
         
         brain->step(step, step * 0.001);
@@ -287,12 +292,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            preNeuron->injectCurrent(Constants::SensoryParameters::TOUCH_SCALE);
+            brain->step(trial * 2, trial * 2 * Constants::SimulationParameters::DEFAULT_TIMESTEP);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            postNeuron->injectCurrent(Constants::SensoryParameters::TOUCH_SCALE);
+            brain->step(trial * 2 + 1, (trial * 2 + 1) * Constants::SimulationParameters::DEFAULT_TIMESTEP);
         }
     }
     
@@ -312,9 +317,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    if (totalDelta > Constants::PlasticityParameters::STDP_LTP_WEIGHT) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+    } else if (totalDelta < -Constants::PlasticityParameters::STDP_LTD_WEIGHT) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
@@ -322,6 +327,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check if CLI mode is requested
+    bool useCLI = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--cli" || arg == "-cli") {
+            useCLI = true;
+        } else if (arg == "--help" || arg == "-h") {
+            // Let CLIInterface handle help
+            return runNLMWithCLI(argc, argv);
+        }
+    }
+    
+    if (useCLI) {
+        return runNLMWithCLI(argc, argv);
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -374,13 +395,13 @@ int main(int argc, char** argv) {
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", Constants::PlasticityParameters::STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", Constants::PlasticityParameters::STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", Constants::PlasticityParameters::STDP_LTP_WEIGHT * 2.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", Constants::DevelopmentParameters::INITIAL_PLASTICITY * 0.00001f, ConfigSource::Default);
+    config->set("pruning_rate", Constants::DevelopmentParameters::ADULT_PLASTICITY * 0.000001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
