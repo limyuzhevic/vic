@@ -108,7 +108,10 @@ struct Logger::Impl {
     std::mutex mutex;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    // Add a default console logger
+    addLogger(std::make_shared<ConsoleLogger>());
+}
 
 Logger::~Logger() = default;
 
@@ -176,17 +179,26 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
+// Global logger management with thread-safe lazy initialization
+namespace {
+    std::shared_ptr<Logger> globalLogger;
+    std::mutex globalLoggerMutex;
+}
+
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    std::lock_guard<std::mutex> lock(globalLoggerMutex);
+    if (!globalLogger) {
+        globalLogger = std::make_shared<Logger>();
+    }
+    return *globalLogger;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    std::lock_guard<std::mutex> lock(globalLoggerMutex);
+    globalLogger = logger;
 }
 
-// LogStream implementation
+// LogStream implementation - now uses the global logger properly
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 

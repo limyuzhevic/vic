@@ -510,9 +510,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Update prediction error signal with current neural activity
+        pImpl->predictionError->update(pImpl->timestep);
+        
+        // Update prediction system with current neural activity
+        // Get current neural activity pattern for prediction
+        std::vector<float> neuralActivityPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron->isInRefractory()) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        neuralActivityPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Compute prediction error based on neural activity patterns
+        // This drives learning and adaptation through prediction error signaling
+        float predictionError = 0.0f;
+        if (!neuralActivityPattern.empty()) {
+            // Get prediction error from prediction system
+            float systemPredictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Compare with neuromodulatory prediction error
+            float neuromodError = pImpl->predictionError->getError();
+            
+            // Combine errors for stronger learning signal
+            predictionError = (systemPredictionError + neuromodError) * 0.5f;
+            
+            // Update prediction system with current activity
+            pImpl->predictionSystem->updatePredictions(*pImpl->sensoryInput, *pImpl->sensoryInput);  // For now use current state as prediction
+            
+            // Store prediction error for neuromodulation
+            pImpl->predictionError->setError(predictionError);
+            
+            // Apply prediction error to neural plasticity
+            if (predictionError > 0.1f) {
+                // Strong prediction error - enhance learning
+                float learningBoost = predictionError * 0.5f;
+                // Apply learning boost to all synapses
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        float weight = syn->getWeight();
+                        weight += (weight > 0 ? 1.0f : -1.0f) * learningBoost * 0.001f;
+                        syn->setWeight(weight);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +571,81 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to selected neurons
+            std::vector<NeuronId> attendedNeurons = pImpl->attention->getAttendedNeurons();
+            for (NeuronId neuronId : attendedNeurons) {
+                // Find and modulate the attended neuron
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                // Apply attention boost - increase excitability
+                                neuron->injectCurrent(2.0f);  // Attention boost current
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Present current neural activity pattern to concept formation system
+        // This allows concepts to emerge from recurring activity patterns
+        
+        // Get current neural activity pattern
+        std::vector<float> neuralActivityPattern;
+        std::vector<float> neuralFeatures;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron->isInRefractory()) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        if (activation > 0.1f) {  // Only consider significantly active neurons
+                            neuralActivityPattern.push_back(activation);
+                            // Extract features: population type, region, etc.
+                            neuralFeatures.push_back(static_cast<float>(pop->getNeuronType()));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get current reward for reinforcement
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        if (!neuralActivityPattern.empty()) {
+            // Present this pattern to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralActivityPattern, neuralFeatures, reward, currentStep);
+            
+            // Concept formation returns concept ID if matches existing concept,
+            // 0 if too early to tell, or new concept ID if novel
+            if (conceptId > 0) {
+                // Get the matched or newly formed concept
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    // Apply concept to working memory - concepts modulate attention
+                    // based on learned patterns
+                    if (concept->avgStability > 0.5f) {  // Only if stable enough
+                        // Store concept information in working memory
+                        // Get concept prototype for storage
+                        std::vector<float> prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                        float stability = pImpl->conceptFormation->getConceptStability(conceptId);
+                        
+                        // Store concept prototype in working memory
+                        pImpl->workingMemory->store(prototype, stability);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

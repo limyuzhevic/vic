@@ -1,10 +1,5 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+#include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -42,6 +37,10 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Helper for JSON/YAML parsing
+void to_json(nlohmann::json& j, const ConfigValue& cv);
+void from_json(const nlohmann::json& j, ConfigValue& cv);
 
 // Main configuration class
 class Config {
