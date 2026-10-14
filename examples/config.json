@@ -1,0 +1,77 @@
+{
+  "nlm_config": {
+    "version": "1.0.0",
+    "description": "NLM (熙然) - Neural Learning Machine Configuration",
+    "brain": {
+      "neuron_count": 1000,
+      "region_count": 2,
+      "connection_probability": 0.1,
+      "initial_weight_mean": 0.5,
+      "initial_weight_std": 0.1,
+      "v_thresh": -50.0,
+      "v_rest": -70.0,
+      "v_reset": -75.0,
+      "tau_mem": 20.0,
+      "tau_ref": 2.0,
+      "timestep": 0.001
+    },
+    "plasticity": {
+      "stdp": {
+        "enable": true,
+        "learning_rate": 0.001,
+        "tau_plus": 20.0,
+        "tau_minus": 20.0
+      },
+      "hebbian": {
+        "enable": true,
+        "learning_rate": 0.01
+      },
+      "structural": {
+        "enable": true,
+        "synaptogenesis_rate": 0.001,
+        "pruning_rate": 0.0001
+      }
+    },
+    "neuromodulation": {
+      "dopamine": {
+        "scale": 1.0
+      },
+      "curiosity": {
+        "enable": true,
+        "scale": 1.0
+      },
+      "novelty": {
+        "enable": true,
+        "scale": 1.0
+      }
+    },
+    "memory": {
+      "working_memory": {
+        "capacity": 100,
+        "decay_rate": 0.01
+      },
+      "episodic_memory": {
+        "capacity": 1000,
+        "replay_probability": 0.1
+      }
+    },
+    "environment": {
+      "name": "GridWorld",
+      "width": 20,
+      "height": 20,
+      "vision_width": 8,
+      "vision_height": 8,
+      "timestep": 0.1
+    },
+    "simulation": {
+      "max_steps": 10000,
+      "time_limit": 0.0,
+      "random_seed": 42
+    },
+    "logging": {
+      "level": "INFO",
+      "to_file": false,
+      "filename": "nlm.log"
+    }
+  }
+}

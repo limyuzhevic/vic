@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
 
 namespace nlm {
 
