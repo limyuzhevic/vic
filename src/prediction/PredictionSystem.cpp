@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../src/brain/Brain.hpp"
 
 namespace nlm {
 
@@ -13,6 +14,14 @@ struct PredictionSystem::Impl {
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(std::shared_ptr<Brain> brain) {
+    // Initialize prediction system with brain reference
+    // Currently a no-op, but provides the interface for consistency
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    pImpl->errorHistory.clear();
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
@@ -55,6 +64,14 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+}
+
+void PredictionSystem::initialize(std::shared_ptr<Brain> brain) {
+    // Initialize prediction system with brain reference
+    // Currently a no-op, but provides the interface for consistency
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    pImpl->errorHistory.clear();
 }
 
 } // namespace nlm

@@ -347,11 +347,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+.def("getConceptFormation", &Brain::getConceptFormation,
+               py::return_value_policy::reference_internal,
+               "Get concept formation system"),
+        .def("getAttention", &Brain::getAttention,
+               py::return_value_policy::reference_internal,
+               "Get attentional selection system"),
+        .def("getDopamine", &Brain::getDopamine,
+               py::return_value_policy::reference_internal,
+               "Get dopamine neuromodulation system"),
+        .def("getCuriosity", &Brain::getCuriosity,
+               py::return_value_policy::reference_internal,
+               "Get curiosity neuromodulation system"),
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+               py::return_value_policy::reference_internal,
+               "Get prediction error neuromodulation system"),
+        .def("getNovelty", &Brain::getNovelty,
+               py::return_value_policy::reference_internal,
+               "Get novelty neuromodulation system"),
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
