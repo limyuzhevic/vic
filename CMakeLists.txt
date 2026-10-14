@@ -127,6 +127,13 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Main improvements test executable
+add_executable(test_main_improvements
+    test_main_improvements.cpp
+)
+target_link_libraries(test_main_improvements PUBLIC nlm_core)
+target_include_directories(test_main_improvements PUBLIC src)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp

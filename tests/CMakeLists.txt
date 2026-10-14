@@ -19,6 +19,15 @@ add_executable(nlm_test
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Add main improvements test
+add_executable(test_main_improvements
+    ${CMAKE_CURRENT_SOURCE_DIR}/../test_main_improvements.cpp
+)
+
+target_link_libraries(test_main_improvements PRIVATE nlm_core)
+target_compile_features(test_main_improvements PRIVATE cxx_std_20)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME test_main_improvements COMMAND test_main_improvements)
