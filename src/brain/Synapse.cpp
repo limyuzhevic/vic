@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 

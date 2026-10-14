@@ -4,6 +4,10 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../agent/MotorCommand.hpp"
+#include "../environment/Action.hpp"
+#include "../development/DevelopmentalStage.hpp"
 #include <chrono>
 #include <cmath>
 

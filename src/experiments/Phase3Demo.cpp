@@ -14,15 +14,36 @@ namespace nlm {
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
 
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 3: World Interaction                               ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - World interaction with agents                           ║
+    ║     - Sensory perception and motor control                     ║
+    ║     - Learning from experience                                 ║
+    ║     - Action planning and execution                           ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
 class Phase3Demo {
 public:
     Phase3Demo() {}
     ~Phase3Demo() {}
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
+        printBanner();
+        std::cout << "===========================================\\n";
+        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\\n";
+        std::cout << "===========================================\\n\\n";
         
         // Create configuration
         auto config = std::make_shared<Config>();
