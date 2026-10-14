@@ -142,6 +142,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Configuration class with enhanced Python interface
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -162,7 +163,30 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Factory methods for convenient creation
+        .def_static("createDefault", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        .def_static("createFromDict", [](const py::dict& config_dict) {
+            // Use existing Config implementation - create a temporary config
+            auto config = std::make_shared<Config>();
+            for (const auto& item : config_dict) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value = item.second;
+                
+                if (value.is(py::int_())) {
+                    config->set(key, py::cast<int>(value));
+                } else if (value.is(py::float_())) {
+                    config->set(key, py::cast<double>(value));
+                } else if (value.is(py::bool_())) {
+                    config->set(key, py::cast<bool>(value));
+                } else if (value.is(py::str())) {
+                    config->set(key, py::cast<std::string>(value));
+                }
+            }
+            return config;
+        }, py::arg("config_dict"), "Create configuration from Python dictionary");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -172,6 +196,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
+    // Vision sensory input with enhanced Python interface
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
@@ -181,7 +206,26 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Factory methods for convenient vision creation
+        .def_static("create", [](int width, int height, float intensity = 0.5f) {
+            auto vision = std::make_shared<Vision>(width, height, 3);
+            std::vector<float> data(width * height * 3, intensity);
+            vision->setData(data);
+            return vision;
+        }, py::arg("width"), py::arg("height"), py::arg("intensity") = 0.5f,
+           "Create a vision input with specified dimensions and intensity")
+        .def_static("createRandom", [](int width, int height) {
+            auto vision = std::make_shared<Vision>(width, height, 3);
+            std::vector<float> data;
+            data.reserve(width * height * 3);
+            for (int i = 0; i < width * height * 3; ++i) {
+                data.push_back(static_cast<float>(rand()) / RAND_MAX);
+            }
+            vision->setData(data);
+            return vision;
+        }, py::arg("width"), py::arg("height"),
+           "Create a random vision input with specified dimensions");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -198,6 +242,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Action class with enhanced Python interface
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -207,7 +252,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Factory methods for convenient action creation
+        .def_static("create", [](ActionType type, const py::list& params) {
+            std::vector<float> param_vec;
+            for (const auto& item : params) {
+                param_vec.push_back(py::cast<float>(item));
+            }
+            return std::make_unique<Action>(type, param_vec);
+        }, py::arg("type"), py::arg("params"),
+           "Create an action with specified type and parameters")
+        .def_static("createMove", [](float distance = 1.0f) {
+            auto action = std::make_unique<Action>(ActionType::MoveForward);
+            action->setParameters(std::vector<float>{distance});
+            return action;
+        }, py::arg("distance") = 1.0f,
+           "Create a move forward action with specified distance")
+        .def_static("createTurn", [](float angle) {
+            auto action = std::make_unique<Action>(ActionType::TurnLeft);
+            action->setParameters(std::vector<float>{angle});
+            return action;
+        }, py::arg("angle"),
+           "Create a turn left action with specified angle");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())

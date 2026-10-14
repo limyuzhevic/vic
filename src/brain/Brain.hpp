@@ -46,7 +46,34 @@ struct InterRegionConnection {
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// and fully integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// This is the core artificial brain implementation that coordinates:
+// - Real spiking neuron dynamics with LIF (Leaky Integrate-and-Fire) models
+// - Event-driven spike propagation with synaptic delays
+// - Integrated working memory, episodic memory, and associative memory
+// - Prediction systems for forward modeling
+// - Cognitive systems (neural planning, concept formation, attention)
+// - Neuromodulation (dopamine, curiosity, novelty signals)
+// - Developmental plasticity and structural changes
+// - Checkpoint save/load and memory replay mechanisms
+// - Complete closed-loop brain-environment interaction
+// 
+// The brain operates through discrete simulation steps, processing:
+// 1. Delayed spike events (synaptic input delivery)
+// 2. Neuron membrane potential updates (LIF dynamics)
+// 3. Spike detection and event scheduling
+// 4. Memory system updates
+// 5. Neuromodulation effects
+// 6. Plasticity rule applications (STDP, Hebbian)
+// 7. Episodic memory updates
+// 8. Prediction system updates
+// 9. Attention system updates
+// 10. Concept formation
+// 11. Structural plasticity
+// 12. Memory replay
+// 13. Development effects
+// 14. Statistics collection
 
 class Brain {
 public:

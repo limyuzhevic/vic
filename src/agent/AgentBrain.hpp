@@ -10,7 +10,33 @@
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding for brain-environment interaction
+// 
+// This class serves as the interface layer between the artificial brain and the external world:
+// - Processes sensory input from the environment and converts to neural currents
+// - Decodes neural activity into actionable motor commands
+// - Applies neuromodulation based on reward signals
+// - Manages developmental progression and plasticity modulation
+// - Handles curiosity-driven exploration behavior
+// 
+// AgentBrain implements the sensorimotor loop:
+// World State → Sensory Input → Neural Processing → Motor Commands → World State
+// 
+// Key features:
+// - Multi-modal sensory processing (vision, touch, internal, proprioception)
+// - Neuromodulation for learning and adaptation
+// - Developmental stages affecting plasticity rates
+// - Curiosity-driven exploration for information gathering
+// - Reward prediction error signaling for reinforcement learning
+// 
+// The agent operates in discrete simulation steps:
+// 1. Receive world state and generate sensory percept
+// 2. Process sensory input into neural currents
+// 3. Apply neuromodulation based on rewards
+// 4. Decode motor commands from neural activity
+// 5. Apply motor commands to world
+// 6. Receive new sensory input
+// 7. Update developmental state
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);

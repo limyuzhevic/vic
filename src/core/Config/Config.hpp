@@ -5,8 +5,60 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
 
 namespace nlm {
+
+// Configuration error types
+enum class ConfigError {
+    Success,
+    FileNotFound,
+    PermissionDenied,
+    InvalidFormat,
+    InvalidKey,
+    InvalidValue,
+    MissingRequiredKey,
+    ValueOutOfRange,
+    MemoryAllocationFailed,
+    UnknownError
+};
+
+// Configuration exception
+class ConfigException : public std::exception {
+public:
+    explicit ConfigException(const std::string& message) : message_(message) {}
+    explicit ConfigException(ConfigError error, const std::string& context = "") 
+        : error_(error), context_(context) {}
+    
+    const char* what() const noexcept override {
+        return message_.c_str();
+    }
+    
+    ConfigError error() const noexcept { return error_; }
+    const std::string& context() const noexcept { return context_; }
+    
+private:
+    std::string message_;
+    ConfigError error_ = ConfigError::UnknownError;
+    std::string context_;
+};
+
+// Input validation utilities
+namespace ConfigValidation {
+    // Validate key name format
+    bool isValidKey(const std::string& key);
+    
+    // Validate numeric value ranges
+    bool isValidValue(const std::string& key, const std::string& value);
+    bool isValidValue(const std::string& key, int value);
+    bool isValidValue(const std::string& key, double value);
+    
+    // Validate vector values
+    bool isValidVector(const std::string& key, const std::vector<std::string>& values);
+    
+    // Get validation error message for specific key/value
+    std::string getValidationError(const std::string& key, const std::string& value);
+}
 
 // Forward declarations
 class Config;

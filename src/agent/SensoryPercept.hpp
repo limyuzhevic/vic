@@ -7,8 +7,29 @@
 
 namespace nlm {
 
-// Sensory data packet - what the agent perceives
-// Contains only low-level sensory signals, NO semantic labels
+// SensoryPercept: Agent sensory data packet
+// Contains what the agent perceives from the environment
+// Only low-level sensory signals, NO semantic labels or object information
+// 
+// This class represents the complete sensory input that an agent receives:
+// - Vision: Simple grayscale intensity grid (no RGB, no object labels)
+// - Touch: Binary collision/proximity sensors
+// - Internal: Homeostatic and metabolic state signals
+// - Proprioception: Body position and movement sensors
+// - Audio: Sound intensity signals (if enabled)
+// 
+// Sensory data format:
+// - All values are normalized to range [0.0, 1.0] for neural input
+// - Vision: Row-major grid, width × height dimensions
+// - Touch: Array of collision signals
+// - Internal: Array of internal state signals
+// - Proprioception: Body position and velocity
+// - Audio: Sound intensity samples
+// 
+// The brain receives all signals concatenated for unified processing:
+// [vision data] + [touch data] + [internal data] + [proprioception data] + [audio data]
+// 
+// Used by AgentBrain for sensorimotor integration in the brain-world loop.
 class SensoryPercept {
 public:
     SensoryPercept();

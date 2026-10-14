@@ -21,6 +21,13 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Performance monitoring
+add_library(nlm_performance STATIC
+    src/performance/PerformanceMonitor.cpp
+)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -107,6 +114,9 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Build Python bindings
+add_subdirectory(python)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
@@ -144,7 +154,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_performance pynlm
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
