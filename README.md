@@ -75,12 +75,28 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### NLM Phase 6: Final Integration Demo
+```bash
+./nlm
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Alternative: Phase 6 Integration Experiment
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the dedicated Phase 6 integration experiment (if built).
+
+### Experiment Demos
+```bash
+./nlm_phase3_demo    # Phase 3: World interaction
+./nlm_phase4_demo    # Phase 4: Cognitive emergence
+./nlm_phase5_demo    # Phase 5: Lifetime learning
+```
+
+All demos showcase different aspects of the integrated artificial brain system.
 
 ## Project Structure
 
