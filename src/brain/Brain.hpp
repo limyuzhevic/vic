@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -88,6 +91,20 @@ public:
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
+
+    // Internal checkpoint helpers
+    void applySynapseStates(const SynapseCheckpointData& synapseData);
+    void applyNeuronStates(const NeuronCheckpointData& neuronData);
+    bool saveMemorySystems() const;
+    bool loadMemorySystems(const MemoryCheckpointData& data);
+    bool saveNeuromodulationSystems() const;
+    bool loadNeuromodulationSystems(const NeuromodulationCheckpointData& data);
+    bool saveCognitiveSystems() const;
+    bool loadCognitiveSystems(const CognitiveCheckpointData& data);
+    bool saveDevelopmentSystem() const;
+    bool loadDevelopmentSystem(const DevelopmentCheckpointData& data);
+    bool saveCheckpointMetadata() const;
+    bool loadCheckpointMetadata(const CheckpointMetadata& metadata);
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -171,9 +188,18 @@ public:
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavioral regulation
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

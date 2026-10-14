@@ -13,7 +13,13 @@ struct Novelty::Impl {
     std::vector<float> lastPattern;
     float noveltyThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    // Acetylcholine integration
+    float acetylcholineLevel;
+    float attentionalGain;
+    float encodingStrength;
+    
+    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f),
+             acetylcholineLevel(0.0f), attentionalGain(1.0f), encodingStrength(1.0f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -34,18 +40,23 @@ void Novelty::setLevel(float level) {
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+                           const Observation& previousObservation) {
+    // Enhanced novelty detection with acetylcholine integration
+    detectNovelty(observation.getData(), previousObservation.getData());
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
+                           const std::vector<float>& previousPattern) {
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
+    }
+    
+    // Get acetylcholine level from brain
+    if (pImpl->brain && pImpl->brain->getAcetylcholine()) {
+        pImpl->acetylcholineLevel = pImpl->brain->getAcetylcholine()->getLevel();
+        pImpl->attentionalGain = 1.0f + pImpl->acetylcholineLevel * 2.0f; // ACh enhances attention to novel stimuli
+        pImpl->encodingStrength = 0.5f + pImpl->acetylcholineLevel * 0.5f; // ACh enhances memory encoding
     }
     
     // Compute difference between patterns
@@ -60,17 +71,31 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     // Normalize by pattern size
     float avgDiff = totalDiff / compareLen;
     
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    // Apply attentional gain from acetylcholine
+    float weightedDiff = avgDiff * pImpl->attentionalGain;
+    
+    // Update novelty level based on difference with ACh modulation
+    float baseNovelty = std::min(1.0f, weightedDiff / pImpl->noveltyThreshold);
+    pImpl->level = baseNovelty * pImpl->encodingStrength;  // ACh enhances novelty encoding
+    
     pImpl->history.push_back(pImpl->level);
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
+    
+    // Signal novelty detection to acetylcholine system
+    if (pImpl->brain && pImpl->brain->getAcetylcholine() && pImpl->level > 0.5f) {
+        pImpl->brain->getAcetylcholine()->updateNoveltySensitivity(baseNovelty);
+    }
 }
 
 void Novelty::update(TimestepDuration dt) {
     // Decay novelty
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Reset attentional gain and encoding strength over time
+    pImpl->attentionalGain = std::max(1.0f, pImpl->attentionalGain - 0.1f * static_cast<float>(dt));
+    pImpl->encodingStrength = std::max(0.5f, pImpl->encodingStrength - 0.05f * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {

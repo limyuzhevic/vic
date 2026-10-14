@@ -158,25 +158,73 @@ struct NeuronCheckpointData {
     std::vector<uint64_t> populationId;
 };
 
-/**
- * Synapse state for checkpointing
- */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
 };
 
 /**
- * Checkpoint reader
+ * Memory system checkpoint data
  */
+struct MemoryCheckpointData {
+    std::vector<NeuronId> workingMemoryNeurons;
+    std::vector<float> workingMemoryActivations;
+    std::vector<Timestep> workingMemoryTimestamps;
+    std::vector<NeuronId> episodicMemoryNeurons;
+    std::vector<float> episodicMemoryNeurActivations;
+    std::vector<float> episodicMemoryEpisodicScores;
+    std::vector<NeuronId> associativeMemoryNeurons;
+    std::vector<std::pair<NeuronId, NeuronId>> associativeMemoryAssociations;
+    std::vector<float> associativeMemoryStrengths;
+};
+
+/**
+ * Neuromodulation system checkpoint data
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float dopaminePlasticityFactor;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorSignal;
+    std::vector<float> dopamineHistory;
+    std::vector<float> curiosityHistory;
+    std::vector<float> noveltyHistory;
+    std::vector<float> predictionErrorHistory;
+};
+
+/**
+ * Cognitive system checkpoint data
+ */
+struct CognitiveCheckpointData {
+    std::vector<float> plannerActionProbabilities;
+    std::vector<float> plannerConfidence;
+    std::vector<float> conceptFormationConcepts;
+    std::vector<float> conceptFormationPrototypes;
+    std::vector<float> attentionSalience;
+    std::vector<float> attentionBias;
+    std::vector<float> attentionWinners;
+};
+
+/**
+ * Development system checkpoint data
+ */
+struct DevelopmentCheckpointData {
+    uint64_t developmentalAge;
+    uint8_t developmentalStage;
+    float plasticityModifier;
+    std::vector<float> developmentalParameters;
+};
+
+/**
+ * Checkpoint metadata
+ */
+struct CheckpointMetadata {
+    uint64_t timestamp;
+    uint32_t versionMajor;
+    uint32_t versionMinor;
+    uint32_t versionPatch;
+    std::string configuration;
+    std::string developerName;
+    uint8_t developmentalStage;
+};
 class CheckpointReader {
 public:
     CheckpointReader();
