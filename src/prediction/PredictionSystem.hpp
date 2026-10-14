@@ -34,6 +34,18 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Calculate current state value (internal helper)
+    float calculateCurrentStateValue(const SensoryInput& state) const;
+    
+    // Calculate temporal trend from history
+    float calculateTemporalTrend() const;
+    
+    // Adapt prediction weights based on error
+    void adaptPredictionWeights();
+    
+    // Update prediction weights based on observed patterns
+    void updatePredictionWeights();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

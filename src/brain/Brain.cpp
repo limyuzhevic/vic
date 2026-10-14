@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +132,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +264,13 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
+    // Initialize new neuromodulators
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +524,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Store current sensory state for prediction
+        // The prediction system needs access to sensory input
+        // For now, we track prediction error history
+        static const SensoryInput* lastSensoryInput = nullptr;
+        static bool predictionInitialized = false;
+        
+        if (!predictionInitialized) {
+            predictionInitialized = true;
+        }
+        
+        // In a full implementation, this would:
+        // 1. Get current sensory percept from the agent world interface
+        // 2. Train prediction system on this input
+        // 3. Generate prediction for next state
+        // 4. Update brain state based on predictions
+        
+        // For now, maintain backward compatibility with existing placeholder
+        // Track prediction error for statistical analysis
+        static float lastError = 0.0f;
+        float currentError = pImpl->predictionSystem->getPredictionError();
+        if (std::abs(currentError - lastError) > 0.001f) {
+            lastError = currentError;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
