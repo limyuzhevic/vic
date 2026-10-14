@@ -60,15 +60,15 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
-        
-        // Record initial weights from first region
+    // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn) {  // Additional null check
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
+        } else {
+            NLM_LOG_WARNING("Region 1 not found, cannot record initial weights");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -77,8 +77,9 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No synapses found to record weights");
         }
-    }
     
     void recordFinalState() {
         finalWeights.clear();
@@ -86,8 +87,12 @@ struct LearningExperiment {
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn) {  // Additional null check
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
+        } else {
+            NLM_LOG_WARNING("Region 1 not found, cannot record final weights");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -98,6 +103,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No synapses found to record final weights");
         }
     }
     

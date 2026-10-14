@@ -198,7 +198,6 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
