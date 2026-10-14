@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,40 +22,69 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 2: Enhanced JSON configuration parser
+    // Supports JSON configuration files with proper parsing
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        // Try to parse as JSON first
+        nlohmann::json jsonData;
+        file >> jsonData;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Recursively process JSON object
+        processJsonData(jsonData, ConfigSource::File);
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        NLM_LOG_INFO("JSON parsing failed, falling back to key=value format for: " + filepath);
+        
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line)) {
+            lineNum++;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+                NLM_LOG_INFO("  Parsed config line " + std::to_string(lineNum) + ": " + key + " = " + value);
+            } else {
+                NLM_LOG_WARNING("Skipping invalid config line " + std::to_string(lineNum) + ": " + line);
+            }
         }
+        
+        if (lineNum > 0) {
+            NLM_LOG_INFO("Loaded configuration from fallback format file: " + filepath + " (" + std::to_string(lineNum) + " lines)");
+            return true;
+        }
+        
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -124,6 +156,18 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Log the configuration change
+    std::string valueStr;
+    std::visit([&](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            valueStr = "\"" + val + "\"";
+        } else {
+            valueStr = std::to_string(val);
+        }
+    }, value);
+    NLM_LOG_DEBUG("Config set: " + key + " = " + valueStr + " (source: " + std::to_string(static_cast<int>(source)) + ")");
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -140,6 +184,54 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+void Config::processJsonData(const nlohmann::json& jsonData, ConfigSource source, const std::string& parentKey) {
+    std::string fullKey = parentKey.empty() ? "" : parentKey + ".";
+    
+    if (jsonData.is_object()) {
+        for (const auto& [key, value] : jsonData.items()) {
+            processJsonData(value, source, fullKey + key);
+        }
+    } else if (jsonData.is_array()) {
+        // For arrays, create a single entry with string representation
+        std::string arrayStr = "["; 
+        for (size_t i = 0; i < jsonData.size(); ++i) {
+            if (i > 0) arrayStr += ", ";
+            if (jsonData[i].is_string()) {
+                arrayStr += "\"" + jsonData[i].get<std::string>() + "\"";
+            } else if (jsonData[i].is_number()) {
+                arrayStr += std::to_string(jsonData[i].get<double>());
+            } else if (jsonData[i].is_boolean()) {
+                arrayStr += jsonData[i].get<bool>() ? "true" : "false";
+            } else {
+                arrayStr += "null";
+            }
+        }
+        arrayStr += "]";
+        set(fullKey + "array", arrayStr, source);
+    } else if (jsonData.is_string()) {
+        set(fullKey, jsonData.get<std::string>(), source);
+    } else if (jsonData.is_number()) {
+        double value = jsonData.get<double>();
+        if (value == static_cast<int>(value)) {
+            set(fullKey, static_cast<int>(value), source);
+        } else {
+            set(fullKey, value, source);
+        }
+    } else if (jsonData.is_boolean()) {
+        set(fullKey, jsonData.get<bool>(), source);
+    } else {
+        NLM_LOG_ERROR("Unsupported JSON type at key: " + fullKey);
+    }
+}
+
+bool Config::validate(const std::string& key) const {
+    if (!has(key)) {
+        NLM_LOG_WARNING("Configuration key not found: " + key);
+        return false;
+    }
+    return true;
 }
 
 bool Config::has(const std::string& key) const {

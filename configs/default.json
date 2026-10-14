@@ -1,0 +1,98 @@
+{
+  // NLM Configuration File - Enhanced JSON Format
+  // Supports advanced configuration options with type safety
+  
+  "version": "1.0",
+  
+  "brain": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1
+  },
+  
+  "plasticity": {
+    "learning_rate": 0.01,
+    "stdp": {
+      "ltp_weight": 0.01,
+      "ltd_weight": 0.012,
+      "time_constant": 20.0
+    },
+    "structural": {
+      "synaptogenesis_rate": 0.001,
+      "pruning_rate": 0.0001
+    }
+  },
+  
+  "neuromodulation": {
+    "dopamine": {
+      "baseline": 0.0,
+      "peak": 1.0,
+      "decay_rate": 0.1,
+      "release_rate": 1.0
+    },
+    "acetylcholine": {
+      "attention_gain": 1.0,
+      "memory_consolidation": 0.0
+    },
+    "norepinephrine": {
+      "arousal": 0.0,
+      "vigilance": 0.0
+    },
+    "serotonin": {
+      "mood": 0.5,
+      "impulse_control": 1.0,
+      "social_behavior": 0.5
+    }
+  },
+  
+  "reward": {
+    "discount_factor": 0.99
+  },
+  
+  "environment": {
+    "name": "GridWorld",
+    "width": 10,
+    "height": 10
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "log_to_file": false,
+    "filename": "nlm.log"
+  },
+  
+  "simulation": {
+    "max_steps": 10000,
+    "time_limit": 0.0
+  },
+  
+  "visualization": {
+    "enabled": false,
+    "update_rate": 30.0
+  },
+  
+  "memory": {
+    "working_memory_capacity": 0.1,
+    "episodic_max_episodes": 1000,
+    "replay_interval": 100,
+    "consolidation_interval": 1000
+  },
+  
+  "cognition": {
+    "planning_depth": 5,
+    "attention_inhibition_strength": 0.5,
+    "attention_excitation_strength": 1.5
+  },
+  
+  "development": {
+    "enable": true,
+    "stages": [
+      {"name": "Initial", "duration": 1000, "plasticity_factor": 1.0},
+      {"name": "CriticalPeriod", "duration": 2000, "plasticity_factor": 0.8},
+      {"name": "Maturation", "duration": 3000, "plasticity_factor": 0.5},
+      {"name": "Adult", "duration": 9000, "plasticity_factor": 0.2}
+    ]
+  }
+}

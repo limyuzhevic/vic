@@ -9,6 +9,10 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -43,12 +47,15 @@ struct Brain::Impl {
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
     // ========== NEUROMODULATION SYSTEMS ==========
+    
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;  // Enhanced attention and memory
+    std::unique_ptr<Norepinephrine> norepinephrine;  // Enhanced arousal and vigilance
+    std::unique_ptr<Serotonin> serotonin;  // Enhanced mood and social behavior
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +136,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();  // Enhanced attention and memory
+        norepinephrine = std::make_unique<Norepinephrine>();  // Enhanced arousal and vigilance
+        serotonin = std::make_unique<Serotonin>();  // Enhanced mood and social behavior
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +268,11 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->acetylcholine->initialize(this);  // Enhanced attention and memory
+    pImpl->norepinephrine->initialize(this);  // Enhanced arousal and vigilance
+    pImpl->serotonin->initialize(this);  // Enhanced mood and social behavior
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -417,22 +432,107 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Apply acetylcholine effects on attention
+        // ACh enhances attention and modulates memory consolidation
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        float attentionGain = pImpl->acetylcholine->getAttentionGain();
+        float memoryConsolidation = pImpl->acetylcholine->getMemoryConsolidation();
+        
+        // ACh enhances attentional focus on sensory input
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring() || 
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                // ACh increases synaptic efficacy for attended inputs
+                neuron->addToMembranePotential(acetylcholineLevel * 0.3f * attentionGain);
+            }
+        }
+        
+        // ACh enhances memory encoding of salient experiences
+        if (memoryConsolidation > 0.5f) {
+            // Strong memory consolidation when ACh is high
+            for (size_t i = 0; i < std::min(size_t(5), pImpl->sensoryNeurons.size()); ++i) {
+                if (pImpl->sensoryNeurons[i]->isFiring()) {
+                    // Encode sensory experience into working memory with higher strength
+                    if (pImpl->workingMemory) {
+                        pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), 
+                            std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - 
+                                   pImpl->sensoryNeurons[i]->getState().restingPotential) / 5.0f * memoryConsolidation);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal and vigilance
+        // NE increases arousal and vigilance in response to novel or stressful stimuli
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        float arousal = pImpl->norepinephrine->getArousal();
+        float vigilance = pImpl->norepinephrine->getVigilance();
+        
+        // NE increases overall neuronal excitability and alertness
+        float arousalBoost = norepinephrineLevel * arousal * 0.3f;
+        float vigilanceBoost = norepinephrineLevel * vigilance * 0.2f;
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    // NE increases excitability and reduces threshold for spike generation
+                    neuron->injectCurrent(arousalBoost + vigilanceBoost);
+                    
+                    // NE enhances burst firing in response to significant stimuli
+                    if (vigilanceBoost > 0.1f) {
+                        float burstProbability = vigilanceBoost * 0.3f;
+                        if (burstProbability > 0.5f) {
+                            // Enhance burst firing for important signals
+                            neuron->injectCurrent(vigilanceBoost * 0.5f);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood and social behavior
+        // Serotonin regulates mood, impulse control, and social behavior
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        float mood = pImpl->serotonin->getMood();
+        float impulseControl = pImpl->serotonin->getImpulseControl();
+        float socialBehavior = pImpl->serotonin->getSocialBehavior();
+        
+        // Serotonin enhances mood and reduces impulsive behavior
+        float moodBoost = serotoninLevel * mood * 0.2f;
+        float impulseControlBoost = serotoninLevel * impulseControl * 0.3f;
+        float socialBehaviorBoost = serotoninLevel * socialBehavior * 0.15f;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin enhances mood-related processing
+                    if (moodBoost > 0.0f) {
+                        neuron->injectCurrent(moodBoost);
+                    }
+                    
+                    // Serotonin enhances impulse control and social behavior
+                    if (impulseControlBoost > 0.0f) {
+                        // Reduce noise in neural firing for better impulse control
+                        // (Simplified model - would involve more complex mechanisms)
+                    }
+                    
+                    if (socialBehaviorBoost > 0.0f && neuron->getType() == NeuronType::Internal) {
+                        // Enhance internal processing for social behavior
+                        neuron->injectCurrent(socialBehaviorBoost);
                     }
                 }
             }
@@ -511,25 +611,86 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // This provides prediction error signals that drive learning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction error to neuromodulation
+        if (pImpl->dopamine) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->dopamine->setPredictionError(predictionError);
+        }
+        
+        // Use predictions to guide attention
+        if (pImpl->attention) {
+            auto predictions = pImpl->predictionSystem->getPredictions();
+            if (!predictions.empty()) {
+                // Focus attention on predicted sensory areas
+                pImpl->attention->applyTopDownBias(predictions[0], 1.0f);
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    // ========== STEP 9: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner evaluates action sequences based on current state
+        // Use episodic memory to evaluate action outcomes
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Get recent episodes for action evaluation
+        auto recentEpisodes = pImpl->episodicMemory ? pImpl->episodicMemory->getRecentEpisodes(5) : std::vector<EpisodicMemoryItem>{};
+        
+        // Use current state for planning
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        currentState.push_back(1.0f);
+                    } else {
+                        currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 100.0f);
+                    }
+                }
+            }
+        }
+        
+        // Update planning based on current state and episodes
+        if (!currentState.empty()) {
+            pImpl->planner->updatePlan(currentState);
+        }
+        
+        // Evaluate action sequences
+        if (!recentEpisodes.empty()) {
+            pImpl->planner->evaluateActions(recentEpisodes);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use sensory state and working memory content
+        
+        // Get current sensory state from sensory neurons
+        std::vector<float> sensoryPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring() || 
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                sensoryPattern.push_back(
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+            }
+        }
+        
+        // Get working memory content
+        auto workingMemoryNeurons = pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons() : std::vector<NeuronId>{};
+        
+        // Process patterns to form/update concepts
+        if (!sensoryPattern.empty()) {
+            pImpl->conceptFormation->processPattern(sensoryPattern);
+        }
+        
+        // Update concepts with working memory content
+        for (const auto& neuronId : workingMemoryNeurons) {
+            pImpl->conceptFormation->updateConcept(NeuronId(neuronId), 1.0f);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -826,6 +987,127 @@ bool Brain::save(const std::string& filepath) const {
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Write working memory state
+        if (pImpl->workingMemory) {
+            auto workingMemoryData = pImpl->workingMemory->exportState();
+            if (!writer.writeSection(CheckpointSection::Memory, &workingMemoryData[0], workingMemoryData.size() * sizeof(decltype(workingMemoryData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write working memory state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write episodic memory state
+        if (pImpl->episodicMemory) {
+            auto episodicMemoryData = pImpl->episodicMemory->exportState();
+            if (!writer.writeSection(CheckpointSection::Memory, &episodicMemoryData[0], episodicMemoryData.size() * sizeof(decltype(episodicMemoryData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write episodic memory state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system state
+        if (pImpl->predictionSystem) {
+            auto predictionData = pImpl->predictionSystem->exportState();
+            if (!writer.writeSection(CheckpointSection::Prediction, &predictionData[0], predictionData.size() * sizeof(decltype(predictionData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write prediction system state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation state (dopamine, curiosity, novelty, acetylcholine, norepinephrine, serotonin)
+        if (pImpl->dopamine) {
+            // Store dopamine level
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            std::vector<float> dopamineData{dopamineLevel};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, dopamineData.data(), dopamineData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write dopamine state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            // Store curiosity level
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            std::vector<float> curiosityData{curiosityLevel};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, curiosityData.data(), curiosityData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write curiosity state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            // Store novelty level
+            float noveltyLevel = pImpl->novelty->getLevel();
+            std::vector<float> noveltyData{noveltyLevel};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, noveltyData.data(), noveltyData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write novelty state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->acetylcholine) {
+            // Store acetylcholine level and attention gain
+            float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+            float attentionGain = pImpl->acetylcholine->getAttentionGain();
+            std::vector<float> acetylcholineData{acetylcholineLevel, attentionGain};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, acetylcholineData.data(), acetylcholineData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write acetylcholine state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->norepinephrine) {
+            // Store norepinephrine level, arousal, and vigilance
+            float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+            float arousal = pImpl->norepinephrine->getArousal();
+            float vigilance = pImpl->norepinephrine->getVigilance();
+            std::vector<float> norepinephrineData{norepinephrineLevel, arousal, vigilance};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, norepinephrineData.data(), norepinephrineData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write norepinephrine state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->serotonin) {
+            // Store serotonin level, mood, impulse control, and social behavior
+            float serotoninLevel = pImpl->serotonin->getLevel();
+            float mood = pImpl->serotonin->getMood();
+            float impulseControl = pImpl->serotonin->getImpulseControl();
+            float socialBehavior = pImpl->serotonin->getSocialBehavior();
+            std::vector<float> serotoninData{serotoninLevel, mood, impulseControl, socialBehavior};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, serotoninData.data(), serotoninData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write serotonin state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write attention state
+        if (pImpl->attention) {
+            auto attentionData = pImpl->attention->exportState();
+            if (!writer.writeSection(CheckpointSection::Memory, &attentionData[0], attentionData.size() * sizeof(decltype(attentionData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write attention state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write concept formation state
+        if (pImpl->conceptFormation) {
+            auto conceptData = pImpl->conceptFormation->exportState();
+            if (!writer.writeSection(CheckpointSection::Memory, &conceptData[0], conceptData.size() * sizeof(decltype(conceptData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write concept formation state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write development system state
+        if (pImpl->developmentSystem) {
+            auto developmentData = pImpl->developmentSystem->exportState();
+            if (!writer.writeSection(CheckpointSection::Development, &developmentData[0], developmentData.size() * sizeof(decltype(developmentData)::value_type))) {
+                NLM_LOG_ERROR("Failed to write development state to checkpoint");
+                return false;
+            }
         }
         
         // Finalize

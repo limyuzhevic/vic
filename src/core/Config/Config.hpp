@@ -81,6 +81,9 @@ public:
     // Check existence
     bool has(const std::string& key) const;
     
+    // Validate configuration key exists
+    bool validate(const std::string& key) const;
+    
     // Remove key
     void remove(const std::string& key);
     
@@ -100,6 +103,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Process JSON configuration data
+    void processJsonData(const nlohmann::json& jsonData, ConfigSource source, const std::string& parentKey = "");
 };
-
-} // namespace nlm
