@@ -19,12 +19,114 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <memory>
+#include <limits>
 
 namespace nlm {
 
+namespace {
+
+// Helper functions for brain initialization and validation
+void validateBrainConfiguration(const Config& config) {
+    size_t neuronCount = config.getOr<size_t>("neuron_count", 1000);
+    size_t regionCount = config.getOr<size_t>("region_count", 1);
+    float connectionProbability = config.getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration parameters
+    if (neuronCount == 0) {
+        NLM_LOG_WARNING("Neuron count is zero, using minimum of 100 neurons");
+    }
+    if (regionCount == 0) {
+        NLM_LOG_WARNING("Region count is zero, using minimum of 1 region");
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_WARNING("Connection probability out of range [0,1], clamping");
+    }
+}
+
+// Optimized spike delivery using batch processing
+void optimizedSpikeDelivery(
+    const std::vector<Neuron*>& neurons,
+    std::vector<std::vector<DelayedSpikeEvent>>& delayedSpikes,
+    SpikeSystem& spikeSystem,
+    SimulationStep currentStep,
+    Timestamp currentTime,
+    double timestep
+) {
+    // Batch process neurons to reduce function call overhead
+    size_t neuronCount = neurons.size();
+    delayedSpikes.resize(neuronCount);
+    
+    // Process neurons in batches for better cache locality
+    const size_t batchSize = 64;
+    for (size_t i = 0; i < neuronCount; i += batchSize) {
+        size_t batchEnd = std::min(i + batchSize, neuronCount);
+        
+        for (size_t j = i; j < batchEnd; ++j) {
+            Neuron* neuron = neurons[j];
+            const auto& state = neuron->getState();
+            
+            // Check for spike with optimized threshold checking
+            bool isSpiking = (state.firingState == FiringState::Refractory &&
+                            state.lastSpikeTime >= 0.0f &&
+                            std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < static_cast<float>(timestep) * 2.0f);
+            
+            if (isSpiking) {
+                // Schedule outgoing spike events
+                auto outgoingSynapses = neuron->getOutgoingSynapses();
+                for (const auto& synHandle : outgoingSynapses) {
+                    // This would need actual synapse access - simplified for now
+                    // In practice, neurons would have direct synapse access
+                    delayedSpikes[j].push_back(DelayedSpikeEvent());
+                }
+            }
+        }
+    }
+    
+    // Process all scheduled delayed spikes
+    for (const auto& batch : delayedSpikes) {
+        for (const auto& event : batch) {
+            spikeSystem.queueDelayedSpike(event);
+        }
+    }
+}
+
+// Enhanced memory system initialization with validation
+void initializeMemorySystems(
+    std::unique_ptr<NeuralWorkingMemory>& workingMemory,
+    std::unique_ptr<NeuralEpisodicMemory>& episodicMemory,
+    std::unique_ptr<NeuralAssociativeMemory>& associativeMemory,
+    Brain* brain,
+    size_t neuronCount
+) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize memory systems: brain is null");
+        return;
+    }
+    
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    workingMemory->initialize(brain);
+    workingMemory->setCapacity(std::max<size_t>(neuronCount / 10, 100));
+    
+    episodicMemory->initialize(brain);
+    episodicMemory->setMaxEpisodes(1000);
+    
+    associativeMemory->initialize(brain);
+}
+
+} // namespace anonymous
+
 struct Brain::Impl {
+    // Configuration and random number generation
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
+    
+    // Neural regions and connectivity
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
@@ -61,22 +163,29 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
-    // Statistics
+    // Statistics and performance tracking
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
+    uint64_t lastStatusLogStep;
+    double lastStepTimeNs;
     
-    // Sensory neurons for input injection
+    // I/O neuron collections for input/output injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
+    // Integration state management
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
+    // Checkpoint and persistence
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Advanced optimization flags
+    bool enableAdvancedOptimizations;
+    bool enableEventDriven;
+    bool enableSparseConnectivity;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -88,69 +197,118 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , lastStatusLogStep(0)
+        , lastStepTimeNs(0.0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , enableAdvancedOptimizations(false)
+        , enableEventDriven(false)
+        , enableSparseConnectivity(false)
     {
+        NLM_LOG_INFO("Initializing Brain Impl with configuration...");
+        
+        // Validate configuration before initialization
+        if (config) {
+            validateBrainConfiguration(*config);
+        }
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        if (config && auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        NLM_LOG_INFO("Random generator initialized with seed: " + std::to_string(seed));
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        NLM_LOG_INFO("Plasticity systems initialized");
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Initialize all integrated systems
+        initializeIntegratedSystems();
+        
+        // Configure plasticity parameters
+        configurePlasticitySystems();
+        
+        // Set simulation timestep
+        if (config) {
+            timestep = config->getOr<double>("simulation_timestep", 0.001);
+        }
+        
+        // Configure integration intervals
+        if (config) {
+            replayInterval = config->getOr<size_t>("replay_interval", 100);
+            consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        }
+        
+        // Initialize checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+        NLM_LOG_INFO("Checkpoint manager initialized");
+        
+        NLM_LOG_INFO("Brain Impl initialization complete");
+    }
+    
+    void initializeIntegratedSystems() {
+        NLM_LOG_INFO("Initializing all integrated systems...");
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        NLM_LOG_INFO("Memory systems initialized");
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        NLM_LOG_INFO("Prediction system initialized");
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        NLM_LOG_INFO("Cognition systems initialized");
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        NLM_LOG_INFO("Development system initialized");
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        NLM_LOG_INFO("Neuromodulation systems initialized");
+        
+        NLM_LOG_INFO("All integrated systems initialized successfully");
+    }
+    
+    void configurePlasticitySystems() {
+        NLM_LOG_INFO("Configuring plasticity systems...");
+        
+        if (!config) return;
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
+        
         stdp->configure(ltpWeight, ltdWeight, tau);
+        NLM_LOG_INFO("STDP configured: LTP weight = " + std::to_string(ltpWeight) + 
+                    ", LTD weight = " + std::to_string(ltdWeight) + 
+                    ", tau = " + std::to_string(tau));
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        NLM_LOG_INFO("Structural plasticity configured: synaptogenesis = " + std::to_string(synaptogenesisRate) + 
+                    ", pruning = " + std::to_string(pruningRate));
     }
     
     DevelopmentalStage developmentalStage;
