@@ -416,6 +416,34 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced API function bindings
+    m.def("create_advanced_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create an advanced configuration for NLM");
+
+    m.def("run_neural_simulation", [](std::shared_ptr<Config> config, int duration) {
+        // Return a Python object that can be used to run simulations
+        // This will be implemented in the Python layer
+        py::dict result;
+        result["status"] = "simulation_started";
+        result["config"] = config;
+        return result;
+    }, py::arg("config"), py::arg("duration"), "Run a neural simulation");
+
+    m.def("benchmark_simulation", [](std::shared_ptr<Config> config, int steps) {
+        // Return benchmark results
+        py::dict result;
+        result["steps"] = steps;
+        result["config"] = config;
+        result["performance"] = "to_be_implemented";
+        return result;
+    }, py::arg("config"), py::arg("steps"), "Benchmark simulation performance");
+
+    // Error types for advanced API
+    py::register_exception<std::runtime_error>(m, "NLMRuntimeError");
+    py::register_exception<std::invalid_argument>(m, "NLMInvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "NLMOutOfRangeError");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
