@@ -145,6 +145,12 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
+    // Store experience in episodic memory
+    void storeExperience(const class SensoryInput& input, const class Action& action, float reward);
+    
+    // Update episodic memory with current brain state
+    void updateEpisodicMemory(const class SensoryInput& input, const class Action& action, float reward);
+    
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     

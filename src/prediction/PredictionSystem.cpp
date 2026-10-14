@@ -17,6 +17,7 @@ PredictionSystem::~PredictionSystem() = default;
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
+    // For now, return a simple copy - later this should use brain state
     return currentState.clone();
 }
 
@@ -54,7 +55,18 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Train prediction model using neural patterns
+    // PLACEHOLDER: Simple update for now
+    // This would involve learning patterns from neural activity
+    
+    // For now, just use the observation to update confidence based on error
+    if (!observation.getData().empty()) {
+        // Simple confidence update based on recent error patterns
+        if (!pImpl->errorHistory.empty()) {
+            float recentError = pImpl->errorHistory.back();
+            pImpl->confidence = std::max(0.1f, pImpl->confidence - recentError * 0.1f);
+        }
+    }
 }
 
 } // namespace nlm
