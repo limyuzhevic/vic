@@ -991,7 +991,11 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    size_t total = 0;
+    for (const auto& region : pImpl->regions) {
+        total += region->getFiringNeuronCount();
+    }
+    return total;
 }
 
 float Brain::getAverageFiringRate() const {

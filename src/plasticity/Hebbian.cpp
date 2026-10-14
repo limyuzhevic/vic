@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
+#include "brain/Synapse.hpp"
+#include "core/Types/Types.hpp"
 #include <algorithm>
 
 namespace nlm {

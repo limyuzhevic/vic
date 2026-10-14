@@ -1,9 +1,9 @@
 #include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+#include "brain/Brain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
 

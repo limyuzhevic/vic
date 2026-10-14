@@ -2,8 +2,8 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
+#include "brain/Brain.hpp"
+#include "world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
 
