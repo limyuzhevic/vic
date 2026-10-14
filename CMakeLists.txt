@@ -54,6 +54,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -125,7 +128,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

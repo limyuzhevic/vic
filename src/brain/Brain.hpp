@@ -175,6 +175,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
