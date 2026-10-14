@@ -5,8 +5,6 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
-
 class STDP : public PlasticityRule {
 public:
     STDP();
@@ -19,7 +17,10 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // STDP parameters
+    // STDP-specific parameters
+    void setLearningRate(float rate) override;
+    float getLearningRate() const override;
+    
     void setLTPWeight(float weight);    // Long-term potentiation weight
     float getLTPWeight() const;
     void setLTDWeight(float weight);    // Long-term depression weight
@@ -27,36 +28,16 @@ public:
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
     
+    // Weight bounds and thresholds (overrides from PlasticityRule)
+    void setWeightBounds(float minWeight, float maxWeight) override;
+    void setWeightChangeThreshold(float threshold) override;
+    
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
 private:
     struct Impl;
     Impl* pImpl;
-};
-
-// Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
-class RewardModulatedSTDP : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
-};
-
-// Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
-class TripletSTDP : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
 };
 
 } // namespace nlm

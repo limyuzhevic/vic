@@ -17,11 +17,15 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    void setLearningRate(float rate);
-    float getLearningRate() const;
+    void setLearningRate(float rate) override;
+    float getLearningRate() const override;
     
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    
+    // Weight bounds and thresholds (overrides from PlasticityRule)
+    void setWeightBounds(float minWeight, float maxWeight) override;
+    void setWeightChangeThreshold(float threshold) override;
     
 private:
     struct Impl;

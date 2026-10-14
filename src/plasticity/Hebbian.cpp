@@ -1,5 +1,5 @@
 #include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
+#include "../brain/Synapse.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -101,6 +101,15 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::setWeightBounds(float minWeight, float maxWeight) {
+    pImpl->minWeight = std::min(minWeight, maxWeight);
+    pImpl->maxWeight = std::max(minWeight, maxWeight);
+}
+
+void Hebbian::setWeightChangeThreshold(float threshold) {
+    pImpl->covarianceThreshold = std::max(threshold, 0.0f);
 }
 
 } // namespace nlm

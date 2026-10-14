@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -134,6 +134,15 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+void STDP::setWeightBounds(float minWeight, float maxWeight) {
+    pImpl->minWeight = std::min(minWeight, maxWeight);
+    pImpl->maxWeight = std::max(minWeight, maxWeight);
+}
+
+void STDP::setWeightChangeThreshold(float threshold) {
+    pImpl->weightChangeThreshold = std::max(threshold, 0.0f);
 }
 
 } // namespace nlm
