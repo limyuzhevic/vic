@@ -511,8 +511,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory observation (from most recent input)
+        // For now, we'll simulate this by injecting some sensory-like data
+        std::vector<float> currentSensoryState;
+        
+        // Get some neural activity as proxy for current state
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activity = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential);
+                    if (activity > 5.0f) {
+                        currentSensoryState.push_back(activity);
+                    }
+                }
+            }
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Make prediction for next state
+            auto prediction = pImpl->predictionSystem->predictNextState(
+                SensoryInput(currentSensoryState)
+            );
+            
+            // Update prediction system with actual neural activity
+            if (prediction) {
+                pImpl->predictionSystem->updatePredictions(
+                    *prediction, SensoryInput(currentSensoryState)
+                );
+            }
+            
+            // Get prediction error and use it for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // Update dopamine level based on prediction error
+            if (pImpl->dopamine) {
+                // Positive prediction error increases dopamine
+                float errorWeight = std::max(0.0f, predictionError) * 0.1f;
+                float currentDopamine = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(currentDopamine + errorWeight);
+            }
+            
+            // Log prediction statistics
+            NLM_LOG_INFO("Prediction System: Error=" + std::to_string(predictionError) + 
+                        " Confidence=" + std::to_string(confidence));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +572,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        float currentReward = 0.0f;
+        
+        // Get current neural activity as input to concept formation
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activity = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential);
+                    if (activity > 2.0f) {
+                        currentPattern.push_back(activity);
+                        currentFeatures.push_back(activity * neuron->getNeuronType());
+                    }
+                }
+            }
+        }
+        
+        // Get reward from dopamine level
+        if (pImpl->dopamine) {
+            currentReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present to concept formation system
+        if (!currentPattern.empty()) {
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, currentFeatures, currentReward, currentStep
+            );
+            
+            // If a matching concept was found, use it for planning
+            if (conceptId > 0 && conceptId <= pImpl->conceptFormation->getConceptCount()) {
+                // Get the concept for potential use in planning
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    NLM_LOG_INFO("Concept Formation: Detected concept " + std::to_string(conceptId) + 
+                                " with category hint: " + concept->categoryHint + 
+                                " (stability: " + std::to_string(concept->avgStability) + ")");
+                    
+                    // Use the concept's prototype as a goal state for planning
+                    // This connects concept formation to neural planning
+                    if (pImpl->planner && concept->avgStability > 0.5f) {
+                        // Get the concept's prototype and set it as goal
+                        std::vector<float> conceptPrototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                        if (!conceptPrototype.empty()) {
+                            // Set a goal based on the concept's prototype pattern
+                            // This helps the planner focus on relevant behaviors
+                            pImpl->planner->setCurrentGoal(conceptPrototype);
+                            
+                            // Update action qualities based on concept experience
+                            // Better concepts should influence action preferences
+                            float conceptValue = concept->avgStability * currentReward;
+                            for (ActionType action : {ActionType::MoveForward, ActionType::TurnLeft, ActionType::TurnRight, ActionType::Interact, ActionType::Wait}) {
+                                pImpl->planner->setActionQuality(action, conceptValue);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -801,6 +903,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getNeuronType()));
+                    neuronData.regionId.push_back(neuron->getId().getRegionIndex());
+                    neuronData.populationId.push_back(neuron->getId().getPopulationIndex());
                 }
             }
         }
@@ -820,12 +925,147 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Write development system state
+        {
+            DevelopmentSystem::DevelopmentState devState;
+            if (pImpl->developmentSystem) {
+                devState = pImpl->developmentSystem->getState();
+            }
+            
+            std::vector<uint8_t> devData(sizeof(DevelopmentSystem::DevelopmentState));
+            std::memcpy(devData.data(), &devState, sizeof(devState));
+            
+            if (!writer.writeSection(CheckpointSection::Development, 
+                                   devData.data(), devData.size())) {
+                NLM_LOG_ERROR("Failed to write development state");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation state
+        {
+            struct NeuromodulationState {
+                float dopamineLevel;
+                float curiosityLevel;
+                float noveltyLevel;
+                float predictionError;
+                float plasticityFactor;
+            } nmState;
+            
+            if (pImpl->dopamine) {
+                nmState.dopamineLevel = pImpl->dopamine->getLevel();
+                nmState.plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+            } else {
+                nmState.dopamineLevel = 0.0f;
+                nmState.plasticityFactor = 1.0f;
+            }
+            
+            if (pImpl->curiosity) {
+                nmState.curiosityLevel = pImpl->curiosity->getLevel();
+            } else {
+                nmState.curiosityLevel = 0.0f;
+            }
+            
+            if (pImpl->novelty) {
+                nmState.noveltyLevel = pImpl->novelty->getLevel();
+            } else {
+                nmState.noveltyLevel = 0.0f;
+            }
+            
+            if (pImpl->predictionError) {
+                nmState.predictionError = pImpl->predictionError->getLevel();
+            } else {
+                nmState.predictionError = 0.0f;
+            }
+            
+            std::vector<uint8_t> nmData(sizeof(NeuromodulationState));
+            std::memcpy(nmData.data(), &nmState, sizeof(nmState));
+            
+            if (!writer.writeSection(CheckpointSection::Neuromodulation,
+                                   nmData.data(), nmData.size())) {
+                NLM_LOG_ERROR("Failed to write neuromodulation state");
+                return false;
+            }
+        }
+        
+        // Write working memory state
+        {
+            if (pImpl->workingMemory) {
+                auto wmState = pImpl->workingMemory->getState();
+                std::vector<uint8_t> wmData(sizeof(std::decay<decltype(wmState)>::type));
+                std::memcpy(wmData.data(), &wmState, sizeof(wmState));
+                
+                if (!writer.writeSection(CheckpointSection::Memory,
+                                       wmData.data(), wmData.size())) {
+                    NLM_LOG_ERROR("Failed to write working memory state");
+                    return false;
+                }
+            }
+        }
+        
+        // Write episodic memory state
+        {
+            if (pImpl->episodicMemory) {
+                auto episodeData = pImpl->episodicMemory->getAllEpisodes();
+                std::vector<uint8_t> epData(sizeof(std::decay<decltype(episodeData)>::type));
+                std::memcpy(epData.data(), &episodeData, sizeof(episodeData));
+                
+                if (!writer.writeSection(CheckpointSection::Environment, // Reusing Environment section for episodic memory
+                                       epData.data(), epData.size())) {
+                    NLM_LOG_ERROR("Failed to write episodic memory state");
+                    return false;
+                }
+            }
+        }
+        
+        // Write random generator state
+        {
+            auto randomState = pImpl->rng->getState();
+            std::vector<uint8_t> randData(randomState.size());
+            std::memcpy(randData.data(), randomState.data(), randomState.size());
+            
+            if (!writer.writeSection(CheckpointSection::RandomState,
+                                   randData.data(), randData.size())) {
+                NLM_LOG_ERROR("Failed to write random state");
+                return false;
+            }
+        }
+        
+        // Write simulation state
+        {
+            struct SimulationState {
+                uint64_t step;
+                double time;
+                bool isResting;
+                size_t stepsSinceLastEpisode;
+                DevelopmentStage developmentalStage;
+            } simState;
+            
+            simState.step = pImpl->currentStep;
+            simState.time = pImpl->currentTime;
+            simState.isResting = pImpl->isResting;
+            simState.stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+            simState.developmentalStage = pImpl->developmentalStage;
+            
+            std::vector<uint8_t> simData(sizeof(SimulationState));
+            std::memcpy(simData.data(), &simState, sizeof(simState));
+            
+            if (!writer.writeSection(CheckpointSection::SimulationState,
+                                   simData.data(), simData.size())) {
+                NLM_LOG_ERROR("Failed to write simulation state");
+                return false;
+            }
         }
         
         // Finalize

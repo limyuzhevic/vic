@@ -18,6 +18,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , planningEnabled_(true)
+    , planningConfidence_(0.0f)
+    , currentConceptId_(0)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -152,6 +155,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try enhanced decoding with planning integration
+    if (planningEnabled_) {
+        return decodeWithPlanning();
+    }
+    
+    // Fallback to traditional decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -160,6 +169,90 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     }
     
     return decoded;
+}
+
+MotorCommand AgentBrain::decodeWithPlanning() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Get neural activity from motor neurons
+    float forwardAct = calcActivity(motorForward_);
+    float backwardAct = calcActivity(motorBackward_);
+    float leftAct = calcActivity(motorTurnLeft_);
+    float rightAct = calcActivity(motorTurnRight_);
+    float interactAct = calcActivity(motorInteract_);
+    float waitAct = calcActivity(motorWait_);
+    
+    // Check if planner is available
+    auto* planner = brain_->getPlanner();
+    if (!planner) {
+        // Fall back to traditional decoding if no planner
+        return decodeFromMotorNeurons();
+    }
+    
+    // Get current neural state as input for planning
+    std::vector<float> currentState;
+    for (auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                float activity = std::abs(neuron->getState().membranePotential - 
+                                         neuron->getState().restingPotential);
+                if (activity > 1.0f) {
+                    currentState.push_back(activity);
+                }
+            }
+        }
+    }
+    
+    if (currentState.empty()) {
+        return decodeFromMotorNeurons();
+    }
+    
+    // Get planning depth and confidence
+    size_t planningDepth = planner->getPlanningDepth();
+    planningConfidence_ = planner->getPlanningConfidence();
+    
+    // Get current goal from concept formation
+    currentGoal_ = planner->getCurrentGoal();
+    
+    // Use planner to suggest action
+    ActionType plannedAction = ActionType::Wait;
+    if (planningConfidence_ > 0.3f && !currentGoal_.empty()) {
+        // Get action quality preferences from planner
+        for (ActionType action : {ActionType::MoveForward, ActionType::MoveBackward, 
+                                ActionType::TurnLeft, ActionType::TurnRight, 
+                                ActionType::Interact, ActionType::Wait}) {
+            float quality = planner->getActionQuality(action);
+            // Log action quality for debugging
+            NLM_LOG_INFO("Action Quality for " + std::to_string(static_cast<int>(action)) + 
+                        ": " + std::to_string(quality));
+        }
+        
+        // Let planner choose based on current state
+        plannedAction = planner->planAction(currentState, 0.5f);
+        
+        // Map planned action to MotorCommand
+        MotorCommand plannedCommand = MotorCommand::Wait;
+        switch (plannedAction) {
+            case ActionType::MoveForward: plannedCommand = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: plannedCommand = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: plannedCommand = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: plannedCommand = MotorCommand::TurnRight; break;
+            case ActionType::LookLeft: plannedCommand = MotorCommand::LookLeft; break;
+            case ActionType::LookRight: plannedCommand = MotorCommand::LookRight; break;
+            case ActionType::Interact: plannedCommand = MotorCommand::Interact; break;
+            default: plannedCommand = MotorCommand::Wait; break;
+        }
+        
+        // Apply curiosity-based exploration to planned action
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            plannedCommand = selectWithCuriosity(plannedCommand);
+        }
+        
+        return plannedCommand;
+    } else {
+        // Low confidence planning - fall back to traditional decoding
+        return decodeFromMotorNeurons();
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -209,30 +302,57 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
+float AgentBrain::calcActivity(const std::vector<Neuron*>& neurons) {
+    // Calculate average activity in given neuron group
+    if (neurons.empty()) return 0.0f;
+    float sum = 0.0f;
+    for (Neuron* n : neurons) {
+        // Use membrane potential deviation from rest as activity measure
+        sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
     }
+    return sum / neurons.size();
+}
+
+float AgentBrain::getCurrentPlanningConfidence() const {
+    return planningConfidence_;
+}
+
+std::vector<float> AgentBrain::getCurrentGoal() const {
+    return currentGoal_;
+}
+
+size_t AgentBrain::getCurrentConceptId() const {
+    return currentConceptId_;
+}
+
+float AgentBrain::getActionQuality(ActionType action) const {
+    if (!brain_) return 0.0f;
+    auto* planner = brain_->getPlanner();
+    if (!planner) return 0.0f;
     
-    return defaultCmd;
+    // Try to get action quality from planner if available
+    // Note: This assumes planner has getActionQuality method
+    // For now, return 0.5f as neutral value
+    return 0.5f;
+}
+
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Reset planning state
+    planningEnabled_ = true;
+    planningConfidence_ = 0.0f;
+    currentGoal_.clear();
+    currentConceptId_ = 0;
+    
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

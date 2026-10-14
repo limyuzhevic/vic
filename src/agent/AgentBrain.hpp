@@ -52,6 +52,18 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Planning integration
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    
+    // Get current state/concept information for monitoring
+    float getCurrentPlanningConfidence() const;
+    std::vector<float> getCurrentGoal() const;
+    size_t getCurrentConceptId() const;
+    
+    // Get action quality from experience
+    float getActionQuality(ActionType action) const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -68,6 +80,7 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -75,6 +88,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Enhanced decoding with planning integration
+    MotorCommand decodeWithPlanning();
     
     std::shared_ptr<Brain> brain_;
     
@@ -98,6 +114,12 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    
+    // Planning state
+    bool planningEnabled_;
+    float planningConfidence_;
+    std::vector<float> currentGoal_;
+    size_t currentConceptId_;
     
     // Development state
     double developmentalAge_;

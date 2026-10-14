@@ -75,6 +75,40 @@ make -j4
 
 ## Running
 
+### NLM CLI
+```bash
+./nlm [OPTIONS] COMMAND [ARGS]
+```
+
+The NLM CLI provides a command-line interface for controlling the neural simulation:
+
+- `run`: Execute simulation with specified parameters
+- `save [FILE]`: Save brain state to file
+- `load FILE`: Load brain state from file  
+- `info`: Display system and brain information
+- `help`: Show help information
+
+**Examples:**
+```bash
+# Run a simulation
+./nlm run
+
+# Save brain state
+./nlm save my_brain.checkpoint
+
+# Load brain state
+./nlm load my_brain.checkpoint
+
+# Show system information
+./nlm info
+
+# Get help
+./nlm help
+
+# Run with configuration file
+./nlm --config myconfig.cfg run --neurons 1000
+```
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
