@@ -19,40 +19,63 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        // Validate file exists and is readable
+        if (!std::filesystem::exists(filepath)) {
+            return false;
+        }
+        
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(file, line)) {
+            ++lineNumber;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Validate line format
+            if (line.find('=') == std::string::npos) {
+                // Invalid line format
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                continue; // Skip invalid keys
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
+            }
+            
+            // Validate value
+            if (value.empty()) {
+                continue; // Skip empty values
             }
             
             set(key, value, ConfigSource::File);
         }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Log error
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -102,7 +125,24 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
-        return std::get<T>(it->value);
+        T value = std::get<T>(it->value);
+        
+        // Validate the retrieved value
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            if (value < std::numeric_limits<T>::min() || value > std::numeric_limits<T>::max()) {
+                return std::nullopt; // Invalid integer value
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (std::isnan(value) || std::isinf(value)) {
+                return std::nullopt; // Invalid double value
+            }
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            if (value.empty() || value.find('\0') != std::string::npos) {
+                return std::nullopt; // Invalid string value
+            }
+        }
+        
+        return value;
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -115,30 +155,75 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Validate key
+        if (key.empty() || key.find(' ') != std::string::npos || key.find('=') != std::string::npos) {
+            return; // Skip invalid keys
+        }
+        
+        // Validate value
+        if (!validateValue(value)) {
+            return; // Skip invalid values
+        }
+        
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, value, source);
+        }
     }
-}
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find(' ') != std::string::npos || key.find('=') != std::string::npos) {
+        return; // Skip invalid keys
+    }
+    
+    // Validate value
+    if (value.empty() || value.find('\0') != std::string::npos) {
+        return; // Skip invalid values
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find(' ') != std::string::npos || key.find('=') != std::string::npos) {
+        return; // Skip invalid keys
+    }
+    
+    // Validate integer value
+    if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
+        return; // Skip invalid values
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find(' ') != std::string::npos || key.find('=') != std::string::npos) {
+        return; // Skip invalid keys
+    }
+    
+    // Validate double value
+    if (std::isnan(value) || std::isinf(value)) {
+        return; // Skip invalid values
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find(' ') != std::string::npos || key.find('=') != std::string::npos) {
+        return; // Skip invalid keys
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
@@ -199,7 +284,59 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+    // Internal validation helpers
+    bool validateKey(const std::string& key) {
+        return !key.empty() && key.find(' ') == std::string::npos && key.find('=') == std::string::npos;
+    }
+    
+    bool validateValue(const ConfigValue& value) {
+        // Check if value is valid variant
+        return std::visit([](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                // Validate integer range
+                return arg >= std::numeric_limits<int>::min() && arg <= std::numeric_limits<int>::max();
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                // Validate int64_t range
+                return true; // int64_t has large range, assume valid
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Validate double range
+                return !std::isnan(arg) && !std::isinf(arg);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                // bool is always valid
+                return true;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                // Validate string content
+                return !arg.empty() && arg.find('\0') == std::string::npos;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Validate integer vector
+                for (const auto& item : arg) {
+                    if (item < std::numeric_limits<int>::min() || item > std::numeric_limits<int>::max()) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                // Validate double vector
+                for (const auto& item : arg) {
+                    if (std::isnan(item) || std::isinf(item)) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // Validate string vector
+                for (const auto& item : arg) {
+                    if (item.empty() || item.find('\0') != std::string::npos) {
+                        return false;
+                    }
+                }
+                return true;
+            } else {
+                return true; // Unknown type, assume valid
+            }
+        }, value);
+    }
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
