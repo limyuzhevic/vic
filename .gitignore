@@ -1,0 +1,124 @@
+# Build artifacts
+build/
+build_*
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv
+venv/
+env/
+.env*
+
+# Eclipse/PyDev
+.project
+.pydevproject
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+*.sh
+*.cmake.in
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output directories
+output/
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# Test artifacts
+test_output/
+coverage/
+htmlcov/
+
+# Distribution
+dist/
+
+# Documentation
+*.html
+*.htm
+*.md
+*.rst
+
+# Data files
+*.csv
+*.json
+*.xml
+*.yaml
+*.yml
+
+# Log files
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Python package cache
+*.egg-info/
+*.dist-info
+*.egg
+
+# Project specific
+*build*
+*.o
+*.obj
+*.exe
+*.so
+*.dylib
+*.lib
+
+# Temporary
+.tmp
+
+# Performance files
+*.prof
+*.cache
+
+# Documentation output
+docs/_build/
+*.pdf
+*.html
+
+# Jupyter notebook checkpoints
+*.ipynb_checkpoints
+
+# Environment variables
+.env.*
+*.env
+
+# Editor backups
+*~
+*.bak
+*.old
+
+# System files
+.system
+.fsevents
+.DS_Store
+.TemporaryItems
+.
+sv Passenger~

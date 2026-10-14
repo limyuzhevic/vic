@@ -1,19 +1,33 @@
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
+# Enhanced Python bindings configuration
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Build configuration options
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(BUILD_TESTS "Build Python tests" OFF)
+option(BUILD_EXAMPLES "Build example scripts" OFF)
+
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Enhanced Python configuration with multiple Python versions support
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Find pybind11 with enhanced error handling
 find_package(pybind11 CONFIG REQUIRED)
 
+# Add Python include directories
+include_directories(${Python_INCLUDE_DIRS})
+
+# Set NLM source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# Enhanced source file lists with better organization
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -69,34 +83,66 @@ set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
+# Enhanced compilation flags for different platforms
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
 )
+
 target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
-
-pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(nlm_core PRIVATE -O3 -march=native -ffast-math)
 endif()
 
+# Install additional headers for development
+install(DIRECTORY ${NLM_SOURCE_DIR}/
+    DESTINATION include/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN "*.h"
+)
+
+# Enhanced Python module installation
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+    INCLUDES DESTINATION include
+)
+
+# Create Python package structure
+install(FILES __init__.py
+    DESTINATION pynlm
+)
+
+# Python package metadata
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml.in
+    ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
+    @ONLY
+)
+
+# Export Python bindings for development
+export(TARGETS nlm_core nlm_agent nlm_world FILE ${CMAKE_CURRENT_BINARY_DIR}/nlm_targets.cmake)
+
+# Add convenience targets for development
+add_custom_target(pynlm_install
+    COMMAND ${CMAKE_COMMAND} --install . --prefix ${CMAKE_BINARY_DIR}/install
+    COMMENT "Installing Python bindings to development directory"
+)
+
+add_custom_target(pynlm_develop
+    COMMAND ${CMAKE_COMMAND} --install . --prefix ${CMAKE_BINARY_DIR}/develop
+    COMMENT "Installing Python bindings to development directory with headers"
+)
+
+add_custom_target(pynlm_test
+    COMMAND pytest tests/ -v
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../python
+    COMMENT "Running Python tests"
+    DEPENDS pynlm
 )
