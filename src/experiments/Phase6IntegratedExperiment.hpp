@@ -130,9 +130,22 @@ public:
     bool testCheckpointing();
     
     /**
-     * Test replay system
+     * Test development integration
      */
-    bool testReplay();
+    bool testDevelopmentIntegration();
+    
+    /**
+     * Test prediction integration
+     */
+    bool testPredictionIntegration();
+    
+    /**
+     * Test cognition integration
+     */
+    bool testCognitionIntegration();
+    
+/**
+     * Run comprehensive integration test
+     */
+    Phase6IntegrationResult runComprehensiveTest(const Phase6Config& config);
 };
-
-} // namespace nlm
