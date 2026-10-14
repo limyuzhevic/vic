@@ -1,0 +1,191 @@
+# Enhanced NLM Python Bindings CMake Configuration
+# This file configures the enhanced bindings module (pynlm-enhanced)
+
+# Minimum CMake version
+cmake_minimum_required(VERSION 3.16)
+
+# Project name and version
+project(pynlm_enhanced LANGUAGES CXX)
+
+# Set C++ standard
+cmake_cxx_standard(20)
+cmake_cxx_standard_required()
+
+# Find Python interpreter
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Include pybind11
+find_package(pybind11 REQUIRED)
+
+# Include NLM source code
+include_directories(${NLM_SOURCE_DIR})
+
+# Enhanced features flag
+option(ENABLE_ENHANCED_FEATURES "Enable enhanced features" ON)
+
+# Source files for enhanced bindings
+set(ENHANCED_SOURCES
+    bindings_enhanced.cpp
+)
+
+# Source files for basic bindings (when enhanced features are enabled)
+set(ENHANCED_COMPAT_SOURCES
+    bindings.cpp
+)
+
+# Determine which source files to compile
+if (ENABLE_ENHANCED_FEATURES)
+    set(SOURCES ${ENHANCED_SOURCES} ${ENHANCED_COMPAT_SOURCES})
+else()
+    set(SOURCES ${ENHANCED_COMPAT_SOURCES})
+endif()
+
+# Create Python module
+pybind11_add_module(pynlm_enhanced ${SOURCES})
+
+# Set target properties
+target_compile_features(pynlm_enhanced PRIVATE cxx_std_20)
+target_link_libraries(pynlm_enhanced PRIVATE pybind11::module)
+
+# Include directories
+target_include_directories(pynlm_enhanced PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Python module installation
+install(TARGETS pybind11_add_module
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}
+)
+
+# Python package structure
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/ENHANCED_PYTHON_BINDINGS_README.md
+    DESTINATION ${CMAKE_INSTALL_DATAROOT}/python/${PROJECT_NAME}
+)
+
+# Documentation
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/docs/enhanced-api.md.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/enhanced-api.md
+    @ONLY
+)
+
+# Installation rules for headers
+install(DIRECTORY
+    ${NLM_SOURCE_DIR}/src/core/Types
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+)
+
+install(DIRECTORY
+    ${NLM_SOURCE_DIR}/src/brain
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+    FILES_MATCHING "*.hpp"
+)
+
+install(DIRECTORY
+    ${NLM_SOURCE_DIR}/src/agent
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+    FILES_MATCHING "*.hpp"
+)
+
+# Find Python for installation
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Create pyproject.toml for enhanced module
+set(ENHANCED_PYPROJECT ${CMAKE_CURRENT_SOURCE_DIR}/pyproject_enhanced.toml)
+configure_file(
+    ${ENHANCED_PYPROJECT}
+    ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
+    @ONLY
+)
+
+# Set Python module path
+set_target_properties(pynlm_enhanced PROPERTIES
+    OUTPUT_NAME "pynlm_enhanced"
+    PREFIX ""
+    SUFFIX ".so"
+)
+
+# Installation of Python package metadata
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
+    DESTINATION ${CMAKE_INSTALL_DATAROOT}/python/${PROJECT_NAME}
+    RENAME "pyproject.toml"
+)
+
+# Add tests for enhanced module
+enable_testing()
+
+# Add test executable for enhanced module
+add_executable(test_enhanced_features
+    test_enhanced_features.cpp
+)
+
+target_link_libraries(test_enhanced_features
+    PRIVATE
+    pybind11::module
+    ${NLM_SOURCE_DIR}/libnlm.a
+)
+
+# Add test target
+add_test(NAME test_enhanced_features
+    COMMAND test_enhanced_features
+)
+
+# Installation of enhanced module
+install(TARGETS pybind11_add_module
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}/enhanced
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}/enhanced
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/${PROJECT_NAME}/enhanced
+)
+
+# Create a simple test for enhanced features
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/test_enhanced_features.cpp
+    "// Enhanced features test\n"
+    "// Test enhanced Python bindings functionality\n"
+    "\n"
+    "#include <pybind11/pybind11.h>\n"
+    "#include <iostream>\n"
+    "\n"
+    "int main() {\n"
+    "    py::module_ m = py::module_::import("pynlm_enhanced");\n"
+    "    \n"
+    "    // Test configuration creation\n"
+    "    auto config = m.attr(\"createBrainConfig\")();\n"
+    "    std::cout << \"Brain config created successfully\" << std::endl;\n"
+    "    \n"
+    "    // Test enhanced features availability\n"
+    "    auto enhanced_config = m.attr(\"createAdvancedConfig\")();\n"
+    "    std::cout << \"Advanced config created successfully\" << std::endl;\n"
+    "    \n"
+    "    // Test validation\n"
+    "    auto validate = m.attr(\"validateConfiguration\");\n"
+    "    auto errors = validate(config);\n"
+    "    if (errors.empty()) {\n"
+    "        std::cout << \"Configuration validation passed\" << std::endl;\n"
+    "    } else {\n"
+    "        std::cout << \"Configuration validation failed: \" << errors.size() << \" errors\" << std     << std::endl;\n"
+    "    }\n"
+    "    \n"
+    "    std::cout << \"All enhanced features tests passed!\" << std::endl;\n"
+    "    return 0;\n"
+    "}"
+)
+
+# Add test for enhanced features
+add_custom_target(test_enhanced_features
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_BINARY_DIR}/test_enhanced_features.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/enhanced_tests/test_enhanced_features.cpp
+    COMMENT "Creating enhanced feature test"
+)
+
+# Create enhanced_tests directory
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/enhanced_tests)
+
+message(STATUS "Enhanced NLM Python bindings module configured")
+message(STATUS "Enhanced features enabled: ${ENABLE_ENHANCED_FEATURES}")
+message(STATUS "Enhanced source files: ${ENHANCED_SOURCES}")

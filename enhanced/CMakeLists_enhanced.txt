@@ -1,0 +1,80 @@
+# Enhanced NLM Python Bindings Module
+# This CMakeLists.txt provides configuration for the enhanced bindings module
+
+# CMake version requirement
+cmake_minimum_required(VERSION 3.16)
+
+# Project name
+project(pynlm_enhanced LANGUAGES CXX)
+
+# Set C++ standard
+cmake_cxx_standard(20)
+cmake_cxx_standard_required()
+
+# Find Python interpreter
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Include pybind11
+find_package(pybind11 REQUIRED)
+
+# Include NLM source directory
+include_directories(${NLM_SOURCE_DIR})
+
+# Enhanced features flag
+option(ENABLE_ENHANCED_FEATURES "Enable enhanced features" ON)
+
+# Enhanced bindings source files
+set(ENHANCED_SOURCES
+    bindings_enhanced.cpp
+)
+
+# Basic bindings source files (for compatibility when enhanced features are enabled)
+set(ENHANCED_COMPAT_SOURCES
+    bindings.cpp
+)
+
+# Determine source files to compile
+if (ENABLE_ENHANCED_FEATURES)
+    set(SOURCES ${ENHANCED_SOURCES} ${ENHANCED_COMPAT_SOURCES})
+else()
+    set(SOURCES ${ENHANCED_COMPAT_SOURCES})
+endif()
+
+# Create Python module
+pybind11_add_module(pynlm_enhanced ${SOURCES})
+
+# Set target properties
+target_compile_features(pynlm_enhanced PRIVATE cxx_std_20)
+target_link_libraries(pynlm_enhanced PRIVATE pybind11::module)
+
+# Include directories
+target_include_directories(pynlm_enhanced PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Python module installation
+install(TARGETS pybind11_add_module
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/pynlm_enhanced
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/pynlm_enhanced
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/pynlm_enhanced
+)
+
+# Python package structure
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/ENHANCED_PYTHON_BINDINGS_README.md
+    DESTINATION ${CMAKE_INSTALL_DATAROOT}/python/pynlm_enhanced
+)
+
+# Installation of headers (if needed)
+install(DIRECTORY
+    ${NLM_SOURCE_DIR}/src/core/Types
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+)
+
+# Create test directory structure
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/enhanced_tests)
+
+message(STATUS "Enhanced NLM Python bindings module configured")
+message(STATUS "Enhanced features enabled: ${ENABLE_ENHANCED_FEATURES}")
+message(STATUS "Enhanced source files: ${ENHANCED_SOURCES}")

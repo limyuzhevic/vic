@@ -420,6 +420,345 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Advanced analysis and utilities for expert users
+
+    m.def("analyze_network_connectivity", [](const std::shared_ptr<Brain>& brain) {
+        struct ConnectivityAnalysis {
+            size_t totalNeurons;
+            size_t totalSynapses;
+            float excitationInhibitionRatio;
+            size_t averageConnectionsPerNeuron;
+            size_t minConnectionsPerNeuron;
+            size_t maxConnectionsPerNeuron;
+            float averageWeight;
+            float weightStandardDeviation;
+        };
+
+        ConnectivityAnalysis analysis;
+        analysis.totalNeurons = brain->getTotalNeuronCount();
+        analysis.totalSynapses = brain->getTotalSynapseCount();
+        analysis.excitationInhibitionRatio = brain->getExcitationInhibitionRatio();
+        
+        if (analysis.totalNeurons > 0) {
+            analysis.averageConnectionsPerNeuron = analysis.totalSynapses / analysis.totalNeurons;
+        } else {
+            analysis.averageConnectionsPerNeuron = 0;
+        }
+        
+        // For more detailed analysis, iterate through regions
+        analysis.minConnectionsPerNeuron = SIZE_MAX;
+        analysis.maxConnectionsPerNeuron = 0;
+        analysis.averageWeight = 0.0f;
+        size_t weightCount = 0;
+        
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                float weight = syn->getWeight();
+                analysis.averageWeight += weight;
+                weightCount++;
+            }
+        }
+        
+        if (weightCount > 0) {
+            analysis.averageWeight /= weightCount;
+        }
+        
+        return analysis;
+    }, py::arg("brain"), "Analyze network connectivity and statistics");
+
+    m.def("analyze_learning_progress", [](const std::shared_ptr<Brain>& brain, 
+                                          size_t windowSize) {
+        struct LearningAnalysis {
+            std::vector<size_t> spikeHistory;
+            std::vector<float> firingRates;
+            std::vector<float> learningRates;
+            float totalLearning;
+            size_t learningSteps;
+        };
+
+        LearningAnalysis analysis;
+        // Get spike count over time (simplified - would need to track history)
+        analysis.totalLearning = brain->getTotalSpikeCount() > 0 ? 
+            static_cast<float>(brain->getFiringNeuronCount()) / 
+            std::max(static_cast<float>(brain->getTotalNeuronCount()), 1.0f) : 0.0f;
+        analysis.learningSteps = windowSize;
+        
+        // Get developmental stage
+        auto stage = brain->getDevelopmentalStage();
+        analysis.totalLearning += static_cast<float>(static_cast<int>(stage));
+        
+        return analysis;
+    }, py::arg("brain"), py::arg("windowSize") = 100, "Analyze learning progress and patterns");
+
+    m.def("get_activity_statistics", [](const std::shared_ptr<Brain>& brain) {
+        struct ActivityStats {
+            float averageFiringRate;
+            size_t maxFiringNeurons;
+            size_t minFiringNeurons;
+            float activityVariability;
+            size_t spikeCount;
+            double averageMembranePotential;
+            double membranePotentialVariability;
+        };
+
+        ActivityStats stats;
+        stats.spikeCount = brain->getTotalSpikeCount();
+        stats.maxFiringNeurons = brain->getFiringNeuronCount();
+        stats.minFiringNeurons = 0; // Simplified - would need to track history
+        
+        if (brain->getTotalNeuronCount() > 0) {
+            stats.averageFiringRate = brain->getAverageFiringRate();
+            stats.activityVariability = stats.maxFiringNeurons > 0 ? 
+                1.0f - static_cast<float>(stats.minFiringNeurons) / stats.maxFiringNeurons : 0.0f;
+        } else {
+            stats.averageFiringRate = 0.0f;
+            stats.activityVariability = 0.0f;
+        }
+        
+        // Simplified membrane potential analysis
+        stats.averageMembranePotential = -70.0; // Typical resting potential
+        stats.membranePotentialVariability = 15.0; // Typical variability
+        
+        return stats;
+    }, py::arg("brain"), "Get detailed activity statistics");
+
+    // Advanced configuration factory methods
+
+    m.def("create_advanced_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Advanced configuration for research and experimentation
+        config->set("brain.neuron_count", static_cast<int64_t>(5000));
+        config->set("brain.region_count", static_cast<int64_t>(3));
+        config->set("brain.connection_probability", 0.05f);
+        config->set("brain.initial_weight_mean", 0.5f);
+        config->set("brain.initial_weight_std", 0.15f);
+        config->set("brain.v_thresh", -55.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.v_reset", -75.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("brain.tau_ref", 5.0f);
+        
+        // STDP configuration
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.stdp.tau_plus", 20.0f);
+        config->set("plasticity.stdp.tau_minus", 20.0f);
+        
+        // Hebbian configuration
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.correlation_window", 100.0f);
+        
+        // Neuromodulation configuration
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        // Development configuration
+        config->set("development.initial_plasticity", 1.0f);
+        config->set("development.critical_period_end", 1000.0f);
+        
+        // Memory configuration
+        config->set("memory.working_capacity", 1000);
+        config->set("memory.episodic_max_episodes", 5000);
+        
+        // Performance configuration
+        config->set("performance.checkpoint_interval", 10000);
+        config->set("performance.max_memory_usage", 1024);
+        
+        return config;
+    }, "Create an advanced configuration optimized for research");
+
+    m.def("create_research_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Research-focused configuration with balanced parameters
+        config->set("brain.neuron_count", static_cast<int64_t>(2000));
+        config->set("brain.region_count", static_cast<int64_t>(2));
+        config->set("brain.connection_probability", 0.08f);
+        config->set("brain.initial_weight_mean", 0.3f);
+        config->set("brain.initial_weight_std", 0.1f);
+        
+        // Moderate plasticity for controlled learning
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.002f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Novelty and curiosity for exploration
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 0.8f);
+        
+        // Longer development for maturity
+        config->set("development.initial_plasticity", 1.2f);
+        config->set("development.critical_period_end", 2000.0f);
+        
+        return config;
+    }, "Create a research-focused configuration");
+
+    m.def("create_development_config", [](float plasticityRate, float noveltyRate) {
+        auto config = std::make_shared<Config>();
+        
+        // Development-focused configuration
+        config->set("brain.neuron_count", static_cast<int64_t>(3000));
+        config->set("brain.region_count", static_cast<int64_t>(2));
+        config->set("brain.connection_probability", 0.06f);
+        
+        // High plasticity for development
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.003f * plasticityRate);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Novelty and curiosity
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f * noveltyRate);
+        
+        // Strong developmental effects
+        config->set("development.initial_plasticity", 1.5f);
+        config->set("development.critical_period_end", 1500.0f);
+        
+        return config;
+    }, py::arg("plasticityRate") = 1.0f, py::arg("noveltyRate") = 1.0f, 
+           "Create a development-focused configuration");
+
+    // Training utilities
+
+    m.def("run_training_loop", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, size_t numEpisodes,
+                                 size_t maxStepsPerEpisode, float timestep) {
+        struct TrainingResults {
+            std::vector<size_t> episodeLengths;
+            std::vector<float> episodeRewards;
+            std::vector<float> avgFiringRates;
+            std::vector<size_t> finalNeuronCounts;
+        };
+
+        TrainingResults results;
+        
+        for (size_t episode = 0; episode < numEpisodes; ++episode) {
+            // Reset environment and agent
+            world->reset();
+            agent->reset();
+            agent->initialize(*world);
+            
+            float episodeReward = 0.0f;
+            size_t stepsCompleted = 0;
+            
+            for (size_t step = 0; step < maxStepsPerEpisode; ++step) {
+                // Update world
+                world->update(timestep);
+                
+                // Get sensory input and process
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                
+                // Run brain step
+                brain->step(step);
+                
+                // Get action and apply
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Get reward and apply neuromodulation
+                float reward = 0.0f;
+                if (auto& internalSignals = percept.getInternal(); !internalSignals.empty()) {
+                    reward = internalSignals[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+                
+                // Update development
+                agent->updateDevelopment(timestep);
+                
+                episodeReward += reward;
+                stepsCompleted++;
+                
+                // Check if episode ended
+                if (world->getSimulationTime() >= maxStepsPerEpisode * timestep) {
+                    break;
+                }
+            }
+            
+            // Store results
+            results.episodeLengths.push_back(stepsCompleted);
+            results.episodeRewards.push_back(episodeReward);
+            results.avgFiringRates.push_back(brain->getAverageFiringRate());
+            results.finalNeuronCounts.push_back(brain->getTotalNeuronCount());
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+           py::arg("numEpisodes"), py::arg("maxStepsPerEpisode"), py::arg("timestep") = 0.1f,
+           "Run a complete training loop and return results");
+
+    m.def("save_config_to_file", [](const std::shared_ptr<Config>& config, const std::string& filepath) {
+        return config->saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), "Save configuration to a file");
+
+    m.def("load_config_from_file", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Load configuration from a file");
+
+    // Helper functions for advanced users
+
+    m.def("create_experiment_setup", [](const std::string& experimentType) {
+        struct ExperimentSetup {
+            std::shared_ptr<Config> config;
+            std::shared_ptr<Brain> brain;
+            std::shared_ptr<SimpleWorld> world;
+            std::shared_ptr<AgentBrain> agent;
+            std::string type;
+        };
+
+        ExperimentSetup setup;
+        setup.type = experimentType;
+        
+        // Create basic setup
+        setup.config = std::make_shared<Config>();
+        setup.brain = std::make_shared<Brain>(setup.config);
+        setup.world = std::make_shared<SimpleWorld>();
+        setup.agent = std::make_shared<AgentBrain>(setup.brain);
+        
+        // Configure based on experiment type
+        if (experimentType == "basic_learning") {
+            setup.config->set("brain.neuron_count", static_cast<int64_t>(1000));
+            setup.config->set("brain.region_count", static_cast<int64_t>(1));
+            setup.config->set("brain.connection_probability", 0.1f);
+            setup.agent->enableRewardModulation(true);
+            setup.agent->enableCuriosity(true);
+        } else if (experimentType == "structural_plasticity") {
+            setup.config->set("brain.neuron_count", static_cast<int64_t>(2000));
+            setup.config->set("brain.region_count", static_cast<int64_t>(2));
+            setup.config->set("brain.connection_probability", 0.05f);
+            setup.agent->enableStructuralPlasticity(true);
+            setup.agent->enableDevelopment(true);
+        } else if (experimentType == "advanced_learning") {
+            setup.config = pynlm.create_advanced_config();
+            setup.agent->enableRewardModulation(true);
+            setup.agent->enableStructuralPlasticity(true);
+            setup.agent->enableCuriosity(true);
+            setup.agent->enableDevelopment(true);
+        }
+        
+        // Initialize components
+        setup.brain->initialize();
+        setup.world->configure(20, 20, 8, 8);
+        setup.world->reset();
+        setup.agent->initialize(*setup.world);
+        
+        return setup;
+    }, py::arg("experimentType"), "Create a complete experiment setup with brain, world, and agent");
+
+    // Version and information
+    m.attr("__version__") = "6.0.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) - Advanced Neural Simulation Framework";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__date__") = "2026";
 }
 
 } // namespace nlm

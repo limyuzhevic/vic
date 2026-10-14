@@ -10,10 +10,20 @@ struct DevelopmentSystem::Impl {
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
+    // Synaptogenesis and pruning
+    std::unique_ptr<class Synaptogenesis> synaptogenesis;
+    std::unique_ptr<class Pruning> pruning;
+    
+    Impl() 
+        : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0)
+        , synaptogenesis(nullptr), pruning(nullptr) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {
+    // Initialize synaptogenesis and pruning
+    pImpl->synaptogenesis = std::make_unique<Synaptogenesis>();
+    pImpl->pruning = std::make_unique<Pruning>();
+}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
@@ -74,6 +84,12 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
         advanceStage();
     }
+    
+    // Update synaptogenesis and pruning
+    if (brain && pImpl->synaptogenesis && pImpl->pruning) {
+        pImpl->synaptogenesis->update(brain, *pImpl->rng);
+        pImpl->pruning->update(brain, *pImpl->rng);
+    }
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
@@ -89,6 +105,12 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
+    }
+    
+    // Update synaptogenesis and pruning
+    if (brain && pImpl->synaptogenesis && pImpl->pruning) {
+        pImpl->synaptogenesis->update(brain, rng);
+        pImpl->pruning->update(brain, rng);
     }
 }
 

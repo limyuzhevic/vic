@@ -33,9 +33,22 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Implement real reward computation from observation
+    // Simple reward: positive if any observation data is positive, negative if negative
+    const std::vector<float>& data = observation.getData();
+    
+    if (data.empty()) {
+        return 0.0f; // No data, no reward
+    }
+    
+    float maxReward = 0.0f;
+    for (float value : data) {
+        if (value > maxReward) {
+            maxReward = value;
+        }
+    }
+    
+    return maxReward;
 }
 
 const std::vector<float>& Reward::getHistory() const {

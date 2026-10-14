@@ -115,6 +115,24 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+private:
+    // Brain component methods (refactored from monolithic step())
+    void processPendingSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void applyNeuromodulation();
+    void applyPlasticity(Timestamp currentTime);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void updateStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void consolidateMemory(SimulationStep currentStep);
+    void updateCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);

@@ -56,25 +56,56 @@ void STDP::update(Synapse* synapse,
         return;
     }
     
+    // Create sorted copies for efficient processing
+    std::vector<Timestamp> sortedPre = preSpikes;
+    std::vector<Timestamp> sortedPost = postSpikes;
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
+    // Use two pointers for efficient O(n) processing
+    size_t i = 0, j = 0;
+    
+    // Only process pairs within reasonable time window to avoid O(n²)
+    float maxDt = tau * 5.0f;  // Consider only pairs within 5*tau
+    
+    while (i < sortedPre.size() && j < sortedPost.size()) {
+        float dt = static_cast<float>(sortedPost[j] - sortedPre[i]);  // Δt in ms
+        
+        if (dt > 0) {
+            // Pre before post: POTENTIATION
+            // "Cells that fire together, wire together" - but only if pre fires before post
+            if (dt <= maxDt) {
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
+            }
+            
+            // Move post pointer if current post is close to pre
+            if (j + 1 < sortedPost.size() && std::abs(sortedPost[j + 1] - sortedPre[i]) < std::abs(dt)) {
+                j++;
+            } else {
+                i++;
+            }
+        } else if (dt < 0) {
+            // Post before pre: DEPRESSION
+            // "Anti-Hebbian" - connection weakens if post fires without pre
+            if (std::abs(dt) <= maxDt) {
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
+            
+            // Move pre pointer if current pre is close to post
+            if (i + 1 < sortedPre.size() && std::abs(sortedPost[j] - sortedPre[i + 1]) < std::abs(dt)) {
+                i++;
+            } else {
+                j++;
+            }
+        } else {
             // dt == 0: no change (simultaneous spikes - rare in practice)
+            i++;
+            j++;
         }
     }
     
