@@ -70,6 +70,24 @@ public:
     // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
+    // Extracted step methods for better separation of concerns
+    void processDelayedSpikeEvents(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeuralDynamics(Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void processImmediateSpikes(SimulationStep currentStep);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity();
+    void replayImportantMemories();
+    void applyDevelopmentEffects();
+    void consolidateMemories();
+    void manageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);

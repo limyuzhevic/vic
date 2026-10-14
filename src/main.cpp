@@ -1,11 +1,17 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
+// This phase demonstrates the fully integrated artificial brain with:
+// - Complete neural computation with LIF neurons
 // - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
+// - STDP and Hebbian plasticity integration
 // - Structural plasticity (synaptogenesis/pruning)
+// - Memory systems (working, episodic, associative)
+// - Prediction system integration
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Cognitive systems (planning, attention, concept formation)
+// - Development system
+// - Sleep/wake cycles and replay
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,14 +41,15 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
+    ║     Complete integrated artificial brain with all systems.     ║
+    ║     Demonstrates:                                            ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity integration                 ║
     ║     - Structural plasticity                                   ║
+    ║     - Memory, prediction, cognition                         ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -161,7 +168,8 @@ struct LearningExperiment {
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    NLM_LOG_INFO("=== Integration Test 1: Basic Neural Connectivity ===");
+    NLM_LOG_INFO("Testing fundamental spiking and synaptic transmission...");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
@@ -204,7 +212,8 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    NLM_LOG_INFO("=== Integration Test 2: Plasticity Learning Experiment ===");
+    NLM_LOG_INFO("Testing activity-dependent synaptic changes...");
     
     LearningExperiment experiment(brain, 42);
     
@@ -247,7 +256,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    NLM_LOG_INFO("=== Integration Test 3: STDP Verification ===");
+    NLM_LOG_INFO("Testing spike-timing dependent plasticity (STDP) rule...");
     
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
@@ -324,7 +334,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6 Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +342,18 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
+    NLM_LOG_INFO("Implementing complete integrated brain system:");
+    NLM_LOG_INFO("  - Real LIF neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Structural plasticity");
+    NLM_LOG_INFO("  - Memory systems (working, episodic, associative)");
+    NLM_LOG_INFO("  - Prediction system integration");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity, novelty)");
+    NLM_LOG_INFO("  - Cognitive systems (planning, attention, concepts)");
+    NLM_LOG_INFO("  - Development system");
+    NLM_LOG_INFO("  - Sleep/wake cycles and replay consolidation");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -430,9 +446,9 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Phase 6 Complete ===");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
+    NLM_LOG_INFO("Phase 6 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
     NLM_LOG_INFO("  ✓ STDP plasticity rule");
