@@ -83,8 +83,11 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Brain API (simplified user interface)
+    src/BrainAPI.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -133,15 +136,13 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# BrainAPI demo executable
+add_executable(nlm_brainapi_tests
+    src/BrainAPITests.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_brainapi_tests PUBLIC nlm_core)
 
 # Testing
-enable_testing()
-add_subdirectory(tests)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
