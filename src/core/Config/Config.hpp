@@ -5,11 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_map>
+#include <algorithm>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -20,31 +22,13 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::map<std::string, ConfigValue>,
+    std::vector<std::map<std::string, ConfigValue>>
 >;
 
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
-class Config {
+// Forward declarations
+class Config;
 public:
     Config();
     ~Config();
@@ -55,14 +39,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file (JSON/YAML format)
+    bool loadFromFile(const std::string& filepath, bool validate = true);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath, const std::string& format = "json") const;
     
     // Get values
     template<typename T>
@@ -93,6 +77,33 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Type conversion utilities
+    static std::optional<ConfigValue> stringToConfigValue(const std::string& str, const std::string& typeHint = "auto");
+    static std::string configValueToString(const ConfigValue& value) const;
+    static bool validateType(const ConfigValue& value, const std::string& typeName) const;
+    
+    // Config file validation
+    static bool validateConfigFile(const std::string& filepath, const std::string& format = "json");
+    static bool validateConfigValue(const ConfigValue& value, const std::string& key = "", const std::string& typeHint = "auto") const;
+    
+    // Merge strategies
+    bool mergeFromFile(const std::string& filepath, bool overwriteFileSettings = false);
+    bool mergeFromArgs(int argc, char** argv, bool overwriteCommandLine = true);
+    Config mergeWith(const Config& other, ConfigSource source = ConfigSource::Runtime) const;
+    
+    // Get configuration source
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Get all entries from a specific source
+    std::vector<ConfigEntry> getEntriesFromSource(ConfigSource source) const;
+    
+    // Check if value is default
+    bool isDefault(const std::string& key) const;
+    
+    // Get validation errors
+    std::vector<ConfigError> getValidationErrors() const;
+    std::string getLastError() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +111,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string toUpper(const std::string& str);
+    static std::string normalizeKey(const std::string& key);
+    static bool parseJSON(const std::string& content, Config& config);
+    static bool parseYAML(const std::string& content, Config& config);
+    static std::string serializeToJSON(const Config& config) const;
+    static std::string serializeToYAML(const Config& config) const;
+    
+    // Error handling
+    void setError(ConfigError error, const std::string& message);
+    void clearErrors();
 };
 
 } // namespace nlm
