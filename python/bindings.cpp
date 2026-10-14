@@ -16,6 +16,30 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Additional system includes for comprehensive Python bindings
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -152,17 +176,135 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+              "Get all configuration keys")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+        .def("summary", &Config::summary,
+              "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
+    // Add missing Pythonic convenience methods for Config
+    
+    // Convenience methods for getting configuration values with type conversion
+    .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+        auto value = self.get<std::string>(key);
+        return value.has_value() ? *value : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get configuration value or return default (string)")
+    .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+        auto value = self.get<int>(key);
+        return value.has_value() ? *value : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get configuration value or return default (int)")
+    .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+        auto value = self.get<double>(key);
+        return value.has_value() ? *value : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get configuration value or return default (double)")
+    .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+        auto value = self.get<bool>(key);
+        return value.has_value() ? *value : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get configuration value or return default (bool)")
+    
+    // Convenience methods for setting configuration values
+    .def("set", [](Config& self, const std::string& key, const std::string& value) {
+        self.set(key, value, ConfigSource::Runtime);
+    }, py::arg("key"), py::arg("value"),
+       "Set configuration value as string")
+    .def("set", [](Config& self, const std::string& key, int value) {
+        self.set(key, value, ConfigSource::Runtime);
+    }, py::arg("key"), py::arg("value"),
+       "Set configuration value as int")
+    .def("set", [](Config& self, const std::string& key, double value) {
+        self.set(key, value, ConfigSource::Runtime);
+    }, py::arg("key"), py::arg("value"),
+       "Set configuration value as double")
+    .def("set", [](Config& self, const std::string& key, bool value) {
+        self.set(key, value, ConfigSource::Runtime);
+    }, py::arg("key"), py::arg("value"),
+       "Set configuration value as bool")
+    
+    // Additional convenience methods for getting configuration values
+    .def("getString", &Config::get<std::string>, py::arg("key"),
+         "Get configuration value as string")
+    .def("getInt", &Config::get<int>, py::arg("key"),
+         "Get configuration value as int")
+    .def("getDouble", &Config::get<double>, py::arg("key"),
+         "Get configuration value as double")
+    .def("getBool", &Config::get<bool>, py::arg("key"),
+         "Get configuration value as bool")
+    
+    // Config dictionary-like interface
+    .def("__contains__", &Config::has, py::arg("key"),
+         "Check if configuration contains key (for 'in' operator)")
+    .def("__getitem__", [](Config& self, const std::string& key) {
+        auto value = self.get<std::string>(key);
+        if (!value.has_value()) {
+            throw py::key_error("Key not found: " + key);
+        }
+        return *value;
+    }, py::arg("key"),
+       "Get configuration value using dictionary access (returns string)")
+    .def("__setitem__", [](Config& self, const std::string& key, const std::string& value) {
+        self.set(key, value, ConfigSource::Runtime);
+    }, py::arg("key"), py::arg("value"),
+       "Set configuration value using dictionary access")
+    
+    // Pythonic update method
+    .def("update", [](Config& self, const py::dict& dict) {
+        for (auto item : dict) {
+            std::string key = py::cast<std::string>(item.first);
+            // Try to convert to various types
+            try {
+                int intValue = py::cast<int>(item.second);
+                self.set(key, intValue, ConfigSource::Runtime);
+            } catch (...) {
+                try {
+                    double doubleValue = py::cast<double>(item.second);
+                    self.set(key, doubleValue, ConfigSource::Runtime);
+                } catch (...) {
+                    try {
+                        bool boolValue = py::cast<bool>(item.second);
+                        self.set(key, boolValue, ConfigSource::Runtime);
+                    } catch (...) {
+                        std::string stringValue = py::cast<std::string>(item.second);
+                        self.set(key, stringValue, ConfigSource::Runtime);
+                    }
+                }
+            }
+        }
+    }, py::arg("dict"),
+       "Update configuration from dictionary (Pythonic interface)")
+    
+    // Configuration summary and string representation
+    .def("to_dict", [](const Config& self) {
+        py::dict result;
+        auto keys = self.getKeys();
+        for (const auto& key : keys) {
+            // Try to convert to string for dict representation
+            auto value = self.get<std::string>(key);
+            if (value.has_value()) {
+                result[key.c_str()] = value.value();
+            } else {
+                result[key.c_str()] = "";
+            }
+        }
+        return result;
+    }, "Convert configuration to Python dictionary")
+    
+    .def("__str__", [](const Config& self) {
+        return self.summary();
+    }, "String representation of configuration")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -306,10 +448,17 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+              py::arg("type"), py::arg("current"),
+              "Inject current into all neurons of a specific type")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+              py::arg("signal"),
+              "Apply neuromodulatory signals")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+              "Update plasticity rules (called automatically in step)")
+        .def("develop", &Brain::develop,
+              "Apply developmental changes (called automatically in step)")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
@@ -341,9 +490,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+              "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
@@ -351,10 +502,100 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
+
+    // ========== SYSTEM ACCESS ==========
+    
+    // Spike system access
+    .def("getSpikeSystem", &Brain::getSpikeSystem,
+              py::return_value_policy::reference_internal,
+              "Get spike system access")
+    .def("getSTDP", &Brain::getSTDP,
+              py::return_value_policy::reference_internal,
+              "Get STDP plasticity system")
+    .def("getHebbian", &Brain::getHebbian,
+              py::return_value_policy::reference_internal,
+              "Get Hebbian plasticity system")
+    .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+              py::return_value_policy::reference_internal,
+              "Get structural plasticity system")
+
+    // ========== MEMORY SYSTEMS ==========
+    
+    // Working memory - transient active information
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+              py::return_value_policy::reference_internal,
+              "Get working memory access")
+    
+    // Episodic memory - experience storage
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              py::return_value_policy::reference_internal,
+              "Get episodic memory access")
+    
+    // Associative memory - pattern associations
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+              py::return_value_policy::reference_internal,
+              "Get associative memory access")
+
+    // ========== PREDICTION SYSTEM ==========
+    
+    // Prediction system for sensory prediction and error computation
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+              py::return_value_policy::reference_internal,
+              "Get prediction system access")
+
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    .def("getPlanner", &Brain::getPlanner,
+              py::return_value_policy::reference_internal,
+              "Get neural planner access")
+    
+    // Concept formation for pattern discovery
+    .def("getConceptFormation", &Brain::getConceptFormation,
+              py::return_value_policy::reference_internal,
+              "Get concept formation access")
+    
+    // Attentional selection for focus
+    .def("getAttention", &Brain::getAttention,
+              py::return_value_policy::reference_internal,
+              "Get attentional selection access")
+
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    // Development system
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              py::return_value_policy::reference_internal,
+              "Get development system access")
+
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Dopamine - reward and reinforcement
+    .def("getDopamine", &Brain::getDopamine,
+              py::return_value_policy::reference_internal,
+              "Get dopamine neuromodulator access")
+    
+    // Curiosity - exploration motivation
+    .def("getCuriosity", &Brain::getCuriosity,
+              py::return_value_policy::reference_internal,
+              "Get curiosity neuromodulator access")
+    
+    // Novelty - novelty detection
+    .def("getNovelty", &Brain::getNovelty,
+              py::return_value_policy::reference_internal,
+              "Get novelty neuromodulator access")
+    
+    // Prediction error signal
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+              py::return_value_policy::reference_internal,
+              "Get prediction error signal access")
+
+    // Get random generator
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+              py::return_value_policy::reference_internal,
+              "Get random generator access");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
