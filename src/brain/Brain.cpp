@@ -41,6 +41,12 @@ struct Brain::Impl {
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
     
+    // ========== ADVANCED COGNITION SYSTEMS ==========
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
+    
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
@@ -49,6 +55,7 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Reward> reward;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -121,6 +128,12 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Initialize advanced cognition systems
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
@@ -129,6 +142,7 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        reward = std::make_unique<Reward>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -254,6 +268,12 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize advanced cognition systems
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
+    pImpl->spatialRepresentation->initialize(this);
+    pImpl->temporalRelation->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -1037,6 +1057,24 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+// ========== ADVANCED COGNITION SYSTEMS ==========
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+
+TemporalRelation* Brain::getTemporalRelation() {
+    return pImpl->temporalRelation.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
@@ -1053,21 +1091,25 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
-
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
-
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
-
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
+    
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+    
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+    
+    Reward* Brain::getReward() {
+        return pImpl->reward.get();
+    }
+    
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
@@ -1100,6 +1142,48 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->reward) {
+        NLM_LOG_INFO("Reward level: " + std::to_string(pImpl->reward->getLevel()));
+        NLM_LOG_INFO("Accumulated reward: " + std::to_string(pImpl->reward->getAccumulatedReward()));
+        NLM_LOG_INFO("Average reward: " + std::to_string(pImpl->reward->getAverageReward()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getError()));
+    }
+    
+    // Advanced cognition status
+    if (pImpl->selfModel && pImpl->selfModel->hasSelfModel()) {
+        NLM_LOG_INFO("SelfModel active: YES (" + std::to_string(pImpl->selfModel->getSelfModelConfidence(ActionType::MoveForward)) + " confidence)");
+    }
+    if (pImpl->socialLearning && pImpl->socialLearning->hasSocialKnowledge()) {
+        NLM_LOG_INFO("SocialLearning observations: " + std::to_string(pImpl->socialLearning->getObservationCount()));
+    }
+    if (pImpl->spatialRepresentation) {
+        NLM_LOG_INFO("SpatialRepresentation active: YES");
+    }
+    if (pImpl->temporalRelation) {
+        NLM_LOG_INFO("TemporalRelation active: YES");
+    }
+    
+    // Advanced cognition status
+    if (pImpl->selfModel && pImpl->selfModel->hasSelfModel()) {
+        NLM_LOG_INFO("SelfModel active: YES (" + std::to_string(pImpl->selfModel->getSelfModelConfidence(ActionType::MoveForward)) + " confidence)");
+    }
+    if (pImpl->socialLearning && pImpl->socialLearning->hasSocialKnowledge()) {
+        NLM_LOG_INFO("SocialLearning observations: " + std::to_string(pImpl->socialLearning->getObservationCount()));
+    }
+    if (pImpl->spatialRepresentation) {
+        NLM_LOG_INFO("SpatialRepresentation active: YES");
+    }
+    if (pImpl->temporalRelation) {
+        NLM_LOG_INFO("TemporalRelation active: YES");
     }
     
     // Development status

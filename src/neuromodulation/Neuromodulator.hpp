@@ -86,4 +86,39 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
+// Reward: Reward computation and reinforcement learning signal
+// Enhanced implementation for real reward processing
+class Reward : public Neuromodulator {
+public:
+    Reward();
+    ~Reward() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Reward signaling
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
+    void accumulateReward(float delta);
+    float getAccumulatedReward() const;
+    void resetAccumulatedReward();
+    
+    // Reward computation from environment state
+    float computeReward(const class Observation& observation) const;
+    
+    // Reward history and statistics
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    float getAverageReward() const;
+    float getMaxReward() const;
+    float getMinReward() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 } // namespace nlm

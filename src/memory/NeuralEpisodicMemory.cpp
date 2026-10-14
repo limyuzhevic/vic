@@ -219,12 +219,107 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    if (episodes_.empty()) {
+        return;
     }
+    
+    NLM_LOG_INFO("Consolidating " + std::to_string(episodes_.size()) + " episodes, threshold: " + 
+                std::to_string(relevanceThreshold));
+    
+    // Calculate relevance scores based on multiple factors
+    std::vector<std::pair<float, size_t>> scored;  // (relevanceScore, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float score = 0.0f;
+        
+        // Factor 1: Recency (more recent = higher relevance)
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        score += recencyScore * 0.3f;
+        
+        // Factor 2: Reward magnitude (higher reward = higher relevance)
+        float rewardScore = std::min(episodes_[i].reward, 1.0f) * 0.2f;
+        score += rewardScore;
+        
+        // Factor 3: Prediction error (higher error = higher relevance)
+        // Episodes that led to unexpected outcomes are more informative
+        float predictionErrorScore = episodes_[i].reward > 0 ? 0.3f : 0.0f;
+        if (episodes_[i].novelty > 0.5f) {
+            predictionErrorScore = 0.4f;
+        }
+        score += predictionErrorScore;
+        
+        // Factor 4: Action diversity (episodes with unique actions are more relevant)
+        static std::set<ActionType> knownActions;
+        ActionType action = episodes_[i].action;
+        if (knownActions.find(action) == knownActions.end()) {
+            knownActions.insert(action);
+            score += 0.2f;
+        }
+        
+        // Factor 5: Neural activation strength
+        float activationStrength = 0.0f;
+        for (float activation : episodes_[i].neuronActivations) {
+            activationStrength += activation;
+        }
+        activationStrength /= episodes_[i].neuronActivations.size();
+        score += activationStrength * 0.1f;
+        
+        scored.emplace_back(score, i);
+    }
+    
+    // Sort by relevance score (descending)
+    std::sort(scored.begin(), scored.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    // Apply consolidation based on relevance threshold
+    size_t keepCount = 0;
+    for (const auto& item : scored) {
+        if (item.first >= relevanceThreshold) {
+            keepCount++;
+        } else {
+            break;
+        }
+    }
+    
+    // Also maintain maximum capacity
+    size_t maxCapacity = maxEpisodes_ * 0.8f;  // Keep 80% of capacity for consolidation
+    if (keepCount > maxCapacity) {
+        keepCount = maxCapacity;
+    }
+    
+    // Remove low-relevance episodes (starting with least relevant)
+    size_t removed = 0;
+    for (size_t i = scored.size(); i > keepCount; --i) {
+        size_t index = scored[i-1].second;
+        
+        // Also remove from episode neurons
+        auto it = std::find(pImpl->episodeNeurons.begin(), pImpl->episodeNeurons.end(), 
+                           static_cast<NeuronId>(index + 20000));
+        if (it != pImpl->episodeNeurons.end()) {
+            pImpl->episodeNeurons.erase(it);
+        }
+        
+        removed++;
+    }
+    
+    // Remove from episodes_ (need to rebuild the deque)
+    std::deque<EpisodicMemoryItem> newEpisodes;
+    for (size_t i = 0; i < scored.size(); ++i) {
+        if (i < keepCount) {
+            newEpisodes.push_back(episodes_[scored[i].second]);
+        }
+    }
+    
+    episodes_ = std::move(newEpisodes);
+    
+    // Age remaining episodes to account for time passed
+    for (auto& ep : episodes_) {
+        ep.age++;
+    }
+    
+    NLM_LOG_INFO("Consolidation complete: removed " + std::to_string(removed) + 
+                " low-relevance episodes, kept " + std::to_string(episodes_.size()) + 
+                " high-relevance episodes");
 }
 
 void NeuralEpisodicMemory::clear() {

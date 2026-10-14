@@ -28,6 +28,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,14 +169,28 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // ========== ADVANCED COGNITION SYSTEMS ==========
+    
+    // SelfModel: Agent's internal representation of itself
+    SelfModel* getSelfModel();
+    
+    // SocialLearning: Learning from observation of other agents
+    SocialLearning* getSocialLearning();
+    
+    // SpatialRepresentation: Representation of spatial relationships
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // TemporalRelation: Understanding of temporal sequences and causality
+    TemporalRelation* getTemporalRelation();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -180,6 +199,9 @@ public:
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    
+    // Reward neuromodulator - reward computation and signaling
+    Reward* getReward();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
