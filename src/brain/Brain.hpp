@@ -6,6 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "Command.hpp"
+#include "CommandManager.hpp"
 #include <memory>
 #include <string>
 
@@ -47,6 +49,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Uses Command Pattern for reduced complexity and better separation of concerns
 
 class Brain {
 public:
@@ -61,23 +64,22 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Command Manager Access
+    CommandManager* getCommandManager();
+    const CommandManager* getCommandManager() const;
+    
     // Initialize brain with configuration
     bool initialize();
     
-    // Main simulation step
+    // Main simulation step - Command interface
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    // Command-based sensory input
     void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inject current directly into a specific neuron
+    // Command-based current injection
     void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
@@ -106,7 +108,7 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
+    // Reset brain state - Command interface
     void reset();
     
     // Save brain state to file (checkpointing)
@@ -192,6 +194,20 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Command execution methods (for backward compatibility and external access)
+    void executeCommand(std::unique_ptr<BrainCommand> command);
+    
+    // Convenience command creation methods
+    std::unique_ptr<BrainCommand> createStepCommand(SimulationStep step, Timestamp time);
+    std::unique_ptr<BrainCommand> createResetCommand();
+    std::unique_ptr<BrainCommand> createSensoryCommand(const class SensoryInput& input);
+    std::unique_ptr<BrainCommand> createNeuromodulationCommand(const class Neuromodulator& signal);
+    
+    // Command-based API for better organization
+    void resetUsingCommand();
+    void stepUsingCommand(SimulationStep step, Timestamp time);
+    void receiveSensoryInputUsingCommand(const class SensoryInput& input);
     
 private:
     struct Impl;

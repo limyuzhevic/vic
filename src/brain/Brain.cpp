@@ -28,6 +28,9 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // Command Manager
+    std::unique_ptr<CommandManager> commandManager;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -81,6 +84,7 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , commandManager(std::make_unique<CommandManager>())
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -172,6 +176,20 @@ Brain& Brain::operator=(Brain&& other) noexcept {
         other.pImpl = nullptr;
     }
     return *this;
+}
+
+CommandManager* Brain::getCommandManager() {
+    return pImpl->commandManager.get();
+}
+
+const CommandManager* Brain::getCommandManager() const {
+    return pImpl->commandManager.get();
+}
+
+void Brain::executeCommand(std::unique_ptr<BrainCommand> command) {
+    if (command) {
+        pImpl->commandManager->execute(std::move(command));
+    }
 }
 
 bool Brain::initialize() {
@@ -1112,6 +1130,46 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// Command execution methods (for backward compatibility and external access)
+void Brain::executeCommand(std::unique_ptr<BrainCommand> command) {
+    if (command) {
+        pImpl->commandManager->execute(std::move(command));
+    }
+}
+
+// Convenience command creation methods
+std::unique_ptr<BrainCommand> Brain::createStepCommand(SimulationStep step, Timestamp time) {
+    return std::make_unique<SimulationCommand>(this, step, time);
+}
+
+std::unique_ptr<BrainCommand> Brain::createResetCommand() {
+    return std::make_unique<SimulationCommand>(this);
+}
+
+std::unique_ptr<BrainCommand> Brain::createSensoryCommand(const class SensoryInput& input) {
+    return std::make_unique<SensorMotorCommand>(this, input);
+}
+
+std::unique_ptr<BrainCommand> Brain::createNeuromodulationCommand(const class Neuromodulator& signal) {
+    return std::make_unique<NeuromodulationCommand>(this, signal);
+}
+
+// Command-based API for better organization
+void Brain::resetUsingCommand() {
+    auto command = createResetCommand();
+    executeCommand(std::move(command));
+}
+
+void Brain::stepUsingCommand(SimulationStep step, Timestamp time) {
+    auto command = createStepCommand(step, time);
+    executeCommand(std::move(command));
+}
+
+void Brain::receiveSensoryInputUsingCommand(const class SensoryInput& input) {
+    auto command = createSensoryCommand(input);
+    executeCommand(std::move(command));
 }
 
 } // namespace nlm

@@ -5,11 +5,30 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Configuration exception hierarchy
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& message) : ConfigException(message) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    explicit ConfigParseException(const std::string& message) : ConfigException(message) {}
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -22,6 +41,18 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// Validation function type
+using ValidationFunction = std::function<bool(const ConfigValue&)>;
+
+// Configuration metadata
+struct ConfigMetadata {
+    std::string description;
+    std::string category;
+    bool required = false;
+    ValidationFunction validator;
+    std::string defaultValue;
+};
 
 // Configuration source
 enum class ConfigSource {
@@ -41,6 +72,41 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Global configuration manager for schema and validation
+class ConfigManager {
+public:
+    static ConfigManager& getInstance();
+    
+    // Register a configuration key with metadata
+    void registerKey(const std::string& key, const ConfigMetadata& metadata);
+    
+    // Get metadata for a key
+    std::optional<ConfigMetadata> getMetadata(const std::string& key) const;
+    
+    // Validate a configuration value against its schema
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    
+    // Check if all required keys are present
+    std::vector<std::string> validateRequired() const;
+    
+    // Get all registered keys
+    std::vector<std::string> getRegisteredKeys() const;
+    
+    // Clear all registered keys
+    void clear();
+    
+    // Initialize with default configuration
+    void initializeDefaultConfig();
+    
+private:
+    ConfigManager() = default;
+    ~ConfigManager() = default;
+    ConfigManager(const ConfigManager&) = delete;
+    ConfigManager& operator=(const ConfigManager&) = delete;
+    
+    std::unordered_map<std::string, ConfigMetadata> keyMetadata;
 };
 
 // Main configuration class
@@ -92,6 +158,12 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validate configuration against schema
+    std::vector<std::string> validateAgainstSchema() const;
+    
+    // Check if configuration is valid
+    bool isValid() const;
     
 private:
     struct Impl;

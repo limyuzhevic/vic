@@ -43,12 +43,27 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                // Validate the key before setting
+                auto metadata = ConfigManager::getInstance().getMetadata(key);
+                if (metadata) {
+                    // Try to set and validate
+                    set(key, value, ConfigSource::File);
+                    auto configValue = get<std::string>(key);
+                    if (configValue && !ConfigManager::getInstance().validate(key, *configValue)) {
+                        throw ConfigParseException("Invalid value for configuration key: " + key);
+                    }
+                } else {
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (const ConfigValidationException& e) {
+                throw ConfigParseException("Validation error for key '" + key + "': " + e.what());
+            }
         }
     }
     
@@ -197,6 +212,46 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Validate configuration against schema
+std::vector<std::string> Config::validateAgainstSchema() const {
+    std::vector<std::string> errors;
+    
+    // Check all registered keys have values
+    std::vector<std::string> missingRequired = ConfigManager::getInstance().validateRequired();
+    for (const auto& key : missingRequired) {
+        errors.push_back("Missing required configuration key: " + key);
+    }
+    
+    // Validate each configured value against schema
+    for (const auto& entry : pImpl->entries) {
+        if (!ConfigManager::getInstance().validate(entry.key, entry.value)) {
+            errors.push_back("Invalid value for configuration key: " + entry.key);
+        }
+    }
+    
+    return errors;
+}
+
+// Check if configuration is valid
+bool Config::isValid() const {
+    return validateAgainstSchema().empty();
+}
+
+// Get validation errors
+std::string Config::getValidationErrors() const {
+    std::vector<std::string> errors = validateAgainstSchema();
+    if (errors.empty()) {
+        return "Configuration is valid.";
+    }
+    
+    std::ostringstream oss;
+    oss << "Configuration validation errors:" << std::endl;
+    for (const auto& error : errors) {
+        oss << "  - " << error << std::endl;
+    }
+    return oss.str();
 }
 
 // Explicit template instantiations

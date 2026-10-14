@@ -29,6 +29,9 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Command Pattern (Phase 7 Refactor)
+    src/brain/CommandManager.cpp
+    src/brain/BrainCommands.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -83,8 +86,8 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Performance instrumentation
+    src/core/Performance/Profiler.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -143,9 +146,10 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Advanced CLI executable
+add_executable(nlm_advanced_cli
+    src/advanced_cli/main.cpp
+    src/advanced_cli/AdvancedCLI.cpp
 )
+target_link_libraries(nlm_advanced_cli PUBLIC nlm_core)
+
