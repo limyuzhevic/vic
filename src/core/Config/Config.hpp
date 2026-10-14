@@ -55,8 +55,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format - Phase 4 enhancement)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file (legacy support)
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Load from file (JSON format - Phase 4 enhancement)
+    bool loadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -64,22 +70,62 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
+// Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Set values with validation
+    void setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    std::vector<std::string> validateAll() const;
+    bool isValid(const std::string& key) const;
+    
+    // Type conversion and validation helpers
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key) const;
+    
+    // Configuration schema
+    static std::vector<std::string> getAllKnownKeys();
+    static bool isKnownKey(const std::string& key);
+    
+    // Error handling
+    std::string getLastError() const;
+    void clearError();
+    
+    // Configuration validation for known keys
+    static std::map<std::string, std::function<bool(const ConfigValue&)>> getValidationFunctions();
+    
+    // Set values with validation
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    std::vector<std::string> validateAll() const;
+    bool isValid(const std::string& key) const;
+    
+    // Type conversion and validation helpers
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key) const;
+    
+    // Configuration schema
+    static std::vector<std::string> getAllKnownKeys();
+    static bool isKnownKey(const std::string& key);
+    
+    // Error handling
+    std::string getLastError() const;
+    void clearError();
+    
+    // Configuration validation for known keys
+    static std::map<std::string, std::function<bool(const ConfigValue&)>> getValidationFunctions();
     
     // Remove key
     void remove(const std::string& key);
