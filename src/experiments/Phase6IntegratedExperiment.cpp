@@ -61,23 +61,37 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        // Get observation with error checking
+        if (agent.getBrain() && !agent.getBrain()->getRegions().empty()) {
+            SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+            
+            // Process sensory input
+            agent.processSensoryInput(percept);
+        } else {
+            NLM_LOG_WARNING("Brain or brain region not available for observation");
+        }
         
         // Brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
+        // Get motor command with validation
+        MotorCommand cmd;
+        cmd = agent.decodeMotorCommand();  // Initialize the variable
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action with error checking
+        if (agent.getBrain() && !agent.getBrain()->getRegions().empty()) {
+            world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        } else {
+            NLM_LOG_WARNING("Brain or brain region not available for applying action");
+        }
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward with error checking
+        float reward = 0.0f;
+        if (agent.getBrain() && !agent.getBrain()->getRegions().empty()) {
+            reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        } else {
+            NLM_LOG_WARNING("Brain or brain region not available for computing reward");
+        }
         totalReward += reward;
         
         // Apply reward modulation

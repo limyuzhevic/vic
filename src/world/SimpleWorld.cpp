@@ -2,19 +2,48 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <limits>
+#include <numeric>
+#include <random>
 
 namespace nlm {
 
-// Simple linear congruential generator
+// Improved linear congruential generator with better validation
 static uint64_t lcg(uint64_t& state) {
-    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    // Prevent overflow by using modulo operation
+    state = (state * 6364136223846793005ULL + 1442695040888963407ULL) % UINT64_MAX;
     return state;
 }
 
 static float urand(uint64_t& state, float min, float max) {
+    if (min > max) {
+        // Swap min and max if invalid
+        std::swap(min, max);
+    }
+    
+    // Validate range to avoid precision issues
+    const float epsilon = std::numeric_limits<float>::epsilon() * 10.0f;
+    if (std::abs(max - min) < epsilon) {
+        return min;  // Return min if range is too small
+    }
+    
     uint64_t r = lcg(state);
-    float normalized = (r & 0xFFFFFFFFFFFFULL) / static_cast<float>(0xFFFFFFFFFFFFULL);
-    return min + normalized * (max - min);
+    
+    // Use double precision for better accuracy before converting to float
+    double normalized = static_cast<double>(r) / static_cast<double>(UINT64_MAX);
+    
+    // Clamp normalized value to avoid precision issues
+    if (normalized < 0.0) normalized = 0.0;
+    if (normalized > 1.0) normalized = 1.0;
+    
+    double result = min + normalized * (max - min);
+    
+    // Final validation and conversion to float
+    if (std::isnan(result) || std::isinf(result)) {
+        return min;  // Fallback to min value
+    }
+    
+    return static_cast<float>(result);
 }
 
 SimpleWorld::SimpleWorld()

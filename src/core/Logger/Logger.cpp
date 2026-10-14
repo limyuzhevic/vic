@@ -47,10 +47,15 @@ void ConsoleLogger::log(const LogEntry& entry) {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set with error checking
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::ofstream::failure& e) {
+            // Log error to console as fallback
+            std::cerr << "[ERROR] Failed to write to log file: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -71,12 +76,37 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file with error checking
     pImpl->fileOut.open(filepath, std::ios::app);
+    
+    // Check if file opened successfully
+    if (!pImpl->fileOut.is_open()) {
+        // Log error to console as fallback
+        std::cerr << "[ERROR] Failed to open log file: " << filepath << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     if (pImpl->fileOut.is_open()) {
+        // Flush any buffered data
+        pImpl->fileOut.flush();
+        
+        // Attempt to close the file
         pImpl->fileOut.close();
+        
+        // Verify file is closed
+        if (pImpl->fileOut.is_open()) {
+            std::cerr << "[ERROR] Failed to close log file properly" << std::endl;
+        }
     }
 }
 
