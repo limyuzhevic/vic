@@ -174,19 +174,84 @@ void testSynapsePlasticityFlags() {
     std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
 }
 
-void runAll() {
-    std::cout << "Running Synapse tests..." << std::endl;
-    testSynapseCreation();
-    testSynapseWeight();
-    testSynapseWeightBounds();
-    testSynapseType();
-    testSynapseDelay();
-    testSynapseSpikeHistory();
-    testSynapseEligibilityTrace();
-    testSynapseEfficacy();
-    testSynapseRandomInitialization();
-    testSynapseReset();
-    testSynapsePlasticityFlags();
+void testSynapseWeightPrecision() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test precise weight changes
+    synapse.setWeight(0.123456f);
+    assert(synapse.getWeight() == 0.123456f);
+    
+    synapse.addToWeight(0.000001f);
+    assert(synapse.getWeight() == 0.123457f);
+    
+    synapse.addToWeight(-0.000001f);
+    assert(synapse.getWeight() == 0.123456f);
+    
+    std::cout << "    testSynapseWeightPrecision passed" << std::endl;
 }
 
-} // namespace test_synapse
+void testSynapseHistoryManagement() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test history with many entries
+    for (int i = 0; i < 100; ++i) {
+        if (i % 2 == 0) {
+            synapse.recordPreSpike(static_cast<float>(i));
+        } else {
+            synapse.recordPostSpike(static_cast<float>(i));
+        }
+    }
+    
+    assert(synapse.getPreSpikeHistory().size() == 50);
+    assert(synapse.getPostSpikeHistory().size() == 50);
+    
+    // Test history clearing performance
+    synapse.clearHistory();
+    assert(synapse.getPreSpikeHistory().empty());
+    assert(synapse.getPostSpikeHistory().empty());
+    
+    std::cout << "    testSynapseHistoryManagement passed" << std::endl;
+}
+
+void testSynapseEfficacyDynamics() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test efficacy changes
+    synapse.setEfficacy(0.5f);
+    assert(synapse.getEfficacy() == 0.5f);
+    
+    synapse.setEfficacy(0.8f);
+    assert(synapse.getEfficacy() == 0.8f);
+    
+    synapse.setEfficacy(2.0f);  // Should be clamped to 2.0f
+    assert(synapse.getEfficacy() == 2.0f);
+    
+    std::cout << "    testSynapseEfficacyDynamics passed" << std::endl;
+}
+
+void testSynapseMoveConstructor() {
+    nlm::Synapse synapse1(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse1.setWeight(0.5f);
+    synapse1.setEfficacy(0.8f);
+    
+    nlm::Synapse synapse2(std::move(synapse1));
+    
+    // synapse1 should be in valid but unspecified state
+    // synapse2 should have the state
+    assert(synapse2.getId() == nlm::SynapseId(1));
+    assert(synapse2.getWeight() == 0.5f);
+    assert(synapse2.getEfficacy() == 0.8f);
+    
+    std::cout << "    testSynapseMoveConstructor passed" << std::endl;
+}
+
+void testSynapseConstants() {
+    // Test default values
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    assert(synapse.getWeight() == 0.0f);
+    assert(synapse.getDelay() == 1);
+    assert(synapse.getEfficacy() == 1.0f);
+    
+    std::cout << "    testSynapseConstants passed" << std::endl;
+}

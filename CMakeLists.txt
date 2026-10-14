@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Plugin Framework
+    src/plugin/PluginFactory.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -138,6 +140,112 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# CLI Tools
+
+# Core CLI Tools
+add_executable(nlm_config
+    src/tools/nlm_config/nlm_config.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+add_executable(nlm_profile
+    src/tools/nlm_profile/nlm_profile.cpp
+)
+target_link_libraries(nlm_profile PUBLIC nlm_core)
+
+add_executable(nlm_validate
+    src/tools/nlm_validate/nlm_validate.cpp
+)
+target_link_libraries(nlm_validate PUBLIC nlm_core)
+
+add_executable(nlm_benchmark
+    src/tools/nlm_benchmark/nlm_benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+add_executable(nlm_explore
+    src/tools/nlm_explore/nlm_explore.cpp
+)
+target_link_libraries(nlm_explore PUBLIC nlm_core)
+
+# Plugin Management Tools
+add_executable(nlm_plugin
+    src/tools/plugin/nlm_plugin/nlm_plugin.cpp
+)
+target_link_libraries(nlm_plugin PUBLIC nlm_core)
+
+add_executable(nlm_plugins
+    src/tools/plugin/nlm_plugins/nlm_plugins.cpp
+)
+target_link_libraries(nlm_plugins PUBLIC nlm_core)
+
+add_executable(nlm_plugin_info
+    src/tools/plugin/nlm_plugin_info/nlm_plugin_info.cpp
+)
+target_link_libraries(nlm_plugin_info PUBLIC nlm_core)
+
+# Data Analysis Tools
+add_executable(nlm_analyze
+    src/tools/analysis/nlm_analyze/nlm_analyze.cpp
+)
+target_link_libraries(nlm_analyze PUBLIC nlm_core)
+
+add_executable(nlm_visualize
+    src/tools/analysis/nlm_visualize/nlm_visualize.cpp
+)
+target_link_libraries(nlm_visualize PUBLIC nlm_core)
+
+add_executable(nlm_export
+    src/tools/analysis/nlm_export/nlm_export.cpp
+)
+target_link_libraries(nlm_export PUBLIC nlm_core)
+
+add_executable(nlm_compare
+    src/tools/analysis/nlm_compare/nlm_compare.cpp
+)
+target_link_libraries(nlm_compare PUBLIC nlm_core)
+
+# System Administration Tools
+add_executable(nlm_monitor
+    src/tools/system/nlm_monitor/nlm_monitor.cpp
+)
+target_link_libraries(nlm_monitor PUBLIC nlm_core)
+
+add_executable(nlm_checkpoint
+    src/tools/system/nlm_checkpoint/nlm_checkpoint.cpp
+)
+target_link_libraries(nlm_checkpoint PUBLIC nlm_core)
+
+add_executable(nlm_log_viewer
+    src/tools/system/nlm_log_viewer/nlm_log_viewer.cpp
+)
+target_link_libraries(nlm_log_viewer PUBLIC nlm_core)
+
+add_executable(nlm_stats
+    src/tools/system/nlm_stats/nlm_stats.cpp
+)
+target_link_libraries(nlm_stats PUBLIC nlm_core)
+
+# Performance infrastructure
+add_library(nlm_performance STATIC
+    # Performance modules
+    src/performance/CheckpointSystem.hpp
+    src/performance/EventQueue.hpp
+    src/performance/MemoryPool.hpp
+    src/performance/OptimizedBrain.hpp
+    src/performance/ParallelProcessing.hpp
+    src/performance/SIMDVectorization.hpp
+    src/performance/SparseConnectivity.hpp
+    # Advanced performance optimizations
+    src/performance/CheckpointOptimizer.hpp
+    src/performance/BenchmarkSuite.hpp
+    src/performance/ResourceProfiler.hpp
+    src/performance/HardwareOptimizer.hpp
+    src/performance/PerformanceMonitor.hpp
+)
+
+target_include_directories(nlm_performance PUBLIC src)
 
 # Testing
 enable_testing()

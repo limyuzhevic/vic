@@ -20,7 +20,9 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -125,7 +127,9 @@ void Logger::clearLoggers() {
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+        if (logger) {
+            logger->setLevel(level);
+        }
     }
 }
 
@@ -142,7 +146,9 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.timestamp = std::chrono::system_clock::now();
     
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        if (logger) {
+            logger->log(entry);
+        }
     }
 }
 

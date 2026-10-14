@@ -14,11 +14,36 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_integration.cpp
+    test_performance.cpp
+    test_stress.cpp
+    test_validation.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core nlm_performance)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+
+# Performance integration test
+add_executable(performance_integration_test
+    performance_integration_test.cpp
+)
+target_link_libraries(performance_integration_test PUBLIC nlm_core nlm_performance)
+
+# Add performance integration test to tests
+add_test(NAME performance_integration_test COMMAND performance_integration_test)
+
+# Performance benchmarks test
+add_executable(nlm_performance_benchmark_test
+    tests/performance_benchmark_test.cpp
+)
+target_link_libraries(nlm_performance_benchmark_test PUBLIC nlm_core nlm_performance)
+
+# Performance integration test
+add_executable(nlm_performance_integration_test
+    tests/performance_integration_test.cpp
+)
+target_link_libraries(nlm_performance_integration_test PUBLIC nlm_core nlm_performance)

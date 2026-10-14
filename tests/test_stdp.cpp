@@ -145,16 +145,138 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
-void runAll() {
-    std::cout << "Running STDP tests..." << std::endl;
-    testSTDPCreation();
-    testSTDPConfiguration();
-    testSTDPConfigure();
-    testSTDPName();
-    testSTDPPotentiation();
-    testSTDPDepression();
-    testSTDPEmptySpikes();
-    testSTDPWeightBounds();
+void testSTDPParameterValidation() {
+    nlm::STDP stdp;
+    
+    // Test parameter boundaries
+    stdp.setLTPWeight(0.0f);
+    assert(stdp.getLTPWeight() == 0.0f);
+    
+    stdp.setLTPWeight(0.1f);
+    assert(stdp.getLTPWeight() == 0.1f);
+    
+    stdp.setLTDWeight(0.0f);
+    assert(stdp.getLTDWeight() == 0.0f);
+    
+    stdp.setLTDWeight(0.2f);
+    assert(stdp.getLTDWeight() == 0.2f);
+    
+    stdp.setTimeConstant(1.0f);
+    assert(stdp.getTimeConstant() == 1.0f);
+    
+    stdp.setTimeConstant(1000.0f);
+    assert(stdp.getTimeConstant() == 1000.0f);
+    
+    std::cout << "    testSTDPParameterValidation passed" << std::endl;
 }
 
-} // namespace test_stdp
+void testSTDPConfigureBoundary() {
+    nlm::STDP stdp;
+    
+    // Test configure with boundary values
+    stdp.configure(0.001f, 0.002f, 1.0f);
+    assert(stdp.getLTPWeight() == 0.001f);
+    assert(stdp.getLTDWeight() == 0.002f);
+    assert(stdp.getTimeConstant() == 1.0f);
+    
+    // Test maximum values
+    stdp.configure(1.0f, 1.0f, 10000.0f);
+    assert(stdp.getLTPWeight() == 1.0f);
+    assert(stdp.getLTDWeight() == 1.0f);
+    assert(stdp.getTimeConstant() == 10000.0f);
+    
+    std::cout << "    testSTDPConfigureBoundary passed" << std::endl;
+}
+
+void testSTDPTimeConstantEffect() {
+    nlm::STDP stdp1;
+    nlm::STDP stdp2;
+    
+    stdp1.setTimeConstant(10.0f);
+    stdp2.setTimeConstant(100.0f);
+    
+    // Create same synapse pairs
+    nlm::Synapse synapse1(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    nlm::Synapse synapse2(nlm::SynapseId(2), nlm::NeuronId(3), nlm::NeuronId(4));
+    
+    synapse1.setType(nlm::SynapseType::Excitatory);
+    synapse2.setType(nlm::SynapseType::Excitatory);
+    synapse1.setWeight(0.5f);
+    synapse2.setWeight(0.5f);
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 5.0};
+    std::vector<nlm::Timestamp> postSpikes = {2.0, 7.0};
+    
+    stdp1.update(&synapse1, preSpikes, postSpikes, 0.001);
+    stdp2.update(&synapse2, preSpikes, postSpikes, 0.001);
+    
+    // Different time constants should produce different weight changes
+    assert(synapse1.getWeight() != synapse2.getWeight());
+    
+    std::cout << "    testSTDPTimeConstantEffect passed" << std::endl;
+}
+
+void testSTDPPotentiationDepressionBalance() {
+    nlm::STDP stdp;
+    
+    // Create two synapses for comparison
+    nlm::Synapse synapsePrePost(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));  // pre before post
+    nlm::Synapse synapsePostPre(nlm::SynapseId(2), nlm::NeuronId(3), nlm::NeuronId(4));  // post before pre
+    
+    synapsePrePost.setType(nlm::SynapseType::Excitatory);
+    synapsePostPre.setType(nlm::SynapseType::Excitatory);
+    synapsePrePost.setWeight(0.5f);
+    synapsePostPre.setWeight(0.5f);
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 10.0};
+    std::vector<nlm::Timestamp> postSpikes = {5.0, 15.0};  // post after pre
+    
+    // For synapsePrePost, we want pre before post pattern
+    stdp.update(&synapsePrePost, preSpikes, postSpikes, 0.001);
+    
+    // For synapsePostPre, we want post before pre pattern (reverse)
+    stdp.update(&synapsePostPre, postSpikes, preSpikes, 0.001);
+    
+    // The pre-before-post should potentiate
+    assert(synapsePrePost.getWeight() > 0.5f);
+    
+    // The post-before-pre should depress
+    assert(synapsePostPre.getWeight() < 0.5f);
+    
+    std::cout << "    testSTDPPotentiationDepressionBalance passed" << std::endl;
+}
+
+void testSTDPNumericalStability() {
+    nlm::STDP stdp;
+    
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(1.0f);  // At max
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 1.0, 2.0, 3.0, 4.0};
+    std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0, 3.0, 4.0, 5.0};
+    
+    // Update multiple times to test stability
+    for (int i = 0; i < 100; ++i) {
+        stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+        // Weight should never exceed bounds
+        assert(synapse.getWeight() <= 1.0f);
+        assert(synapse.getWeight() >= -1.0f);
+    }
+    
+    std::cout << "    testSTDPNumericalStability passed" << std::endl;
+}
+
+void testSTDPNameValidation() {
+    nlm::STDP stdp;
+    
+    const char* name = stdp.getName();
+    assert(name != nullptr);
+    std::string nameStr = name;
+    assert(nameStr == "STDP");
+    
+    // Test RewardModulatedSTDP if available
+    // This would require including the appropriate header
+    
+    std::cout << "    testSTDPNameValidation passed" << std::endl;
+}

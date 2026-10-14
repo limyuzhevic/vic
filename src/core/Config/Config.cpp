@@ -35,11 +35,20 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with bounds checking
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
+            // Validate key size (reasonable limit to prevent buffer overflow)
             std::string key = trim(line.substr(0, pos));
+            if (key.size() > 256) {
+                continue; // Skip malformed line
+            }
+            
             std::string value = trim(line.substr(pos + 1));
+            // Validate value size (reasonable limit to prevent buffer overflow)
+            if (value.size() > 4096) {
+                continue; // Skip malformed line
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
