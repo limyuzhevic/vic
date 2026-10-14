@@ -1,13 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../performance/CheckpointSystem.hpp"
 
 namespace nlm {
 
@@ -109,11 +100,19 @@ public:
     // Reset brain state
     void reset();
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // ========== CHECKPOINTING ==========
+
+// Save brain state to checkpoint
+bool save(const std::string& filepath) const;
+
+// Load brain state from checkpoint
+bool load(const std::string& filepath);
+
+// Get neuron data for checkpointing
+bool getNeuronData(NeuronCheckpointData& data);
+
+// Get synapse data for checkpointing
+bool getSynapseData(SynapseCheckpointData& data);
     
     // Region management
     RegionId addRegion(const std::string& name = "");
