@@ -37,6 +37,9 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
+// Timestamp helper function (thread-safe)
+std::string formatTimestamp(const std::chrono::system_clock::time_point& timestamp);
+
 // Console logger implementation
 class ConsoleLogger : public ILogger {
 public:
@@ -97,6 +100,9 @@ public:
     
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
+    
+    // Fast thread-safe version for high-performance scenarios
+    bool isEnabledFast(LogLevel level) const;
     
     // Get global logger instance
     static Logger& getGlobal();

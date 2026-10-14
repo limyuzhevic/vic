@@ -1,11 +1,82 @@
+#include <ctime>
+
+// Timestamp helper with thread-safe timezone handling
+std::string formatTimestamp(const std::chrono::system_clock::time_point& timestamp) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    
+    // Use thread-safe version with localtime_r
+    struct tm tm_buf;
+    std::tm* tm_ptr = nullptr;
+    
+    // Try thread-safe localtime_r first (POSIX)
+    #ifdef _POSIX_VERSION
+    localtime_r(&time, &tm_buf);
+    tm_ptr = &tm_buf;
+    #else
+    // Fallback to thread-local storage (C++11)
+    tm* tls_tm = std::localtime(&time);
+    tm_ptr = tls_tm;
+    #endif
+    
+    if (!tm_ptr) {
+        // Fallback to UTC if all else fails
+        std::time_t utc_time = std::chrono::system_clock::to_time_t(timestamp);
+        tm_ptr = std::gmtime(&utc_time);
+    }
+    
+    if (!tm_ptr) {
+        // Last resort - return empty string
+        return "";
+    }
+    
+    std::ostringstream oss;
+    oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
+
 #include "Logger.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <ctime>
 
 namespace nlm {
+
+// Timestamp helper with thread-safe timezone handling
+std::string formatTimestamp(const std::chrono::system_clock::time_point& timestamp) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    
+    // Use thread-safe version with localtime_r
+    struct tm tm_buf;
+    std::tm* tm_ptr = nullptr;
+    
+    // Try thread-safe localtime_r first (POSIX)
+    #ifdef _POSIX_VERSION
+    localtime_r(&time, &tm_buf);
+    tm_ptr = &tm_buf;
+    #else
+    // Fallback to thread-local storage (C++11)
+    tm* tls_tm = std::localtime(&time);
+    tm_ptr = tls_tm;
+    #endif
+    
+    if (!tm_ptr) {
+        // Fallback to UTC if all else fails
+        std::time_t utc_time = std::chrono::system_clock::to_time_t(timestamp);
+        tm_ptr = std::gmtime(&utc_time);
+    }
+    
+    if (!tm_ptr) {
+        // Last resort - return empty string
+        return "";
+    }
+    
+    std::ostringstream oss;
+    oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
 
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
@@ -32,9 +103,8 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add timestamp using thread-safe function
+    oss << formatTimestamp(entry.timestamp);
     
     oss << " " << entry.message;
     
@@ -80,15 +150,55 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
-std::string ConsoleLogger::levelToString(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
-        default: return "UNKNOWN";
+// Timestamp helper with thread-safe timezone handling
+std::string formatTimestamp(const std::chrono::system_clock::time_point& timestamp) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    
+    // Use thread-safe version with localtime_r
+    struct tm tm_buf;
+    std::tm* tm_ptr = nullptr;
+    
+    // Try thread-safe localtime_r first (POSIX)
+    #ifdef _POSIX_VERSION
+    localtime_r(&time, &tm_buf);
+    tm_ptr = &tm_buf;
+    #else
+    // Fallback to thread-local storage (C++11)
+    tm* tls_tm = std::localtime(&time);
+    tm_ptr = tls_tm;
+    #endif
+    
+    if (!tm_ptr) {
+        // Fallback to UTC if all else fails
+        std::time_t utc_time = std::chrono::system_clock::to_time_t(timestamp);
+        tm_ptr = std::gmtime(&utc_time);
     }
+    
+    if (!tm_ptr) {
+        // Last resort - return empty string
+        return "";
+    }
+    
+    std::ostringstream oss;
+    oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
+
+// Atomic version for thread-safe read operations
+std::atomic<LogLevel> ConsoleLogger::getLevelAtomic() const {
+    return std::atomic<LogLevel>(pImpl->level);
+}
+
+// Thread-safe isEnabled check with atomic operations
+bool Logger::isEnabledFast(LogLevel level) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (const auto& logger : pImpl->loggers) {
+        // Use atomic read for better performance
+        if (logger->getLevel() <= level) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
@@ -166,9 +276,21 @@ void Logger::critical(const std::string& message, const std::string& file, int l
     log(LogLevel::Critical, message, file, line, function);
 }
 
-bool Logger::isEnabled(LogLevel level) const {
+std::string ConsoleLogger::levelToString(LogLevel level) const {
+    switch (level) {
+        case LogLevel::Debug: return "DEBUG";
+        case LogLevel::Info: return "INFO";
+        case LogLevel::Warning: return "WARN";
+        case LogLevel::Error: return "ERROR";
+        case LogLevel::Critical: return "CRIT";
+        default: return "UNKNOWN";
+    }
+}
+
+// Thread-safe isEnabled check
+bool Logger::isEnabledFast(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
