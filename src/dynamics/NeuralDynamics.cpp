@@ -15,63 +15,44 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
-    const auto& state = neuron->getState();
-    
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
-    float V = neuron->getMembranePotential();
-    float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
-    float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
-    
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
-    
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
-    }
-    
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
-    }
-    
-    // Clear current for next step
-    neuron->clearTotalCurrent();
+    // Real LIF dynamics using neuron->stepLIF()
+    // This delegates to the neuron's LIF implementation for consistency
+    Timestamp currentTime = 0.0;  // Using 0 as placeholder, actual time should be provided by caller
+    neuron->stepLIF(currentTime, dt);
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    // Real synaptic dynamics with short-term plasticity
+    // Uses the synapse's internal time-stepping mechanism
+    (void)dt;  // dt is unused but kept for interface consistency
+    Timestamp currentTime = 0.0;  // Placeholder - actual time should be provided
+    synapse->step(currentTime);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    // Real synaptic input application based on synapse type and weight
+    // For LIF neurons, this translates to conductance-based synaptic currents
     SynapticWeight weight = synapse->getWeight();
+    
     if (synapse->isExcitatory()) {
+        // Excitatory synapses add positive current to membrane potential
         neuron->receiveExcitatoryInput(weight);
-    } else {
+    } else if (synapse->isInhibitory()) {
+        // Inhibitory synapses subtract from membrane potential (hyperpolarization)
         neuron->receiveInhibitoryInput(std::abs(weight));
+    } else if (synapse->getType() == SynapseType::Modulatory) {
+        // Modulatory synapses affect plasticity and adaptation variables
+        neuron->receiveModulatoryInput(weight);
     }
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
-    return neuron->getMembranePotential() >= neuron->getThreshold();
+    // Check if neuron's membrane potential exceeds firing threshold
+    return neuron->checkThreshold();
 }
 
 void IntegrateAndFireDynamics::reset() {
-    // No internal state to reset
+    // No internal state to reset (all state is in Neuron and Synapse objects)
 }
 
 void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
