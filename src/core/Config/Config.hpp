@@ -5,6 +5,26 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <stdexcept>
+#include <sstream>
+#include <iomanip>
+#include <fstream>
+#include <chrono>
+#include <ctime>
+#include <cmath>
+
+// JSON parsing support - forward declarations for json.hpp
+namespace nlohmann {
+    template<typename T>
+    class json;
+    class json_pointer;
+}
+
+// YAML parsing support - forward declarations for yaml-cpp
+namespace YAML {
+    class Node;
+}
 
 namespace nlm {
 

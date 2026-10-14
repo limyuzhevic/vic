@@ -1,0 +1,112 @@
+# Phase 6 Experiment Configuration File
+# This configuration file supports JSON format for Phase 6 neural simulation experiments
+
+{
+    "experiment_id": "phase6_neural_brain",
+    "version": "6.0",
+    "description": "Phase 6: Integrated Neural Learning Machine with complete brain system integration",
+    
+    "simulation_parameters": {
+        "max_simulation_steps": 10000,
+        "simulation_time_limit": 0.0,
+        "simulation_timestep": 0.001,
+        "random_seed": 42,
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1
+    },
+    
+    "brain_architecture": {
+        "enable_plasticity": true,
+        "stdp_ltp_weight": 0.01,
+        "stdp_ltd_weight": 0.012,
+        "stdp_time_constant": 20.0,
+        "synaptogenesis_rate": 0.001,
+        "pruning_rate": 0.0001
+    },
+    
+    "memory_systems": {
+        "working_memory_enabled": true,
+        "working_memory_capacity": 1000,
+        "episodic_memory_enabled": true,
+        "episodic_memory_capacity": 5000,
+        "semantic_memory_enabled": true,
+        "procedural_memory_enabled": true,
+        "replay_enabled": true,
+        "replay_interval": 100,
+        "replay_strength": 0.8,
+        "consolidation_enabled": true,
+        "consolidation_interval": 1000
+    },
+    
+    "neuromodulation": {
+        "dopamine_enabled": true,
+        "dopamine_baseline": 0.1,
+        "dopamine_range": 1.0,
+        "curiosity_enabled": true,
+        "novelty_enabled": true,
+        "serotonin_enabled": true,
+        "norepinephrine_enabled": true,
+        "acetylcholine_enabled": true
+    },
+    
+    "development": {
+        "development_enabled": true,
+        "enable_critical_periods": true,
+        "enable_maturation": true,
+        "enable_aging": true,
+        "plasticity_decay_rate": 0.01,
+        "synapse_scaling_enabled": true
+    },
+    
+    "visualization": {
+        "enabled": true,
+        "update_rate": 30.0,
+        "brain_region_view": true,
+        "neuron_state_view": true,
+        "synaptic_connectivity_view": true,
+        "memory_state_view": true,
+        "neuromodulation_view": true
+    },
+    
+    "logging": {
+        "log_level": "INFO",
+        "log_to_file": true,
+        "log_filename": "nlm_experiment.log",
+        "enable_performance_logging": true,
+        "performance_log_interval": 100,
+        "enable_debug_logging": false
+    },
+    
+    "performance_monitoring": {
+        "enable_monitoring": true,
+        "monitoring_interval": 1000,
+        "track_cpu_usage": true,
+        "track_memory_usage": true,
+        "track_firing_rate": true,
+        "track_plasticity_rate": true,
+        "thresholds": {
+            "high_cpu_threshold": 80.0,
+            "high_memory_threshold": 90.0,
+            "high_firing_threshold": 10.0
+        }
+    },
+    
+    "environment": {
+        "environment_name": "GridWorld",
+        "environment_width": 10,
+        "environment_height": 10,
+        "max_energy": 100.0,
+        "energy_decay_rate": 0.01,
+        "enable_resources": true,
+        "enable_hazards": false
+    },
+    
+    "goals": {
+        "target_reward": 100.0,
+        "max_episodes_before_terminate": 1000,
+        "minimum_firing_rate": 0.1,
+        "minimum_memory_efficiency": 0.8,
+        "target_plasticity_rate": 0.05
+    }
+}
