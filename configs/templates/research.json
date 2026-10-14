@@ -1,0 +1,64 @@
+{
+    "nlm": {
+        "version": "2.0",
+        "brain": {
+            "neuron_count": 5000,
+            "region_count": 3,
+            "connection_probability": 0.08,
+            "initial_weight_mean": 0.5,
+            "initial_weight_std": 0.2,
+            "v_thresh": -50.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 20.0,
+            "tau_ref": 2.0
+        },
+        "plasticity": {
+            "stdp": {
+                "enable": true,
+                "learning_rate": 0.02,
+                "tau_plus": 20.0,
+                "tau_minus": 20.0
+            },
+            "hebbian": {
+                "enable": true,
+                "learning_rate": 0.005
+            },
+            "structural": {
+                "enable": true,
+                "synaptogenesis_rate": 0.001,
+                "pruning_rate": 0.0001
+            }
+        },
+        "neuromodulation": {
+            "dopamine": {
+                "scale": 1.5,
+                "baseline": 0.1
+            },
+            "curiosity": {
+                "enable": true,
+                "threshold": 0.3
+            },
+            "novelty": {
+                "enable": true
+            },
+            "reward": {
+                "scale": 2.0,
+                "discount_factor": 0.95
+            }
+        },
+        "development": {
+            "enable": true,
+            "critical_period_length": 200.0,
+            "maturation_rate": 0.02,
+            "aging_rate": 0.005
+        },
+        "agent": {
+            "enable_reward_modulation": true,
+            "enable_structural_plasticity": true,
+            "enable_development": true,
+            "enable_curiosity": true,
+            "exploration_rate": 0.2
+        }
+    }
+}

@@ -1,0 +1,56 @@
+{
+    "nlm": {
+        "version": "2.0",
+        "brain": {
+            "neuron_count": 1000,
+            "region_count": 2,
+            "connection_probability": 0.05,
+            "initial_weight_mean": 0.0,
+            "initial_weight_std": 0.15,
+            "v_thresh": -55.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 15.0,
+            "tau_ref": 1.0
+        },
+        "plasticity": {
+            "stdp": {
+                "enable": true,
+                "learning_rate": 0.005,
+                "tau_plus": 15.0,
+                "tau_minus": 15.0
+            },
+            "hebbian": {
+                "enable": true,
+                "learning_rate": 0.001
+            },
+            "structural": {
+                "enable": false,
+                "synaptogenesis_rate": 0.0,
+                "pruning_rate": 0.0
+            }
+        },
+        "neuromodulation": {
+            "dopamine": {
+                "scale": 1.0,
+                "baseline": 0.0
+            },
+            "curiosity": {
+                "enable": false,
+                "threshold": 0.0
+            },
+            "novelty": {
+                "enable": false
+            },
+            "reward": {
+                "scale": 1.0,
+                "discount_factor": 0.99
+            }
+        },
+        "simulation": {
+            "max_steps": 5000,
+            "time_limit": 10.0,
+            "verbose": false
+        }
+    }
+}

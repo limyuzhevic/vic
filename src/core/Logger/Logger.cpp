@@ -80,6 +80,195 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
+#include "Logger.hpp"
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <mutex>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+
+namespace nlm {
+
+struct ConsoleLogger::Impl {
+    LogLevel level = LogLevel::Info;
+    bool useColors = true;
+    std::ofstream fileOut;
+    std::mutex mutex;
+    
+    // Advanced logging features
+    std::unordered_map<std::string, DebugLevel> categoryLevels;
+    std::vector<std::string> categories;
+    bool jsonOutput = false;
+    std::string currentCorrelationID;
+};
+
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+
+ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
+    pImpl->level = level;
+}
+
+ConsoleLogger::~ConsoleLogger() = default;
+
+void ConsoleLogger::log(const LogEntry& entry) {
+    if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    std::ostringstream oss;
+    oss << "[" << levelToString(entry.level) << "] ";
+    
+    // Add timestamp
+    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    oss << " " << entry.message;
+    
+    std::string output = oss.str();
+    
+    // Console output
+    if (pImpl->useColors) {
+        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+    } else {
+        std::cout << output << "\n";
+    }
+    
+    // File output if set
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut << output << "\n";
+        pImpl->fileOut.flush();
+    }
+}
+
+void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->level = level;
+}
+
+LogLevel ConsoleLogger::getLevel() const {
+    return pImpl->level;
+}
+
+void ConsoleLogger::setUseColors(bool useColors) {
+    pImpl->useColors = useColors;
+}
+
+bool ConsoleLogger::getUseColors() const {
+    return pImpl->useColors;
+}
+
+void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->fileOut.open(filepath, std::ios::app);
+}
+
+void ConsoleLogger::closeOutputFile() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+void ConsoleLogger::logStructured(const StructuredLogEntry& entry) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    std::ostringstream oss;
+    
+    if (pImpl->jsonOutput) {
+        // JSON formatted output
+        oss << "{\"timestamp\": \"" << std::chrono::system_clock::to_time_t(entry.timestamp) << "\", \"correlation_id\": \"" 
+            << entry.correlation_id << "\", \"category\": \"" << entry.category << "\", \"level\": " 
+            << static_cast<int>(entry.level) << ", \"message\": \"" << entry.message << "\"";
+        
+        if (!entry.fields.empty()) {
+            oss << ", \"fields\": {";
+            bool first = true;
+            for (const auto& field : entry.fields) {
+                if (!first) oss << ", ";
+                oss << "\"" << field.first << "\": \"" << field.second << "\"";
+                first = false;
+            }
+            oss << "}";
+        }
+        
+        oss << "}\n";
+        std::cout << oss.str();
+    } else {
+        // Standard format with enhanced debugging info
+        oss << "[" << debugLevelToString(entry.level) << "] "
+            << "CORRELATION: " << entry.correlation_id << " "
+            << "CATEGORY: " << entry.category << " "
+            << "TIMESTAMP: " << std::chrono::system_clock::to_time_t(entry.timestamp) << " "
+            << "MESSAGE: " << entry.message << "\n";
+        
+        if (!entry.fields.empty()) {
+            oss << "  FIELDS: ";
+            bool first = true;
+            for (const auto& field : entry.fields) {
+                if (!first) oss << ", ";
+                oss << field.first << "=" << field.second;
+                first = false;
+            }
+            oss << "\n";
+        }
+        
+        if (entry.perf_data) {
+            oss << "  PERFORMANCE: " << entry.perf_data->name << " took " 
+                << entry.perf_data->duration.count() << " seconds\n";
+        }
+        
+        if (entry.memory_data) {
+            oss << "  MEMORY: " << entry.memory_data->current_usage << " bytes, "
+                << "peak: " << entry.memory_data->peak_usage << " bytes\n";
+        }
+        
+        if (entry.neural_state_data) {
+            oss << "  NEURAL: region=" << entry.neural_state_data->region_name 
+                << " timestep=" << entry.neural_state_data->timestep << "\n";
+        }
+        
+        std::cout << oss.str();
+    }
+    
+    // File output if set
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut << oss.str();
+        pImpl->fileOut.flush();
+    }
+}
+
+void ConsoleLogger::setCategoryLevel(const std::string& category, DebugLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->categoryLevels[category] = level;
+}
+
+void ConsoleLogger::addCategory(const std::string& category) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (std::find(pImpl->categories.begin(), pImpl->categories.end(), category) == pImpl->categories.end()) {
+        pImpl->categories.push_back(category);
+    }
+}
+
+std::vector<std::string> ConsoleLogger::getCategories() const {
+    return pImpl->categories;
+}
+
+void ConsoleLogger::enableJSONOutput(bool enable) {
+    pImpl->jsonOutput = enable;
+}
+
+void ConsoleLogger::setCorrelationID(const std::string& id) {
+    pImpl->currentCorrelationID = id;
+}
+
+std::string ConsoleLogger::getCurrentCorrelationID() const {
+    return pImpl->currentCorrelationID;
+}
+
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
@@ -102,10 +291,36 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
+DebugLevel ConsoleLogger::debugLevelToLogLevel(DebugLevel level) const {
+    switch (level) {
+        case DebugLevel::Trace: return DebugLevel::Trace;
+        case DebugLevel::Debug: return DebugLevel::Debug;
+        case DebugLevel::Info: return DebugLevel::Info;
+        case DebugLevel::Warning: return DebugLevel::Warning;
+        case DebugLevel::Error: return DebugLevel::Error;
+        case DebugLevel::Critical: return DebugLevel::Critical;
+        default: return DebugLevel::Info;
+    }
+}
+
+std::string ConsoleLogger::debugLevelToString(DebugLevel level) const {
+    switch (level) {
+        case DebugLevel::Trace: return "TRACE";
+        case DebugLevel::Debug: return "DEBUG";
+        case DebugLevel::Info: return "INFO";
+        case DebugLevel::Warning: return "WARN";
+        case DebugLevel::Error: return "ERROR";
+        case DebugLevel::Critical: return "CRIT";
+        default: return "UNKNOWN";
+    }
+}
+
 // Logger class implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::shared_ptr<IAdvancedLogger> advanced_logger;
+    std::string current_correlation_id;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}

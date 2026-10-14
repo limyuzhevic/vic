@@ -5,11 +5,14 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class JSONParser;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -61,6 +64,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& content);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
@@ -93,6 +99,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // JSON conversion
+    nlohmann::json toJSON() const;
+    bool fromJSON(const nlohmann::json& json);
+    
+    // Template management
+    bool applyTemplate(const std::string& templateName);
+    static std::vector<std::string> getAvailableTemplates();
+    
+    // Get configuration categories
+    static std::vector<std::string> getConfigurationCategories();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +121,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidType(const std::string& key, const ConfigValue& value);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
+

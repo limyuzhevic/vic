@@ -6,17 +6,11 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <mutex>
+#include "../DebugAdvanced.hpp"
 
 namespace nlm {
-
-// Log severity levels
-enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
-};
 
 // Log entry structure
 struct LogEntry {
@@ -35,10 +29,17 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    virtual void logStructured(const StructuredLogEntry& entry) = 0;
+    virtual void setCategoryLevel(const std::string& category, DebugLevel level) = 0;
+    virtual void addCategory(const std::string& category) = 0;
+    virtual std::vector<std::string> getCategories() const = 0;
+    virtual void enableJSONOutput(bool enable) = 0;
+    virtual void setCorrelationID(const std::string& id) = 0;
+    virtual std::string getCurrentCorrelationID() const = 0;
 };
 
 // Console logger implementation
-class ConsoleLogger : public ILogger {
+class ConsoleLogger : public ILogger, public IAdvancedLogger {
 public:
     ConsoleLogger();
     explicit ConsoleLogger(LogLevel level);
@@ -56,16 +57,28 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // IAdvancedLogger interface implementation
+    void logStructured(const StructuredLogEntry& entry) override;
+    void setCategoryLevel(const std::string& category, DebugLevel level) override;
+    void addCategory(const std::string& category) override;
+    std::vector<std::string> getCategories() const override;
+    void enableJSONOutput(bool enable) override;
+    void setCorrelationID(const std::string& id) override;
+    std::string getCurrentCorrelationID() const override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    
+    DebugLevel debugLevelToLogLevel(DebugLevel level) const;
+    std::string debugLevelToString(DebugLevel level) const;
 };
 
 // Main Logger class
-class Logger {
+class Logger : public IAdvancedLogger {
 public:
     Logger();
     ~Logger();
@@ -103,7 +116,16 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // IAdvancedLogger interface implementation
+    void logStructured(const StructuredLogEntry& entry) override;
+    void setCategoryLevel(const std::string& category, DebugLevel level) override;
+    void addCategory(const std::string& category) override;
+    std::vector<std::string> getCategories() const override;
+    void enableJSONOutput(bool enable) override;
+    void setCorrelationID(const std::string& id) override;
+    std::string getCurrentCorrelationID() const override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -1,0 +1,77 @@
+{
+    "nlm": {
+        "version": "2.0",
+        "brain": {
+            "neuron_count": 1000,
+            "region_count": 2,
+            "connection_probability": 0.1,
+            "initial_weight_mean": 0.5,
+            "initial_weight_std": 0.1,
+            "v_thresh": -50.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 20.0,
+            "tau_ref": 2.0
+        },
+        "plasticity": {
+            "stdp": {
+                "enable": true,
+                "learning_rate": 0.01,
+                "tau_plus": 20.0,
+                "tau_minus": 20.0
+            },
+            "hebbian": {
+                "enable": true,
+                "learning_rate": 0.001
+            },
+            "structural": {
+                "enable": true,
+                "synaptogenesis_rate": 0.001,
+                "pruning_rate": 0.0001
+            }
+        },
+        "neuromodulation": {
+            "dopamine": {
+                "scale": 1.0,
+                "baseline": 0.1
+            },
+            "curiosity": {
+                "enable": true,
+                "threshold": 0.5
+            },
+            "novelty": {
+                "enable": true
+            },
+            "reward": {
+                "scale": 1.0,
+                "discount_factor": 0.99
+            }
+        },
+        "development": {
+            "enable": true,
+            "critical_period_length": 100.0,
+            "maturation_rate": 0.01,
+            "aging_rate": 0.001
+        },
+        "agent": {
+            "enable_reward_modulation": true,
+            "enable_structural_plasticity": true,
+            "enable_development": true,
+            "enable_curiosity": true,
+            "exploration_rate": 0.1
+        },
+        "environment": {
+            "name": "GridWorld",
+            "width": 10,
+            "height": 10,
+            "max_energy": 100.0,
+            "vision_width": 8,
+            "vision_height": 8
+        },
+        "simulation": {
+            "max_steps": 10000,
+            "time_limit": 0.0,
+            "verbose": false
+        }
+    }
+}
