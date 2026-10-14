@@ -4,6 +4,11 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
 #include <memory>
 #include <vector>
 
@@ -31,11 +36,8 @@ public:
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
     
-    // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
-    
-    // Update development system
-    void updateDevelopment(double timestep);
+    // Apply neuromodulation to cognitive systems (attention, planning, concept formation)
+    void applyNeuromodulationToCognitiveSystems();
     
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
@@ -63,11 +65,19 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enablePrediction(bool enable) { predictionEnabled_ = enable; }
+    void enableEpisodicMemory(bool enable) { episodicMemoryEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isAttentionEnabled() const { return attentionEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isPredictionEnabled() const { return predictionEnabled_; }
+    bool isEpisodicMemoryEnabled() const { return episodicMemoryEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -92,6 +102,14 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
+    // Cognitive systems integration (Phase 6: Full Integration)
+    NeuralPlanner* neuralPlanner_;
+    ConceptFormation* conceptFormation_;
+    PredictionSystem* predictionSystem_;
+    AttentionalSelection* attentionSystem_;
+    NeuralEpisodicMemory* episodicMemory_;
+    NeuralWorkingMemory* workingMemory_;
+    
     // Neuromodulation state
     float dopamineLevel_;
     float noveltyLevel_;
@@ -108,6 +126,10 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool attentionEnabled_;
+    bool conceptFormationEnabled_;
+    bool predictionEnabled_;
+    bool episodicMemoryEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
