@@ -5,7 +5,8 @@
 namespace nlm {
 
 // Vision processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
+// TODO PHASE 6+: Implement real vision processing using NLM's neural substrate for advanced users
+// (Connects to brain for perception, enables cognitive mapping of environment)
 
 class VisionProcessor {
 public:

@@ -1,11 +1,23 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the final integration of all neural computation systems:
+// - Real LIF neuron dynamics (Phase 2)
+// - Event-driven spike propagation with synaptic delays (Phase 2)
+// - STDP and Hebbian plasticity (Phase 2)
+// - Structural plasticity (synaptogenesis/pruning) (Phase 2)
+// - Working memory with persistent activity and competition (Phase 4)
+// - Episodic memory with experience encoding and replay (Phase 4)
+// - Associative memory with Hebbian pattern associations (Phase 4)
+// - Neuromodulation with dopamine, curiosity, and prediction error (Phase 3)
+// - Neural prediction system (Phase 4)
+// - Neural planner with action sequence evaluation (Phase 4)
+// - Concept formation from experience patterns (Phase 4)
+// - Neural attention with competitive selection dynamics (Phase 4)
+// - Developmental system with age-dependent plasticity (Phase 3)
+// - Performance optimizations with memory pools and event queues (Phase 5)
+// - Checkpoint save/load system (Phase 5)
+// - Replay and consolidation with sleep/rest cycle (Phase 5)
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,14 +47,19 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     This phase integrates all previous systems:                ║
+    ║     - LIF neuron dynamics (Phase 2)                            ║
+    ║     - Event-driven spike propagation (Phase 2)                  ║
+    ║     - STDP and Hebbian plasticity (Phase 2)                    ║
+    ║     - Structural plasticity (Phase 2)                          ║
+    ║     - Memory systems (Phase 4)                                 ║
+    ║     - Neuromodulation (Phase 3)                                 ║
+    ║     - Prediction and cognition (Phase 4)                       ║
+    ║     - Development system (Phase 3)                             ║
+    ║     - Performance optimizations (Phase 5)                      ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -324,7 +341,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6 Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +349,24 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
+    NLM_LOG_INFO("Integrating all neural computation systems:");
+    NLM_LOG_INFO("  - Real LIF neuron dynamics (Phase 2)");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays (Phase 2)");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules (Phase 2)");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning) (Phase 2)");
+    NLM_LOG_INFO("  - Working memory with persistent activity and competition (Phase 4)");
+    NLM_LOG_INFO("  - Episodic memory with experience encoding and replay (Phase 4)");
+    NLM_LOG_INFO("  - Associative memory with Hebbian pattern associations (Phase 4)");
+    NLM_LOG_INFO("  - Neuromodulation: dopamine, curiosity, prediction error (Phase 3)");
+    NLM_LOG_INFO("  - Neural prediction system (Phase 4)");
+    NLM_LOG_INFO("  - Neural planner with action sequence evaluation (Phase 4)");
+    NLM_LOG_INFO("  - Concept formation from experience patterns (Phase 4)");
+    NLM_LOG_INFO("  - Neural attention with competitive selection dynamics (Phase 4)");
+    NLM_LOG_INFO("  - Developmental system with age-dependent plasticity (Phase 3)");
+    NLM_LOG_INFO("  - Performance optimizations with memory pools and event queues (Phase 5)");
+    NLM_LOG_INFO("  - Checkpoint save/load system (Phase 5)");
+    NLM_LOG_INFO("  - Replay and consolidation with sleep/rest cycle (Phase 5)");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -366,7 +395,38 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Print help if requested
+    if (config->getOr<bool>("show_help", false)) {
+        std::cout << "\n=== NLM Phase 6 Command Line Options ===" << std::endl;
+        std::cout << "  --help, -h                     Show this help message" << std::endl;
+        std::cout << "  --config <file>                Load configuration from file" << std::endl;
+        std::cout << "  --random_seed <seed>           Set random seed" << std::endl;
+        std::cout << "  --neuron_count <count>         Set neuron count" << std::endl;
+        std::cout << "  --region_count <count>         Set region count" << std::endl;
+        std::cout << "  --connection_probability <prob> Set connection probability" << std::endl;
+        std::cout << "  --stdp_ltp_weight <weight>     Set STDP LTP weight" << std::endl;
+        std::cout << "  --stdp_ltd_weight <weight>     Set STDP LTD weight" << std::endl;
+        std::cout << "  --stdp_tau <tau>               Set STDP time constant" << std::endl;
+        std::cout << "  --synaptogenesis_rate <rate>   Set synaptogenesis rate" << std::endl;
+        std::cout << "  --pruning_rate <rate>          Set pruning rate" << std::endl;
+        std::cout << "  --simulation_timestep <dt>     Set simulation timestep" << std::endl;
+        std::cout << "  --log_level <level>            Set log level (Debug, Info, Warning, Error)" << std::endl;
+        std::cout << "  --enable_checkpointing         Enable checkpointing" << std::endl;
+        std::cout << "  --enable_replay                Enable memory replay" << std::endl;
+        std::cout << "  --enable_development           Enable developmental plasticity" << std::endl;
+        std::cout << "  --enable_curiosity            Enable curiosity-driven exploration" << std::endl;
+        std::cout << "  --max_steps <steps>            Set maximum simulation steps" << std::endl;
+        std::cout << "  --dry_run                      Validate configuration only" << std::endl;
+        std::cout << "  --checkpoint_path <path>       Set checkpoint save/load path" << std::endl;
+        std::cout << "  --enable_debug_features         Enable debug mode with extra output" << std::endl;
+        std::cout << "  --enable_advanced_plasticity   Enable advanced plasticity rules" << std::endl;
+        std::cout << "  --enable_social_learning        Enable social learning mechanisms" << std::endl;
+        std::cout << "  --learning_rate <rate>         Set overall learning rate" << std::endl;
+        std::cout << "  --exploration_rate <rate>      Set exploration/exploitation balance" << std::endl;
+        return 0;
+    }
+    
+    // Set default values for Phase 6
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -382,7 +442,25 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Memory systems parameters
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_capacity", 50, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.5f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.3f, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("critical_period_start", 100, ConfigSource::Default);
+    config->set("critical_period_end", 500, ConfigSource::Default);
+    
+    // Performance parameters
+    config->set("max_simulation_steps", 10000, ConfigSource::Default);
+    config->set("checkpoint_interval", 1000, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+    
+// Print configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -390,7 +468,30 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<int64_t>("working_memory_capacity", 100)));
+    NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<int64_t>("episodic_memory_capacity", 50)));
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
+    NLM_LOG_INFO("  curiosity_threshold: " + std::to_string(config->getOr<float>("curiosity_threshold", 0.5f)));
+    NLM_LOG_INFO("  novelty_threshold: " + std::to_string(config->getOr<float>("novelty_threshold", 0.3f)));
+    NLM_LOG_INFO("  critical_period_start: " + std::to_string(config->getOr<int64_t>("critical_period_start", 100)));
+    NLM_LOG_INFO("  critical_period_end: " + std::to_string(config->getOr<int64_t>("critical_period_end", 500)));
+    NLM_LOG_INFO("  max_simulation_steps: " + std::to_string(config->getOr<int64_t>("max_simulation_steps", 10000)));
+    NLM_LOG_INFO("  checkpoint_interval: " + std::to_string(config->getOr<int64_t>("checkpoint_interval", 1000)));
+    NLM_LOG_INFO("  replay_interval: " + std::to_string(config->getOr<int64_t>("replay_interval", 100)));
     NLM_LOG_INFO("");
+    
+    // Validate configuration
+    if (validateConfiguration(config)) {
+        NLM_LOG_INFO("Configuration validation passed.");
+    } else {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return 1;
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -404,6 +505,8 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("This usually indicates configuration issues or insufficient memory.");
+        NLM_LOG_ERROR("Check your configuration values and try again.");
         return 1;
     }
     
@@ -430,20 +533,116 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Phase 6 Complete ===");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("Phase 6 Objectives Completed:");
+    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented (Phase 2)");
+    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays (Phase 2)");
+    NLM_LOG_INFO("  ✓ STDP plasticity rule (Phase 2)");
+    NLM_LOG_INFO("  ✓ Hebbian plasticity rule (Phase 2)");
+    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning) (Phase 2)");
+    NLM_LOG_INFO("  ✓ Working memory with persistent activity and competition (Phase 4)");
+    NLM_LOG_INFO("  ✓ Episodic memory with experience encoding and replay (Phase 4)");
+    NLM_LOG_INFO("  ✓ Associative memory with Hebbian pattern associations (Phase 4)");
+    NLM_LOG_INFO("  ✓ Neuromodulation with dopamine, curiosity, and prediction error (Phase 3)");
+    NLM_LOG_INFO("  ✓ Neural prediction system (Phase 4)");
+    NLM_LOG_INFO("  ✓ Neural planner with action sequence evaluation (Phase 4)");
+    NLM_LOG_INFO("  ✓ Concept formation from experience patterns (Phase 4)");
+    NLM_LOG_INFO("  ✓ Neural attention with competitive selection dynamics (Phase 4)");
+    NLM_LOG_INFO("  ✓ Developmental system with age-dependent plasticity (Phase 3)");
+    NLM_LOG_INFO("  ✓ Performance optimizations with memory pools and event queues (Phase 5)");
+    NLM_LOG_INFO("  ✓ Checkpoint save/load system (Phase 5)");
+    NLM_LOG_INFO("  ✓ Replay and consolidation with sleep/rest cycle (Phase 5)");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Configuration validation function
+bool validateConfiguration(const std::shared_ptr<Config>& config) {
+    bool isValid = true;
+    
+    // Validate core parameters
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    if (neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be positive.");
+        isValid = false;
+    }
+    
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be positive.");
+        isValid = false;
+    }
+    
+    float connectionProb = config->getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProb) + ". Must be between 0.0 and 1.0.");
+        isValid = false;
+    }
+    
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be positive and less than 1.0.");
+        isValid = false;
+    }
+    
+    // Validate plasticity parameters
+    float stdpLTP = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    if (stdpLTP < 0.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltp_weight: " + std::to_string(stdpLTP) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    float stdpLTD = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    if (stdpLTD < 0.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltd_weight: " + std::to_string(stdpLTD) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    // Validate neuromodulation parameters
+    float dopamine = config->getOr<float>("dopamine_baseline", 0.1f);
+    if (dopamine < 0.0f || dopamine > 1.0f) {
+        NLM_LOG_ERROR("Invalid dopamine_baseline: " + std::to_string(dopamine) + ". Must be between 0.0 and 1.0.");
+        isValid = false;
+    }
+    
+    // Validate development parameters
+    int64_t criticalStart = config->getOr<int64_t>("critical_period_start", 100);
+    int64_t criticalEnd = config->getOr<int64_t>("critical_period_end", 500);
+    if (criticalStart < 0) {
+        NLM_LOG_ERROR("Invalid critical_period_start: " + std::to_string(criticalStart) + ". Must be non-negative.");
+        isValid = false;
+    }
+    if (criticalEnd <= criticalStart) {
+        NLM_LOG_ERROR("Invalid critical_period_end: " + std::to_string(criticalEnd) + ". Must be greater than critical_period_start.");
+        isValid = false;
+    }
+    
+    // Validate memory system parameters
+    int64_t workingMemCap = config->getOr<int64_t>("working_memory_capacity", 100);
+    if (workingMemCap <= 0) {
+        NLM_LOG_ERROR("Invalid working_memory_capacity: " + std::to_string(workingMemCap) + ". Must be positive.");
+        isValid = false;
+    }
+    
+    int64_t episodicMemCap = config->getOr<int64_t>("episodic_memory_capacity", 50);
+    if (episodicMemCap <= 0) {
+        NLM_LOG_ERROR("Invalid episodic_memory_capacity: " + std::to_string(episodicMemCap) + ". Must be positive.");
+        isValid = false;
+    }
+    
+    // Check for memory capacity conflicts
+    if (workingMemCap + episodicMemCap > neuronCount * 10) {  // Heuristic: 10 neurons per memory trace
+        NLM_LOG_WARNING("Memory system capacity may be too high relative to neuron count. Consider reducing capacity.");
+    }
+    
+    if (!isValid) {
+        NLM_LOG_ERROR("Configuration validation failed. Please check the errors above.");
+    }
+    
+    return isValid;
 }

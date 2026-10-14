@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Important Update: This guide covers NLM Phase 6 - Final Integration**
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -177,24 +179,52 @@ Updates the virtual world by `time` seconds.
 Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
+    Reads the brain's motor neurons to decide what action to take.
+    
 ---
 
-## Mini Projects
+## Advanced Features for Power Users
 
-### Project 1: Silent Brain (Just Neurons)
+NLM Phase 6 includes many advanced features for researchers and developers. Here are some key capabilities:
+
+### Pattern 4: Enable Learning and Development
 
 ```python
-import pynlm
+# Create configuration with learning enabled
+config = pynlm.createDefaultConfig()
+config.set("enable_reward_modulation", True)
+config.set("enable_structural_plasticity", True)
+config.set("enable_development", True)
+config.set("enable_curiosity", True)
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create and run with advanced features
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-for i in range(10):
-    brain.step(i)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
 
-print("Silent brain test done!")
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning mechanisms
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run simulation with learning
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 50 == 0:
+        print(f"Step {step}: Firing={brain.getFiringNeuronCount()}, "
+              f"Reward={world.getReward():.3f}")
 ```
 
 ### Project 2: Brain Watching a World
