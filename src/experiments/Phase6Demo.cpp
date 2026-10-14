@@ -51,14 +51,18 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with optimized settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = 200;
+    config.maxSteps = 1000;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.enableNeuromodulation = true;
+    config.enablePrediction = true;
+    config.enableCognition = true;
+    config.checkpointPath = "./nlm_phase6_demo_checkpoint.bin";
     
     auto result = experiment.run(config);
     
