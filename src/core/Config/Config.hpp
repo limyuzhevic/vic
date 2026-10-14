@@ -43,6 +43,13 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Helper functions
+namespace config_helpers {
+    std::string detectFileFormat(const std::string& filepath);
+    bool jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue);
+    bool configValueToJSON(const ConfigValue& configValue, nlohmann::json& jsonValue);
+} // namespace config_helpers
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +62,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports .cfg, .json, .yaml formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,13 +100,27 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+        // Configuration validation
+    std::string validate() const;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal loading methods
+    bool loadFromSimpleFile(const std::string& filepath);
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool setFromJSONValue(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source);
+};
+
+class ConfigValidator {
+public:
+    static ValidationResult validate(const Config& config);
 };
 
 } // namespace nlm

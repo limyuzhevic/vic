@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -18,10 +19,32 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+static std::string detectFileFormat(const std::string& filepath) {
+    std::string extension = std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
+    if (extension == ".json" || extension == ".jsn") {
+        return "json";
+    } else if (extension == ".yaml" || extension == ".yml") {
+        return "yaml";
+    } else {
+        return "cfg";  // Default to simple config format
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    auto format = detectFileFormat(filepath);
+    
+    if (format == "json") {
+        return loadFromJSONFile(filepath);
+    } else if (format == "yaml") {
+        return loadFromYAMLFile(filepath);
+    } else {
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +66,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -53,6 +76,87 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        for (const auto& [key, value] : jsonData.items()) {
+            setFromJSONValue(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Add YAML parsing when libyaml-cpp is available
+    // For now, fall back to simple parsing
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::setFromJSONValue(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source) {
+    try {
+        ConfigValue configValue;
+        
+        if (jsonValue.is_string()) {
+            configValue = jsonValue.get<std::string>();
+        } else if (jsonValue.is_boolean()) {
+            configValue = jsonValue.get<bool>();
+        } else if (jsonValue.is_number_integer()) {
+            configValue = jsonValue.get<int64_t>();
+        } else if (jsonValue.is_number_unsigned()) {
+            configValue = jsonValue.get<uint64_t>();
+        } else if (jsonValue.is_number_float()) {
+            configValue = jsonValue.get<double>();
+        } else if (jsonValue.is_array()) {
+            // Handle arrays - convert to vector based on element type
+            if (!jsonValue.empty()) {
+                const auto& firstElement = jsonValue[0];
+                if (firstElement.is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    intArray.reserve(jsonValue.size());
+                    for (const auto& item : jsonValue) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    configValue = intArray;
+                } else if (firstElement.is_number_float()) {
+                    std::vector<double> doubleArray;
+                    doubleArray.reserve(jsonValue.size());
+                    for (const auto& item : jsonValue) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else if (firstElement.is_string()) {
+                    std::vector<std::string> stringArray;
+                    stringArray.reserve(jsonValue.size());
+                    for (const auto& item : jsonValue) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    configValue = stringArray;
+                }
+            }
+        }
+        
+        if (!std::holds_alternative<std::monostate>(configValue)) {
+            set(key, configValue, source);
+            return true;
+        }
+        
+    } catch (const std::exception& e) {
+        // Silently ignore malformed JSON values
+    }
+    
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,14 +183,36 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    auto format = detectFileFormat(filepath);
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (format == "json") {
+        nlohmann::json jsonData;
+        for (const auto& entry : pImpl->entries) {
+            configValueToJSON(entry.value, jsonData[entry.key]);
+        }
+        file << jsonData.dump(2);
+    } else {
+        // For simple .cfg format, write in key=value format
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            file << "\n\n";
+        }
     }
     
     return true;

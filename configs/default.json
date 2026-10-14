@@ -1,0 +1,63 @@
+# NLM Configuration File
+# This is the default configuration for Phase 6 (Final Integration)
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 500
+
+# Number of brain regions
+region_count = 1
+
+# Connection probability for random connectivity
+connection_probability = 0.15
+
+# Plasticity settings
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+plasticity_learning_rate = 0.01
+
+# Structural plasticity parameters
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Neuromodulation settings
+dopamine_baseline = 0.1
+
+# Memory system settings
+working_memory_capacity = 50
+max_episodes = 1000
+
+# Replay and consolidation intervals
+replay_interval = 100
+consolidation_interval = 1000
+
+# Reward settings
+reward_discount_factor = 0.99
+
+# Environment settings
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+
+# Logging settings
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+
+# Simulation settings
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
+
+# Visualization settings
+visualization_enabled = false
+visualization_update_rate = 30.0
+
+# Checkpoint settings
+checkpoint_dir = ./checkpoints
+checkpoint_interval = 10000
