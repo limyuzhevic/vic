@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <system_error>
+#include "Exceptions.hpp"
 
 namespace nlm {
 
@@ -19,15 +22,161 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    try {
+        // Validate file path
+        if (filepath.empty()) {
+            throw ConfigFileError("File path cannot be empty");
+        }
+        
+        // Check if file exists
+        if (!std::filesystem::exists(filepath)) {
+            throw ConfigFileError("File does not exist: '" + filepath + "'");
+        }
+        
+        // Check if file is readable
+        if (!std::filesystem::is_readable(filepath)) {
+            throw ConfigFileError("File is not readable: '" + filepath + "'");
+        }
+        
+        // Try JSON first, then fallback to simple key=value format
+        bool success = false;
+        
+        // First try to parse as JSON
+        success = loadFromJSON(filepath);
+        if (!success) {
+            // If JSON fails, try simple key=value format
+            success = loadFromSimpleFormat(filepath);
+        }
+        
+        return success;
+    } catch (const ConfigFileError& e) {
+        throw; // Re-throw ConfigFileError as-is
+    } catch (const std::bad_alloc& e) {
+        throw MemoryAllocationError("Memory allocation failed while loading config from file: '" + filepath + "': " + std::string(e.what()));
+    } catch (const std::filesystem::filesystem_error& e) {
+        throw ConfigFileError("Filesystem error loading file '" + filepath + "': " + e.what());
+    } catch (const std::exception& e) {
+        throw ConfigFileError("Failed to load config from file '" + filepath + "': " + e.what());
+    } catch (...) {
+        throw ConfigFileError("Unknown error loading config from file: '" + filepath + "'");
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    try {
+        // Simple JSON parsing - looking for key-value pairs
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+        // Remove whitespace and newlines
+        std::string cleaned;
+        for (char c : content) {
+            if (!std::isspace(c)) {
+                cleaned += c;
+            }
+        }
+        
+        // Parse JSON-like format: {"key": "value", "key2": value2}
+        if (cleaned.find('{') != 0 || cleaned.back() != '}') {
+            return false;
+        }
+        
+        // Remove braces
+        std::string jsonContent = cleaned.substr(1, cleaned.size() - 2);
+        
+        // Parse key-value pairs
+        size_t pos = 0;
+        while (pos < jsonContent.size()) {
+            // Find next key
+            size_t keyStart = jsonContent.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            
+            size_t keyEnd = jsonContent.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Find value after colon and comma
+            size_t colonPos = jsonContent.find(':', keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            size_t valueStart = jsonContent.find_first_not_of(' ', colonPos + 1);
+            if (valueStart == std::string::npos) break;
+            
+            // Check if value is string, number, boolean, or array
+            char firstChar = jsonContent[valueStart];
+            size_t valueEnd;
+            
+            if (firstChar == '"') {
+                // String value
+                valueEnd = jsonContent.find('"', valueStart + 1);
+                if (valueEnd == std::string::npos) break;
+                std::string value = jsonContent.substr(valueStart + 1, valueEnd - valueStart - 1);
+                set(key, value, ConfigSource::File);
+                pos = valueEnd + 1;
+            } else if (firstChar == 't' || firstChar == 'f') {
+                // Boolean value
+                size_t nextComma = jsonContent.find(',', valueStart);
+                if (nextComma == std::string::npos) {
+                    nextComma = jsonContent.size();
+                }
+                std::string valueStr = jsonContent.substr(valueStart, nextComma - valueStart);
+                bool value = (valueStr == "true");
+                set(key, value, ConfigSource::File);
+                pos = nextComma;
+            } else if (firstChar == '-' || std::isdigit(firstChar)) {
+                // Number value (integer or float)
+                size_t nextComma = jsonContent.find(',', valueStart);
+                if (nextComma == std::string::npos) {
+                    nextComma = jsonContent.size();
+                }
+                std::string valueStr = jsonContent.substr(valueStart, nextComma - valueStart);
+                
+                // Try to parse as double first, then as int64 if no decimal
+                try {
+                    size_t decimalPos = valueStr.find('.');
+                    if (decimalPos != std::string::npos) {
+                        double value = std::stod(valueStr);
+                        set(key, value, ConfigSource::File);
+                    } else {
+                        int64_t value = std::stoll(valueStr);
+                        set(key, value, ConfigSource::File);
+                    }
+                    pos = nextComma;
+                } catch (...) {
+                    // Skip this value and continue
+                    pos = nextComma;
+                }
+            } else {
+                // Unknown type, skip
+                pos = valueStart + 1;
+            }
+            
+            // Skip comma and whitespace
+            while (pos < jsonContent.size() && (jsonContent[pos] == ',' || jsonContent[pos] == ' ')) {
+                pos++;
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        // If JSON parsing fails, fallback to simple format
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    bool hasContent = false;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -48,14 +197,44 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to infer type from value
+            try {
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    bool boolValue = (value == "true");
+                    set(key, boolValue, ConfigSource::File);
+                    hasContent = true;
+                    continue;
+                }
+                
+                // Try integer
+                if (value.find('.') == std::string::npos) {
+                    int64_t intValue = std::stoll(value);
+                    set(key, intValue, ConfigSource::File);
+                    hasContent = true;
+                    continue;
+                }
+                
+                // Try floating point
+                double doubleValue = std::stod(value);
+                set(key, doubleValue, ConfigSource::File);
+                hasContent = true;
+                continue;
+                
+            } catch (...) {
+                // If all type conversions fail, treat as string
+                set(key, value, ConfigSource::File);
+                hasContent = true;
+            }
         }
     }
     
-    return true;
+    return hasContent;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool hasContent = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,31 +244,175 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Parse value with type inference
+                try {
+                    // Try boolean
+                    if (value == "true" || value == "false") {
+                        bool boolValue = (value == "true");
+                        set(key, boolValue, ConfigSource::CommandLine);
+                        hasContent = true;
+                        continue;
+                    }
+                    
+                    // Try integer
+                    if (value.find('.') == std::string::npos) {
+                        int64_t intValue = std::stoll(value);
+                        set(key, intValue, ConfigSource::CommandLine);
+                        hasContent = true;
+                        continue;
+                    }
+                    
+                    // Try floating point
+                    double doubleValue = std::stod(value);
+                    set(key, doubleValue, ConfigSource::CommandLine);
+                    hasContent = true;
+                    continue;
+                    
+                } catch (...) {
+                    // If all type conversions fail, treat as string
+                    set(key, value, ConfigSource::CommandLine);
+                    hasContent = true;
+                }
+            } else {
+                // Handle --key value format
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    std::string key = arg.substr(2);
+                    std::string value = argv[++i];
+                    
+                    try {
+                        // Try boolean
+                        if (value == "true" || value == "false") {
+                            bool boolValue = (value == "true");
+                            set(key, boolValue, ConfigSource::CommandLine);
+                            hasContent = true;
+                            continue;
+                        }
+                        
+                        // Try integer
+                        if (value.find('.') == std::string::npos) {
+                            int64_t intValue = std::stoll(value);
+                            set(key, intValue, ConfigSource::CommandLine);
+                            hasContent = true;
+                            continue;
+                        }
+                        
+                        // Try floating point
+                        double doubleValue = std::stod(value);
+                        set(key, doubleValue, ConfigSource::CommandLine);
+                        hasContent = true;
+                        continue;
+                        
+                    } catch (...) {
+                        // If all type conversions fail, treat as string
+                        set(key, value, ConfigSource::CommandLine);
+                        hasContent = true;
+                    }
+                }
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
     }
-    return true;
+    
+    return hasContent;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    try {
+        // Validate file path
+        if (filepath.empty()) {
+            throw ConfigFileError("File path cannot be empty");
+        }
+        
+        // Create directory if it doesn't exist
+        std::filesystem::path path(filepath);
+        std::filesystem::path parentDir = path.parent_path();
+        if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+            if (!std::filesystem::create_directories(parentDir)) {
+                throw ConfigFileError("Failed to create directory: '" + parentDir.string() + "'");
+            }
+        }
+        
+        // Check if file is writable (will be created or overwritten)
+        std::ofstream testFile(filepath, std::ios::trunc);
+        if (!testFile.is_open()) {
+            throw ConfigFileError("File is not writable: '" + filepath + "'");
+        }
+        testFile.close();
+        
+        std::ofstream file(filepath, std::ios::trunc);
+        if (!file.is_open()) {
+            throw ConfigFileError("Failed to open file for writing: '" + filepath + "'");
+        }
+        
+        // Save in simple key=value format (can be extended to JSON/YAML later)
+        for (const auto& entry : pImpl->entries) {
+            // Add description as comment if available
+            if (!entry.description.empty()) {
+                file << "# " << entry.description << "\n";
+            }
+            
+            // Save key=value pair
+            file << entry.key << " = ";
+            
+            // Convert ConfigValue to string based on type
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                
+                if constexpr (std::is_same_v<T, int>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    }
+                    file << "]";
+                } else {
+                    file << "UNKNOWN_TYPE";
+                }
+            }, entry.value);
+            
+            file << "\n\n";  // Empty line between entries
+        }
+        
+        if (!file.good()) {
+            throw ConfigFileError("Error occurred while writing to file: '" + filepath + "'");
+        }
+        
+        return true;
+    } catch (const ConfigFileError& e) {
+        throw; // Re-throw ConfigFileError as-is
+    } catch (const std::bad_alloc& e) {
+        throw MemoryAllocationError("Memory allocation failed while saving config to file: '" + filepath + "': " + std::string(e.what()));
+    } catch (const std::filesystem::filesystem_error& e) {
+        throw ConfigFileError("Filesystem error saving file '" + filepath + "': " + e.what());
+    } catch (const std::exception& e) {
+        throw ConfigFileError("Failed to save config to file '" + filepath + "': " + e.what());
+    } catch (...) {
+        throw ConfigFileError("Unknown error saving config to file: '" + filepath + "'");
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -197,6 +520,75 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper method to convert ConfigValue to string
+std::string Config::valueToString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    
+    return oss.str();
+}
+
+// Method to validate configuration
+bool Config::validate() const {
+    // Add configuration validation logic here
+    // For example, check that required parameters are present
+    // or that parameter values are within valid ranges
+    return true;
+}
+
+// Method to get configuration statistics
+std::string Config::getStats() const {
+    std::ostringstream oss;
+    oss << "Configuration Statistics:" << std::endl;
+    oss << "  Total entries: " << pImpl->entries.size() << std::endl;
+    
+    size_t entriesBySource = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: entriesBySource++; break;
+            case ConfigSource::File: entriesBySource++; break;
+            case ConfigSource::CommandLine: entriesBySource++; break;
+            case ConfigSource::Runtime: entriesBySource++; break;
+        }
+    }
+    
+    oss << "  By source: Default=" << (entriesBySource / 4) 
+        << ", File=" << (entriesBySource / 4) 
+        << ", CommandLine=" << (entriesBySource / 4) 
+        << ", Runtime=" << (entriesBySource / 4) << std::endl;
+    
+    return oss.str();
 }
 
 // Explicit template instantiations

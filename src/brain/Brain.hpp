@@ -2,12 +2,10 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Exceptions.hpp"
 #include <memory>
 #include <string>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -43,6 +41,18 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// Helper macro for validation
+#define VALIDATE_STATE(condition, exception_type, message) \
+    if (!(condition)) { \
+        throw exception_type(message); \
+    }
+
+// Helper macro for null pointer check
+#define VALIDATE_NOT_NULL(ptr, exception_type, message) \
+    if ((ptr) == nullptr) { \
+        throw exception_type(message); \
+    }
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics

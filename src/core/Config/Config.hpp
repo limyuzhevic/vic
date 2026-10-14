@@ -93,6 +93,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced configuration methods
+    std::string valueToString(const ConfigValue& value) const;
+    bool validate() const;
+    std::string getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +105,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper methods for file loading
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
 };
 
 } // namespace nlm
