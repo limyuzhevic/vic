@@ -48,6 +48,16 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Real neuromodulation parameters
+    void setBaseline(float baseline);
+    void setBurstMagnitude(float magnitude);
+    void setDecayRate(float rate);
+    void setNoiseLevel(float noise);
+    
+    // Getters for observation
+    float getPredictionError() const;
+    float getBaseline() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

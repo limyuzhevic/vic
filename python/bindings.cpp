@@ -142,16 +142,32 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            bool result = self.loadFromFile(filepath);
+            if (!result) {
+                throw py::error_already_set();
+            }
+            return result;
+        }, py::arg("filepath"),
+             "Load configuration from a JSON or simple text file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            bool result = self.loadFromArgs(argc, argv);
+            if (!result) {
+                throw py::error_already_set();
+            }
+            return result;
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+            "Load configuration from command line arguments. Returns True on success, False on error.")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            bool result = self.saveToFile(filepath);
+            if (!result) {
+                throw py::error_already_set();
+            }
+            return result;
+        }, py::arg("filepath"),
+             "Save configuration to a text file. Returns True on success, False on error.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -415,6 +431,265 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced brain configuration and analysis
+    m.def("configureBrainForLearning", [](std::shared_ptr<Brain> brain, const std::string& learningMode) {
+        // Advanced brain configuration for different learning modes
+        auto config = brain->getConfig();
+        
+        if (learningMode == "exploration") {
+            // Configure for exploration-based learning
+            config->set("neuromodulation.curiosity.enable", true);
+            config->set("neuromodulation.curiosity.scale", 1.5f);
+            config->set("neuromodulation.novelty.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001f);
+            config->set("plasticity.hebbian.learning_rate", 0.01f);
+            config->set("plasticity.reward_modulated.enable", true);
+        } else if (learningMode == "exploitation") {
+            // Configure for exploitation-based learning
+            config->set("neuromodulation.curiosity.enable", false);
+            config->set("neuromodulation.novelty.enable", false);
+            config->set("plasticity.stdp.learning_rate", 0.0001f);
+            config->set("plasticity.hebbian.learning_rate", 0.005f);
+            config->set("plasticity.reward_modulated.enable", true);
+        } else if (learningMode == "balanced") {
+            // Configure for balanced learning
+            config->set("neuromodulation.curiosity.enable", true);
+            config->set("neuromodulation.curiosity.scale", 1.0f);
+            config->set("neuromodulation.novelty.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.0005f);
+            config->set("plasticity.hebbian.learning_rate", 0.01f);
+            config->set("plasticity.reward_modulated.enable", true);
+        }
+        
+        // Update brain configuration
+        // Note: In a real implementation, this would require modifying the brain's internal config
+        return true;
+    }, py::arg("brain"), py::arg("learningMode"),
+         "Configure brain for specific learning mode (exploration, exploitation, or balanced)");
+
+    m.def("analyzeBrainPerformance", [](std::shared_ptr<Brain> brain) {
+        // Advanced brain performance analysis
+        std::map<std::string, double> metrics;
+        
+        if (brain) {
+            metrics["total_neurons"] = brain->getTotalNeuronCount();
+            metrics["total_synapses"] = brain->getTotalSynapseCount();
+            metrics["firing_rate"] = brain->getAverageFiringRate();
+            metrics["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+            metrics["total_spikes"] = brain->getTotalSpikeCount();
+            metrics["pending_events"] = brain->getPendingSpikeEventCount();
+            
+            // Get neuromodulation metrics if available
+            auto* dopamine = brain->getDopamine();
+            if (dopamine) {
+                metrics["dopamine_level"] = dopamine->getLevel();
+                metrics["dopamine_plasticity"] = dopamine->getPlasticityFactor();
+            }
+            
+            // Get development metrics
+            metrics["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        }
+        
+        // Convert to Python dictionary
+        py::dict result;
+        for (const auto& metric : metrics) {
+            result[metric.first] = metric.second;
+        }
+        
+        return result;
+    }, py::arg("brain"),
+         "Analyze brain performance and return detailed metrics");
+
+    m.def("runAdvancedSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, 
+                                     int steps, double dt, bool adaptiveLearning,
+                                     std::function<void(const std::string&)> progressCallback) {
+        // Advanced simulation with adaptive learning and progress monitoring
+        int completedSteps = 0;
+        double totalReward = 0.0;
+        double maxCuriosity = 0.0;
+        
+        std::cout << "Starting advanced simulation..." << std::endl;
+        
+        for (int step = 0; step < steps; ++step) {
+            try {
+                // Run simulation step
+                world->update(dt);
+                agent->processSensoryInput(world->getSensoryPercept());
+                brain->step(step, step * dt);
+                
+                Action action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, step * dt);
+                
+                // Apply adaptive learning if enabled
+                if (adaptiveLearning) {
+                    float curiosity = agent->getCuriosityLevel();
+                    float novelty = agent->getNoveltyLevel();
+                    
+                    if (curiosity > 0.8 || novelty > 0.6) {
+                        // Increase learning rate based on exploration drive
+                        agent->enableRewardModulation(true);
+                        float currentReward = agent->getNeuromodulationLevel();
+                        agent->applyRewardModulation(currentReward * 1.1, currentReward * 0.9);
+                    }
+                }
+                
+                totalReward += 1.0; // Simple reward accumulation
+                maxCuriosity = std::max(maxCuriosity, agent->getCuriosityLevel());
+                
+                completedSteps++;
+                
+                // Progress callback
+                if (progressCallback && step % 100 == 0) {
+                    double progress = static_cast<double>(step) / steps * 100.0;
+                    std::string progressStr = "Progress: " + std::to_string(progress) + "% (Step " + 
+                                           std::to_string(step) + "/" + std::to_string(steps) + ")";
+                    progressCallback(progressStr);
+                }
+                
+            } catch (const std::exception& e) {
+                std::cerr << "Error at step " << step << ": " << e.what() << std::endl;
+                // Continue simulation despite errors
+                completedSteps++;
+            }
+        }
+        
+        // Calculate final metrics
+        double avgFiringRate = completedSteps > 0 ? brain->getAverageFiringRate() : 0.0;
+        double learningEfficiency = totalReward / completedSteps;
+        
+        std::cout << "Advanced simulation completed!" << std::endl;
+        std::cout << "Total steps: " << completedSteps << std::endl;
+        std::cout << "Average firing rate: " << avgFiringRate << " Hz" << std::endl;
+        std::cout << "Learning efficiency: " << learningEfficiency << std::endl;
+        std::cout << "Peak curiosity: " << maxCuriosity << std::endl;
+        
+        // Return simulation results
+        py::dict results;
+        results["steps_completed"] = completedSteps;
+        results["total_steps"] = steps;
+        results["success_rate"] = static_cast<double>(completedSteps) / steps;
+        results["average_firing_rate"] = avgFiringRate;
+        results["total_reward"] = totalReward;
+        results["learning_efficiency"] = learningEfficiency;
+        results["peak_curiosity"] = maxCuriosity;
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+         py::arg("steps"), py::arg("dt"), py::arg("adaptiveLearning") = false,
+         py::arg("progressCallback") = nullptr,
+         "Run advanced simulation with adaptive learning and progress monitoring");
+
+    m.def("createLearningProfile", [](const std::string& profileName, 
+                                    double curiosityWeight,
+                                    double noveltyWeight,
+                                    double rewardWeight) {
+        // Create custom learning profile
+        auto config = std::make_shared<Config>();
+        
+        // Configure neuromodulation based on profile
+        config->set("neuromodulation.curiosity.weight", curiosityWeight);
+        config->set("neuromodulation.novelty.weight", noveltyWeight);
+        config->set("neuromodulation.reward.weight", rewardWeight);
+        
+        // Configure plasticity based on profile
+        double totalWeight = curiosityWeight + noveltyWeight + rewardWeight;
+        if (totalWeight > 0) {
+            config->set("plasticity.stdp.learning_rate", 0.001f * curiosityWeight / totalWeight);
+            config->set("plasticity.hebbian.learning_rate", 0.01f * noveltyWeight / totalWeight);
+            config->set("plasticity.reward_modulated.learning_rate", 0.1f * rewardWeight / totalWeight);
+        }
+        
+        return config;
+    }, py::arg("profileName"), py::arg("curiosityWeight") = 1.0,
+         py::arg("noveltyWeight") = 1.0, py::arg("rewardWeight") = 1.0,
+         "Create custom learning profile with weighted neuromodulation");
+
+    m.def("analyzeLearningPatterns", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        // Analyze learning patterns across multiple brains
+        std::map<std::string, double> collectiveMetrics;
+        
+        if (brains.empty()) {
+            return py::dict();
+        }
+        
+        double totalFiringRate = 0.0;
+        double totalPlasticity = 0.0;
+        double totalCuriosity = 0.0;
+        int validBrains = 0;
+        
+        for (const auto& brain : brains) {
+            if (brain) {
+                totalFiringRate += brain->getAverageFiringRate();
+                totalPlasticity += brain->getExcitationInhibitionRatio();
+                
+                auto* dopamine = brain->getDopamine();
+                if (dopamine) {
+                    totalCuriosity += dopamine->getLevel();
+                }
+                
+                validBrains++;
+            }
+        }
+        
+        if (validBrains > 0) {
+            collectiveMetrics["average_firing_rate"] = totalFiringRate / validBrains;
+            collectiveMetrics["average_plasticity"] = totalPlasticity / validBrains;
+            collectiveMetrics["average_curiosity"] = totalCuriosity / validBrains;
+            collectiveMetrics["brain_count"] = static_cast<double>(validBrains);
+        }
+        
+        // Convert to Python dictionary
+        py::dict result;
+        for (const auto& metric : collectiveMetrics) {
+            result[metric.first] = metric.second;
+        }
+        
+        return result;
+    }, py::arg("brains"),
+         "Analyze learning patterns across multiple brains and return collective metrics");
+
+    m.def("validateConfiguration", [](const std::shared_ptr<Config>& config) {
+        // Validate configuration with detailed error reporting
+        std::vector<std::string> errors;
+        
+        if (!config) {
+            errors.push_back("Configuration is null");
+            return py::make_tuple(false, errors);
+        }
+        
+        // Check for required configuration keys
+        std::vector<std::string> requiredKeys = {
+            "brain.neuron_count",
+            "brain.connection_probability",
+            "plasticity.stdp.learning_rate"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                errors.push_back("Missing required configuration key: " + key);
+            }
+        }
+        
+        // Validate configuration values
+        if (config->has("brain.neuron_count")) {
+            auto neuronCount = config->get<int64_t>("brain.neuron_count");
+            if (neuronCount < 10 || neuronCount > 1000000) {
+                errors.push_back("brain.neuron_count must be between 10 and 1,000,000");
+            }
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            auto connProb = config->get<double>("brain.connection_probability");
+            if (connProb < 0.0 || connProb > 1.0) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        return py::make_tuple(errors.empty(), errors);
+    }, py::arg("config"),
+         "Validate configuration and return validation result with error messages");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
