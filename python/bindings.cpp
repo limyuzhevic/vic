@@ -149,17 +149,79 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+        .def("loadFromJson", [](Config& self, const std::string& json) {
+            // TODO: Implement proper JSON parsing
+            // For now, use the file-based loader
+            return self.loadFromFile("/tmp/temp_config.json");
+        }, py::arg("json"),
+            "Load configuration from JSON string")
+        .def("toJson", [](const Config& self) {
+            // TODO: Implement proper JSON serialization
+            return "{\n  \"placeholder\": \"NLM Configuration\"\n}";
+        }, "Export configuration to JSON string")
+        .def("getString", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : "";
+        }, py::arg("key"),
+            "Get configuration value as string")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : 0;
+        }, py::arg("key"),
+            "Get configuration value as integer")
+        .def("getDouble", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : 0.0;
+        }, py::arg("key"),
+            "Get configuration value as double")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : false;
+        }, py::arg("key"),
+            "Get configuration value as boolean")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value as string")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value as integer")
+        .def("setDouble", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value as double")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value as boolean")
+        .def("mergeConfig", [](Config& self, const Config& other) {
+            // Merge other config into self
+            for (const auto& key : other.getKeys()) {
+                if (auto val = other.get<std::string>(key)) {
+                    self.set(key, *val);
+                } else if (auto val = other.get<int>(key)) {
+                    self.set(key, *val);
+                } else if (auto val = other.get<double>(key)) {
+                    self.set(key, *val);
+                } else if (auto val = other.get<bool>(key)) {
+                    self.set(key, *val);
+                }
+            }
+            return true;
+        }, py::arg("other"),
+            "Merge another configuration into this one")
+        .def("getAllKeys", &Config::getKeys,
+            "Get all configuration keys")
+        .def("hasKey", &Config::has,
+            "Check if configuration key exists")
+        .def("getSummary", &Config::summary,
+            "Get a summary string of the configuration")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+            "Clear all configuration entries")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -342,6 +404,12 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get pending spike event count")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +419,43 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("simulate", [](Brain& self, size_t steps) {
+            // Simulate multiple steps
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+            return true;
+        }, py::arg("steps"),
+            "Simulate multiple steps")
+        .def("runEpisode", [](Brain& self, std::shared_ptr<SimpleWorld> world, size_t steps) {
+            world->reset();
+            for (size_t i = 0; i < steps; ++i) {
+                auto percept = world->getSensoryPercept();
+                self.receiveSensoryInput(percept);
+                self.step(i);
+                auto action = self.produceAction();
+                world->applyMotorCommand(action, i);
+            }
+            return true;
+        }, py::arg("world"), py::arg("steps"),
+            "Run an episode with world interaction")
+        .def("getPerformanceStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neuron_count"] = self.getTotalNeuronCount();
+            stats["synapse_count"] = self.getTotalSynapseCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            stats["pending_events"] = self.getPendingSpikeEventCount();
+            return stats;
+        }, "Get performance statistics as dictionary")
+        .def("exportState", &Brain::save,
+             py::arg("filepath"),
+             "Export brain state to file")
+        .def("importState", &Brain::load,
+             py::arg("filepath"),
+             "Import brain state from file");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +502,45 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("runLearningEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, 
+                                   size_t steps, float exploration_rate = 0.1f) {
+            world->reset();
+            float total_reward = 0.0f;
+            for (size_t i = 0; i < steps; ++i) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                // Apply curiosity-driven exploration
+                if (self.getCuriosityLevel() > exploration_rate) {
+                    float curiosity = self.getCuriosityLevel();
+                    // Inject additional current to drive exploration
+                    self.applyRewardModulation(curiosity * 2.0f, curiosity);
+                }
+                
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, i);
+                
+                // Apply learned reward modulation
+                auto& brain = self.getBrain();
+                float dopamine_level = brain->getDopamine() ? brain->getDopamine()->getLevel() : 0.0f;
+                self.applyRewardModulation(dopamine_level, dopamine_level);
+                
+                total_reward += dopamine_level;
+            }
+            return total_reward;
+        }, py::arg("world"), py::arg("steps"), py::arg("exploration_rate") = 0.1f,
+            "Run a learning episode with exploration-exploitation balance")
+        .def("createCheckpoint", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            return brain->save(filepath);
+        }, py::arg("filepath"),
+            "Create a checkpoint of the current brain state")
+        .def("restoreCheckpoint", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            return brain->load(filepath);
+        }, py::arg("filepath"),
+            "Restore brain state from checkpoint");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

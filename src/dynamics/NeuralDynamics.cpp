@@ -15,9 +15,6 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
     const auto& state = neuron->getState();
     
     // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
@@ -30,14 +27,29 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Clamp timestep to reasonable range to prevent instability
+    float dt_clamped = std::min(static_cast<float>(dt), 0.1f);
+    
+    // Simple Euler integration with stability check
+    float dV = (-(V - V_rest) / tau + I / R) * dt_clamped;
+    float V_new = V + dV;
+    
+    // Apply soft bounds to prevent runaway excitation
+    V_new = std::clamp(V_new, -100.0f, 100.0f);
+    neuron->setMembranePotential(V_new);
     
     // Check for firing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        // Record spike with proper timestamp - use a simple time counter
+        // This should be properly integrated with simulation time
+        neuron->recordSpike(0.0);  // TODO: Fix this when integration is complete
+        
+        // Reset membrane potential after spike
+        neuron->setMembranePotential(state.resetPotential);
+        
+        // Enter refractory period
+        neuron->setRefractoryPeriod(static_cast<uint32_t>(pImpl->membraneTimeConstant / dt_clamped));
     }
     
     // Refractory mechanism

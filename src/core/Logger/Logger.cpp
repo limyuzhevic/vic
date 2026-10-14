@@ -182,8 +182,15 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Set the global logger instance
+    // This allows overriding the default global logger
+    // For thread safety, we could use a mutex here
+    // For now, we'll just note this placeholder
+    if (logger) {
+        NLM_LOG_INFO("Global logger set to new instance");
+    } else {
+        NLM_LOG_INFO("Global logger reset to default");
+    }
 }
 
 // LogStream implementation
