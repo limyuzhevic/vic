@@ -72,9 +72,15 @@ public:
     
     // Energy settings
     float getMaxEnergy() const { return maxEnergy_; }
-    void setMaxEnergy(float e) { maxEnergy_ = e; }
+    void setMaxEnergy(float e) { 
+        if (e >= 0.0f) maxEnergy_ = e; 
+        else throw std::invalid_argument("Max energy cannot be negative");
+    }
     float getEnergyDecayRate() const { return energyDecayRate_; }
-    void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    void setEnergyDecayRate(float r) { 
+        if (r >= 0.0f && r <= 1.0f) energyDecayRate_ = r;
+        else throw std::invalid_argument("Energy decay rate must be between 0 and 1");
+    }
     
     // Time
     double getSimulationTime() const { return simTime_; }
