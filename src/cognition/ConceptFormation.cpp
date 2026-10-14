@@ -291,12 +291,65 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
+void ConceptFormation::learnFromEpisodicMemory(const NeuralEpisodicMemory& episodicMemory) {
+    NLM_LOG_INFO("ConceptFormation: Learning from episodic memory");
+    
+    // Get all episodes from episodic memory
+    auto episodes = episodicMemory.getRecentEpisodes(100); // Get last 100 episodes
+    
+    for (const auto& episode : episodes) {
+        // Extract sensory pattern from episode
+        std::vector<float> pattern = episode.sensoryState;
+        
+        // Extract features from episode
+        std::vector<float> features;
+        
+        // Normalize position if present
+        if (episode.positionX != 0 || episode.positionY != 0) {
+            float posX = episode.positionX / 100.0f;  // Normalize to [0, 1]
+            float posY = episode.positionY / 100.0f;
+            features.push_back(posX);
+            features.push_back(posY);
+        }
+        
+        // Add action if present
+        if (episode.action != ActionType::Wait) {
+            // Convert action to feature vector
+            float actionFeat = static_cast<float>(episode.action) / 10.0f;  // Normalize
+            features.push_back(actionFeat);
+        }
+        
+        // Add reward feature
+        features.push_back(episode.reward);
+        
+        // Add novelty feature
+        features.push_back(episode.novelty);
+        
+        // Present this experience to concept formation
+        if (!pattern.empty()) {
+            size_t conceptId = presentExperience(pattern, features, 
+                                                  episode.reward, episode.timestamp);
+            
+            // Log concept creation if new
+            if (conceptId > 0 && conceptId <= nextConceptId_ - 1) {
+                NLM_LOG_INFO("ConceptFormation: New concept " + std::to_string(conceptId) +
+                           " formed from episode at position (" + 
+                           std::to_string(episode.positionX) + "," + 
+                           std::to_string(episode.positionY) + ")");
+            }
+        }
+    }
 }
 
-// SpatialRepresentation Implementation
+size_t ConceptFormation::getConceptForEpisode(const EpisodicMemoryItem& episode) {
+    if (episode.sensoryState.empty()) return 0;
+    
+    // Extract sensory pattern from episode
+    std::vector<float> pattern = episode.sensoryState;
+    
+    // Check if this pattern matches any existing concept
+    return findConceptForPattern(pattern);
+}
 struct SpatialRepresentation::Impl {
     Brain* brain;
     

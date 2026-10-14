@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , plannedAction_(ActionType::Wait)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -146,6 +147,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Neural planner integration
+    if (brain_ && brain_->getPlanner() && !vision.empty()) {
+        // Convert vision to state representation for planner
+        std::vector<float> currentState = vision;
+        
+        // Use neural planner to get better action selection
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+        
+        // Store for potential use in curiosity-based exploration
+        plannedAction_ = plannedAction;
     }
 }
 
@@ -331,7 +344,10 @@ float AgentBrain::getNoveltyLevel() const {
 }
 
 float AgentBrain::getPredictionError() const {
-    return predictionError_;
+    if (!brain_ || !brain_->getPredictionSystem()) {
+        return 0.0f;
+    }
+    return brain_->getPredictionSystem()->getPredictionError();
 }
 
 void AgentBrain::reset() {

@@ -110,6 +110,12 @@ public:
     // Get number of concepts discovered
     size_t getConceptCount() const { return concepts_.size(); }
 
+    // Learn from episodic memory (for integration)
+    void learnFromEpisodicMemory(const NeuralEpisodicMemory& episodicMemory);
+    
+    // Get concept for specific episode
+    size_t getConceptForEpisode(const EpisodicMemoryItem& episode);
+
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 

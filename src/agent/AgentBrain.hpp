@@ -46,11 +46,20 @@ public:
     // Get curiosity level
     float getCuriosityLevel() const;
     
-    // Get novelty level
-    float getNoveltyLevel() const;
-    
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // Get concept formation status
+    size_t getConceptCount() const;
+    
+    // Get episodic memory status
+    size_t getEpisodicMemoryCount() const;
+    
+    // Get novelty level
+    float getNoveltyLevel() const;
     
     // Reset agent for new episode
     void reset();
@@ -75,6 +84,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Neural planning results
+    ActionType plannedAction_;
     
     std::shared_ptr<Brain> brain_;
     

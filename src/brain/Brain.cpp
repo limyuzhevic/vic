@@ -4,6 +4,7 @@
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
+#include "../sensory/Vision.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
@@ -509,15 +510,92 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 8.5: Neural planner learns from episodic memory ==========
+    if (pImpl->planner && pImpl->episodicMemory) {
+        // Neural planner can learn from episodes to improve action planning
+        // It analyzes which actions led to good outcomes in past experiences
+        pImpl->planner->learnFromEpisodicMemory(*pImpl->episodicMemory);
+    }
+    
+    // ========== STEP 8.6: Neural planner evaluates current context ==========
+    if (pImpl->planner && !pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+        // Get most recent episode for context evaluation
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(1);
+        if (!recentEpisodes.empty()) {
+            // Neural planner can update its goal based on recent successful outcomes
+            const auto* latestEpisode = recentEpisodes[0];
+            if (latestEpisode->reward > 0.0f) {
+                // Set a goal that might lead to similar positive outcomes
+                // This is a simple integration - real implementation would be more sophisticated
+                pImpl->planner->setCurrentGoal(latestEpisode->sensoryState);
+            }
+        }
+    }
+    
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Extract current sensory state from sensory neurons
+        std::vector<float> currentSensoryData;
+        currentSensoryData.reserve(256);  // Vision data
+        
+        // Collect vision data from all sensory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            // Get the neuron's current state
+            auto state = neuron->getState();
+            currentSensoryData.push_back(state.membranePotential / 20.0f);  // Normalize to [0,1]
+        }
+        
+        if (!currentSensoryData.empty()) {
+            // Create a Vision input from the collected sensory data
+            auto currentInput = std::make_unique<Vision>(currentSensoryData.size(), 1, 1);
+            currentInput->setData(currentSensoryData);
+            
+            // Make prediction using brain's neural substrate
+            auto predicted = pImpl->predictionSystem->predictNextState(*currentInput);
+            
+            // Update prediction system with actual observation
+            pImpl->predictionSystem->updatePredictions(*currentInput, *predicted);
+            
+            // Train prediction system using brain's learning
+            pImpl->predictionSystem->train(*currentInput);
+            
+            // Integrate prediction error with neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.0f) {
+                // Use prediction error to modulate dopamine
+                if (pImpl->dopamine) {
+                    // Scale prediction error for dopamine modulation
+                    float dopamineSignal = std::min(1.0f, predictionError * 2.0f);
+                    pImpl->dopamine->setLevel(dopamineSignal);
+                }
+                
+                // Update prediction error signal for learning
+                if (pImpl->predictionError) {
+                    // Compute error using the actual value as both predicted and actual
+                    // In a real implementation, this would use a true forward model
+                    pImpl->predictionError->computeError(predictionError, predictionError);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
+        
+        // Apply neuromodulation effects on attention
+        // Acetylcholine enhances attention focus and selective processing
+        if (pImpl->dopamine) {
+            float noveltyLevel = pImpl->dopamine->getLevel();
+            // Novelty modulates attention salience
+            pImpl->attention->applyTopDownBias(noveltyLevel, 0.5f);
+        }
+        
+        if (pImpl->curiosity) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            // Curiosity modulates exploration-based attention
+            pImpl->attention->applyBottomUpSalience(curiosityLevel, 0.5f);
+        }
         
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {

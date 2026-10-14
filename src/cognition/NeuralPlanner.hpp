@@ -59,6 +59,18 @@ public:
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
 
+    // Learn from episodic memory (for integration)
+    void learnFromEpisodicMemory(const NeuralEpisodicMemory& episodicMemory);
+    
+    // Get action sequence that led to best outcome for current state
+    std::vector<ActionType> getBestActionSequence(const std::vector<float>& currentState,
+                                                float targetReward = 0.5f);
+    
+    // Evaluate planned action sequence using episode data
+    float evaluatePlannedSequenceWithExperience(const std::vector<ActionType>& actions,
+                                               const std::vector<float>& startState,
+                                               const EpisodicMemoryItem* episode = nullptr);
+
     // Clear planning cache
     void clearCache();
 

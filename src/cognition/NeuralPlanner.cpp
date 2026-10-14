@@ -237,22 +237,82 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
+void NeuralPlanner::learnFromEpisodicMemory(const NeuralEpisodicMemory& episodicMemory) {
+    NLM_LOG_INFO("NeuralPlanner: Learning action plans from episodic memory");
+    
+    // Get recent episodes from episodic memory
+    auto episodes = episodicMemory.getRecentEpisodes(100); // Get last 100 episodes
+    
+    for (const auto* episode : episodes) {
+        // Extract action from episode
+        ActionType action = episode->action;
+        
+        // Create a pattern representing the context-action-reward combination
+        std::vector<float> pattern;
+        
+        // Add position information if available
+        if (episode->positionX != 0 || episode->positionY != 0) {
+            float posX = episode->positionX / 100.0f;  // Normalize
+            float posY = episode->positionY / 100.0f;
+            pattern.push_back(posX);
+            pattern.push_back(posY);
+        }
+        
+        // Add reward as a feature
+        pattern.push_back(episode->reward);
+        
+        // Add novelty as a feature
+        pattern.push_back(episode->novelty);
+        
+        // Add action as a feature
+        float actionFeat = static_cast<float>(action) / 10.0f;  // Normalize
+        pattern.push_back(actionFeat);
+        
+        // Evaluate this action as a potential plan
+        float actionValue = evaluateAction(action, pattern);
+        
+        // Set action quality based on episode reward
+        setActionQuality(action, actionValue * episode->reward);
+        
+        // If this action led to good outcomes, consider it for planning
+        if (actionValue > 0.3f && episode->reward > 0.0f) {
+            // Store successful action sequence (single action for now)
+            std::vector<ActionType> successfulAction = {action};
+            PlanningCandidate candidate = evaluateSequence(successfulAction, pattern);
+            
+            if (candidate.expectedReward > 0.0f) {
+                NLM_LOG_INFO("NeuralPlanner: Action " + std::to_string(static_cast<int>(action)) +
+                           " learned from episode with reward " + std::to_string(episode->reward));
+            }
+        }
+    }
 }
 
-bool NeuralPlanner::wasRecentPlanSuccessful() const {
-    if (recentPlanSuccess_.empty()) return true;  // No data
+std::vector<ActionType> NeuralPlanner::getBestActionSequence(const std::vector<float>& currentState,
+                                                          float targetReward) {
+    // Get current best action based on planning
+    ActionType bestAction = planAction(currentState, targetReward);
     
-    size_t successCount = 0;
-    for (bool success : recentPlanSuccess_) {
-        if (success) ++successCount;
+    // Return single action (could be expanded to multi-step planning)
+    return {bestAction};
+}
+
+float NeuralPlanner::evaluatePlannedSequenceWithExperience(const std::vector<ActionType>& actions,
+                                                         const std::vector<float>& startState,
+                                                         const EpisodicMemoryItem* episode) {
+    // Evaluate the planned sequence
+    PlanningCandidate candidate = evaluateSequence(actions, startState);
+    
+    // If episode data is available, adjust evaluation based on episode outcome
+    if (episode) {
+        // Modify candidate reward based on actual episode outcome
+        float episodeMultiplier = (1.0f + episode->reward) * 0.5f;
+        candidate.expectedReward *= episodeMultiplier;
+        candidate.confidence *= (0.5f + episode->reward * 0.5f);
     }
     
-    return successCount > recentPlanSuccess_.size() / 2;
+    return candidate.expectedReward;
 }
-
-// SelfModel Implementation
 struct SelfModel::Impl {
     Brain* brain;
     
