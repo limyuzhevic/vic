@@ -55,43 +55,115 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Advanced configuration management
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from environment variables
+    bool loadFromEnvironment(const std::string& prefix = "NLM_");
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from JSON file (Phase 2)
+    bool loadFromJSON(const std::string& filepath);
     
-    // Get values
+    // Load from YAML file (Phase 3)
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Validate configuration against schema
+    bool validate() const;
+    
+    // Get configuration groups
+    std::vector<std::string> getGroups() const;
+    
+    // Add configuration group
+    void addGroup(const std::string& group, const std::string& description = "");
+    
+    // Move configuration entry to group
+    void moveToGroup(const std::string& key, const std::string& group);
+    
+    // Get configuration value with type checking
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    T getValidated(const std::string& key, const T& defaultValue) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Set configuration with validation
+    bool setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Configuration commands
+    bool executeCommand(const std::string& command);
+    std::vector<std::string> getAvailableCommands() const;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Configuration templates
+    bool saveTemplate(const std::string& name, const std::string& description = "");
+    bool loadTemplate(const std::string& name);
+    std::vector<std::string> getAvailableTemplates() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Configuration analysis
+    std::string analyze() const;
+    std::map<std::string, double> getStatistics() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Configuration migration
+    bool migrate(const std::string& fromVersion, const std::string& toVersion);
+    std::string getVersion() const;
+    void setVersion(const std::string& version);
     
-    // Clear all
-    void clear();
+    // Configuration comparison
+    bool equals(const Config& other) const;
+    std::string diff(const Config& other) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration backup/restore
+    bool backup(const std::string& filepath) const;
+    bool restore(const std::string& filepath);
+    
+    // Configuration search
+    std::vector<std::string> search(const std::string& pattern) const;
+    
+    // Configuration export/import
+    bool exportToJSON(const std::string& filepath, bool pretty = true) const;
+    bool exportToINI(const std::string& filepath) const;
+    
+    // Configuration history
+    void recordChange(const std::string& key, const ConfigValue& oldValue, const ConfigValue& newValue);
+    std::vector<std::pair<std::string, ConfigValue>> getHistory() const;
+    void clearHistory();
+    
+    // Configuration optimization
+    void optimize();
+    double getMemoryUsage() const;
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    size_t getGroupCount() const;
+    double getAverageValueLength() const;
+    
+    // Configuration cleanup
+    void removeUnused();
+    void removeOldEntries(ConfigSource source);
+    
+    // Configuration batch operations
+    void batchSet(const std::map<std::string, ConfigValue>& settings);
+    void batchRemove(const std::vector<std::string>& keys);
+    
+    // Configuration merge
+    void merge(const Config& other, bool overwrite = true);
+    
+    // Configuration diff
+    struct DiffEntry {
+        std::string key;
+        ConfigValue oldValue;
+        ConfigValue newValue;
+        ConfigSource source;
+        std::string timestamp;
+    };
+    
+    std::vector<DiffEntry> computeDiff(const Config& other) const;
+    
+    // Configuration validation rules
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
+    
+    void addValidationRule(const ValidationRule& rule);
+    void removeValidationRule(const std::string& key);
+    bool hasValidationRule(const std::string& key) const;
     
 private:
     struct Impl;
