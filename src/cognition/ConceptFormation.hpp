@@ -138,6 +138,18 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Update concept with new instance
+    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
+                      const std::vector<float>& features, float reward);
+
+    // Update concepts based on current brain state and recent experiences
+    // Called every simulation step to integrate concept formation into cognition
+    void update(float timestep, const std::vector<float>& currentState,
+               float reward, SimulationStep currentTime);
+
+    // Clear all concepts
+    void clear();
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,

@@ -554,4 +554,15 @@ float SocialLearning::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
+void NeuralPlanner::update(float timestep) {
+    // Update planning confidence based on temporal factors
+    // Decay confidence over time to encourage fresh planning
+    planningConfidence_ = std::max(0.1f, planningConfidence_ * (1.0f - timestep * 0.01f));
+    
+    // Update recent plan success history
+    while (!recentPlanSuccess_.empty() && recentPlanSuccess_.front() > timestep) {
+        recentPlanSuccess_.pop_front();
+    }
+}
+
 } // namespace nlm

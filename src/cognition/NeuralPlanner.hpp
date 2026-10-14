@@ -59,6 +59,10 @@ public:
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
 
+    // Update planner with current brain state
+    // Called every simulation step to integrate planning into cognition
+    void update(float timestep);
+
     // Clear planning cache
     void clearCache();
 

@@ -541,8 +541,20 @@ float TemporalRelation::getPredictionConfidence(const std::vector<float>& event)
     return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
 }
 
-void TemporalRelation::clear() {
-    sequences_.clear();
-}
-
 } // namespace nlm
+
+void ConceptFormation::update(float timestep, const std::vector<float>& currentState,
+                             float reward, SimulationStep currentTime) {
+    // Simple concept update: process current state if reward is significant
+    // In a full implementation, this would be more sophisticated
+    if (reward > 0.1f && !currentState.empty()) {
+        // Present experience to concept formation system
+        // This would typically be called by Brain.cpp with sensory state
+        size_t conceptId = presentExperience(currentState, currentState, reward, currentTime);
+        
+        if (conceptId > 0) {
+            // Update concept stability based on observations
+            updateConcept(conceptId, currentState, currentState, reward);
+        }
+    }
+}
