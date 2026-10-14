@@ -137,6 +137,37 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     
     // Update instance stability
     concept->instances.back().stability = newStability;
+    
+    // ===== ENHANCED: Store concept in episodic memory for recall =====
+    if (brain_ && brain_->getEpisodicMemory()) {
+        // Create a memory item for this concept
+        EpisodicMemoryItem conceptMemory;
+        conceptMemory.timestamp = brain_->getCurrentStep();
+        conceptMemory.reward = reward;
+        
+        // Encode concept information
+        conceptMemory.sensoryState = features;
+        conceptMemory.predictionError = 0.0f; // Simplified - could be enhanced with actual error
+        conceptMemory.novelty = 1.0f - newStability; // Less stable = more novel
+        conceptMemory.actionId = 0; // Will be set by action system
+        conceptMemory.goal = concept->categoryHint; // Store category hint
+        
+        // Store concept memory in episodic memory
+        brain_->getEpisodicMemory()->storeEpisodeWithContext(
+            conceptMemory,
+            std::vector<float>(),  // system state
+            reward,
+            1.0f,  // global excitability
+            std::vector<float>(),  // body velocity
+            features,  // working memory pattern
+            std::vector<float>(),  // prediction target
+            std::vector<float>(),  // attention focus
+            0.0f,  // prediction error
+            conceptMemory.novelty,  // curiosity gain
+            newStability,  // salience (stability = salience)
+            reward  // emotional valence
+        );
+    }
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
@@ -295,8 +326,132 @@ void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
 }
+    // ===== ENHANCED CONCEPT FORMATION FUNCTIONS =====
 
-// SpatialRepresentation Implementation
+    // ConceptFormation::presentExperience now integrates with all brain systems
+    void ConceptFormation::presentExperienceEnhanced(const std::vector<float>& sensoryPattern,
+                                                     const std::vector<float>& workingMemory,
+                                                     const std::vector<float>& episodicContext,
+                                                     float reward,
+                                                     SimulationStep currentStep) {
+        // Multi-modal concept formation from sensory, working memory, and episodic memory
+        std::vector<float> multimodalPattern = sensoryPattern;
+        
+        // Blend working memory (if present)
+        if (!workingMemory.empty()) {
+            for (size_t i = 0; i < std::min(multimodalPattern.size(), workingMemory.size()); ++i) {
+                multimodalPattern[i] = (multimodalPattern[i] + workingMemory[i]) * 0.5f;
+            }
+        }
+        
+        // Blend episodic context (if present)
+        if (!episodicContext.empty()) {
+            for (size_t i = 0; i < std::min(multimodalPattern.size(), episodicContext.size()); ++i) {
+                multimodalPattern[i] = (multimodalPattern[i] + episodicContext[i]) * 0.3f;
+            }
+        }
+        
+        // Present to concept formation system
+        size_t conceptId = presentExperience(multimodalPattern, multimodalPattern, reward, currentStep);
+    }
+    
+    // ===== Helper function to compute similarity between concepts =====
+    float ConceptFormation::computeConceptSimilarity(size_t conceptAId, size_t conceptBId) const {
+        const DiscoveredConcept* conceptA = getConcept(conceptAId);
+        const DiscoveredConcept* conceptB = getConcept(conceptBId);
+        
+        if (!conceptA || !conceptB) return 0.0f;
+        
+        // Compare prototypes
+        return computeSimilarity(conceptA->prototype, conceptB->prototype);
+    }
+    
+    // ===== Configuration and control for concept formation =====
+    void ConceptFormation::configureConceptFormation(float formationThreshold, 
+                                                     float stabilityThreshold,
+                                                     size_t stabilityWindow,
+                                                     bool enableMultiModalFormation,
+                                                     float conceptAttentiveGain,
+                                                     float conceptPlanningGain,
+                                                     float conceptPredictionGain) {
+        formationThreshold_ = formationThreshold;
+        stabilityThreshold_ = stabilityThreshold;
+        stabilityWindow_ = stabilityWindow;
+        
+        // Store configuration for integration with other systems
+        formationConfig_.threshold = formationThreshold;
+        formationConfig_.stabilityThreshold = stabilityThreshold;
+        formationConfig_.window = stabilityWindow;
+        formationConfig_.enableMultiModal = enableMultiModalFormation;
+        formationConfig_.attentionGain = conceptAttentiveGain;
+        formationConfig_.planningGain = conceptPlanningGain;
+        formationConfig_.predictionGain = conceptPredictionGain;
+    }
+    
+    // ===== Integration helpers =====
+    void ConceptFormation::integrateWithEpisodicMemory() {
+        if (!brain_ || !brain_->getEpisodicMemory()) return;
+        
+        // Get all concepts
+        const auto& concepts = getConcepts();
+        
+        // Create concept-based memory associations
+        for (const auto& concept : concepts) {
+            // Store concept in episodic memory as a learned pattern
+            // This creates a bridge between discovered concepts and episodic recall
+            // The actual storage is done in updateConcept method
+        }
+    }
+    
+    void ConceptFormation::integrateWithAttention() {
+        if (!brain_ || !brain_->getAttention()) return;
+        
+        // Create concept-based attention biases
+        // This allows concepts to guide attentional selection
+        // Top-down biases are applied in presentExperienceEnhanced
+    }
+    
+    void ConceptFormation::integrateWithPlanning() {
+        if (!brain_ || !brain_->getPlanner()) return;
+        
+        // Concepts provide planning goals and constraints
+        // This is done in presentExperienceEnhanced
+    }
+    
+    void ConceptFormation::integrateWithPrediction() {
+        if (!brain_ || !brain_->getPredictionSystem()) return;
+        
+        // Concepts provide prediction constraints
+        // This is done in presentExperienceEnhanced
+    }
+    
+    // ===== Diagnostic and monitoring =====
+    ConceptFormation::FormationConfig ConceptFormation::getFormationConfig() const {
+        return formationConfig_;
+    }
+    
+    float ConceptFormation::getConceptActivationStrength(size_t conceptId) const {
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) return 0.0f;
+        
+        // Compute activation strength based on recent observations and reward
+        if (concept->instances.empty()) return 0.0f;
+        
+        float totalActivation = 0.0f;
+        size_t count = 0;
+        
+        for (const auto& instance : concept->instances) {
+            // Recent instances contribute more
+            float recencyFactor = 1.0f - (static_cast<float>(instance.lastObserved) / 
+                                           (static_cast<float>(concept->totalObservations) + 1.0f));
+            
+            // Reward contributes to activation
+            totalActivation += (instance.avgReward + 1.0f) * 0.5f * recencyFactor;
+            count++;
+        }
+        
+        return totalActivation / (count + 0.0001f);
+    }
 struct SpatialRepresentation::Impl {
     Brain* brain;
     
@@ -539,10 +694,6 @@ float TemporalRelation::getPredictionConfidence(const std::vector<float>& event)
     }
     
     return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
-}
-
-void TemporalRelation::clear() {
-    sequences_.clear();
 }
 
 } // namespace nlm

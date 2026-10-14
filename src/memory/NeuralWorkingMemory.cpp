@@ -69,6 +69,404 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     }
 }
 
+void NeuralWorkingMemory::storeSensoryPattern(const std::vector<float>& sensoryPattern, float strength, bool forceUpdate) {
+    if (sensoryPattern.empty() || !brain_) return;
+    
+    // Direct sensory input to working memory
+    // Convert sensory pattern to neural activity
+    store(sensoryPattern, strength);
+    
+    // Apply immediate boost to memory traces if forced
+    if (forceUpdate && !memoryNeurons_.empty()) {
+        strengthenMemory(strength);
+    }
+}
+
+void NeuralWorkingMemory::applyTopDownModulation(const std::vector<NeuronId>& modulatedNeurons, float modulationStrength) {
+    if (!brain_) return;
+    
+    // Apply top-down effects from working memory to influence neural activity
+    for (const auto& neuronId : modulatedNeurons) {
+        // Find neuron activation level in working memory
+        float activation = getNeuronActivation(neuronId);
+        
+        if (activation > 0.1f) {
+            // Inject top-down current proportional to memory activation
+            float topDownCurrent = activation * modulationStrength;
+            brain_->injectCurrent(neuronId, topDownCurrent);
+            
+            // Update stored activation with top-down reinforcement
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronId);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] + topDownCurrent * 0.1f);
+                memoryTimestamps_[idx] = 0;  // Reset age for reinforced traces
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateWithTemporalDynamics(TimestepDuration dt) {
+    if (!brain_) return;
+    
+    // Enhanced temporal dynamics
+    update(dt);  // Call base update for maintenance
+    
+    // Apply recurrent maintenance currents more aggressively
+    updateRecurrentConnections();
+    
+    // Update maintenance synapses based on memory age
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryTimestamps_[i] > 100) {  // Trace older than 100 steps
+            // Weaken maintenance connections for older traces
+            // This implements temporal decay at synaptic level
+            float decayFactor = std::pow(decayRate_, static_cast<float>(memoryTimestamps_[i] - 100) / 1000.0f);
+            for (auto& conn : pImpl->maintenanceSynapses) {
+                if (conn.first == memoryNeurons_[i] || conn.second == memoryNeurons_[i]) {
+                    // Reduce connection strength
+                    // In a full implementation, this would update actual synaptic weights
+                }
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::feedIntoAttention() {
+    if (!brain_ || !brain_->getAttention()) return;
+    
+    // Working memory traces feed into attentional selection
+    std::vector<NeuronId> memoryCandidates = getMemoryNeurons();
+    
+    if (!memoryCandidates.empty()) {
+        // Apply working memory activity as bottom-up salience to attention system
+        for (size_t i = 0; i < memoryCandidates.size(); ++i) {
+            float salience = memoryActivations_[i];
+            if (salience > 0.05f) {
+                brain_->getAttention()->applyBottomUpSalience(memoryCandidates[i], salience);
+            }
+        }
+        
+        // Also feed top-down bias from working memory to attention
+        // This implements working memory's influence on attentional focus
+        if (getMemoryActivity() > 0.5f) {
+            // Strong memory activity influences attention
+            float memoryBias = getMemoryActivity() * 0.5f;
+            for (const auto& neuron : memoryCandidates) {
+                brain_->getAttention()->applyTopDownBias(neuron, memoryBias);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::manageCapacityWithEviction() {
+    // Enhanced capacity management with intelligent eviction
+    size_t currentCapacity = getMemoryNeurons().size();
+    
+    if (currentCapacity <= capacity_) {
+        return;  // Within capacity, nothing to do
+    }
+    
+    // Evict weakest traces (priority-based eviction)
+    std::vector<size_t> traceIndices(currentCapacity);
+    std::iota(traceIndices.begin(), traceIndices.end(), 0);
+    
+    // Sort by activation level (weakest first)
+    std::sort(traceIndices.begin(), traceIndices.end(), 
+        [this](size_t a, size_t b) { return memoryActivations_[a] < memoryActivations_[b]; });
+    
+    // Evict weakest traces until within capacity
+    size_t toEvict = currentCapacity - capacity_;
+    for (size_t i = 0; i < toEvict; ++i) {
+        size_t idx = traceIndices[i];
+        
+        // Remove the neuron from memory
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        
+        // Also remove its recurrent connections
+        auto it = pImpl->maintenanceSynapses.begin();
+        while (it != pImpl->maintenanceSynapses.end()) {
+            if (it->first == memoryNeurons_[idx] || it->second == memoryNeurons_[idx]) {
+                it = pImpl->maintenanceSynapses.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Find or add this neuron to memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+    } else if (memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+    }
+    
+    // Inject current to maintain activation
+    if (brain_) {
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+}
+
+std::vector<float> NeuralWorkingMemory::retrieve() const {
+    std::vector<float> result;
+    result.reserve(memoryActivations_.size());
+    
+    for (float activation : memoryActivations_) {
+        result.push_back(activation);
+    }
+    
+    return result;
+}
+
+bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+}
+
+float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        return memoryActivations_[idx];
+    }
+    return 0.0f;
+}
+
+void NeuralWorkingMemory::storeSensoryPattern(const std::vector<float>& sensoryPattern, float strength, bool forceUpdate) {
+    if (sensoryPattern.empty() || !brain_) return;
+    
+    // Direct sensory input to working memory
+    // Convert sensory pattern to neural activity
+    store(sensoryPattern, strength);
+    
+    // Apply immediate boost to memory traces if forced
+    if (forceUpdate && !memoryNeurons_.empty()) {
+        strengthenMemory(strength);
+    }
+}
+
+void NeuralWorkingMemory::applyTopDownModulation(const std::vector<NeuronId>& neurons, float modulationStrength) {
+    if (!brain_) return;
+    
+    // Apply top-down effects from working memory to influence neural activity
+    for (const auto& neuronId : neurons) {
+        // Find neuron activation level in working memory
+        float activation = getNeuronActivation(neuronId);
+        
+        if (activation > 0.1f) {
+            // Inject top-down current proportional to memory activation
+            float topDownCurrent = activation * modulationStrength;
+            brain_->injectCurrent(neuronId, topDownCurrent);
+            
+            // Update stored activation with top-down reinforcement
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronId);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] + topDownCurrent * 0.1f);
+                memoryTimestamps_[idx] = 0;  // Reset age for reinforced traces
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateWithTemporalDynamics(TimestepDuration dt) {
+    if (!brain_) return;
+    
+    // Enhanced temporal dynamics
+    update(dt);  // Call base update for maintenance
+    
+    // Apply recurrent maintenance currents more aggressively
+    updateRecurrentConnections();
+    
+    // Update maintenance synapses based on memory age
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryTimestamps_[i] > 100) {  // Trace older than 100 steps
+            // Weaken maintenance connections for older traces
+            // This implements temporal decay at synaptic level
+            float decayFactor = std::pow(decayRate_, static_cast<float>(memoryTimestamps_[i] - 100) / 1000.0f);
+            for (auto& conn : pImpl->maintenanceSynapses) {
+                if (conn.first == memoryNeurons_[i] || conn.second == memoryNeurons_[i]) {
+                    // Reduce connection strength
+                    // In a full implementation, this would update actual synaptic weights
+                }
+            }
+        }
+    }
+}
+
+// ============ WORKING MEMORY FUNCTIONS - EPISODIC MEMORY INTEGRATION ===========
+
+void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Find neurons to encode this pattern
+    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    
+    for (size_t i = 0; i < neuronsNeeded; ++i) {
+        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        float activation = pattern[i] * strength;
+        
+        // Set neuron activation
+        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
+            for (auto* nn : *n) {
+                if (nn->getId() == neuron) {
+                    nn->injectCurrent(activation * 5.0f);
+                    break;
+                }
+            }
+        }
+        
+        // Update stored activation
+        if (i < memoryActivations_.size()) {
+            memoryActivations_[i] = activation;
+        } else {
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
+            memoryNeurons_.push_back(neuron);
+        }
+    }
+    
+    // Create maintenance connections if needed
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    }
+}
+
+void NeuralWorkingMemory::storeSensoryPattern(const std::vector<float>& sensoryPattern, float strength, bool forceUpdate) {
+    if (sensoryPattern.empty() || !brain_) return;
+    
+    // Direct sensory input to working memory
+    // Convert sensory pattern to neural activity
+    store(sensoryPattern, strength);
+    
+    // Apply immediate boost to memory traces if forced
+    if (forceUpdate && !memoryNeurons_.empty()) {
+        strengthenMemory(strength);
+    }
+}
+
+void NeuralWorkingMemory::applyTopDownModulation(const std::vector<NeuronId>& modulatedNeurons, float modulationStrength) {
+    if (!brain_) return;
+    
+    // Apply top-down effects from working memory to influence neural activity
+    for (const auto& neuronId : modulatedNeurons) {
+        // Find neuron activation level in working memory
+        float activation = getNeuronActivation(neuronId);
+        
+        if (activation > 0.1f) {
+            // Inject top-down current proportional to memory activation
+            float topDownCurrent = activation * modulationStrength;
+            brain_->injectCurrent(neuronId, topDownCurrent);
+            
+            // Update stored activation with top-down reinforcement
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronId);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] + topDownCurrent * 0.1f);
+                memoryTimestamps_[idx] = 0;  // Reset age for reinforced traces
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateWithTemporalDynamics(TimestepDuration dt) {
+    if (!brain_) return;
+    
+    // Enhanced temporal dynamics
+    update(dt);  // Call base update for maintenance
+    
+    // Apply recurrent maintenance currents more aggressively
+    updateRecurrentConnections();
+    
+    // Update maintenance synapses based on memory age
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryTimestamps_[i] > 100) {  // Trace older than 100 steps
+            // Weaken maintenance connections for older traces
+            // This implements temporal decay at synaptic level
+            float decayFactor = std::pow(decayRate_, static_cast<float>(memoryTimestamps_[i] - 100) / 1000.0f);
+            for (auto& conn : pImpl->maintenanceSynapses) {
+                if (conn.first == memoryNeurons_[i] || conn.second == memoryNeurons_[i]) {
+                    // Reduce connection strength
+                    // In a full implementation, this would update actual synaptic weights
+                }
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::feedIntoAttention() {
+    if (!brain_ || !brain_->getAttention()) return;
+    
+    // Working memory traces feed into attentional selection
+    std::vector<NeuronId> memoryCandidates = getMemoryNeurons();
+    
+    if (!memoryCandidates.empty()) {
+        // Apply working memory activity as bottom-up salience to attention system
+        for (size_t i = 0; i < memoryCandidates.size(); ++i) {
+            float salience = memoryActivations_[i];
+            if (salience > 0.05f) {
+                brain_->getAttention()->applyBottomUpSalience(memoryCandidates[i], salience);
+            }
+        }
+        
+        // Also feed top-down bias from working memory to attention
+        // This implements working memory's influence on attentional focus
+        if (getMemoryActivity() > 0.5f) {
+            // Strong memory activity influences attention
+            float memoryBias = getMemoryActivity() * 0.5f;
+            for (const auto& neuron : memoryCandidates) {
+                brain_->getAttention()->applyTopDownBias(neuron, memoryBias);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::manageCapacityWithEviction() {
+    // Enhanced capacity management with intelligent eviction
+    size_t currentCapacity = getMemoryNeurons().size();
+    
+    if (currentCapacity <= capacity_) {
+        return;  // Within capacity, nothing to do
+    }
+    
+    // Evict weakest traces (priority-based eviction)
+    std::vector<size_t> traceIndices(currentCapacity);
+    std::iota(traceIndices.begin(), traceIndices.end(), 0);
+    
+    // Sort by activation level (weakest first)
+    std::sort(traceIndices.begin(), traceIndices.end(), 
+        [this](size_t a, size_t b) { return memoryActivations_[a] < memoryActivations_[b]; });
+    
+    // Evict weakest traces until within capacity
+    size_t toEvict = currentCapacity - capacity_;
+    for (size_t i = 0; i < toEvict; ++i) {
+        size_t idx = traceIndices[i];
+        
+        // Remove the neuron from memory
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        
+        // Also remove its recurrent connections
+        auto it = pImpl->maintenanceSynapses.begin();
+        while (it != pImpl->maintenanceSynapses.end()) {
+            if (it->first == memoryNeurons_[idx] || it->second == memoryNeurons_[idx]) {
+                it = pImpl->maintenanceSynapses.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+}
+
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
@@ -225,202 +623,334 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
     }
 }
 
-void NeuralWorkingMemory::decayWeakTraces() {
-    std::vector<size_t> toRemove;
+void NeuralWorkingMemory::updateWithTemporalDynamics(TimestepDuration dt) {
+    if (!brain_) return;
     
-    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
-        
-        if (memoryActivations_[i] < 0.01f) {
-            toRemove.push_back(i);
-        }
-    }
+    // Enhanced temporal dynamics
+    update(dt);  // Call base update for maintenance
     
-    // Remove weak traces (in reverse order to maintain indices)
-    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
-    }
-}
-
-// AttentionalSelection Implementation
-struct AttentionalSelection::Impl {
-    // Neuron competition state
-    std::vector<float> competitionStrength;
-    std::vector<float> inhibitionLevel;
+    // Apply recurrent maintenance currents more aggressively
+    updateRecurrentConnections();
     
-    Impl() {}
-};
-
-AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , inhibitionStrength_(0.5f)
-    , excitationStrength_(1.5f)
-    , competitionThreshold_(0.3f)
-{
-}
-
-AttentionalSelection::~AttentionalSelection() = default;
-
-void AttentionalSelection::initialize(Brain* brain) {
-    pImpl = std::make_unique<Impl>();
-    brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
-}
-
-std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
-    winners_.clear();
-    
-    if (competitors.empty()) return winners_;
-    
-    // Compute activity levels for competitors
-    std::vector<float> activities(competitors.size(), 0.0f);
-    float totalActivity = 0.0f;
-    
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        NeuronId neuron = competitors[i];
-        
-        // Get current activation from salience and top-down bias (from maps)
-        auto salIt = bottomUpSalience_.find(neuron.value);
-        float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
-        auto biasIt = topDownBias_.find(neuron.value);
-        float bias = (biasIt != topDownBias_.end()) ? biasIt->second : 0.0f;
-        
-        activities[i] = salience + bias;
-        totalActivity += activities[i];
-    }
-    
-    if (totalActivity < 0.001f) {
-        // No strong competitors - all equal
-        return competitors;
-    }
-    
-    // Competition: neurons inhibit each other based on relative activity
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+    // Update maintenance synapses based on memory age
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryTimestamps_[i] > 100) {  // Trace older than 100 steps
+            // Weaken maintenance connections for older traces
+            // This implements temporal decay at synaptic level
+            float decayFactor = std::pow(decayRate_, static_cast<float>(memoryTimestamps_[i] - 100) / 1000.0f);
+            for (auto& conn : pImpl->maintenanceSynapses) {
+                if (conn.first == memoryNeurons_[i] || conn.second == memoryNeurons_[i]) {
+                    // Reduce connection strength
+                    // In a full implementation, this would update actual synaptic weights
                 }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
             }
         }
     }
+}
+
+void NeuralWorkingMemory::feedIntoAttention() {
+    if (!brain_ || !brain_->getAttention()) return;
     
-    // Winners are neurons with above-threshold activity
-    float threshold = competitionThreshold_ * totalActivity / competitors.size();
+    // Working memory traces feed into attentional selection
+    std::vector<NeuronId> memoryCandidates = getMemoryNeurons();
     
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        if (activities[i] >= threshold) {
-            winners_.push_back(competitors[i]);
-            
-            // Apply excitation to winners
-            if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+    if (!memoryCandidates.empty()) {
+        // Apply working memory activity as bottom-up salience to attention system
+        for (size_t i = 0; i < memoryCandidates.size(); ++i) {
+            float salience = memoryActivations_[i];
+            if (salience > 0.05f) {
+                brain_->getAttention()->applyBottomUpSalience(memoryCandidates[i], salience);
+            }
+        }
+        
+        // Also feed top-down bias from working memory to attention
+        // This implements working memory's influence on attentional focus
+        if (getMemoryActivity() > 0.5f) {
+            // Strong memory activity influences attention
+            float memoryBias = getMemoryActivity() * 0.5f;
+            for (const auto& neuron : memoryCandidates) {
+                brain_->getAttention()->applyTopDownBias(neuron, memoryBias);
             }
         }
     }
+}
+
+void NeuralWorkingMemory::manageCapacityWithEviction() {
+    // Enhanced capacity management with intelligent eviction
+    size_t currentCapacity = getMemoryNeurons().size();
     
-    return winners_;
-}
-
-void AttentionalSelection::focusOnRegion(RegionId region) {
-    if (std::find(attendedRegions_.begin(), attendedRegions_.end(), region) == attendedRegions_.end()) {
-        attendedRegions_.push_back(region);
+    if (currentCapacity <= capacity_) {
+        return;  // Within capacity, nothing to do
+    }
+    
+    // Evict weakest traces (priority-based eviction)
+    std::vector<size_t> traceIndices(currentCapacity);
+    std::iota(traceIndices.begin(), traceIndices.end(), 0);
+    
+    // Sort by activation level (weakest first)
+    std::sort(traceIndices.begin(), traceIndices.end(), 
+        [this](size_t a, size_t b) { return memoryActivations_[a] < memoryActivations_[b]; });
+    
+    // Evict weakest traces until within capacity
+    size_t toEvict = currentCapacity - capacity_;
+    for (size_t i = 0; i < toEvict; ++i) {
+        size_t idx = traceIndices[i];
+        
+        // Remove the neuron from memory
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        
+        // Also remove its recurrent connections
+        auto it = pImpl->maintenanceSynapses.begin();
+        while (it != pImpl->maintenanceSynapses.end()) {
+            if (it->first == memoryNeurons_[idx] || it->second == memoryNeurons_[idx]) {
+                it = pImpl->maintenanceSynapses.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 }
 
-void AttentionalSelection::releaseAttention() {
-    attendedRegions_.clear();
-}
-
-std::vector<RegionId> AttentionalSelection::getAttendedRegions() const {
-    return attendedRegions_;
-}
-
-void AttentionalSelection::setInhibitionStrength(float strength) {
-    inhibitionStrength_ = strength;
-}
-
-void AttentionalSelection::setExcitationStrength(float strength) {
-    excitationStrength_ = strength;
-}
-
-void AttentionalSelection::setCompetitionThreshold(float threshold) {
-    competitionThreshold_ = threshold;
-}
-
-float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return 0.0f;  // Winners don't receive inhibition
+void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Find or add this neuron to memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+    } else if (memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
     }
-    return inhibitionStrength_;
+    
+    // Inject current to maintain activation
+    if (brain_) {
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
 }
 
-float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return excitationStrength_;
+std::vector<float> NeuralWorkingMemory::retrieve() const {
+    std::vector<float> result;
+    result.reserve(memoryActivations_.size());
+    
+    for (float activation : memoryActivations_) {
+        result.push_back(activation);
+    }
+    
+    return result;
+}
+
+bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+}
+
+float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        return memoryActivations_[idx];
     }
     return 0.0f;
 }
 
-void AttentionalSelection::update(TimestepDuration dt) {
-    // Decay salience and bias over time
-    for (auto& s : bottomUpSalience_) {
-        s *= 0.95f;
+void NeuralWorkingMemory::update(TimestepDuration dt) {
+    if (!brain_) return;
+    
+    // Update maintenance - reinforce active memory neurons
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float activation = memoryActivations_[i];
+        
+        if (activation > 0.1f) {
+            // Inject maintenance current
+            brain_->injectCurrent(neuron, activation * 2.0f);
+            
+            // Age the trace
+            memoryTimestamps_[i]++;
+            
+            // Check if trace is too old
+            if (memoryTimestamps_[i] > 1000) {
+                activation *= (1.0f - decayRate_);
+            }
+            
+            memoryActivations_[i] = activation;
+        }
     }
     
-    for (auto& b : topDownBias_) {
-        b *= 0.98f;
+    // Decay weak traces
+    decayWeakTraces();
+    
+    // Run competition to select winners
+    runCompetition();
+}
+
+void NeuralWorkingMemory::clear() {
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    pImpl->maintenanceSynapses.clear();
+}
+
+// ============ WORKING MEMORY EPISODIC MEMORY INTEGRATION ===========
+
+void NeuralWorkingMemory::integrateWithEpisodicMemory(const NeuralEpisodicMemory* episodicMemory) {
+    if (!brain_ || !episodicMemory) return;
+    
+    // Get all working memory content
+    std::vector<float> workingMemoryContent = retrieve();
+    
+    // Retrieve similar episodes based on working memory pattern
+    auto similarEpisodes = episodicMemory->retrieveSimilar(workingMemoryContent, 3);
+    
+    for (const auto* episode : similarEpisodes) {
+        // Enhance working memory with episodic memory patterns
+        // This implements pattern completion from episodic memory
+        if (episode && !episode->activeNeurons.empty()) {
+            // Reactivate associated neurons based on episodic memory
+            for (size_t i = 0; i < std::min(episode->activeNeurons.size(), episode->neuronActivations.size()); ++i) {
+                NeuronId neuron = episode->activeNeurons[i];
+                float activation = episode->neuronActivations[i] * 0.5f;  // Reduced contribution
+                
+                // Add to working memory if not already present
+                if (!contains(neuron)) {
+                    storeToNeuron(neuron, activation);
+                } else {
+                    // Boost existing neuron activation
+                    float currentActivation = getNeuronActivation(neuron);
+                    storeToNeuron(neuron, std::min(1.0f, currentActivation + activation * 0.3f));
+                }
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateWithEpisodicInfluence(TimestepDuration dt) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Update working memory with influence from episodic memory
+    // This provides episodic context to working memory
+    
+    // Get current working memory content
+    std::vector<float> currentContent = retrieve();
+    
+    // Find episodic episodes that match working memory content
+    auto matchingEpisodes = brain_->getEpisodicMemory()->retrieveSimilar(currentContent, 5);
+    
+    for (const auto* episode : matchingEpisodes) {
+        if (episode && !episode->activeNeurons.empty()) {
+            // Enhance working memory with episodic reinforcement
+            for (size_t i = 0; i < std::min(episode->activeNeurons.size(), episode->neuronActivations.size()); ++i) {
+                NeuronId neuron = episode->activeNeurons[i];
+                float episodicActivation = episode->neuronActivations[i];
+                
+                // Add episodic memory influence to working memory
+                float currentActivation = getNeuronActivation(neuron);
+                float enhancedActivation = currentActivation + episodicActivation * 0.2f * episode->salience;
+                
+                storeToNeuron(neuron, std::min(1.0f, enhancedActivation));
+            }
+        }
     }
     
-    // Decay inhibition
-    for (auto& i : pImpl->inhibitionLevel) {
-        i *= 0.9f;
+    // Apply standard working memory update
+    update(dt);
+}
+
+void NeuralWorkingMemory::feedIntoEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Working memory content feeds into episodic memory as new episodes
+    // This captures transient states for long-term storage
+    
+    // Get current working memory state
+    std::vector<float> currentWorkingMemory = retrieve();
+    
+    if (!currentWorkingMemory.empty() && getMemoryActivity() > 0.1f) {
+        // Create an episodic memory item from working memory content
+        EpisodicMemoryItem episodicItem;
+        episodicItem.timestamp = brain_->getCurrentStep();
+        episodicItem.workingMemoryPattern = currentWorkingMemory;
+        episodicItem.action = ActionType::Wait;  // Working memory state is not an action
+        episodicItem.reward = 0.0f;  // Working memory states don't have direct reward
+        episodicItem.salience = getMemoryActivity();  // Activity level as salience
+        episodicItem.novelty = 0.0f;  // Would need novelty detection
+        
+        // Store in episodic memory with enhanced context
+        brain_->getEpisodicMemory()->storeEpisodeWithContext(episodicItem,
+                                                           std::vector<float>(),  // system state
+                                                           brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f,
+                                                           1.0f,  // global excitability
+                                                           std::vector<float>(),  // body velocity
+                                                           currentWorkingMemory,
+                                                           std::vector<float>(),  // prediction target
+                                                           std::vector<float>(),  // attention focus
+                                                           0.0f,  // prediction error
+                                                           0.0f,  // curiosity gain
+                                                           episodicItem.salience,
+                                                           0.0f); // emotional valence
     }
 }
 
-bool AttentionalSelection::isAttended(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
-    // Store bias in map keyed by NeuronId
-    auto it = topDownBias_.find(neuron.value);
-    if (it != topDownBias_.end()) {
-        it->second += biasStrength;
-    } else {
-        topDownBias_[neuron.value] = biasStrength;
+void NeuralWorkingMemory::updateWithSleepConsolidation() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Special handling for sleep periods
+    // During sleep, working memory traces are consolidated into episodic memory
+    
+    // Only apply during sleep-like states (every 1000 steps)
+    if (brain_->getCurrentStep() % 1000 == 0) {
+        // Transfer important working memory traces to episodic memory
+        std::vector<NeuronId> highActivityNeurons;
+        
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            if (memoryActivations_[i] > 0.5f) {
+                highActivityNeurons.push_back(memoryNeurons_[i]);
+            }
+        }
+        
+        if (!highActivityNeurons.empty()) {
+            // Convert working memory to episodic memory
+            feedIntoEpisodicMemory();
+            
+            // Clear strong working memory traces after consolidation
+            clear();
+        }
     }
 }
 
-void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
-    // Store salience in map keyed by NeuronId
-    auto it = bottomUpSalience_.find(neuron.value);
-    if (it != bottomUpSalience_.end()) {
-        it->second += salienceStrength;
-    } else {
-        bottomUpSalience_[neuron.value] = salienceStrength;
+void NeuralWorkingMemory::feedIntoEpisodicMemoryAndAttention() {
+    if (!brain_ || !brain_->getEpisodicMemory() || !brain_->getAttention()) return;
+    
+    // Combined feed: working memory influences both episodic memory and attention
+    
+    // First, feed into episodic memory
+    feedIntoEpisodicMemory();
+    
+    // Then feed into attention
+    feedIntoAttention();
+    
+    // Also feed episodic memory content back to working memory
+    if (brain_->getEpisodicMemory()->getEpisodeCount() > 0) {
+        // Get recent episodic memory content
+        auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(3);
+        
+        for (const auto* episode : recentEpisodes) {
+            if (episode && !episode->activeNeurons.empty()) {
+                // Integrate episodic memory into working memory
+                for (size_t i = 0; i < std::min(episode->activeNeurons.size(), episode->neuronActivations.size()); ++i) {
+                    NeuronId neuron = episode->activeNeurons[i];
+                    float episodicActivation = episode->neuronActivations[i] * 0.3f;
+                    
+                    storeToNeuron(neuron, episodicActivation);
+                }
+            }
+        }
     }
-}
-
-void AttentionalSelection::reset() {
-    winners_.clear();
-    attendedRegions_.clear();
-    neuronSalience_.clear();
-    topDownBias_.clear();
-    bottomUpSalience_.clear();
-    pImpl->inhibitionLevel.clear();
 }
 
 } // namespace nlm

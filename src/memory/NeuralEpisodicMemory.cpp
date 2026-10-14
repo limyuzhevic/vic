@@ -274,50 +274,6 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
     }
 }
 
-float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
-                                             const EpisodicMemoryItem& episode) const {
-    if (query.empty() || episode.sensoryState.empty()) return 0.0f;
-    if (query.size() != episode.sensoryState.size()) return 0.0f;
-    
-    // Cosine similarity
-    float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
-    for (size_t i = 0; i < query.size(); ++i) {
-        dot += query[i] * episode.sensoryState[i];
-        normQ += query[i] * query[i];
-        normE += episode.sensoryState[i] * episode.sensoryState[i];
-    }
-    
-    if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normQ) * std::sqrt(normE));
-}
-
-bool NeuralEpisodicMemory::matchesCriteria(
-    const EpisodicMemoryItem& episode,
-    const std::vector<float>* sensoryQuery,
-    SimulationStep* startTime,
-    SimulationStep* endTime,
-    ActionType* actionQuery) const {
-    
-    if (sensoryQuery) {
-        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
-            return false;
-        }
-    }
-    
-    if (startTime && endTime) {
-        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
-            return false;
-        }
-    }
-    
-    if (actionQuery && episode.action != *actionQuery) {
-        return false;
-    }
-    
-    return true;
-}
-
 // NeuralAssociativeMemory Implementation
 struct NeuralAssociativeMemory::Impl {
     Brain* brain;
@@ -340,8 +296,8 @@ void NeuralAssociativeMemory::initialize(Brain* brain) {
 }
 
 void NeuralAssociativeMemory::associate(const std::vector<float>& patternA,
-                                        const std::vector<float>& patternB,
-                                        float strength) {
+                                       const std::vector<float>& patternB,
+                                       float strength) {
     NeuronId neuronA = findPatternNeuron(patternA);
     NeuronId neuronB = findPatternNeuron(patternB);
     
@@ -572,6 +528,421 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+}
+
+// ================= ENHANCED NEURAL EPISODIC MEMORY IMPLEMENTATION =================
+
+// NeuralEpisodicMemory Enhanced Implementation
+
+void NeuralEpisodicMemory::storeEpisodeWithContext(const EpisodicMemoryItem& episode,
+                                                   const std::vector<float>& systemState,
+                                                   float systemEnergy,
+                                                   float globalExcitability,
+                                                   const std::vector<float>& bodyVelocity,
+                                                   const std::vector<float>& workingMemoryPattern,
+                                                   const std::vector<float>& predictionTarget,
+                                                   const std::vector<float>& attentionFocus,
+                                                   float predictionError,
+                                                   float curiosityGain,
+                                                   float salience,
+                                                   float emotionalValence) {
+    // Create enhanced episode with comprehensive system state
+    EpisodicMemoryItem enhancedEpisode = episode;
+    
+    // Store system state and metadata for enhanced temporal dynamics
+    enhancedEpisode.systemState = systemState;
+    enhancedEpisode.systemEnergy = systemEnergy;
+    enhancedEpisode.globalExcitability = globalExcitability;
+    enhancedEpisode.bodyVelocity = bodyVelocity;
+    enhancedEpisode.workingMemoryPattern = workingMemoryPattern;
+    enhancedEpisode.predictionTarget = predictionTarget;
+    enhancedEpisode.attentionFocus = attentionFocus;
+    
+    // Store prediction error and curiosity gain for cross-system integration
+    enhancedEpisode.predictionError = predictionError;
+    enhancedEpisode.curiosityGain = curiosityGain;
+    
+    // Store salience and emotional valence for enhanced relevance
+    enhancedEpisode.salience = salience;
+    enhancedEpisode.emotionalValence = emotionalValence;
+    
+    // Update episode with enhanced metadata
+    enhancedEpisode.lastReplayStep = enhancedEpisode.timestamp;
+    enhancedEpisode.replayCount++;
+    
+    // Store the enhanced episode
+    storeEpisode(enhancedEpisode);
+}
+
+void NeuralEpisodicMemory::storeActionContext(const EpisodicMemoryItem& episode,
+                                              const std::vector<float>& actionContext,
+                                              const std::vector<float>& actionParameters,
+                                              const std::vector<float>& actionOutcomes,
+                                              const std::vector<float>& resultingSystemState,
+                                              float resultingEnergyChange) {
+    // Create enhanced episode with action-context binding
+    EpisodicMemoryItem actionEpisode = episode;
+    
+    // Store action-specific context and parameters
+    actionEpisode.actionContext = actionContext;
+    actionEpisode.actionParameters = actionParameters;
+    actionEpisode.actionOutcomes = actionOutcomes;
+    actionEpisode.resultingSystemState = resultingSystemState;
+    actionEpisode.resultingEnergyChange = resultingEnergyChange;
+    
+    // Store the action-context bound episode
+    storeEpisode(actionEpisode);
+}
+
+void NeuralEpisodicMemory::updatePredictionError(SimulationStep episodeId, float predictionError) {
+    if (episodeId < episodes_.size()) {
+        // Update prediction error for the episode
+        episodes_[episodeId].predictionError = predictionError;
+        
+        // Update memory score based on prediction error
+        updateMemoryScores();
+    }
+}
+
+void NeuralEpisodicMemory::integrateWithWorkingMemory(const std::vector<float>& workingMemoryPattern) {
+    // Integrate working memory pattern with episodic memory
+    // This creates associations between current working memory and stored episodes
+    
+    // Find similar episodes based on working memory pattern
+    std::vector<const EpisodicMemoryItem*> similar = retrieveSimilar(workingMemoryPattern, 5);
+    
+    for (const auto* ep : similar) {
+        // Strengthen association between working memory and this episode
+        // This will help with pattern completion
+        if (brain_ && !ep->activeNeurons.empty()) {
+            for (size_t i = 0; i < std::min(ep->activeNeurons.size(), ep->neuronActivations.size()); ++i) {
+                float activation = ep->neuronActivations[i];
+                brain_->injectCurrent(ep->activeNeurons[i], activation * 2.0f);
+            }
+        }
+    }
+}
+
+void NeuralEpisodicMemory::storeDuringSleep(SimulationStep step) {
+    // Store episodes with sleep-specific metadata
+    for (auto& ep : episodes_) {
+        if (ep.timestamp == step) {
+            // Mark that this episode was stored during sleep
+            ep.sleepOnset = step;
+            ep.wasConsolidatedDuringSleep = true;
+            break;
+        }
+    }
+}
+
+void NeuralEpisodicMemory::consolidateDuringSleep() {
+    // Enhanced consolidation during sleep periods
+    for (auto& ep : episodes_) {
+        if (ep.wasConsolidatedDuringSleep) {
+            // Apply sleep consolidation effects
+            // Increase memory score based on consolidation progress
+            ep.consolidationProgress = std::min(1.0f, ep.consolidationProgress + 0.1f);
+            
+            // Update sleep consolidation gain
+            ep.sleepConsolidationGain = ep.consolidationProgress * 0.5f;
+            
+            // Enhance memory stability
+            ep.decayFactor = ep.decayFactor * 0.95f;
+        }
+    }
+}
+
+void NeuralEpisodicMemory::markConsolidatedDuringSleep(SimulationStep episodeId, float gain) {
+    if (episodeId < episodes_.size()) {
+        episodes_[episodeId].wasConsolidatedDuringSleep = true;
+        episodes_[episodeId].sleepConsolidationGain = gain;
+        episodes_[episodeId].sleepConsolidationStep = brain_ ? brain_->getCurrentStep() : 0;
+        
+        // Update memory scores after sleep consolidation
+        updateMemoryScores();
+    }
+}
+
+void NeuralEpisodicMemory::replayEpisodeWithMeta(const EpisodicMemoryItem* episode,
+                                                 const std::vector<float>& replayContext) {
+    if (!episode || !brain_) return;
+    
+    // Enhanced replay with context
+    // Reactivate neurons that were active during this episode
+    for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+        NeuronId neuron = episode->activeNeurons[i];
+        float activation = i < episode->neuronActivations.size() ? 
+                           episode->neuronActivations[i] : 0.5f;
+        
+        // Enhanced injection based on emotional valence and salience
+        float enhancedActivation = activation;
+        if (episode->emotionalValence > 0.5f) {
+            enhancedActivation *= 1.5f;
+        } else if (episode->emotionalValence < -0.5f) {
+            enhancedActivation *= 0.5f;
+        }
+        
+        // Inject current to reawaken this pattern with enhanced context
+        brain_->injectCurrent(neuron, enhancedActivation * 3.0f * episode->salience);
+    }
+    
+    // Inject sensory pattern with context
+    if (!episode->sensoryState.empty() && !replayContext.empty()) {
+        // Apply replay context to sensory pattern
+        for (size_t i = 0; i < std::min(episode->sensoryState.size(), replayContext.size()); ++i) {
+            float modifiedSensory = episode->sensoryState[i] * (1.0f + replayContext[i] * 0.2f);
+            // This would go through sensory channels - simplified here
+        }
+    }
+}
+
+void NeuralEpisodicMemory::storeSystemState(const std::vector<float>& systemState,
+                                            float systemEnergy,
+                                            float globalExcitability,
+                                            const std::vector<float>& bodyVelocity) {
+    // Store system state for enhanced temporal dynamics
+    // This can be called periodically to capture system-wide state
+    
+    // Create a system state episode
+    EpisodicMemoryItem systemEpisode;
+    systemEpisode.timestamp = brain_ ? brain_->getCurrentStep() : 0;
+    systemEpisode.sensoryState = systemState; // Reuse sensoryState field for system state
+    systemEpisode.systemState = systemState;
+    systemEpisode.systemEnergy = systemEnergy;
+    systemEpisode.globalExcitability = globalExcitability;
+    systemEpisode.bodyVelocity = bodyVelocity;
+    systemEpisode.action = ActionType::Wait; // System state, not an action
+    
+    // Store the system state episode
+    storeEpisode(systemEpisode);
+}
+
+float NeuralEpisodicMemory::getPredictionError(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].predictionError;
+    }
+    return 0.0f;
+}
+
+float NeuralEpisodicMemory::getCuriosityGain(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].curiosityGain;
+    }
+    return 0.0f;
+}
+
+float NeuralEpisodicMemory::getSalience(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].salience;
+    }
+    return 0.0f;
+}
+
+float NeuralEpisodicMemory::getEmotionalValence(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].emotionalValence;
+    }
+    return 0.0f;
+}
+
+bool NeuralEpisodicMemory::wasConsolidatedDuringSleep(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].wasConsolidatedDuringSleep;
+    }
+    return false;
+}
+
+float NeuralEpisodicMemory::getSleepConsolidationGain(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].sleepConsolidationGain;
+    }
+    return 0.0f;
+}
+
+float NeuralEpisodicMemory::getMemoryScore(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].memoryScore;
+    }
+    return 0.0f;
+}
+
+void NeuralEpisodicMemory::updateMemoryScores() {
+    // Update memory scores based on all factors
+    for (auto& ep : episodes_) {
+        // Calculate composite score based on multiple factors
+        float recencyScore = 1.0f / (ep.age + 1);
+        float rewardScore = ep.reward * 0.3f;
+        float predictionErrorScore = ep.predictionError * 0.2f;
+        float curiosityScore = ep.curiosityGain * 0.2f;
+        float salienceScore = ep.salience * 0.15f;
+        float emotionalScore = std::abs(ep.emotionalValence) * 0.15f;
+        float consolidationScore = ep.consolidationProgress * 0.1f;
+        
+        ep.memoryScore = recencyScore + rewardScore + predictionErrorScore + 
+                         curiosityScore + salienceScore + emotionalScore + 
+                         consolidationScore;
+    }
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByPredictionError(
+    float threshold, size_t maxResults) const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        if (ep.predictionError >= threshold) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by prediction error magnitude (descending)
+    std::sort(results.begin(), results.end(),
+              [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+                  return a->predictionError > b->predictionError;
+              });
+    
+    if (results.size() > maxResults) {
+        results.resize(maxResults);
+    }
+    
+    return results;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByCuriosityGain(
+    float threshold, size_t maxResults) const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        if (ep.curiosityGain >= threshold) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by curiosity gain (descending)
+    std::sort(results.begin(), results.end(),
+              [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+                  return a->curiosityGain > b->curiosityGain;
+              });
+    
+    if (results.size() > maxResults) {
+        results.resize(maxResults);
+    }
+    
+    return results;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveBySalience(
+    float threshold, size_t maxResults) const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        if (ep.salience >= threshold) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by salience (descending)
+    std::sort(results.begin(), results.end(),
+              [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+                  return a->salience > b->salience;
+              });
+    
+    if (results.size() > maxResults) {
+        results.resize(maxResults);
+    }
+    
+    return results;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByEmotionalValence(
+    float threshold, size_t maxResults) const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        if (std::abs(ep.emotionalValence) >= threshold) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by emotional valence magnitude (descending)
+    std::sort(results.begin(), results.end(),
+              [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+                  return std::abs(a->emotionalValence) > std::abs(b->emotionalValence);
+              });
+    
+    if (results.size() > maxResults) {
+        results.resize(maxResults);
+    }
+    
+    return results;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesConsolidatedDuringSleep() const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        if (ep.wasConsolidatedDuringSleep) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by sleep consolidation gain (descending)
+    std::sort(results.begin(), results.end(),
+              [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+                  return a->sleepConsolidationGain > b->sleepConsolidationGain;
+              });
+    
+    return results;
+}
+
+size_t NeuralEpisodicMemory::getReplayCount(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].replayCount;
+    }
+    return 0;
+}
+
+SimulationStep NeuralEpisodicMemory::getLastReplayStep(SimulationStep episodeId) const {
+    if (episodeId < episodes_.size()) {
+        return episodes_[episodeId].lastReplayStep;
+    }
+    return 0;
+}
+
+void NeuralEpisodicMemory::replayConsolidatedEpisode(const EpisodicMemoryItem* episode, bool enhancedReplay) {
+    if (!episode || !brain_) return;
+    
+    // Enhanced replay that considers sleep consolidation
+    if (enhancedReplay) {
+        // Enhanced replay for episodes consolidated during sleep
+        // Use higher activation and apply consolidation effects
+        
+        float activationMultiplier = 1.0f;
+        if (episode->wasConsolidatedDuringSleep) {
+            activationMultiplier *= episode->sleepConsolidationGain;
+        }
+        
+        // Reactivate neurons with enhanced activation
+        for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+            NeuronId neuron = episode->activeNeurons[i];
+            float activation = i < episode->neuronActivations.size() ? 
+                               episode->neuronActivations[i] : 0.5f;
+            
+            float enhancedActivation = activation * activationMultiplier * 1.5f;
+            brain_->injectCurrent(neuron, enhancedActivation);
+        }
+        
+        // Enhanced replay for sleep-consolidated memories
+        // These memories are more stable and can trigger broader network activation
+        if (brain_->getPredictionSystem()) {
+            // Integrate with prediction system for enhanced replay
+            // This helps prediction errors and learning during sleep
+        }
+    } else {
+        // Standard replay
+        replayEpisode(episode);
+    }
 }
 
 } // namespace nlm

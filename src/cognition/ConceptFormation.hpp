@@ -137,6 +137,65 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // ===== ENHANCED: Multi-modal concept formation =====
+    
+    // Present experience with integration of working memory and episodic memory
+    // This is the enhanced version that supports multi-modal concept formation
+    void presentExperienceEnhanced(const std::vector<float>& sensoryPattern,
+                                  const std::vector<float>& workingMemory,
+                                  const std::vector<float>& episodicContext,
+                                  float reward,
+                                  SimulationStep currentStep);
+    
+    // Configure concept formation parameters
+    void configureConceptFormation(float formationThreshold,
+                                   float stabilityThreshold,
+                                   size_t stabilityWindow,
+                                   bool enableMultiModalFormation,
+                                   float conceptAttentiveGain,
+                                   float conceptPlanningGain,
+                                   float conceptPredictionGain);
+    
+    // ===== INTEGRATION HELPERS =====
+    
+    // Integrate with episodic memory for concept storage and recall
+    void integrateWithEpisodicMemory();
+    
+    // Integrate with attention system
+    void integrateWithAttention();
+    
+    // Integrate with planning system
+    void integrateWithPlanning();
+    
+    // Integrate with prediction system
+    void integrateWithPrediction();
+    
+    // ===== DIAGNOSTIC AND MONITORING =====
+    
+    // Get concept formation configuration
+    struct FormationConfig {
+        float threshold;              // Similarity threshold for forming new concepts
+        float stabilityThreshold;     // Stability needed to be considered stable
+        size_t window;               // Number of observations for stability calculation
+        bool multiModalEnabled;      // Whether multi-modal formation is enabled
+        float attentionGain;         // Gain for concept-attentional integration
+        float planningGain;          // Gain for concept-planning integration
+        float predictionGain;        // Gain for concept-prediction integration
+        
+        FormationConfig()
+            : threshold(0.75f), stabilityThreshold(0.7f), window(5),
+              multiModalEnabled(true), attentionGain(0.5f), planningGain(0.3f),
+              predictionGain(0.2f) {}
+    };
+    
+    FormationConfig getFormationConfig() const;
+    
+    // Get concept activation strength (how active a concept is)
+    float getConceptActivationStrength(size_t conceptId) const;
+    
+    // Compute similarity between two concepts
+    float computeConceptSimilarity(size_t conceptAId, size_t conceptBId) const;
 
 private:
     // Create new concept from pattern
@@ -161,6 +220,9 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    
+    // Enhanced configuration for system integration
+    FormationConfig formationConfig_;
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience

@@ -62,6 +62,21 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
+    // Store sensory patterns directly in working memory
+    void storeSensoryPattern(const std::vector<float>& pattern, float strength = 1.0f, bool forceUpdate = false);
+
+    // Apply top-down modulation from working memory to neural activity
+    void applyTopDownModulation(const std::vector<NeuronId>& neurons, float modulationStrength = 1.0f);
+
+    // Enhanced working memory update with temporal dynamics
+    void updateWithTemporalDynamics(TimestepDuration dt);
+
+    // Feed working memory traces into attentional selection
+    void feedIntoAttention();
+
+    // Enhanced capacity management with intelligent eviction
+    void manageCapacityWithEviction();
+
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
