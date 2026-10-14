@@ -1,12 +1,22 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
-// Novelty detection signal
-// Computes novelty from comparison with previous observations
-
+/**
+ * @class Novelty
+ * @brief Neuromodulator for detecting and tracking novel stimuli
+ * 
+ * Novelty detection computes the difference between current and previous observations
+ * to identify new or unexpected patterns in the environment. This signal drives
+ * curiosity and learning processes.
+ * 
+ * @details Maintains a history of detected novelty levels and provides methods
+ * for extracting features from sensory inputs. Uses a sliding window approach
+ * for pattern comparison.
+ */
 class Novelty {
 public:
     Novelty();
@@ -33,7 +43,7 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
-    
+
 private:
     struct Impl;
     Impl* pImpl;

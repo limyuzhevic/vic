@@ -4,9 +4,17 @@
 
 namespace nlm {
 
-// Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
-
+/**
+ * @class PredictionError
+ * @brief Neuromodulator for prediction error signals
+ * 
+ * PredictionError computes the discrepancy between predicted and actual values,
+ * serving as a core learning signal in both curiosity-driven and reinforcement
+ * learning. Higher prediction errors increase plasticity and exploration.
+ * 
+ * @details Maintains prediction history and computes error magnitudes for
+ * neuromodulatory effects on synaptic plasticity.
+ */
 class PredictionError {
 public:
     PredictionError();
@@ -30,7 +38,7 @@ public:
     
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
-    
+
 private:
     struct Impl;
     Impl* pImpl;

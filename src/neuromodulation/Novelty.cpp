@@ -12,8 +12,10 @@ struct Novelty::Impl {
     std::vector<float> history;
     std::vector<float> lastPattern;
     float noveltyThreshold;
+    float baseline;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), 
+             noveltyThreshold(0.3f), baseline(0.0f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -30,15 +32,35 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
+    // Simple implementation: compute difference in mean intensity
+    float currentMean = 0.0f;
+    float prevMean = 0.0f;
+    size_t count = 0;
+    
+    for (size_t i = 0; i < observation.size(); ++i) {
+        currentMean += observation[i];
+        if (i < previousObservation.size()) {
+            prevMean += previousObservation[i];
+            ++count;
+        }
+    }
+    
+    if (count > 0) {
+        currentMean /= observation.size();
+        prevMean /= count;
+        pImpl->level = std::abs(currentMean - prevMean);
+    }
+    
     pImpl->history.push_back(pImpl->level);
+    if (pImpl->history.size() > 100) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
@@ -63,14 +85,17 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     // Update novelty level based on difference
     pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
+    if (pImpl->history.size() > 100) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay novelty towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {

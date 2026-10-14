@@ -1,17 +1,19 @@
 #include "PredictionError.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
 struct PredictionError::Impl {
     class Brain* brain;
     float error;
-    float predictedValue;
-    float actualValue;
+    float magnitude;
     std::vector<float> history;
+    float prediction;
+    float baseline;
+    float maxHistorySize;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), magnitude(0.0f), 
+             prediction(0.0f), baseline(0.0f), maxHistorySize(1000) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
@@ -20,7 +22,6 @@ PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
 }
 
 float PredictionError::getError() const {
@@ -28,14 +29,18 @@ float PredictionError::getError() const {
 }
 
 void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
+    pImpl->prediction = predicted;
     pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+    pImpl->magnitude = std::abs(pImpl->error);
+    
+    pImpl->history.push_back(pImpl->magnitude);
+    if (pImpl->history.size() > pImpl->maxHistorySize) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+    pImpl->prediction = newPrediction;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
@@ -47,7 +52,7 @@ void PredictionError::clearHistory() {
 }
 
 float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+    return pImpl->magnitude;
 }
 
 } // namespace nlm
