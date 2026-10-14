@@ -3,11 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <any>
+#include <typeinfo>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::any> validationMetadata;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -142,6 +145,26 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+bool Config::validate(ConfigValidator& validator) const {
+    std::unordered_map<std::string, std::any> configMap;
+    
+    // Convert entries to any map for validation
+    for (const auto& entry : pImpl->entries) {
+        configMap[entry.key] = toAny(entry.value);
+    }
+    
+    std::vector<ValidationError> errors = validator.validate(configMap);
+    
+    // Store errors in validator for reporting
+    validator.clearValidationErrors();
+    validator.getValidationErrors().insert(
+        validator.getValidationErrors().end(),
+        errors.begin(), errors.end()
+    );
+    
+    return errors.empty();
+}
+
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -186,6 +209,50 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+void Config::setPhase2Defaults() {
+    // Set default values for Phase 2
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    
+    // Reward parameters
+    set("reward_discount_factor", 0.99f, ConfigSource::Default);
+    
+    // Environment parameters
+    set("environment_name", std::string("GridWorld"), ConfigSource::Default);
+    set("environment_width", 10, ConfigSource::Default);
+    set("environment_height", 10, ConfigSource::Default);
+    
+    // Logging parameters
+    set("log_level", std::string("INFO"), ConfigSource::Default);
+    set("log_to_file", false, ConfigSource::Default);
+    set("log_filename", std::string("nlm.log"), ConfigSource::Default);
+    
+    // Simulation parameters
+    set("max_simulation_steps", 10000, ConfigSource::Default);
+    set("simulation_time_limit", 0.0, ConfigSource::Default);
+    
+    // Visualization parameters
+    set("visualization_enabled", false, ConfigSource::Default);
+    set("visualization_update_rate", 30.0f, ConfigSource::Default);
+}
+
+// Helper function implementations
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +264,51 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::any Config::toAny(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> std::any {
+        return std::any(arg);
+    }, value);
+}
+
+ConfigValue Config::fromAny(const std::any& value) {
+    if (value.type() == typeid(int)) {
+        return std::any_cast<int>(value);
+    } else if (value.type() == typeid(int64_t)) {
+        return std::any_cast<int64_t>(value);
+    } else if (value.type() == typeid(double)) {
+        return std::any_cast<double>(value);
+    } else if (value.type() == typeid(bool)) {
+        return std::any_cast<bool>(value);
+    } else if (value.type() == typeid(std::string)) {
+        return std::any_cast<std::string>(value);
+    }
+    return std::string();
+}
+
+std::vector<ValidationError> Config::validateKey(const std::string& key) const {
+    std::vector<ValidationError> errors;
+    
+    // Check if key is valid (alphanumeric + underscore, no spaces)
+    if (key.empty()) {
+        errors.emplace_back("empty", "Key cannot be empty", "error");
+        return errors;
+    }
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_') {
+            errors.emplace_back(key, "Key contains invalid characters. Only alphanumeric and underscore allowed", "error");
+            break;
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::isValidKey(const std::string& key) const {
+    return !key.empty() && std::all_of(key.begin(), key.end(), 
+        [](char c) { return std::isalnum(c) || c == '_'; });
 }
 
 // Explicit template instantiations

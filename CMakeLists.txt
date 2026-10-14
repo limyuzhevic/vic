@@ -26,9 +26,14 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
+    src/core/Config/ConfigSchema.cpp
+    src/core/Config/ConfigValidator.cpp
+    src/core/Config/ConfigInitializer.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Exceptions/Exceptions.cpp
+    src/core/ExceptionHandler/ExceptionHandler.cpp
+    src/core/Random/Random.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp

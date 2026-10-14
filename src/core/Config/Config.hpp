@@ -5,11 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <any>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,7 +47,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main enhanced configuration class
 class Config {
 public:
     Config();
@@ -78,6 +82,9 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Validate configuration
+    bool validate(ConfigValidator& validator) const;
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -93,6 +100,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Set default values for all parameters (Phase 2 defaults)
+    void setPhase2Defaults();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +110,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::any toAny(const ConfigValue& value);
+    static ConfigValue fromAny(const std::any& value);
+    
+    // Validation helpers
+    static std::vector<ValidationError> validateKey(const std::string& key) const;
+    static bool isValidKey(const std::string& key) const;
 };
 
 } // namespace nlm
