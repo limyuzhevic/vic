@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Includes comprehensive memory retention and learning progression tests
 
 #include <iostream>
 #include <cassert>
@@ -35,6 +36,10 @@ namespace test_stdp {
 
 namespace test_brain {
     void runAll();
+}
+
+namespace test_memory {
+    void runAllMemoryTests();
 }
 
 int main() {
@@ -113,6 +118,16 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "Running Memory Retention and Learning Progression Tests..." << std::endl;
+    try {
+        test_memory::runAllMemoryTests();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

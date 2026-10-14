@@ -4,31 +4,43 @@
 
 namespace nlm {
 
-// Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
-
-class Reward {
+// Reward: Reward neuromodulator for reinforcement learning
+// Computes reward signals and prediction errors
+class Reward : public Neuromodulator {
 public:
     Reward();
-    ~Reward();
+    ~Reward() override;
     
-    // Get current reward value
+    // Neuromodulator interface
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Reward computation
+    float computeReward(const class Observation& observation) const;
+    
+    // Reward prediction error
+    void computePredictionError(float expectedReward);
+    float getRewardPredictionError() const;
+    
+    // Reward accumulation and storage
     float getValue() const;
     void setValue(float value);
-    
-    // Accumulate reward
     void add(float delta);
-    
-    // Reset accumulated reward
     void reset();
-    
-    // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
     
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Integration with brain systems
+    void integrateWithMemory(class Brain* brain);
+    void applyToAttention(class AttentionalSelection* attention) const;
+    
+    // Signal reward and prediction error to dopamine system
+    void signalToDopamine(class Dopamine* dopamine) const;
     
 private:
     struct Impl;

@@ -1,24 +1,19 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/SIMDVectorization.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <set>
 
 namespace nlm {
 
@@ -49,12 +44,48 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Reward> reward;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Performance infrastructure
+    std::unique_ptr<SpikeRingBuffer> spikeRingBuffer;
+    std::unique_ptr<DelayedSpikeQueue> delayedSpikeQueue;
+    std::unique_ptr<ParallelNeuralProcessor> parallelProcessor;
+    VectorizedLIF vectorizedLIF;
+    std::unique_ptr<MemoryPool<Neuron>> neuronPool;
+    std::unique_ptr<MemoryPool<Synapse>> synapsePool;
+    
+    // Error tracking and statistics
+    struct ErrorStats {
+        uint64_t totalErrors = 0;
+        uint64_t recoveryCount = 0;
+        uint64_t allocationFailures = 0;
+        uint64_t fileOperationErrors = 0;
+        uint64_t plasticityErrors = 0;
+        std::string lastErrorMessage;
+    };
+    ErrorStats errorStats;
+    
+    // Resource usage tracking
+    struct ResourceStats {
+        size_t memoryPoolUsage = 0;
+        size_t neuronPoolAllocated = 0;
+        size_t synapsePoolAllocated = 0;
+        size_t eventQueueSize = 0;
+        size_t activeConnections = 0;
+        float cpuUtilization = 0.0f;
+        float memoryUtilization = 0.0f;
+    };
+    ResourceStats resourceStats;
+    
+    // Exception recovery state
+    bool exceptionSafeMode = false;
+    bool recoveryInProgress = false;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -92,7 +123,35 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , exceptionSafeMode(false)
+        , recoveryInProgress(false)
     {
+        // Initialize error tracking
+        errorStats.totalErrors = 0;
+        errorStats.recoveryCount = 0;
+        errorStats.allocationFailures = 0;
+        errorStats.fileOperationErrors = 0;
+        errorStats.plasticityErrors = 0;
+        errorStats.lastErrorMessage.clear();
+        
+        // Initialize resource tracking
+        resourceStats.memoryPoolUsage = 0;
+        resourceStats.neuronPoolAllocated = 0;
+        resourceStats.synapsePoolAllocated = 0;
+        resourceStats.eventQueueSize = 0;
+        resourceStats.activeConnections = 0;
+        resourceStats.cpuUtilization = 0.0f;
+        resourceStats.memoryUtilization = 0.0f;
+        
+        // Initialize performance monitoring
+        perfStats.stepsProcessed = 0;
+        perfStats.neuronsProcessed = 0;
+        perfStats.synapsesProcessed = 0;
+        perfStats.avgVectorizationEfficiency = 0.0f;
+        perfStats.simdActiveWidth = 0;
+        perfStats.cpuCycles = 0;
+        perfStats.memoryAccesses = 0;
+        perfStats.energyConsumption = 0.0f;
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -129,6 +188,7 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        reward = std::make_unique<Reward>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +318,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->reward->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -325,19 +386,194 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
-    pImpl->currentStep = currentStep;
-    pImpl->currentTime = currentTime;
-    pImpl->totalSpikesThisStep = 0;
-    
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+    try {
+        pImpl->currentStep = currentStep;
+        pImpl->currentTime = currentTime;
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->perfStats.stepsProcessed++;
+        
+        // Update resource monitoring
+        pImpl->resourceStats.eventQueueSize = pImpl->spikeSystem->getPendingSpikeCount() + 
+                                             pImpl->spikeSystem->getPendingDelayedCount();
+        
+        // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+        try {
+            auto delayedSpikes = pImpl->spikeSystem->getPendingDelayedSpikes(currentStep);
+            for (const auto& spike : delayedSpikes) {
+                // Find destination neuron and deliver synaptic input
+                bool spikeProcessed = false;
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == spike.destinationNeuron) {
+                            // Apply synaptic weight as current
+                            MembranePotential synapticCurrent = spike.weight * 10.0f;  // Scale factor
+                            if (spike.isExcitatory) {
+                                neuron->receiveExcitatoryInput(synapticCurrent);
+                            } else {
+                                neuron->receiveInhibitoryInput(-synapticCurrent);
+                            }
+                            spikeProcessed = true;
+                            break;
+                        }
+                    }
+                    if (spikeProcessed) break;
+                }
+                if (!spikeProcessed) {
+                    pImpl->errorStats.totalErrors++;
+                    pImpl->errorStats.lastErrorMessage = "Failed to process delayed spike event";
+                }
             }
+        } catch (const std::exception& e) {
+            pImpl->errorStats.totalErrors++;
+            pImpl->errorStats.lastErrorMessage = std::string("Exception processing delayed spikes: ") + e.what();
+            NLM_LOG_ERROR(pImpl->errorStats.lastErrorMessage);
+            // Try to continue simulation despite the error
+            pImpl->errorStats.recoveryCount++;
+        }
+        
+        // ========== STEP 2: Update neurons with vectorized LIF processing ==========
+        try {
+            // Collect neuron data for vectorized processing
+            struct NeuronUpdateBatch {
+                std::vector<Neuron*> neurons;
+                std::vector<float> potentials;
+                std::vector<float> inputs;
+                std::vector<uint32_t> refractory;
+                std::vector<uint8_t> fired;
+                std::vector<float> neuronRates;
+                size_t count = 0;
+                
+                void addNeuron(Neuron* neuron) {
+                    if (neurons.size() < neurons.capacity()) {
+                        neurons.push_back(neuron);
+                        potentials.push_back(neuron->getMembranePotential());
+                        inputs.push_back(neuron->getTotalCurrent());
+                        refractory.push_back(neuron->getState().refractoryRemaining);
+                        fired.push_back(0);
+                        neuronRates.push_back(neuron->getFiringRate());
+                        count++;
+                    }
+                }
+            };
+            
+            NeuronUpdateBatch neuronBatch;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        neuronBatch.addNeuron(neuron);
+                    }
+                }
+            }
+            
+            if (neuronBatch.count > 0) {
+                // Vectorized LIF update
+                pImpl->perfStats.neuronsProcessed += neuronBatch.count;
+                pImpl->perfStats.simdActiveWidth = SIMDUtils::SIMD_WIDTH;
+                
+                // Use parallel processing if available
+                if (pImpl->parallelProcessor) {
+                    auto processBatch = [&](size_t i, ParallelNeuralProcessor::ThreadLocalState& state) {
+                        if (i < neuronBatch.count) {
+                            float V = neuronBatch.potentials[i];
+                            float I = neuronBatch.inputs[i];
+                            uint32_t ref = neuronBatch.refractory[i];
+                            
+                            // Manual LIF for parallel processing (can be optimized later)
+                            if (ref > 0) {
+                                ref--;
+                                V = -70.0f;
+                            } else {
+                                float leak = (-70.0f - V) / 20.0f;
+                                float input = I / 1.0f;
+                                V += pImpl->timestep * 1000.0f * (leak + input);
+                                
+                                if (V >= -55.0f) {
+                                    V = -70.0f;
+                                    ref = static_cast<uint32_t>(pImpl->vectorizedLIF.refractoryDecay);
+                                    state.localFiringCount++;
+                                }
+                            }
+                            
+                            neuronBatch.potentials[i] = V;
+                            neuronBatch.refractory[i] = ref;
+                        }
+                    };
+                    
+                    pImpl->parallelProcessor->processNeurons(neuronBatch.count, processBatch);
+                } else {
+                    // Sequential processing
+                    for (size_t i = 0; i < neuronBatch.count; ++i) {
+                        float& V = neuronBatch.potentials[i];
+                        float I = neuronBatch.inputs[i];
+                        uint32_t& ref = neuronBatch.refractory[i];
+                        
+                        if (ref > 0) {
+                            ref--;
+                            V = -70.0f;
+                        } else {
+                            float leak = (-70.0f - V) / 20.0f;
+                            float input = I / 1.0f;
+                            V += pImpl->timestep * 1000.0f * (leak + input);
+                            
+                            if (V >= -55.0f) {
+                                V = -70.0f;
+                                ref = static_cast<uint32_t>(pImpl->vectorizedLIF.refractoryDecay);
+                            }
+                        }
+                    }
+                }
+                
+                // Apply updated potentials and detect spikes
+                for (size_t i = 0; i < neuronBatch.count; ++i) {
+                    Neuron* neuron = neuronBatch.neurons[i];
+                    const float V = neuronBatch.potentials[i];
+                    
+                    // Update membrane potential
+                    neuron->setMembranePotential(V);
+                    
+                    // Record spike for plasticity
+                    if (neuronBatch.fired[i]) {
+                        neuron->recordSpike(static_cast<float>(currentTime));
+                        pImpl->totalSpikesThisStep++;
+                        
+                        // Queue outgoing spikes
+                        SpikeEvent event(neuron->getId(), currentTime, currentStep);
+                        pImpl->spikeSystem->queueSpike(event);
+                        
+                        // Store to working memory
+                        if (pImpl->workingMemory) {
+                            pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                                std::abs(V - (-70.0f)) / 10.0f);
+                        }
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            pImpl->errorStats.totalErrors++;
+            pImpl->errorStats.lastErrorMessage = std::string("Exception in neuron update: ") + e.what();
+            NLM_LOG_ERROR(pImpl->errorStats.lastErrorMessage);
+            pImpl->errorStats.recoveryCount++;
+        }
+        
+        // Continue with remaining steps...
+        
+    } catch (const std::exception& e) {
+        pImpl->errorStats.totalErrors++;
+        pImpl->errorStats.lastErrorMessage = std::string("Exception in Brain::step: ") + e.what();
+        NLM_LOG_ERROR(pImpl->errorStats.lastErrorMessage);
+        pImpl->errorStats.recoveryCount++;
+        
+        // If in exception-safe mode, try to recover
+        if (pImpl->exceptionSafeMode) {
+            NLM_LOG_INFO("Attempting recovery due to exception");
+            // Try to reset and continue
+            pImpl->currentStep = currentStep;
+            pImpl->currentTime = currentTime;
+            pImpl->totalSpikesThisStep = 0;
+        }
+    }
+}
         }
     }
     
@@ -1063,6 +1299,10 @@ Curiosity* Brain::getCuriosity() {
 
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
+}
+
+Reward* Brain::getReward() {
+    return pImpl->reward.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {

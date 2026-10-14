@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -161,6 +164,12 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
+    // Self model for predicting own action consequences
+    SelfModel* getSelfModel();
+
+    // Social learning for observing other agents
+    SocialLearning* getSocialLearning();
+    
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
@@ -180,6 +189,9 @@ public:
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    
+    // Reward neuromodulator for reinforcement learning
+    Reward* getReward();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
