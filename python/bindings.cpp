@@ -261,7 +261,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Pythonic convenience methods
+        .def("to_dict", &SensoryPercept::getAllSignals,
+             "Convert percept to dictionary representation")
+        .def("get_vision_as_array", &SensoryPercept::getVision,
+             "Get vision data as numpy-compatible array")
+        .def("get_internal_values", &SensoryPercept::getInternal,
+             "Get internal signal values as list")
+        .def("is_valid", [](const SensoryPercept& self) {
+            return !self.getVision().empty() || 
+                   !self.getTouch().empty() || 
+                   !self.getInternal().empty();
+        }, "Check if percept has valid data");
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())

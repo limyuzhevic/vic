@@ -5,9 +5,10 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "Phase6IntegratedExperiment.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <iostream>
+#include <random>
 
 using namespace nlm;
 
@@ -59,6 +60,7 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "/tmp/nlm_phase6_demo_checkpoint.bin";
     
     auto result = experiment.run(config);
     

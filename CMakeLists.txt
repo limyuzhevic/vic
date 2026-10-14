@@ -139,13 +139,37 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Advanced configuration system
+add_library(nlm_advanced_config STATIC
+    src/core/AdvancedConfig/AdvancedConfig.cpp
+)
+target_include_directories(nlm_advanced_config PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_advanced_config PUBLIC nlm_core)
+
+# Advanced CLI
+add_executable(nlm_advanced_cli
+    src/advanced_cli/advanced_cli.cpp
+)
+target_link_libraries(nlm_advanced_cli PUBLIC nlm_core nlm_advanced_config)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(test_advanced_features)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+    nlm_advanced_config nlm_advanced_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+if(PYBIND11_FOUND)
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib
+    )
+endif()
