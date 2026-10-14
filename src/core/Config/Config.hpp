@@ -5,13 +5,30 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <any>
+#include <functional>
+#include <filesystem>
+#include <chrono>
+#include <stdexcept>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
+// Exception for configuration errors
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigValidationError : public ConfigError {
+public:
+    explicit ConfigValidationError(const std::string& msg) : ConfigError(msg) {}
+};
+
+// Configuration value types - expanded to support nested structures
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -20,27 +37,91 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<ConfigValue>,  // Vector of variant values for complex arrays
+    std::unordered_map<std::string, ConfigValue>,  // Nested configuration (objects)
+    std::vector<std::unordered_map<std::string, ConfigValue>>  // Array of objects
 >;
 
-// Configuration source
+// Configuration source with enhanced tracking
 enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Environment,
+    Runtime,
+    Schema
 };
 
-// Configuration entry
+// Configuration entry with enhanced metadata
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string type;
+    std::optional<ConfigValue> defaultValue;
+    std::function<bool(const ConfigValue&)> validator;
+    bool required;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), type(), 
+                   required(false), validator(nullptr) {}
+    
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& t = "",
+                const std::optional<ConfigValue>& def = std::nullopt,
+                const std::function<bool(const ConfigValue&)>& val = nullptr,
+                bool req = false)
+        : key(k), value(v), source(s), description(desc), type(t), 
+          defaultValue(def), validator(val), required(req) {}
+};
+
+// Parser strategy interface (Strategy pattern)
+class ConfigParser {
+public:
+    virtual ~ConfigParser() = default;
+    virtual std::unordered_map<std::string, ConfigValue> parse(const std::string& content) = 0;
+    virtual std::string serialize(const std::unordered_map<std::string, ConfigValue>& config) = 0;
+    virtual bool canParse(const std::string& filename) const = 0;
+};
+
+// JSON parser implementation
+class JsonConfigParser : public ConfigParser {
+public:
+    std::unordered_map<std::string, ConfigValue> parse(const std::string& content) override;
+    std::string serialize(const std::unordered_map<std::string, ConfigValue>& config) override;
+    bool canParse(const std::string& filename) const override;
+};
+
+// YAML parser implementation  
+class YamlConfigParser : public ConfigParser {
+public:
+    std::unordered_map<std::string, ConfigValue> parse(const std::string& content) override;
+    std::string serialize(const std::unordered_map<std::string, ConfigValue>& config) override;
+    bool canParse(const std::string& filename) const override;
+};
+
+// Key-value parser for backward compatibility
+class KeyValueConfigParser : public ConfigParser {
+public:
+    std::unordered_map<std::string, ConfigValue> parse(const std::string& content) override;
+    std::string serialize(const std::unordered_map<std::string, ConfigValue>& config) override;
+    bool canParse(const std::string& filename) const override;
+};
+
+// Configuration schema for validation
+struct ConfigSchema {
+    std::unordered_map<std::string, ConfigEntry> entries;
+    std::string description;
+    std::chrono::system_clock::time_point created;
+    std::string version;
+    
+    ConfigSchema() : created(std::chrono::system_clock::now()), version("1.0") {}
+    
+    void addEntry(const ConfigEntry& entry);
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    bool validate(const std::unordered_map<std::string, ConfigValue>& config) const;
+    std::vector<std::string> getMissingRequired() const;
 };
 
 // Main configuration class
@@ -55,7 +136,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +181,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string detectFileFormat(const std::string& filepath);
 };
+
+// Helper functions (declarations)
+std::string configValueToString(const ConfigValue& value);
 
 } // namespace nlm

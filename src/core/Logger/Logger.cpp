@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <shared_mutex>
 
 namespace nlm {
 
@@ -106,15 +107,28 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::shared_ptr<EnhancedLogger> enhancedLogger;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    // Create enhanced logger with default configuration
+    auto enhancedLogger = std::make_shared<EnhancedLogger>();
+    auto consoleSink = std::make_shared<ConsoleSink>(true);
+    enhancedLogger->addSink(consoleSink);
+    
+    pImpl->enhancedLogger = enhancedLogger;
+    pImpl->loggers.push_back(std::make_shared<ILoggerAdapter>(enhancedLogger));
+}
+
+Logger::Logger(std::shared_ptr<ILogger> logger) : pImpl(std::make_unique<Impl>()) {
+    pImpl->loggers.push_back(std::move(logger));
+}
 
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    pImpl->loggers.push_back(std::move(logger));
 }
 
 void Logger::clearLoggers() {
@@ -184,6 +198,20 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+}
+
+// EnhancedLogger implementation helpers
+namespace {
+    std::string levelToString(LogLevel level) {
+        switch (level) {
+            case LogLevel::Debug: return "DEBUG";
+            case LogLevel::Info: return "INFO";
+            case LogLevel::Warning: return "WARN";
+            case LogLevel::Error: return "ERROR";
+            case LogLevel::Critical: return "CRIT";
+            default: return "UNKNOWN";
+        }
+    }
 }
 
 // LogStream implementation
