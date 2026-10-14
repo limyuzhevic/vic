@@ -54,3 +54,99 @@ void Dopamine::signalRewardPredictionError(float error) {
 }
 
 } // namespace nlm
+
+// Acetylcholine: Attention and memory consolidation
+Acetylcholine::Acetylcholine() : pImpl(new Impl) {}
+
+Acetylcholine::~Acetylcholine() = default;
+
+const char* Acetylcholine::getName() const {
+    return "ACh";
+}
+
+float Acetylcholine::getLevel() const {
+    return pImpl->level;
+}
+
+void Acetylcholine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Acetylcholine::getPlasticityFactor() const {
+    // Enhanced plasticity factor for attention-related learning
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Acetylcholine::update(TimestepDuration dt) {
+    // Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Update attention boost and memory consolidation based on current level
+    pImpl->attentionBoost = pImpl->level * 0.8f;  // Strong attention boost
+    pImpl->memoryConsolidationBoost = pImpl->level * 0.6f;  // Moderate memory boost
+}
+
+// Norepinephrine: Arousal and vigilance
+Norepinephrine::Norepinephrine() : pImpl(new Impl) {}
+
+Norepinephrine::~Norepinephrine() = default;
+
+const char* Norepinephrine::getName() const {
+    return "NE";
+}
+
+float Norepinephrine::getLevel() const {
+    return pImpl->level;
+}
+
+void Norepinephrine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Norepinephrine::getPlasticityFactor() const {
+    // Enhanced plasticity factor for arousal-related learning
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Norepinephrine::update(TimestepDuration dt) {
+    // Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Update arousal and vigilance based on current level
+    pImpl->arousalLevel = pImpl->level * 0.7f;  // Moderate arousal
+    pImpl->vigilance = 0.5f + pImpl->level * 0.5f;  // Higher vigilance with higher NE
+}
+
+// Serotonin: Mood, impulsivity, and social behavior
+Serotonin::Serotonin() : pImpl(new Impl) {}
+
+Serotonin::~Serotonin() = default;
+
+const char* Serotonin::getName() const {
+    return "5-HT";
+}
+
+float Serotonin::getLevel() const {
+    return pImpl->level;
+}
+
+void Serotonin::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Serotonin::getPlasticityFactor() const {
+    // Serotonin reduces plasticity (stabilizing effects)
+    return 1.0f - 0.3f * pImpl->level;
+}
+
+void Serotonin::update(TimestepDuration dt) {
+    // Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Update mood and behavioral state based on current level
+    pImpl->moodLevel = pImpl->level;  // Higher serotonin = better mood
+    pImpl->impulsivity = 0.5f - pImpl->level * 0.3f;  // Higher serotonin = less impulsive
+    pImpl->socialMotivator = pImpl->level * 0.8f;  // Higher serotonin = more social
+}
+
+} // namespace nlm

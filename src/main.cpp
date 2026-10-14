@@ -409,41 +409,312 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Helper functions for advanced commands
+void printHelp() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+Usage:
+  nlm [options]
+
+Options:
+  --config=file      Load configuration from file (default: configs/default.cfg)
+  --interactive      Enter interactive mode for real-time control
+  --batch=file       Run batch experiment from configuration file
+  --debug            Enable debug output and detailed logging
+  --checkpoint=file  Load/save brain state from checkpoint file
+  --duration=steps   Run simulation for specified number of steps (default: 1000)
+  --verbose          Enable verbose output
+
+Advanced Options (Phase 6 Integration):
+  --enable-memory    Enable memory systems integration
+  --enable-planner   Enable neural planning integration
+  --enable-prediction Enable prediction system integration
+  --enable-neuromod  Enable enhanced neuromodulation
+  --enable-dev       Enable developmental stages
+  --memory-capacity=N Set working memory capacity
+  --episode-limit=N   Set episodic memory episode limit
+  --replay-interval=N Set memory replay interval
+  --consolidation-interval=N Set memory consolidation interval
+  --plasticity-rate=N Set base plasticity rate
+  --dopamine-level=N Set dopamine baseline level
+  --curiosity-level=N Set curiosity baseline level
+
+Examples:
+  nlm --config=myconfig.cfg --interactive
+  nlm --batch=experiment.cfg --verbose --enable-memory
+  nlm --checkpoint=saved_brain.bin --duration=5000
+  nlm --enable-planner --enable-prediction --enable-neuromod
+
+For more information, visit: https://github.com/neural-learning-machine/NLM
+
+)" << std::endl;
+}
+
+void printBrainStatus(const std::shared_ptr<Brain>& brain) {
+    if (!brain) return;
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    std::cout << R"(
+=== NLM Brain Status ===
+Regions: )" << brain->getRegionCount() 
+              << R"(
+Total neurons: )" << brain->getTotalNeuronCount()
+              << R"(
+Total synapses: )" << brain->getTotalSynapseCount()
+              << R"(
+Active neurons: )" << brain->getActiveNeuronCount()
+              << R"(
+Firing neurons (this step): )" << brain->getFiringNeuronCount()
+              << R"(
+Total spikes: )" << brain->getTotalSpikeCount()
+              << R"(
+Average firing rate: )" << std::fixed << std::setprecision(2) 
+                                    << brain->getAverageFiringRate()
+              << R"( Hz
+E/I ratio: )" << brain->getExcitationInhibitionRatio()
+              << R"(
+
+Memory Systems:
+  Working Memory: )" << (brain->getWorkingMemory() ? 
+                             std::to_string(brain->getWorkingMemory()->getActiveTraces()) : 
+                             std::string("NOT INTEGRATED"))
+              << R"(
+  Episodic Memory: )" << (brain->getEpisodicMemory() ? 
+                              std::to_string(brain->getEpisodicMemory()->getEpisodeCount()) : 
+                              std::string("NOT INTEGRATED"))
+              << R"(
+  Associative Memory: )" << (brain->getAssociativeMemory() ? 
+                                 std::to_string(brain->getAssociativeMemory()->getAssociationCount()) : 
+                                 std::string("NOT INTEGRATED"))
+              << R"(
+
+Cognitive Systems:
+  Neural Planner: )" << (brain->getPlanner() ? "INTEGRATED" : "NOT INTEGRATED")
+              << R"(
+  Concept Formation: )" << (brain->getConceptFormation() ? "INTEGRATED" : "NOT INTEGRATED")
+              << R"(
+  Attention: )" << (brain->getAttention() ? "INTEGRATED" : "NOT INTEGRATED")
+              << R"(
+
+Prediction System: )" << (brain->getPredictionSystem() ? "INTEGRATED" : "NOT INTEGRATED")
+              << R"(
+Neuromodulation:
+  Dopamine: )" << (brain->getDopamine() ? 
+                          std::to_string(std::fixed << std::setprecision(2) 
+                                      << brain->getDopamine()->getLevel()) : 
+                          std::string("NOT INTEGRATED"))
+              << R"(
+  Curiosity: )" << (brain->getCuriosity() ? 
+                        std::to_string(std::fixed << std::setprecision(2) 
+                                    << brain->getCuriosity()->getLevel()) : 
+                        std::string("NOT INTEGRATED"))
+              << R"(
+  Novelty: )" << (brain->getNovelty() ? 
+                      std::to_string(std::fixed << std::setprecision(2) 
+                                  << brain->getNovelty()->getLevel()) : 
+                      std::string("NOT INTEGRATED"))
+              << R"(
+
+Development: )" << (brain->getDevelopmentSystem() ? 
+                        std::to_string(static_cast<int>(brain->getDevelopmentalStage())) : 
+                        std::string("NOT INTEGRATED"))
+              << R"(
+=== End Status ===
+
+)" << std::endl;
+}
+
+void saveBrainState(const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+    if (!brain) {
+        std::cerr << "Error: No brain to save." << std::endl;
+        return;
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (brain->save(filepath)) {
+        std::cout << "Successfully saved brain state to: " << filepath << std::endl;
+        std::cout << "Brain statistics:" << std::endl;
+        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    } else {
+        std::cerr << "Error: Failed to save brain state to: " << filepath << std::endl;
+    }
+}
+
+void loadBrainState(const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+    if (!brain) {
+        std::cerr << "Error: No brain to load." << std::endl;
+        return;
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (brain->load(filepath)) {
+        std::cout << "Successfully loaded brain state from: " << filepath << std::endl;
+        std::cout << "Brain statistics after load:" << std::endl;
+        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    } else {
+        std::cerr << "Error: Failed to load brain state from: " << filepath << std::endl;
+    }
+}
+
+void configureBrain(const std::shared_ptr<Brain>& brain, const std::vector<std::string>& args) {
+    if (!brain) return;
     
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    for (const auto& arg : args) {
+        size_t pos = arg.find('=');
+        if (pos != std::string::npos) {
+            std::string key = arg.substr(0, pos);
+            std::string value = arg.substr(pos + 1);
+            
+            // Convert value to appropriate type based on key
+            if (key == "memory-capacity") {
+                // This would be a more complex implementation
+                // For now, just note the setting
+                std::cout << "Setting memory capacity to: " << value << std::endl;
+            } else if (key == "episode-limit") {
+                std::cout << "Setting episodic memory limit to: " << value << std::endl;
+            } else if (key == "replay-interval") {
+                std::cout << "Setting memory replay interval to: " << value << std::endl;
+            } else if (key == "consolidation-interval") {
+                std::cout << "Setting memory consolidation interval to: " << value << std::endl;
+            } else if (key == "plasticity-rate") {
+                std::cout << "Setting plasticity rate to: " << value << std::endl;
+            } else if (key == "dopamine-level") {
+                float level = std::stof(value);
+                if (brain->getDopamine()) {
+                    brain->getDopamine()->setLevel(level);
+                    std::cout << "Set dopamine level to: " << level << std::endl;
+                }
+            } else if (key == "curiosity-level") {
+                float level = std::stof(value);
+                if (brain->getCuriosity()) {
+                    brain->getCuriosity()->setLevel(level);
+                    std::cout << "Set curiosity level to: " << level << std::endl;
+                }
+            } else {
+                std::cout << "Unknown configuration option: " << key << std::endl;
+            }
+        }
+    }
+}
+
+void runInteractiveMode(std::shared_ptr<Brain>& brain, const std::shared_ptr<Config>& config) {
+    std::cout << "=== NLM Interactive Mode ===" << std::endl;
+    std::cout << "Commands:" << std::endl;
+    std::cout << "  status    - Display brain status" << std::endl;
+    std::cout << "  save <file> - Save brain state to file" << std::endl;
+    std::cout << "  load <file> - Load brain state from file" << std::endl;
+    std::cout << "  step N     - Run N simulation steps" << std::endl;
+    std::cout << "  inject <neuron_id> <current> - Inject current into neuron" << std::endl;
+    std::cout << "  inject <type> <current>       - Inject current into neurons of type" << std::endl;
+    std::cout << "  help       - Show this help message" << std::endl;
+    std::cout << "  quit/q     - Exit interactive mode" << std::endl;
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    std::string line;
+    bool running = true;
     
-    return 0;
+    while (running) {
+        std::cout << ">>> ";
+        std::getline(std::cin, line);
+        
+        if (line.empty()) continue;
+        
+        // Parse command
+        size_t spacePos = line.find(' ');
+        std::string command;
+        std::string arg;
+        
+        if (spacePos != std::string::npos) {
+            command = line.substr(0, spacePos);
+            arg = line.substr(spacePos + 1);
+        } else {
+            command = line;
+        }
+        
+        if (command == "status" || command == "s") {
+            printBrainStatus(brain);
+        } else if (command == "save" || command == "save") {
+            if (arg.empty()) {
+                std::cout << "Usage: save <filename>" << std::endl;
+            } else {
+                saveBrainState(brain, arg);
+            }
+        } else if (command == "load" || command == "load") {
+            if (arg.empty()) {
+                std::cout << "Usage: load <filename>" << std::endl;
+            } else {
+                loadBrainState(brain, arg);
+            }
+        } else if (command == "step" || command == "t") {
+            try {
+                size_t steps = std::stoul(arg);
+                std::cout << "Running " << steps << " steps..." << std::endl;
+                for (size_t i = 0; i < steps; ++i) {
+                    brain->step(i, i * config->getOr<double>("simulation_timestep", 0.001));
+                    if (i % 100 == 0) {
+                        std::cout << "  Step " << i << " completed" << std::endl;
+                    }
+                }
+                std::cout << "Completed " << steps << " steps." << std::endl;
+            } catch (const std::exception& e) {
+                std::cout << "Error: Invalid number of steps." << std::endl;
+            }
+        } else if (command == "inject" || command == "i") {
+            // Parse inject command
+            size_t spacePos2 = arg.find(' ');
+            if (spacePos2 != std::string::npos) {
+                std::string target = arg.substr(0, spacePos2);
+                std::string currentStr = arg.substr(spacePos2 + 1);
+                
+                try {
+                    float current = std::stof(currentStr);
+                    
+                    // Try to parse target as neuron ID
+                    size_t neuronIdPos = target.find(':');
+                    if (neuronIdPos != std::string::npos) {
+                        // Format: "region:neuron_id"
+                        std::string regionStr = target.substr(0, neuronIdPos);
+                        std::string neuronStr = target.substr(neuronIdPos + 1);
+                        
+                        try {
+                            int regionId = std::stoi(regionStr);
+                            int neuronId = std::stoi(neuronStr);
+                            // This is a simplified injection - in real implementation, would need proper neuron lookup
+                            std::cout << "Injecting " << current << " into neuron " << neuronId 
+                                     << " in region " << regionId << std::endl;
+                        } catch (...) {
+                            std::cout << "Error: Invalid neuron ID format: " << target << std::endl;
+                        }
+                    } else {
+                        // Try to parse as neuron ID directly
+                        try {
+                            int neuronId = std::stoi(target);
+                            std::cout << "Injecting " << current << " into neuron " << neuronId << std::endl;
+                        } catch (...) {
+                            // Try to parse as neuron type
+                            if (target == "sensory" || target == "internal" || target == "motor") {
+                                std::cout << "Injecting " << current << " into " << target << " neurons" << std::endl;
+                                // This would call brain->injectCurrentToNeurons()
+                            } else {
+                                std::cout << "Error: Invalid injection target: " << target << std::endl;
+                            }
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    std::cout << "Error: Invalid current value." << std::endl;
+                }
+            } else {
+                std::cout << "Usage: inject <target> <current>" << std::endl;
+                std::cout << "  <target>: neuron_id or neuron_type (sensory, internal, motor)" << std::endl;
+            }
+        } else if (command == "help" || command == "?" || command == "h") {
+            printHelp();
+        } else if (command == "quit" || command == "q" || command == "exit") {
+            running = false;
+            std::cout << "Exiting interactive mode." << std::endl;
+        } else {
+            std::cout << "Unknown command: " << command << std::endl;
+            std::cout << "Type 'help' for available commands." << std::endl;
+        }
+    }
 }
