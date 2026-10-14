@@ -19,15 +19,22 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -160,6 +167,18 @@ public:
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    
+    // Self model of the agent
+    SelfModel* getSelfModel();
+    
+    // Social learning from other agents
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations
+    TemporalRelation* getTemporalRelation();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();

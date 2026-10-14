@@ -34,6 +34,9 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Set brain reference for integration
+    void setBrainReference(class Brain* brain);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

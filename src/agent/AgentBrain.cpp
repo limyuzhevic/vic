@@ -334,6 +334,45 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+std::unique_ptr<SensoryInput> AgentBrain::predictNextState(const SensoryInput& currentState) {
+    if (!brain_) return currentState.clone();
+    
+    // Get prediction system from brain
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (!predictionSystem) {
+        NLM_LOG_WARNING("Prediction system not available");
+        return currentState.clone();
+    }
+    
+    // Make prediction using the prediction system
+    auto predicted = predictionSystem->predictNextState(currentState);
+    
+    NLM_LOG_INFO("AgentBrain: Predicted next state (" + 
+                 std::to_string(predicted->getData().size()) + " dimensions)");
+    
+    return predicted;
+}
+
+void AgentBrain::updatePredictionSystem(const SensoryInput& predicted, const SensoryInput& actual) {
+    if (!brain_) return;
+    
+    // Get prediction system from brain
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (!predictionSystem) {
+        NLM_LOG_WARNING("Prediction system not available for update");
+        return;
+    }
+    
+    // Update prediction system with prediction error
+    predictionSystem->updatePredictions(predicted, actual);
+    
+    // Train prediction model with actual observation
+predictionSystem->train(actual);
+
+    NLM_LOG_INFO("AgentBrain: Updated prediction system with prediction error: " + 
+                 std::to_string(predictionSystem->getPredictionError()));
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

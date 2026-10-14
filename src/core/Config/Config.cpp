@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cstddef>
 
 namespace nlm {
 
@@ -93,79 +95,42 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+void writeToStream(std::ostringstream& oss, const T& value) {
+    oss << value;
+}
+
+inline void writeToStream(std::ostringstream& oss, const std::string& value) {
+    oss << "\"" << value << "\"";
+}
+
+// Overload for std::vector<int>
+inline void writeToStream(std::ostringstream& oss, const std::vector<int>& value) {
+    oss << "[";
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << value[i];
     }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    oss << "]";
+}
+
+// Overload for std::vector<double>
+inline void writeToStream(std::ostringstream& oss, const std::vector<double>& value) {
+    oss << "[";
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << value[i];
     }
+    oss << "]";
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+// Overload for std::vector<std::string>
+inline void writeToStream(std::ostringstream& oss, const std::vector<std::string>& value) {
+    oss << "[";
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << "\"" << value[i] << "\"";
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
+    oss << "]";
 }
 
 std::string Config::summary() const {
@@ -174,12 +139,7 @@ std::string Config::summary() const {
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
+            writeToStream(oss, arg);
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
@@ -197,6 +157,47 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// ConfigValue conversion helper
+template<typename T>
+std::optional<T> convertValue(const ConfigValue& value) {
+    if constexpr (std::is_same_v<T, int>) {
+        return std::get<int>(value);
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        return std::get<int64_t>(value);
+    } else if constexpr (std::is_same_v<T, double>) {
+        return std::get<double>(value);
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return std::get<bool>(value);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        return std::get<std::string>(value);
+    } else {
+        return std::nullopt;
+    }
+}
+
+// Template implementations for get() and getOr()
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+
+    // Try to convert to type T
+    return convertValue<T>(it->value);
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto value = get<T>(key);
+    if (value) {
+        return *value;
+    }
+    return defaultValue;
 }
 
 // Explicit template instantiations

@@ -62,10 +62,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
+        
+        // === PREDICTION SYSTEM INTEGRATION ===
+        // Convert percept to Vision input for prediction
+        const auto& vision = percept.getVision();
+        Vision predictionInput;
+        predictionInput.setData(vision);
+        predictionInput.setTimestamp(world.getSimulationTime());
+        
+        // Make prediction for next state
+        auto predictedState = agent.predictNextState(predictionInput);
+        
+        // Convert current observation to SensoryInput for comparison
+        Vision actualInput;
+        actualInput.setData(vision);
+        actualInput.setTimestamp(world.getSimulationTime());
+        
+        // Update prediction system with prediction error
+        agent.updatePredictionSystem(predictedState, actualInput);
+        
+        // === END PREDICTION INTEGRATION ===
         
         // Brain step
         brain->step(step, step * 0.001);

@@ -52,6 +52,13 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Make prediction for current state
+    // Returns predicted next state based on current sensory input
+    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    
+    // Update prediction system with prediction error
+    void updatePredictionSystem(const SensoryInput& predicted, const SensoryInput& actual);
+    
     // Reset agent for new episode
     void reset();
     
