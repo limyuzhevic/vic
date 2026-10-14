@@ -36,15 +36,57 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
-    
-    // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
+    // Add neural encoding signatures for faster retrieval
+    if (brain_ && !episode.activeNeurons.empty()) {
+        // Create episode-specific neural pattern
+        stored.neuralPattern = episode.activeNeurons;
+        
+        // Store average activation for pattern completion
+        if (!episode.neuronActivations.empty()) {
+            float sum = std::accumulate(episode.neuronActivations.begin(), 
+                                        episode.neuronActivations.end(), 0.0f);
+            stored.averageActivation = sum / episode.neuronActivations.size();
+        }
+        
+        // Create episode neuron with pattern associations
         NeuronId epNeuron(episodes_.size() + 20000);
+        stored.episodeNeuron = epNeuron;
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Add to associative memory for faster recall
+        if (brain_->getAssociativeMemory()) {
+            brain_->getAssociativeMemory()->associate(stored.neuralPattern, stored.neuralPattern, 0.9f);
+        }
+    }
+    
+    episodes_.push_back(stored);
+    
+    // Apply development stage effects on storage
+    if (brain_) {
+        DevelopmentalStage stage = brain_->getDevelopmentalStage();
+        float storageMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                storageMod = 1.5f;  // Enhanced storage in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                storageMod = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                storageMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                storageMod = 0.8f;  // Reduced storage in adulthood
+                break;
+        }
+        
+        // Adjust memory capacity based on developmental stage
+        if (stage == DevelopmentalStage::Adult) {
+            // Adult brain prioritizes memory quality over quantity
+            // Enforce stricter consolidation
+            consolidate(0.5f);
+        }
     }
     
     // Remove old episodes if over capacity
@@ -55,9 +97,15 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
         }
     }
     
-    // Age all episodes
+    // Age all episodes and apply sleep/rest consolidation if needed
     for (auto& ep : episodes_) {
         ep.age++;
+        
+        // Apply sleep/rest consolidation during rest periods
+        if (brain_->getDevelopmentSystem() && brain_->getDevelopmentSystem()->isResting()) {
+            // Enhance memory during rest
+            ep.consolidation += 0.1f;
+        }
     }
 }
 

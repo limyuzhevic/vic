@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -184,11 +187,25 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== NEW: Enhanced neuromodulation ==========
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Enhanced logging
+    void logEnhancedStatus() const;
     
     // Logging
     void logStatus() const;

@@ -44,11 +44,10 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // ========== NEW: Enhanced neuromodulators ==========
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -68,6 +67,11 @@ struct Brain::Impl {
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
+    
+    // ========== NEW: Enhanced neuromodulators ==========
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -129,6 +133,16 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // ========== NEW: Initialize enhanced neuromodulators ==========
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        
+        // ========== NEW: Enhanced neuromodulators ==========
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -576,16 +590,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
-    }
+    // Apply enhanced neuromodulation effects
+        applyEnhancedNeuromodulation(pImpl->timestep);
+        
+        // ========== STEP 15: Apply development effects ==========
+        if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+            
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            }
+        }
+        
+        // ========== STEP 16: Apply enhanced neuromodulation ==========
+        // Integrate enhanced neuromodulation effects
+        applyEnhancedNeuromodulation(pImpl->timestep);
+        
+        // ========== STEP 17: Memory consolidation and sleep/rest cycle ==========
+        if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+            // Consolidate important memories with neuromodulation influence
+            float consolidationThreshold = 0.3f;
+            if (pImpl->dopamine) {
+                // Dopamine enhances consolidation of reward-related memories
+                consolidationThreshold -= pImpl->dopamine->getLevel() * 0.2f;
+            }
+            if (pImpl->acetylcholine) {
+                // Acetylcholine modulates memory consolidation rate
+                consolidationThreshold += pImpl->acetylcholine->getMemoryConsolidationRate() * 0.5f;
+            }
+            
+            pImpl->episodicMemory->consolidate(consolidationThreshold);
+        }
+        
+        // Sleep/rest cycle implementation
+        if (pImpl->isResting) {
+            pImpl->stepsSinceLastEpisode++;
+            if (pImpl->stepsSinceLastEpisode >= pImpl->replayInterval * 10) {
+                pImpl->isResting = false;
+                NLM_LOG_INFO("Brain exiting rest period, consolidating memories");
+            }
+        }
+        
+        // ========== STEP 18: Record statistics ==========
+        // Collect and log enhanced statistics
+        logEnhancedStatus();
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1077,8 +1146,8 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+void logEnhancedStatus() const {
+    NLM_LOG_INFO("=== Enhanced NLM Brain Status (Phase 6.1 - Super Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
@@ -1089,17 +1158,38 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
-    // Memory system status
+    // Enhanced memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_INFO("Working memory activity: " + std::to_string(pImpl->workingMemory->getMemoryActivity()));
+        NLM_LOG_INFO("Working memory winners: " + std::to_string(pImpl->workingMemory->getWinners().size()));
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_INFO("Episodic memory average reward: " + std::to_string(pImpl->episodicMemory->getAverageReward()));
     }
     
-    // Neuromodulation status
+    // Enhanced neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+        NLM_LOG_INFO("ACh attention gain: " + std::to_string(pImpl->acetylcholine->getAttentionGain()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+        NLM_LOG_INFO("NE learning rate modulation: " + std::to_string(pImpl->norepinephrine->getLearningRateModulation()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+        NLM_LOG_INFO("5-HT impulse control: " + std::to_string(pImpl->serotonin->getImpulseControl()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
     }
     
     // Development status
@@ -1112,6 +1202,10 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+void Brain::logStatus() const {
+    logEnhancedStatus();
 }
 
 } // namespace nlm

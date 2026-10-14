@@ -125,12 +125,16 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
-            // Age the trace
+            // Age the trace and apply decay based on age
             memoryTimestamps_[i]++;
+            if (memoryTimestamps_[i] > 100) {
+                activation *= (1.0f - decayRate_ * static_cast<float>(memoryTimestamps_[i] - 100) / 1000.0f);
+            }
             
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+            // Apply neuromodulation-based decay
+            if (brain_->getDopamine()) {
+                float plasticityFactor = brain_->getDopamine()->getPlasticityFactor();
+                activation *= plasticityFactor;
             }
             
             memoryActivations_[i] = activation;
@@ -140,8 +144,11 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition to select winners with enhanced selection
     runCompetition();
+    
+    // Update recurrent connections
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
@@ -163,8 +170,19 @@ void NeuralWorkingMemory::runCompetition() {
     
     if (memoryActivations_.empty()) return;
     
-    // Find neurons with above-threshold activation
+    // Find neurons with above-threshold activation, influenced by neuromodulation
     float threshold = 0.3f;
+    
+    // Adjust threshold based on neuromodulation
+    if (brain_ && brain_->getNovelty()) {
+        float noveltyLevel = brain_->getNovelty()->getLevel();
+        threshold *= (1.0f + noveltyLevel * 0.5f);  // Novelty increases competition threshold
+    }
+    
+    if (brain_ && brain_->getCuriosity()) {
+        float curiosityLevel = brain_->getCuriosity()->getLevel();
+        threshold *= (1.0f - curiosityLevel * 0.3f);  // Curiosity lowers competition threshold
+    }
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
@@ -172,14 +190,26 @@ void NeuralWorkingMemory::runCompetition() {
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // Inhibitory competition - suppress non-winners with enhanced dynamics
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
         if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            // Apply modulated inhibition based on dopamine level
+            float inhibition = -memoryActivations_[i] * 3.0f;
+            
+            if (brain_->getDopamine()) {
+                float dopamineLevel = brain_->getDopamine()->getLevel();
+                inhibition *= (1.0f + dopamineLevel);  // Dopamine enhances inhibition
+            }
+            
+            brain_->injectCurrent(memoryNeurons_[i], inhibition);
         }
+    }
+    
+    // Apply attention to winners if attention system exists
+    if (brain_ && brain_->getAttention() && !winners_.empty()) {
+        brain_->getAttention()->processCompetition(winners_, 1.0f);
     }
 }
 
