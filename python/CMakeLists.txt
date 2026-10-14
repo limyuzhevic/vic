@@ -90,6 +90,16 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_compile_features(pynlm PRIVATE cxx_std_20)
+
+# Set Python module properties
+set_target_properties(pynlm PROPERTIES
+    OUTPUT_NAME "pynlm"
+    PREFIX ""
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    VERSION "2.0.0"
+    SOVERSION "2"
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
