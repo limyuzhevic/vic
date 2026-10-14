@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -137,6 +138,13 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Integration with memory systems
+    void setWorkingMemoryAccess(Brain* brain) { brain_ = brain; }
+    void storeConceptToWorkingMemory(size_t conceptId);
+    void updateConceptFromEpisodicMemory(const EpisodicMemoryItem& episode);
+    std::vector<size_t> getConceptsRelevantToCurrentAttention() const;
+    void applyConceptBasedAttention(size_t conceptId, float relevance);
 
 private:
     // Create new concept from pattern

@@ -1,5 +1,6 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -295,6 +296,83 @@ void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
 }
+
+    // Store concept prototype in working memory for retrieval
+    void ConceptFormation::storeConceptToWorkingMemory(size_t conceptId) {
+        if (!brain_ || conceptId == 0) return;
+        
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) return;
+        
+        // Store the concept prototype in working memory as a neural pattern
+        if (brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->store(concept->prototype, 1.0f);
+        }
+    }
+    
+    // Update concept from episodic memory experience
+    void ConceptFormation::updateConceptFromEpisodicMemory(const EpisodicMemoryItem& episode) {
+        if (!brain_ || episode.sensoryState.empty()) return;
+        
+        // Get matching concept for this episodic memory
+        size_t conceptId = getMatchingConcept(episode.sensoryState);
+        
+        if (conceptId > 0) {
+            // Update existing concept with this experience
+            updateConcept(conceptId, episode.sensoryState, 
+                         std::vector<float>(episode.neuronActivations.size(), 0.5f), 
+                         episode.reward);
+        } else {
+            // Create new concept from episodic memory
+            createConcept(episode.sensoryState, 
+                         std::vector<float>(episode.neuronActivations.size(), 0.5f), 
+                         episode.reward);
+        }
+    }
+    
+    // Get concepts relevant to current attention
+    std::vector<size_t> ConceptFormation::getConceptsRelevantToCurrentAttention() const {
+        std::vector<size_t> relevantConcepts;
+        
+        if (!brain_ || !brain_->getAttention()) {
+            return relevantConcepts;
+        }
+        
+        // Get current attention focus (winners from attention system)
+        const auto& attentionWinners = brain_->getAttention()->getWinners();
+        
+        for (const auto& concept : concepts_) {
+            // Check if concept prototype matches attended neurons
+            // Simple heuristic: if concept has any observations that might be attended
+            for (const auto& instance : concept.instances) {
+                // For now, just check if concept is stable
+                if (getConceptStability(concept.id) > 0.7f) {
+                    relevantConcepts.push_back(concept.id);
+                    break;
+                }
+            }
+        }
+        
+        return relevantConcepts;
+    }
+    
+    // Apply concept-based attention
+    void ConceptFormation::applyConceptBasedAttention(size_t conceptId, float relevance) {
+        if (!brain_ || conceptId == 0 || !brain_->getAttention()) return;
+        
+        // Get concept instances
+        const auto& instances = getConceptInstances(conceptId);
+        
+        if (!instances.empty()) {
+            // Apply top-down bias based on concept relevance
+            // This would ideally activate specific neural populations
+            // representing this concept
+            for (size_t i = 0; i < instances.size() && i < 100; ++i) {
+                NeuronId neuronId(10000 + i);  // Concept-related neuron IDs
+                brain_->getAttention()->applyTopDownBias(neuronId, relevance * 2.0f);
+            }
+        }
+    }
 
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {

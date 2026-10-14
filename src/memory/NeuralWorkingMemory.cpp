@@ -36,36 +36,54 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Use attention system to select best neurons for pattern storage
+    std::vector<NeuronId> competitors;
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+    // Create or get neurons for pattern encoding
+    // Each element in pattern corresponds to a sensory neuron or feature neuron
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        // Create neuron IDs based on pattern index
+        // Format: 1000 + sensory_neuron_index for identification
+        NeuronId neuron(1000 + i);
+        
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Check if neuron already exists in memory
+        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
         
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
+        if (it != memoryNeurons_.end()) {
+            // Update existing neuron's activation
+            size_t idx = std::distance(memoryNeurons_.begin(), it);
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+            
+            // Inject current to maintain activation
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        } else if (memoryNeurons_.size() < capacity_) {
+            // Add new neuron to working memory
+            memoryNeurons_.push_back(neuron);
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            
+            // Inject current to establish activation
+            brain_->injectCurrent(neuron, activation * 5.0f);
+            
+            // Add to competitors for attention selection
+            competitors.push_back(neuron);
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Use attention system to select and compete for pattern storage
+    if (!competitors.empty() && brain_->getAttention()) {
+        // Apply attentional selection to competitors
+        brain_->getAttention()->processCompetition(competitors, 0.5f);
+    }
+    
+    // Create maintenance connections between newly stored neurons
+    if (memoryNeurons_.size() >= 2) {
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
     }
 }
 
@@ -128,14 +146,22 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Check if trace is too old - apply decay
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
+            }
+            
+            // Apply attention-based reinforcement if neuron is being attended
+            if (brain_->getAttention() && brain_->getAttention()->isAttended(neuron)) {
+                activation *= (1.0f + decayRate_ * 2.0f);  // Boost for attended neurons
             }
             
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();

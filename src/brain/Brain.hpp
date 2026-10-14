@@ -147,7 +147,17 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+
+    // ========== WORKING MEMORY ==========
     
+    // Working memory - current context for planning
+    NeuralWorkingMemory* getWorkingMemory();
+
+    // ========== EPISODIC MEMORY ==========
+    
+    // Episodic memory - past experiences for planning context
+    NeuralEpisodicMemory* getEpisodicMemory();
+
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

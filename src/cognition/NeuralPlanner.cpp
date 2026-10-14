@@ -1,15 +1,32 @@
 #include "NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
-struct NeuralPlanner::Impl {
-    Brain* brain;
+float NeuralPlanner::computePatternSimilarity(const std::vector<float>& a,
+                                         const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.empty()) return 0.0f;
     
-    Impl() : brain(nullptr) {}
-};
+    // Cosine similarity
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
 
 NeuralPlanner::NeuralPlanner()
     : pImpl(new Impl)
@@ -29,16 +46,43 @@ void NeuralPlanner::initialize(Brain* brain) {
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
+    // Integration with working memory for planning context
+    std::vector<float> workingMemoryContext;
+    if (auto* wm = getWorkingMemory()) {
+        workingMemoryContext = wm->retrieve();
+    }
+    
+    // Integration with episodic memory for experience-based planning
+    std::vector<const EpisodicMemoryItem*> relevantEpisodes;
+    if (auto* em = getEpisodicMemory()) {
+        relevantEpisodes = em->retrieveSimilar(currentState, 5);
+    }
+    
+    // Integration with concept-based planning
+    std::vector<size_t> relevantConcepts;
+    if (auto* cf = getConceptFormation()) {
+        relevantConcepts = cf->getConceptsRelevantToCurrentAttention();
+    }
+    
+    // Integration with attention for attentional planning
+    std::vector<NeuronId> attendedNeurons;
+    if (auto* attention = getAttention()) {
+        attendedNeurons = attention->getWinners();
+    }
+    
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
     PlanningCandidate best;
     best.expectedReward = -1000.0f;
     
-    // Evaluate each sequence
+    // Evaluate each sequence with enhanced context integration
     for (const auto& sequence : sequences) {
-        PlanningCandidate candidate = evaluateSequence(sequence, currentState);
+        PlanningCandidate candidate = evaluateSequenceWithIntegration(
+            sequence, currentState, targetReward, 
+            workingMemoryContext, relevantEpisodes, 
+            relevantConcepts, attendedNeurons);
         
         if (candidate.expectedReward > best.expectedReward) {
             best = candidate;
@@ -65,8 +109,14 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
     return ActionType::Wait;
 }
 
-PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
-                                                 const std::vector<float>& startState) {
+PlanningCandidate NeuralPlanner::evaluateSequenceWithIntegration(
+    const std::vector<ActionType>& actions,
+    const std::vector<float>& startState,
+    float targetReward,
+    const std::vector<float>& workingMemoryContext,
+    const std::vector<const EpisodicMemoryItem*>& relevantEpisodes,
+    const std::vector<size_t>& relevantConcepts,
+    const std::vector<NeuronId>& attendedNeurons) {
     PlanningCandidate candidate;
     candidate.actions = actions;
     candidate.depth = actions.size();
@@ -78,11 +128,53 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     for (size_t i = 0; i < actions.size(); ++i) {
         ActionType action = actions[i];
         
-        // Evaluate this action
-        float actionValue = evaluateAction(action, currentState);
+        // Integration with concept-based planning
+        float conceptBonus = 0.0f;
+        if (!relevantConcepts.empty()) {
+            // Check if this action relates to relevant concepts
+            for (size_t conceptId : relevantConcepts) {
+                auto* cf = getConceptFormation();
+                if (cf) {
+                    const auto* concept = cf->getConcept(conceptId);
+                    if (concept) {
+                        // Simple concept-action compatibility check
+                        conceptBonus += cf->getConceptStability(conceptId) * 0.1f;
+                    }
+                }
+            }
+        }
         
-        // Predict next state
-        auto predictedNext = predictNextState(action, currentState);
+        // Integration with working memory context
+        float workingMemoryBonus = 0.0f;
+        if (!workingMemoryContext.empty()) {
+            // Use working memory to evaluate action in context
+            for (float activation : workingMemoryContext) {
+                workingMemoryBonus += activation * 0.05f;
+            }
+        }
+        
+        // Integration with attention
+        float attentionBonus = 0.0f;
+        if (!attendedNeurons.empty()) {
+            // Actions that engage attended neurons get bonus
+            for (NeuronId neuron : attendedNeurons) {
+                // Simple heuristic: actions that activate attended neurons are better
+                attentionBonus += 0.05f;
+            }
+        }
+        
+        // Evaluate this action with enhanced context
+        float actionValue = evaluateActionWithContext(action, currentState,
+                                                     conceptBonus, workingMemoryBonus,
+                                                     attentionBonus);
+        
+        // Integration with prediction system for predictive planning
+        std::vector<float> predictedNext;
+        if (auto* ps = getPredictionSystem()) {
+            predictedNext = ps->predictActionConsequence(action, currentState);
+        } else {
+            predictedNext = predictNextState(action, currentState);
+        }
         
         if (!predictedNext.empty()) {
             candidate.predictedStates.push_back(predictedNext);
@@ -99,6 +191,19 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         
         // Reduce confidence if we're uncertain
         confidence *= getSelfModelConfidence(action);
+        
+        // Integration with episodic memory for experience-based evaluation
+        if (!relevantEpisodes.empty() && i > 0) {
+            // Use similar past experiences to evaluate this action
+            for (const auto* episode : relevantEpisodes) {
+                if (episode && episode->action == action) {
+                    float episodeReward = episode->reward;
+                    if (std::abs(episodeReward - totalReward) < 0.5f) {
+                        confidence *= 1.1f;  // Reinforce confidence if similar outcome
+                    }
+                }
+            }
+        }
     }
     
     candidate.expectedReward = totalReward;
@@ -145,7 +250,11 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     return result;
 }
 
-float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
+float NeuralPlanner::evaluateActionWithContext(ActionType action, 
+                                                   const std::vector<float>& state,
+                                                   float conceptBonus,
+                                                   float workingMemoryBonus,
+                                                   float attentionBonus) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionQuality_.size()) return 0.0f;
     
@@ -166,18 +275,62 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
         }
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    // Integration with prediction system for action evaluation
+    float predictionBonus = 0.0f;
+    if (auto* ps = getPredictionSystem()) {
+        // Get prediction for this action
+        auto prediction = ps->predictActionConsequence(action, state);
+        if (!prediction.empty()) {
+            // Check how prediction aligns with current state
+            float predictionSimilarity = computePatternSimilarity(prediction->getData(), state);
+            predictionBonus = predictionSimilarity * 0.2f;
+        }
+    }
+    
+    // Integration with episodic memory for action evaluation
+    float episodicBonus = 0.0f;
+    if (auto* em = getEpisodicMemory()) {
+        auto similarEpisodes = em->retrieveSimilar(state, 3);
+        for (const auto* episode : similarEpisodes) {
+            if (episode && episode->action == action) {
+                // Higher bonus if similar past experiences were successful
+                episodicBonus += episode->reward * 0.3f;
+            }
+        }
+    }
+    
+    // Combine all bonuses
+    return baseValue * 0.4f + goalBonus * 0.2f + 
+           conceptBonus * 0.1f + workingMemoryBonus * 0.1f + 
+           attentionBonus * 0.1f + predictionBonus * 0.1f + 
+           episodicBonus * 0.1f;
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
-                                                  const std::vector<float>& currentState) {
-    // Use simple action-consequence prediction
-    // In a full implementation, this would use learned forward models
+                                                   const std::vector<float>& currentState) {
+    // Integration with prediction system for forward models
+    if (auto* ps = getPredictionSystem()) {
+        auto prediction = ps->predictActionConsequence(action, currentState);
+        if (!prediction.empty()) {
+            return prediction->getData();
+        }
+    }
     
+    // Integration with episodic memory for experience-based prediction
+    if (auto* em = getEpisodicMemory()) {
+        auto relevantEpisodes = em->retrieveSimilar(currentState, 3);
+        for (const auto* episode : relevantEpisodes) {
+            if (episode && episode->action == action) {
+                // Use similar past experiences to predict outcome
+                return episode->resultingSensoryState;
+            }
+        }
+    }
+    
+    // Fallback to simple action-consequence prediction
     std::vector<float> nextState = currentState;
     
     // Apply expected effect based on action
-    // This is a simplified model - real implementation would use experience
     switch (action) {
         case ActionType::MoveForward:
             // Shift visual field forward
@@ -197,7 +350,6 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
         case ActionType::TurnLeft:
         case ActionType::TurnRight:
             // Rotate pattern
-            // Simplified: just add some noise
             for (auto& v : nextState) {
                 v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
                 v = std::clamp(v, 0.0f, 1.0f);

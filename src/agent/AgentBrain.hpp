@@ -4,6 +4,15 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <memory>
 #include <vector>
 
@@ -51,6 +60,32 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+    
+    // Record experience to episodic memory
+    void recordExperience(const SensoryPercept& percept, 
+                         float reward,
+                         float predictedReward);
+    
+    // Get episodic memory
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    
+    // Get working memory
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    
+    // Get associative memory
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    
+    // Get prediction system
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // Get neural planner
+    NeuralPlanner* getPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    
+    // Get concept formation
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    
+    // Get attention system
+    AttentionalSelection* getAttention() { return brain_ ? brain_->getAttention() : nullptr; }
     
     // Reset agent for new episode
     void reset();

@@ -74,12 +74,34 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
-private:
-    // Generate possible action sequences
-    std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
+    // Integration with other brain systems
+    
+    // Get working memory for planning context
+    NeuralWorkingMemory* getWorkingMemory() const { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    
+    // Get episodic memory for experience-based planning
+    NeuralEpisodicMemory* getEpisodicMemory() const { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    
+    // Get prediction system for predictive planning
+    PredictionSystem* getPredictionSystem() const { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // Get concept formation for concept-based planning
+    ConceptFormation* getConceptFormation() const { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    
+    // Get associative memory for related experience recall
+    NeuralAssociativeMemory* getAssociativeMemory() const { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    
+    // Get attention system for attentional planning
+    AttentionalSelection* getAttention() const { return brain_ ? brain_->getAttention() : nullptr; }
 
-    // Evaluate single action from state
-    float evaluateAction(ActionType action, const std::vector<float>& state);
+// Evaluate single action from state with context integration
+    float evaluateActionWithContext(ActionType action, const std::vector<float>& state,
+                                  float conceptBonus, float workingMemoryBonus,
+                                  float attentionBonus);
+
+    // Compute pattern similarity for comparison
+    float computePatternSimilarity(const std::vector<float>& a,
+                                 const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

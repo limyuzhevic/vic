@@ -45,6 +45,19 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
         
         // Store episode index in the neuron
         // (This is a simplified approach - real implementation would use more distributed encoding)
+        
+        // Integrate with working memory - store the complete sensory pattern
+        // This helps with experience consolidation later
+        if (brain_->getWorkingMemory()) {
+            // Store the sensory pattern in working memory for later consolidation
+            // This creates a link between working memory traces and episodic memory
+            brain_->getWorkingMemory()->store(episode.sensoryState, 1.0f);
+            
+            // Also store the resulting state to show the outcome of the experience
+            if (!episode.resultingSensoryState.empty()) {
+                brain_->getWorkingMemory()->store(episode.resultingSensoryState, episode.reward * 0.5f);
+            }
+        }
     }
     
     // Remove old episodes if over capacity
@@ -58,6 +71,27 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Age all episodes
     for (auto& ep : episodes_) {
         ep.age++;
+    }
+    
+    // Associate with working memory traces for consolidation
+    if (brain_ && !episode.sensoryState.empty() && brain_->getWorkingMemory()) {
+        // Store association between current sensory state and episode
+        // This helps with later replay and consolidation
+        std::vector<float> workingMemoryPattern = brain_->getWorkingMemory()->retrieve();
+        if (!workingMemoryPattern.empty()) {
+            // Create a simpler association - sensory pattern to episode index
+            // In full implementation, this would create neural connections
+            for (size_t i = 0; i < std::min(episode.sensoryState.size(), workingMemoryPattern.size()); ++i) {
+                if (std::abs(episode.sensoryState[i] - workingMemoryPattern[i]) < 0.1f) {
+                    // Good match - associate these patterns
+                    brain_->getAssociativeMemory()->associate(
+                        episode.sensoryState, 
+                        workingMemoryPattern, 
+                        0.5f * (1.0f - std::abs(episode.sensoryState[i] - workingMemoryPattern[i]))
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -218,6 +252,18 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+void NeuralEpisodicMemory::setMaxEpisodes(size_t max) {
+    maxEpisodes_ = max;
+    
+    // Trim episodes if over new capacity
+    while (episodes_.size() > maxEpisodes_) {
+        episodes_.erase(episodes_.begin());
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+    }
+}
+
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
     // In a full implementation, episodes would have relevance scores
@@ -227,9 +273,16 @@ void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     }
 }
 
-void NeuralEpisodicMemory::clear() {
-    episodes_.clear();
-    pImpl->episodeNeurons.clear();
+void NeuralEpisodicMemory::setMaxEpisodes(size_t max) {
+    maxEpisodes_ = max;
+    
+    // Trim episodes if over new capacity
+    while (episodes_.size() > maxEpisodes_) {
+        episodes_.erase(episodes_.begin());
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+    }
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
