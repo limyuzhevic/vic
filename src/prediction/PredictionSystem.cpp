@@ -1,48 +1,73 @@
 #include "PredictionSystem.hpp"
+#include "NeuralPrediction.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include <memory>
 
 namespace nlm {
 
 struct PredictionSystem::Impl {
-    float predictionError;
-    float confidence;
-    std::vector<float> errorHistory;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
+    Brain* brain;
+    std::vector<float> errorHistory;  
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : brain(nullptr) {
+        neuralPrediction = std::make_unique<NeuralPrediction>();
+    }
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+void PredictionSystem::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    pImpl->neuralPrediction->initialize(brain);
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
+std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const std::vector<float>& currentState) {
+    if (!pImpl->brain) {
+        return std::make_unique<SensoryInput>();
+    }
     
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
-        }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
+    // Update neural prediction with current sensory state
+    pImpl->neuralPrediction->recordSensoryState(currentState, pImpl->brain->getCurrentStep());
+    
+    // Generate prediction for next state
+    std::vector<float> predictedData = pImpl->neuralPrediction->generatePrediction(pImpl->brain->getCurrentStep());
+    
+    if (predictedData.empty()) {
+        return std::make_unique<SensoryInput>();
+    }
+    
+    // Convert to SensoryInput
+    auto predictedInput = std::make_unique<SensoryInput>();
+    predictedInput->setData(predictedData);
+    
+    // Update prediction error
+    float error = pImpl->neuralPrediction->updateWithObservation(predictedData, pImpl->brain->getCurrentStep() + 1);
+    pImpl->errorHistory.push_back(error);
+    
+    return predictedInput;
+}
+
+void PredictionSystem::updatePredictions(const std::vector<float>& predicted, const std::vector<float>& actual) {
+    if (!pImpl->brain) return;
+    
+    if (predicted.size() == actual.size() && !predicted.empty()) {
+        // Update neural prediction with actual observation and compute error
+        float error = pImpl->neuralPrediction->updateWithObservation(actual, pImpl->brain->getCurrentStep());
+        
+        // Store in error history
+        pImpl->errorHistory.push_back(error);
     }
 }
 
 float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
+    return pImpl->neuralPrediction ? pImpl->neuralPrediction->getPredictionError() : 0.0f;
 }
 
 float PredictionSystem::getConfidence() const {
-    return pImpl->confidence;
+    return pImpl->neuralPrediction ? pImpl->neuralPrediction->getPredictionConfidence() : 0.0f;
 }
 
 const std::vector<float>& PredictionSystem::getErrorHistory() const {
@@ -51,10 +76,15 @@ const std::vector<float>& PredictionSystem::getErrorHistory() const {
 
 void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
+    if (pImpl->neuralPrediction) {
+        pImpl->neuralPrediction->clearHistory();
+    }
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::train(const std::vector<float>& observation) {
+    if (!pImpl->brain) return;
+    
+    pImpl->neuralPrediction->recordSensoryState(observation, pImpl->brain->getCurrentStep());
 }
 
 } // namespace nlm

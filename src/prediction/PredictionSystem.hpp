@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 
@@ -14,12 +15,15 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference for proper integration
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
-    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    std::unique_ptr<SensoryInput> predictNextState(const std::vector<float>& currentState);
     
     // Update predictions based on actual observation
-    void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    void updatePredictions(const std::vector<float>& predicted, const std::vector<float>& actual);
     
     // Get prediction error
     float getPredictionError() const;
@@ -32,7 +36,7 @@ public:
     void clearHistory();
     
     // Train prediction model
-    void train(const SensoryInput& observation);
+    void train(const std::vector<float>& observation);
     
 private:
     struct Impl;
