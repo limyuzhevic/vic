@@ -12,8 +12,39 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments using the common parser
+    size_t neuronCount = 500;
+    size_t maxSteps = 2000;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    
+    CommandLineParser parser("nlm_phase6_demo", "NLM Phase 6: Integration Demo");
+    
+    parser.addArgument("neurons", "Number of neurons in the simulation", "int", "500");
+    parser.addArgument("steps", "Number of simulation steps", "int", "2000");
+    parser.addArgument("checkpoint", "Enable checkpointing", "bool", "true");
+    parser.addArgument("replay", "Enable replay functionality", "bool", "true");
+    parser.addArgument("development", "Enable development system", "bool", "true");
+    parser.addArgument("help", "Display help information", "bool", "false");
+    
+    if (!parser.parse(argc, argv)) {
+        return 1;
+    }
+    
+    neuronCount = parser.getArgumentAsInt("neurons");
+    maxSteps = parser.getArgumentAsInt("steps");
+    enableCheckpointing = parser.getArgumentAsInt("checkpoint") > 0;
+    enableReplay = parser.getArgumentAsInt("replay") > 0;
+    enableDevelopment = parser.getArgumentAsInt("development") > 0;
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the integrated artificial brain..." << std::endl;
+    std::cout << "Configuration: " << neuronCount << " neurons, " << maxSteps << " steps" << std::endl;
+    std::cout << "Features: " << (enableCheckpointing ? "Checkpointing " : "") 
+              << (enableReplay ? "Replay " : "") 
+              << (enableDevelopment ? "Development" : "") << std::endl;
+    std::cout << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -51,14 +82,14 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with configured settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = neuronCount;
+    config.maxSteps = maxSteps;
+    config.enableCheckpointing = enableCheckpointing;
+    config.enableReplay = enableReplay;
+    config.enableDevelopment = enableDevelopment;
     
     auto result = experiment.run(config);
     

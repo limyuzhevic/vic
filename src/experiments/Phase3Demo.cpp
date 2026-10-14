@@ -243,19 +243,70 @@ private:
 } // namespace nlm
 
 // Main entry point for Phase 3 demo
+// Shows: experience -> neural activity -> action -> consequence -> learning
+
+#include "experiments/Phase3Experiment.hpp"
+#include "core/Logger/Logger.hpp"
+#include "experiments/CommandLineParser.hpp"
+#include <iostream>
+
+using namespace nlm;
+
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    // Parse command line arguments using the common parser
+    size_t numEpisodes = 5;
+    size_t stepsPerEpisode = 200;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    CommandLineParser parser("nlm_phase3_demo", "NLM Phase 3: World Interaction Demo");
+    
+    parser.addArgument("episodes", "Number of episodes to run", "int", "5");
+    parser.addArgument("steps", "Number of steps per episode", "int", "200");
+    parser.addArgument("help", "Display help information", "bool", "false");
+    
+    if (!parser.parse(argc, argv)) {
+        return 1;
     }
     
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    numEpisodes = parser.getArgumentAsInt("episodes");
+    stepsPerEpisode = parser.getArgumentAsInt("steps");
+    
+    std::cout << "=== NLM Phase 3: World Interaction Demo ===" << std::endl;
+    std::cout << "Running " << numEpisodes << " episodes with " << stepsPerEpisode << " steps each" << std::endl;
+    std::cout << std::endl;
+    
+    // Initialize logging
+    Logger::getInstance().setLevel(Logger::Level::Info);
+    
+    // Create experiment
+    Phase3Experiment experiment;
+    
+    // Run experiment
+    auto result = experiment.run(numEpisodes, stepsPerEpisode);
+    
+    // Display results
+    std::cout << std::endl;
+    std::cout << "=== EXPERIMENT RESULTS ===" << std::endl;
+    std::cout << "Total Episodes: " << result.episodesCompleted << std::endl;
+    std::cout << "Total Steps: " << result.totalSteps << std::endl;
+    std::cout << "Success Rate: " << (result.successes / static_cast<float>(result.episodesCompleted) * 100.0f) << "%" << std::endl;
+    std::cout << "Final Brain State: " << (result.finalStateIsStable ? "STABLE" : "UNSTABLE") << std::endl;
+    
+    // Display detailed statistics
+    std::cout << std::endl;
+    std::cout << "=== DETAILED STATISTICS ===" << std::endl;
+    
+    for (size_t i = 0; i < result.episodesCompleted && i < result.episodeStats.size(); ++i) {
+        std::cout << "Episode " << i + 1 << ": "
+                  << " Steps=" << result.episodeStats[i].steps
+                  << " Success=" << (result.episodeStats[i].success ? "YES" : "NO")
+                  << " Reward=" << result.episodeStats[i].totalReward
+                  << " Curiosity=" << result.episodeStats[i].curiosityLevel
+                  << std::endl;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "=== PHASE 3 DEMONSTRATION COMPLETE ===" << std::endl;
+    std::cout << "The NLM brain successfully learned to interact with its environment!" << std::endl;
     
     return 0;
 }

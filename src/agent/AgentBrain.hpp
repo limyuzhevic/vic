@@ -6,15 +6,30 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <map>
+
+// Include the actual subsystem headers
+#include "SensoryNeuronGroup.hpp"
+#include "MotorCommandGroup.hpp"
+#include "SensoryProcessor.hpp"
+#include "MotorDecoder.hpp"
+#include "NeuromodulationSystem.hpp"
+#include "DevelopmentSystem.hpp"
+#include "CuriositySystem.hpp"
+#include "AgentBrainConfig.hpp"
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding through modular subsystems
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Delete copy operations
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -69,37 +84,29 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Subsystem access for testing and advanced usage
+    const SensoryProcessor* getSensoryProcessor() const { return sensoryProcessor_.get(); }
+    const MotorDecoder* getMotorDecoder() const { return motorDecoder_.get(); }
+    const NeuromodulationSystem* getNeuromodulationSystem() const { return neuromodulationSystem_.get(); }
+    const DevelopmentSystem* getDevelopmentSystem() const { return developmentSystem_.get(); }
+    const CuriositySystem* getCuriositySystem() const { return curiositySystem_.get(); }
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+private:
+    // Private helper methods
+    void initializeSubsystems();
+    void resetSubsystems();
+    void createSensoryNeuronGroups(const std::vector<std::unique_ptr<NeuralRegion>>& regions);
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
+    // Neuromodulation state variables
     float dopamineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
     
-    // Development state
+    // Development state variables
     double developmentalAge_;
     float plasticityModifier_;
     
@@ -112,6 +119,33 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Subsystem instances
+    std::unique_ptr<SensoryProcessor> sensoryProcessor_;
+    std::unique_ptr<MotorDecoder> motorDecoder_;
+    std::unique_ptr<NeuromodulationSystem> neuromodulationSystem_;
+    std::unique_ptr<DevelopmentSystem> developmentSystem_;
+    std::unique_ptr<CuriositySystem> curiositySystem_;
+    
+    // Sensory neuron groups
+    SensoryNeuronGroup sensoryVisionGroup_;
+    SensoryNeuronGroup sensoryTouchGroup_;
+    SensoryNeuronGroup sensoryInternalGroup_;
+    SensoryNeuronGroup sensoryProprioceptionGroup_;
+    
+    // Motor neuron groups (for direct access if needed)
+    std::vector<Neuron*> motorForward_;
+    std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorTurnLeft_;
+    std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorWait_;
+    
+    // Legacy neuron group arrays (for backward compatibility)
+    std::vector<Neuron*> sensoryVision_;
+    std::vector<Neuron*> sensoryTouch_;
+    std::vector<Neuron*> sensoryInternal_;
+    std::vector<Neuron*> sensoryProprioception_;
 };
 
 } // namespace nlm

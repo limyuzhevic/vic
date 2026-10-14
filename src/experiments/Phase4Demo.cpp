@@ -37,8 +37,26 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+    // Parse command line arguments using the common parser
+    size_t numTrials = 50;
+    
+    CommandLineParser parser("nlm_phase4_demo", "NLM Phase 4: Emerging Cognition Demo");
+    
+    parser.addArgument("trials", "Number of experimental trials", "int", "50");
+    parser.addArgument("help", "Display help information", "bool", "false");
+    
+    if (!parser.parse(argc, argv)) {
+        return 1;
+    }
+    
+    numTrials = parser.getArgumentAsInt("trials");
+    
+    printHeader("PHASE 4: EMERGING COGNITION");
+    
+    std::cout << "\nRunning " << numTrials << " trials for each cognitive experiment.\n\n";
+    
+    // Initialize logging
+    Logger::getInstance().setLevel(Logger::Level::Info);
     
     // Parse command line arguments
     size_t numTrials = 50;

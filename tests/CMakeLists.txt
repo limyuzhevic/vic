@@ -8,12 +8,14 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_enhanced.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_agentbrain_enhanced.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
@@ -22,3 +24,23 @@ target_compile_features(nlm_test PRIVATE cxx_std_20)
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+
+# Create logger tests (if logger tests exist)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_logger.cpp)
+    add_executable(nlm_logger_test
+        test_logger.cpp
+    )
+    target_link_libraries(nlm_logger_test PRIVATE nlm_core)
+    target_compile_features(nlm_logger_test PRIVATE cxx_std_20)
+    add_test(NAME nlm_logger_test COMMAND nlm_logger_test)
+endif()
+
+# Create integration tests (if integration tests exist)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_integration.cpp)
+    add_executable(nlm_integration_test
+        test_integration.cpp
+    )
+    target_link_libraries(nlm_integration_test PRIVATE nlm_core nlm_agent nlm_world)
+    target_compile_features(nlm_integration_test PRIVATE cxx_std_20)
+    add_test(NAME nlm_integration_test COMMAND nlm_integration_test)
+endif()
