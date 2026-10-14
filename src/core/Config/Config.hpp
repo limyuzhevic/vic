@@ -5,8 +5,33 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
+
+// Forward declaration for nlohmann::json
+namespace nlohmann {
+    template<typename> class basic_json;
+    using json = basic_json<std::string>;
+}
 
 namespace nlm {
+
+// Configuration parsing error
+class ConfigParseError : public std::runtime_error {
+public:
+    explicit ConfigParseError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Configuration file error
+class ConfigFileError : public std::runtime_error {
+public:
+    explicit ConfigFileError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    explicit ConfigValidationError(const std::string& msg) : std::runtime_error(msg) {}
+};
 
 // Forward declarations
 class Config;
@@ -55,13 +80,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (format determined by extension)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +118,25 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // JSON conversion helpers
+    ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    nlohmann::json configValueToJson(const ConfigValue& value) const;
+    
+    // Validation
+    void validateKey(const std::string& key);
+    void validateValue(const ConfigValue& value);
+    
+    // Format-specific save/load
+    void saveToJSON(const std::string& filepath) const;
+    void saveToSimpleFormat(const std::string& filepath) const;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

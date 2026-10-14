@@ -1,0 +1,83 @@
+{
+    "test_configuration": {
+        "framework": "doctest",
+        "version": "2.4.11",
+        "enabled_categories": [
+            "unit",
+            "integration", 
+            "performance",
+            "configuration",
+            "error",
+            "cli",
+            "system"
+        ],
+        "default_timeout": 30,
+        "enable_coverage": false,
+        "enable_sanitizers": false,
+        "parallel_execution": false,
+        "verbose_output": false
+    },
+    "test_paths": {
+        "unit_tests": [
+            "tests/test_types.cpp",
+            "tests/test_config.cpp",
+            "tests/test_random.cpp",
+            "tests/test_clock.cpp",
+            "tests/test_neuron.cpp",
+            "tests/test_synapse.cpp",
+            "tests/test_stdp.cpp",
+            "tests/test_plasticity.cpp",
+            "tests/test_structural_plasticity.cpp",
+            "tests/test_memory.cpp",
+            "tests/test_neuromodulation.cpp"
+        ],
+        "integration_tests": [
+            "tests/test_integration.cpp"
+        ],
+        "performance_tests": [
+            "tests/test_performance.cpp"
+        ],
+        "configuration_tests": [
+            "tests/test_config_loading.cpp"
+        ],
+        "cli_tests": [
+            "tests/test_cli.cpp"
+        ],
+        "error_tests": [
+            "tests/test_error_handling.cpp"
+        ]
+    },
+    "test_markers": {
+        "unit_test_marker": "TEST_CASE",
+        "integration_test_marker": "INTEGRATION_TEST",
+        "performance_test_marker": "PERFORMANCE_TEST",
+        "configuration_test_marker": "CONFIGURATION_TEST",
+        "cli_test_marker": "CLI_TEST",
+        "error_test_marker": "ERROR_TEST"
+    },
+    "performance_benchmarks": {
+        "neuron_creation_time": {
+            "target_time_ms": 0.1,
+            "iterations": 10000
+        },
+        "synapse_plasticity_time": {
+            "target_time_ms": 0.01,
+            "iterations": 1000
+        },
+        "memory_access_time": {
+            "target_time_ns": 100,
+            "iterations": 100000
+        }
+    },
+    "coverage_configuration": {
+        "minimum_coverage_percentage": 80,
+        "exclude_patterns": [
+            "*/tests/*",
+            "*/benchmarks/*",
+            "*/examples/*"
+        ],
+        "include_patterns": [
+            "*/src/*"
+        ]
+    }
+}

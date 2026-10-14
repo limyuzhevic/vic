@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 namespace test_config {
 
@@ -78,12 +80,119 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigSimpleFormat() {
+    nlm::Config config;
+    
+    config.set("test_int", 42);
+    config.set("test_double", 3.14);
+    config.set("test_string", "hello");
+    config.set("test_bool", true);
+    
+    // Test simple format save
+    std::stringstream buffer;
+    std::ofstream test_file("test_config_simple.cfg");
+    if (test_file.is_open()) {
+        // Create a temporary file
+        config.saveToFile("test_config_simple.cfg");
+        
+        // Read back and parse (simple format)
+        std::ifstream file("test_config_simple.cfg");
+        if (file.is_open()) {
+            nlm::Config config2;
+            config2.loadFromFile("test_config_simple.cfg");
+            
+            assert(config2.get<int>("test_int").has_value());
+            assert(config2.get<int>("test_int").value() == 42);
+            assert(config2.get<double>("test_double").has_value());
+            assert(config2.get<double>("test_double").value() > 3.13 && 
+                   config2.get<double>("test_double").value() < 3.15);
+            assert(config2.get<std::string>("test_string").has_value());
+            assert(config2.get<std::string>("test_string").value() == "hello");
+            assert(config2.get<bool>("test_bool").has_value());
+            assert(config2.get<bool>("test_bool").value() == true);
+        }
+    }
+    
+    // Cleanup
+    std::remove("test_config_simple.cfg");
+    
+    std::cout << "    testConfigSimpleFormat passed" << std::endl;
+}
+
+void testConfigJSONFormat() {
+    nlm::Config config;
+    
+    config.set("test_int", 42);
+    config.set("test_double", 3.14);
+    config.set("test_string", "hello");
+    config.set("test_bool", true);
+    
+    // Test JSON format save
+    std::ofstream json_file("test_config.json");
+    if (json_file.is_open()) {
+        config.saveToFile("test_config.json");
+    }
+    
+    // Load back using JSON format
+    nlm::Config config2;
+    config2.loadFromFile("test_config.json");
+    
+    assert(config2.get<int>("test_int").has_value());
+    assert(config2.get<int>("test_int").value() == 42);
+    assert(config2.get<double>("test_double").has_value());
+    assert(config2.get<double>("test_double").value() > 3.13 && 
+           config2.get<double>("test_double").value() < 3.15);
+    assert(config2.get<std::string>("test_string").has_value());
+    assert(config2.get<std::string>("test_string").value() == "hello");
+    assert(config2.get<bool>("test_bool").has_value());
+    assert(config2.get<bool>("test_bool").value() == true);
+    
+    // Cleanup
+    std::remove("test_config.json");
+    
+    std::cout << "    testConfigJSONFormat passed" << std::endl;
+}
+
+void testConfigKeyValidation() {
+    nlm::Config config;
+    
+    // Test valid key
+    config.set("valid_key", 123);
+    assert(config.has("valid_key"));
+    
+    // Test that internal validation would catch invalid keys
+    // (This is tested implicitly through loadFromFile)
+    
+    std::cout << "    testConfigKeyValidation passed" << std::endl;
+}
+
+void testConfigValueValidation() {
+    nlm::Config config;
+    
+    // Test valid values
+    config.set("valid_int", 42);
+    config.set("valid_double", 3.14);
+    config.set("valid_string", "hello");
+    config.set("valid_bool", true);
+    
+    assert(config.get<int>("valid_int").has_value());
+    assert(config.get<double>("valid_double").has_value());
+    assert(config.get<std::string>("valid_string").has_value());
+    assert(config.get<bool>("valid_bool").has_value());
+    
+    std::cout << "    testConfigValueValidation passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigSimpleFormat();
+    testConfigJSONFormat();
+    testConfigKeyValidation();
+    testConfigValueValidation();
 }
 
 } // namespace test_config

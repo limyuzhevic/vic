@@ -1,8 +1,6 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <iomanip>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,40 +17,68 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+
+    // Try to parse as JSON first
+    try {
+        json j;
+        file >> j;
+        clear();
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Parse JSON and validate
+        if (j.is_object()) {
+            for (const auto& [key, value] : j.items()) {
+                validateKey(key);
+                ConfigValue configValue;
+                try {
+                    configValue = jsonToConfigValue(value);
+                    set(key, configValue, ConfigSource::File);
+                } catch (const std::exception& e) {
+                    throw ConfigParseError("Failed to parse JSON value for key '" + key + "': " + std::string(e.what()));
+                }
+            }
+        } else {
+            throw ConfigParseError("Invalid JSON format: root must be an object");
+        }
+        return true;
+    } catch (const json::parse_error& e) {
+        // Fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        return true;
+    } catch (const ConfigParseError& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw ConfigParseError("Error parsing config file: " + std::string(e.what()));
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +105,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
+    // Determine file format based on extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (ext == "json" || ext == "JSON") {
+        return saveToJSON(filepath);
+    } else {
+        return saveToSimpleFormat(filepath);
     }
-    
-    return true;
 }
 
 template<typename T>
@@ -186,30 +209,188 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+ConfigValue Config::jsonToConfigValue(const json& j) {
+    if (j.is_number_integer()) {
+        return j.get<int>();
+    } else if (j.is_number()) {
+        double val = j.get<double>();
+        // Check for NaN
+        if (std::isnan(val)) {
+            throw ConfigParseError("Configuration value cannot be NaN");
+        }
+        return val;
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_array()) {
+        return jsonToConfigVector(j);
+    }
+    
+    throw ConfigParseError("Unsupported JSON value type");
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+ConfigValue Config::jsonToConfigVector(const json& j) {
+    if (!j.empty()) {
+        // Check first element type to determine vector type
+        if (j[0].is_number_integer()) {
+            std::vector<int> vec = j.get<std::vector<int>>();
+            return vec;
+        } else if (j[0].is_number()) {
+            // Check for NaN in any element
+            for (const auto& element : j) {
+                double val = element.get<double>();
+                if (std::isnan(val)) {
+                    throw ConfigParseError("Configuration array values cannot be NaN");
+                }
+            }
+            std::vector<double> vec = j.get<std::vector<double>>();
+            return vec;
+        } else if (j[0].is_boolean()) {
+            // Booleans in arrays aren't standard JSON, but we handle them
+            std::vector<bool> vec = j.get<std::vector<bool>>();
+            return vec;
+        } else if (j[0].is_string()) {
+            std::vector<std::string> vec = j.get<std::vector<std::string>>();
+            return vec;
+        }
+    }
+    
+    throw ConfigParseError("Unsupported JSON array element type");
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+void Config::validateKey(const std::string& key) {
+    if (key.empty()) {
+        throw ConfigParseError("Configuration key cannot be empty");
+    }
+    if (key.find('.') != std::string::npos) {
+        throw ConfigParseError("Invalid key format: key cannot contain dots ('.')");
+    }
+    if (key.find(' ') != std::string::npos) {
+        throw ConfigParseError("Invalid key format: key cannot contain spaces");
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+void Config::validateValue(const ConfigValue& value) {
+    std::visit([this](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        
+        if constexpr (std::is_same_v<T, double>) {
+            if (std::isnan(val)) {
+                throw ConfigValidationError("Configuration value cannot be NaN");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            for (const auto& element : val) {
+                if (std::isnan(element)) {
+                    throw ConfigValidationError("Configuration array values cannot be NaN");
+                }
+            }
+        }
+    }, value);
+}
 
+void Config::saveToJSON(const std::string& filepath) const {
+    json j;
+    
+    for (const auto& entry : pImpl->entries) {
+        j[entry.key] = configValueToJson(entry.value);
+        
+        if (!entry.description.empty()) {
+            j[entry.key + "_description"] = entry.description;
+        }
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw ConfigFileError("Cannot open file for writing: " + filepath);
+    }
+    
+    file << j.dump(2);  // Pretty print with 2-space indentation
+}
+
+void Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << configValueToSimpleFormat(entry.value) << "\n\n";
+    }
+}
+
+json Config::configValueToJson(const ConfigValue& value) const {
+    return std::visit([](auto&& val) -> json {
+        using T = std::decay_t<decltype(val)>;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return val;
+        } else {
+            throw ConfigParseError("Unsupported configuration value type");
+        }
+    }, value);
+}
+
+std::string Config::configValueToSimpleFormat(const ConfigValue& value) const {
+    return std::visit([](auto&& val) -> std::string {
+        using T = std::decay_t<decltype(val)>;
+        
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return std::to_string(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Format to avoid scientific notation for reasonable values
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(6) << val;
+            return ss.str();
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return "\"" + val + "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            std::stringstream ss;
+            ss << "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << val[i];
+            }
+            ss << "]";
+            return ss.str();
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            std::stringstream ss;
+            ss << "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << std::fixed << std::setprecision(6) << val[i];
+            }
+            ss << "]";
+            return ss.str();
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            std::stringstream ss;
+            ss << "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << "\"" << val[i] << "\"";
+            }
+            ss << "]";
+            return ss.str();
+        } else {
+            return "PLACEHOLDER_VALUE";
+        }
+    }, value);
+}
 } // namespace nlm

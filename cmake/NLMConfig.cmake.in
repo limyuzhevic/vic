@@ -1,0 +1,29 @@
+@PACKAGE_INIT@
+
+# Include the export configuration
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Check for dependencies
+check_required_components(NLM)
+
+# Provide variables for component detection
+if(NLM_FIND_COMPONENTS)
+    foreach(comp ${NLM_FIND_COMPONENTS})
+        set(NLM_${comp}_FOUND TRUE)
+    endforeach()
+endif()
+
+# Provide convenience variables
+set(NLM_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+set(NLM_LIBRARY_DIR "@PACKAGE_LIBRARY_INSTALL_DIR@")
+set(NLM_BIN_DIR "@PACKAGE_RUNTIME_INSTALL_DIR@")
+
+# Legacy variables (for backward compatibility)
+set(NLM_INCLUDE_DIRS ${NLM_INCLUDE_DIR})
+set(NLM_LIBRARY_DIRS ${NLM_LIBRARY_DIR})
+set(NLM_BIN_DIRS ${NLM_BIN_DIR})
+
+# Message for found package
+if(NLM_FIND_PACKAGE)
+    message(STATUS "Found NLM: ${NLM_VERSION}")
+endif()

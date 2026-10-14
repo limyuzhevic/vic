@@ -66,11 +66,90 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard Build
+
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+```
+
+### Enhanced Build Options
+
+The CMake build system supports various configuration options:
+
+```bash
+cmake .. \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=ON \
+  -DBUILD_PHASE5_EXPERIMENTS=ON \
+  -DBUILD_PHASE6_EXPERIMENTS=ON \
+  -DBUILD_DEMOS=ON \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DUSE_SYSTEM_JSON=OFF \
+  -DENABLE_COVERAGE=OFF \
+  -DENABLE_SANITIZERS=OFF
+```
+
+### Key Configuration Options
+
+- `BUILD_TESTING`: Enable testing (default: ON)
+- `BUILD_PHASE5_EXPERIMENTS`: Build Phase 5 experiments (default: OFF)
+- `BUILD_PHASE6_EXPERIMENTS`: Build Phase 6 experiments (default: OFF)
+- `BUILD_DEMOS`: Build demo executables (default: ON)
+- `BUILD_SHARED_LIBS`: Build shared libraries (default: OFF)
+- `USE_SYSTEM_JSON`: Use system JSON library instead of bundled (default: OFF)
+- `ENABLE_COVERAGE`: Enable test coverage reporting (default: OFF)
+- `ENABLE_SANITIZERS`: Enable memory/thread sanitizers (default: OFF)
+
+### Package Installation
+
+To install the developed libraries and executables:
+
+```bash
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+```
+
+This will install:
+- Libraries to `/usr/local/lib`
+- Headers to `/usr/local/include/NLM`
+- Executables to `/usr/local/bin`
+- Documentation to `/usr/local/share/doc/NLM`
+
+### Package Generation
+
+For packaging and distribution, CMake generates:
+- `NLMConfig.cmake`: Configuration file for find_package
+- `NLMConfigVersion.cmake`: Version compatibility file
+- `NLMTargets.cmake`: Target export file
+
+These files enable proper integration with other CMake-based projects.
+
+### Build System Information
+
+After configuration, CMake will output:
+- Build type (Debug/Release/RelWithDebInfo/MinSizeRel)
+- Compiler information (GCC/Clang/MSVC)
+- C++ standard being used
+- Enabled/disabled features
+- Optional components configuration
+
+### Cross-Platform Support
+
+The build system supports:
+- Windows (MSVC with modern C++17+ support)
+- Linux (GCC/Clang with modern standards)
+- macOS (Clang with modern standards)
+
+### Development Build
+
+For development builds with additional warnings and sanitization:
+
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON -DENABLE_SANITIZERS=ON
 ```
 
 ## Running
