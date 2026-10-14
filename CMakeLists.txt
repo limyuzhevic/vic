@@ -121,11 +121,23 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable - Phase 6 integration demo (now the primary entry point)
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 6 integration demo (backward compatibility - can be removed after transition)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Legacy Phase 2 demo (for backward compatibility - can be removed after transition)
+add_executable(nlm_legacy_phase2
+    src/experiments/Phase2Demo.cpp
+)
+target_link_libraries(nlm_legacy_phase2 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
