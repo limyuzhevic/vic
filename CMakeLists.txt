@@ -18,8 +18,11 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 # Core library
 add_library(nlm_core STATIC
@@ -89,6 +92,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -97,35 +101,42 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
+target_include_directories(nlm_agent PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
+target_include_directories(nlm_world PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
+target_include_directories(nlm_phase3 PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_phase4 PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Phase 5 experiments (for refactored main)
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(nlm_phase5 PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Main executable (refactored)
+add_executable(nlm
+    src/main_refactored.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase5)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -138,6 +149,12 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Testing
 enable_testing()

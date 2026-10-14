@@ -56,6 +56,17 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Log rotation configuration
+    void setMaxFileSize(size_t maxBytes);
+    size_t getMaxFileSize() const;
+    void setMaxFiles(int maxFiles);
+    int getMaxFiles() const;
+    void rotateLogs();
+    
+    // Performance monitoring
+    size_t getLogCount() const;
+    double getAverageLogTime() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -70,9 +81,11 @@ public:
     Logger();
     ~Logger();
     
-    // Disable copying
+    // Disable copying, enable moving
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
+    Logger(Logger&&) noexcept;
+    Logger& operator=(Logger&&) noexcept;
     
     // Add logger sink
     void addLogger(std::shared_ptr<ILogger> logger);
@@ -103,7 +116,19 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Performance statistics
+    size_t getTotalLogCount() const;
+    double getGlobalAverageLogTime() const;
+    
+    // Configuration
+    void setGlobalMaxLogLevel(LogLevel level);
+    void setEnablePerformanceStats(bool enable);
+    bool getEnablePerformanceStats() const;
+    
+    // Flush all log buffers
+    void flush();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -137,5 +162,8 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Performance monitoring function
+void recordLogPerformance(double durationMs);
 
 } // namespace nlm

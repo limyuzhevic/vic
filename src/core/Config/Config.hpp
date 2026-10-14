@@ -93,13 +93,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Validate configuration values
+    bool validate(const std::string& key) const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Get description for a key
+    std::string getDescription(const std::string& key) const;
+    
+    // Check if a value matches expected type
+    template<typename T>
+    bool hasType(const std::string& key) const;
+    
+    // Set with validation
+    template<typename T>
+    bool setWithValidation(const std::string& key, const T& value, 
+                          ConfigSource source = ConfigSource::Runtime, 
+                          const std::string& description = "");
 };
-
-} // namespace nlm
