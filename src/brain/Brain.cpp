@@ -1051,6 +1051,255 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
+// Performance optimization implementation
+void Brain::enableSIMD(bool enable) {
+    // Apply SIMD settings to relevant components
+    if (enable) {
+        NLM_LOG_INFO("Enabling SIMD optimizations");
+        // Enable SIMD in spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->enableSIMD(true);
+        }
+        // Enable SIMD in plasticity rules
+        if (pImpl->stdp) {
+            pImpl->stdp->enableSIMD(true);
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->enableSIMD(true);
+        }
+        // Enable SIMD in development system
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->enableSIMD(true);
+        }
+        // Enable SIMD in neuromodulation systems
+        if (pImpl->dopamine) {
+            pImpl->dopamine->enableSIMD(true);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->enableSIMD(true);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->enableSIMD(true);
+        }
+    } else {
+        NLM_LOG_INFO("Disabling SIMD optimizations");
+        // Disable SIMD in all systems
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->enableSIMD(false);
+        }
+        if (pImpl->stdp) {
+            pImpl->stdp->enableSIMD(false);
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->enableSIMD(false);
+        }
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->enableSIMD(false);
+        }
+        if (pImpl->dopamine) {
+            pImpl->dopamine->enableSIMD(false);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->enableSIMD(false);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->enableSIMD(false);
+        }
+    }
+}
+
+bool Brain::isSIMDEnabled() const {
+    bool simdEnabled = true;
+    if (pImpl->spikeSystem) {
+        simdEnabled = simdEnabled && pImpl->spikeSystem->isSIMDEnabled();
+    }
+    if (pImpl->stdp) {
+        simdEnabled = simdEnabled && pImpl->stdp->isSIMDEnabled();
+    }
+    if (pImpl->hebbian) {
+        simdEnabled = simdEnabled && pImpl->hebbian->isSIMDEnabled();
+    }
+    if (pImpl->developmentSystem) {
+        simdEnabled = simdEnabled && pImpl->developmentSystem->isSIMDEnabled();
+    }
+    if (pImpl->dopamine) {
+        simdEnabled = simdEnabled && pImpl->dopamine->isSIMDEnabled();
+    }
+    if (pImpl->curiosity) {
+        simdEnabled = simdEnabled && pImpl->curiosity->isSIMDEnabled();
+    }
+    if (pImpl->predictionError) {
+        simdEnabled = simdEnabled && pImpl->predictionError->isSIMDEnabled();
+    }
+    return simdEnabled;
+}
+
+void Brain::enableParallel(bool enable) {
+    if (enable) {
+        NLM_LOG_INFO("Enabling parallel processing optimizations");
+        // Enable parallel processing in spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->enableParallel(true);
+        }
+        // Enable parallel processing in plasticity rules
+        if (pImpl->stdp) {
+            pImpl->stdp->enableParallel(true);
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->enableParallel(true);
+        }
+        // Enable parallel processing in development system
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->enableParallel(true);
+        }
+        // Enable parallel processing in neuromodulation systems
+        if (pImpl->dopamine) {
+            pImpl->dopamine->enableParallel(true);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->enableParallel(true);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->enableParallel(true);
+        }
+    } else {
+        NLM_LOG_INFO("Disabling parallel processing optimizations");
+        // Disable parallel processing in all systems
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->enableParallel(false);
+        }
+        if (pImpl->stdp) {
+            pImpl->stdp->enableParallel(false);
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->enableParallel(false);
+        }
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->enableParallel(false);
+        }
+        if (pImpl->dopamine) {
+            pImpl->dopamine->enableParallel(false);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->enableParallel(false);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->enableParallel(false);
+        }
+    }
+}
+
+bool Brain::isParallelEnabled() const {
+    bool parallelEnabled = true;
+    if (pImpl->spikeSystem) {
+        parallelEnabled = parallelEnabled && pImpl->spikeSystem->isParallelEnabled();
+    }
+    if (pImpl->stdp) {
+        parallelEnabled = parallelEnabled && pImpl->stdp->isParallelEnabled();
+    }
+    if (pImpl->hebbian) {
+        parallelEnabled = parallelEnabled && pImpl->hebbian->isParallelEnabled();
+    }
+    if (pImpl->developmentSystem) {
+        parallelEnabled = parallelEnabled && pImpl->developmentSystem->isParallelEnabled();
+    }
+    if (pImpl->dopamine) {
+        parallelEnabled = parallelEnabled && pImpl->dopamine->isParallelEnabled();
+    }
+    if (pImpl->curiosity) {
+        parallelEnabled = parallelEnabled && pImpl->curiosity->isParallelEnabled();
+    }
+    if (pImpl->predictionError) {
+        parallelEnabled = parallelEnabled && pImpl->predictionError->isParallelEnabled();
+    }
+    return parallelEnabled;
+}
+
+void Brain::optimizeForPhase(int phase) {
+    NLM_LOG_INFO("Optimizing brain configuration for Phase " + std::to_string(phase));
+    
+    // Clear current configuration
+    pImpl->config->clear();
+    
+    // Apply phase-specific configuration
+    switch (phase) {
+        case 1:
+            // Phase 1: Skeleton
+            pImpl->config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.1, ConfigSource::Default);
+            break;
+            
+        case 2:
+            // Phase 2: Real Neural Computation
+            pImpl->config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.15, ConfigSource::Default);
+            pImpl->config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            pImpl->config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            pImpl->config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+            break;
+            
+        case 3:
+            // Phase 3: Integration
+            pImpl->config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.2, ConfigSource::Default);
+            pImpl->config->set("development_synaptogenesis_rate", 0.001f, ConfigSource::Default);
+            pImpl->config->set("development_pruning_rate", 0.0001f, ConfigSource::Default);
+            pImpl->config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+            break;
+            
+        case 4:
+            // Phase 4: Advanced Cognition
+            pImpl->config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(8), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.25, ConfigSource::Default);
+            pImpl->config->set("prediction_time_constant", 0.1f, ConfigSource::Default);
+            pImpl->config->set("confidence_threshold", 0.8f, ConfigSource::Default);
+            break;
+            
+        case 5:
+            // Phase 5: Performance
+            pImpl->config->set("neuron_count", static_cast<int64_t>(10000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(16), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.3, ConfigSource::Default);
+            pImpl->config->set("simd_enabled", true, ConfigSource::Default);
+            pImpl->config->set("parallel_enabled", true, ConfigSource::Default);
+            pImpl->config->set("vectorization_width", static_cast<int64_t>(4), ConfigSource::Default);
+            break;
+            
+        case 6:
+            // Phase 6: Final Integration
+            pImpl->config->set("neuron_count", static_cast<int64_t>(20000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(32), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.35, ConfigSource::Default);
+            pImpl->config->set("development_critical_period_multiplier", 1.5f, ConfigSource::Default);
+            pImpl->config->set("neuromodulation_strength", 1.0f, ConfigSource::Default);
+            break;
+            
+        default:
+            // Phase 1 defaults
+            pImpl->config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            pImpl->config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            pImpl->config->set("connection_probability", 0.1, ConfigSource::Default);
+            break;
+    }
+    
+    // Re-initialize components with new configuration
+    pImpl->spikeSystem->reconfigure();
+    pImpl->stdp->reconfigure();
+    pImpl->hebbian->reconfigure();
+    pImpl->structuralPlasticity->reconfigure();
+    pImpl->developmentSystem->reconfigure();
+    pImpl->dopamine->reconfigure();
+    pImpl->curiosity->reconfigure();
+    pImpl->predictionError->reconfigure();
+    pImpl->novelty->reconfigure();
+    
+    NLM_LOG_INFO("Phase " + std::to_string(phase) + " optimization complete");
+}
+
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {

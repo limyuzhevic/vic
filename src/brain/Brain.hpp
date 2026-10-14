@@ -187,15 +187,22 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
+// Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
-    
+
+    // Performance optimization features
+    void enableSIMD(bool enable);
+    bool isSIMDEnabled() const;
+    void enableParallel(bool enable);
+    bool isParallelEnabled() const;
+    void optimizeForPhase(int phase);
+
 private:
     struct Impl;
     Impl* pImpl;
-};
+}};
 
 } // namespace nlm
