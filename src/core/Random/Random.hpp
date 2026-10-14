@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
+#include <algorithm>
 
 namespace nlm {
 
@@ -80,8 +82,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
@@ -92,19 +94,19 @@ private:
 };
 
 // Template implementations
-template<typename Container>
-void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
-}
-
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+    template<typename Container>
+    void shuffle(Container& container) {
+        std::random_shuffle(container.begin(), container.end());
     }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
+
+    template<typename Container>
+    auto pickRandom(const Container& container) -> typename Container::const_reference {
+        if (container.empty()) {
+            throw std::runtime_error("Cannot pick from empty container");
+        }
+        auto it = container.begin();
+        std::advance(it, pickRandomIndex(container.size()));
+        return *it;
+    }
 
 } // namespace nlm

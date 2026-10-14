@@ -24,11 +24,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Log error for debugging
+        // TODO: Add proper logging system
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,22 +42,37 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            // Malformed line - log warning
+            // TODO: Add proper logging system
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            // Empty key - log warning
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Check for duplicate keys
+        if (has(key)) {
+            // Log warning about overriding existing key
+            // TODO: Add proper logging system
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
-    return true;
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -170,18 +190,39 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\\\"" << arg << "\\\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << "\\\"" << item << "\\\"";
+                    first = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
             } else {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")\\n";
     }
     return oss.str();
 }
