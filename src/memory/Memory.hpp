@@ -8,8 +8,60 @@ namespace nlm {
 
 // Working memory: temporary active storage of information
 // PLACEHOLDER - Phase 2 will implement real working memory
+// 
+// Working memory represents the brain's active workspace for processing information.
+// It's a temporary storage system that maintains neural activation patterns,
+// sensory inputs, and intermediate computation results for immediate use.
+// 
+// Key features:
+// - Temporary storage with decay to prevent persistent activation
+// - Rapid access to frequently used neural representations
+// - Integration with sensory and cognitive systems
+// - Support for chunking and binding of neural information
+// - Activity-dependent maintenance through synaptic facilitation
+// 
+// Biological inspiration:
+// - Human working memory capacity (~4±1 chunks)
+// - Active maintenance through persistent neural firing
+// - Interference and rehearsal mechanisms
+// - Neural synchronization for memory encoding
+// 
+// Phase 2 Implementation:
+// - Spike-based encoding using neuron populations
+// - Synaptic facilitation for active maintenance
+// - Decay dynamics based on neuronal firing rates
+// - Integration with attentional selection systems
+// - Real-time updating based on sensory input
 
 class WorkingMemory {
+public:
+    WorkingMemory();
+    ~WorkingMemory();
+    
+    // Store item
+    // TODO PHASE 2: Implement real storage
+    void store(NeuronId neuron, float value);
+    
+    // Retrieve item
+    float retrieve(NeuronId neuron) const;
+    
+    // Check if item exists
+    bool contains(NeuronId neuron) const;
+    
+    // Clear all
+    void clear();
+    
+    // Get capacity
+    size_t getCapacity() const;
+    size_t getCurrentSize() const;
+    
+    // Decay all items
+    void decay(float decayRate);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
 public:
     WorkingMemory();
     ~WorkingMemory();
