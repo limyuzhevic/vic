@@ -2,173 +2,456 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
+#include <chrono>
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Forward declarations for memory system components
+class WorkingMemory;
+class EpisodicMemory;
+class SemanticMemory;
+class ProceduralMemory;
+class AssociativeMemory;
 
-class WorkingMemory {
+// Memory system configuration
+struct MemoryConfig {
+    // Working memory configuration
+    size_t workingMemoryCapacity = 200;
+    float workingMemoryDecayRate = 0.95f;
+    
+    // Episodic memory configuration
+    size_t episodicMaxEpisodes = 5000;
+    bool episodicReplayEnabled = true;
+    float episodicConsolidationThreshold = 0.7f;
+    
+    // Semantic memory configuration
+    size_t semanticMaxFacts = 10000;
+    bool semanticAutoCategorize = true;
+    
+    // Procedural memory configuration
+    size_t proceduralMaxSkills = 1000;
+    float skillLearningRate = 0.01f;
+    
+    // Associative memory configuration
+    size_t associativeMaxAssociations = 10000;
+    bool associativeHebbianEnabled = true;
+    float associativeDecayRate = 0.99f;
+    
+    // Integration settings
+    bool enableMemoryReplay = true;
+    bool enableCrossMemoryAssociations = true;
+    float memoryIntegrationStrength = 1.0f;
+    
+    // Development settings
+    size_t criticalMemoryGrowthPeriod = 100;
+    float developmentMemoryPlasticity = 1.0f;
+};
+
+// Core memory interface
+class IMemorySystem {
 public:
-    WorkingMemory();
-    ~WorkingMemory();
+    virtual ~IMemorySystem() = default;
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    virtual void store(const std::string& key, const std::vector<float>& value,
+                      const std::unordered_map<std::string, std::string>& metadata = {}) = 0;
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    virtual std::vector<float> retrieve(const std::string& key) const = 0;
     
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
+    virtual bool exists(const std::string& key) const = 0;
     
-    // Clear all
-    void clear();
+    virtual void clear() = 0;
     
-    // Get capacity
+    virtual size_t size() const = 0;
+    
+    virtual void update(float deltaTime) = 0;
+    
+    virtual std::string getTypeName() const = 0;
+};
+
+// Working memory: temporary active storage with neural integration
+class WorkingMemory : public IMemorySystem {
+public:
+    WorkingMemory(const MemoryConfig& config);
+    ~WorkingMemory() override;
+    
+    // IMemorySystem interface
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata) override;
+    
+    std::vector<float> retrieve(const std::string& key) const override;
+    
+    bool exists(const std::string& key) const override;
+    
+    void clear() override;
+    
+    size_t size() const override;
+    
+    void update(float deltaTime) override;
+    
+    std::string getTypeName() const override { return "WorkingMemory"; }
+    
+    // Working memory specific methods
+    void storeActivation(const NeuronId& neuron, float activation);
+    float getActivation(const NeuronId& neuron) const;
+    bool hasNeuron(const NeuronId& neuron) const;
+    void clearNeuron(const NeuronId& neuron);
+    
+    // Competition and normalization
+    void applyCompetition();
+    void applyNormalization();
+    
+    // Capacity management
     size_t getCapacity() const;
     size_t getCurrentSize() const;
+    float getLoadPercentage() const;
     
-    // Decay all items
+    // Decay and plasticity
     void decay(float decayRate);
+    void applyPlasticity(const std::vector<float>& inputPattern, float strength);
+    
+    // Integration with episodic memory
+    std::string getEpisodicMemoryKey(const NeuronId& neuron) const;
+    void storeToEpisodicMemory(const NeuronId& neuron, float value);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
-
-struct EpisodicMemoryItem {
+// Episodic memory: event storage and replay with neural patterns
+struct MemoryEpisode {
     SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
+    SimulationStep replayTime;
+    std::vector<NeuronId> neuronPattern;
+    std::vector<float> activationPattern;
+    std::vector<std::string> sensoryInputs;
+    std::vector<std::string> actionsTaken;
+    std::vector<float> rewardsReceived;
+    float relevanceScore;
+    std::string contextSignature;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    MemoryEpisode()
+        : timestamp(0), replayTime(0), relevanceScore(0.0f) {}
+    
+    MemoryEpisode(SimulationStep ts, const std::vector<NeuronId>& neurons,
+                  const std::vector<float>& activations,
+                  const std::vector<std::string>& inputs,
+                  const std::vector<std::string>& actions,
+                  const std::vector<float>& rewards,
+                  const std::string& context)
+        : timestamp(ts), replayTime(ts), neuronPattern(neurons),
+          activationPattern(activations), sensoryInputs(inputs),
+          actionsTaken(actions), rewardsReceived(rewards),
+          relevanceScore(calculateRelevance(inputs, actions)),
+          contextSignature(context) {}
+    
+    static float calculateRelevance(const std::vector<std::string>& inputs,
+                                   const std::vector<std::string>& actions) {
+        float inputScore = inputs.empty() ? 0.0f : 1.0f;
+        float actionScore = actions.empty() ? 0.0f : 1.0f;
+        return (inputScore + actionScore) * 0.5f;
+    }
 };
 
-class EpisodicMemory {
+class EpisodicMemory : public IMemorySystem {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    EpisodicMemory(const MemoryConfig& config);
+    ~EpisodicMemory() override;
     
-    // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    // IMemorySystem interface
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata) override;
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    std::vector<float> retrieve(const std::string& key) const override;
     
-    // Get episode count
+    bool exists(const std::string& key) const override;
+    
+    void clear() override;
+    
+    size_t size() const override;
+    
+    void update(float deltaTime) override;
+    
+    std::string getTypeName() const override { return "EpisodicMemory"; }
+    
+    // Episodic memory specific methods
+    void storeEpisode(const MemoryEpisode& episode);
+    MemoryEpisode retrieveEpisode(size_t index) const;
     size_t getEpisodeCount() const;
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    // Replay functionality
+    std::vector<MemoryEpisode> getRecentEpisodes(size_t count) const;
+    std::vector<MemoryEpisode> getReplayEpisodes(size_t count, float minRelevance = 0.5f);
+    void replayEpisode(size_t index, std::vector<float>& outPattern) const;
     
-    // Clear all
-    void clear();
+    // Integration with working memory
+    void integrateWithWorkingMemory(const WorkingMemory& workingMem);
+    std::vector<NeuronId> getReplicatedNeurons() const;
     
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    // Consolidation and pruning
+    void consolidateEpisodes(float threshold);
+    void pruneOldEpisodes(size_t maxCount);
+    
+    // Pattern completion
+    std::vector<float> completePattern(const std::vector<float>& partialPattern) const;
+    float getPatternSimilarity(const std::vector<float>& pattern1,
+                              const std::vector<float>& pattern2) const;
+    
+    // Relevance and strength calculation
+    float getEpisodeRelevance(size_t index) const;
+    void updateEpisodeRelevance(size_t index, float delta);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
-class SemanticMemory {
+// Semantic memory: abstract knowledge representation
+class SemanticMemory : public IMemorySystem {
 public:
-    SemanticMemory();
-    ~SemanticMemory();
+    SemanticMemory(const MemoryConfig& config);
+    ~SemanticMemory() override;
     
-    // Store fact
-    void storeFact(const std::string& key, const std::string& value);
+    // IMemorySystem interface
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata) override;
     
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
+    std::vector<float> retrieve(const std::string& key) const override;
     
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
+    bool exists(const std::string& key) const override;
     
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    void clear() override;
     
-    // Clear all
-    void clear();
+    size_t size() const override;
+    
+    void update(float deltaTime) override;
+    
+    std::string getTypeName() const override { return "SemanticMemory"; }
+    
+    // Semantic memory specific methods
+    void storeConcept(const std::string& concept, const std::vector<std::string>& instances,
+                     const std::vector<float>& activationPattern);
+    
+    std::vector<std::string> retrieveConcept(const std::string& concept) const;
+    std::vector<float> getConceptActivation(const std::string& concept) const;
+    
+    // Category and hierarchy management
+    void createCategory(const std::string& parent, const std::string& child);
+    std::vector<std::string> getSubcategories(const std::string& parent) const;
+    std::vector<std::string> getSupercategories(const std::string& child) const;
+    
+    // Concept relationships
+    void establishRelationship(const std::string& concept1, const std::string& concept2,
+                              const std::string& relationshipType, float strength);
+    
+    std::vector<std::pair<std::string, float>> getRelatedConcepts(const std::string& concept) const;
+    
+    // Activation spreading
+    void spreadActivation(const std::string& concept, float amount);
+    std::vector<std::pair<std::string, float>> getAllActiveConcepts() const;
+    
+    // Knowledge inference
+    std::vector<std::string> inferFromConcepts(const std::vector<std::string>& inputConcepts) const;
+    std::string getConceptExplanation(const std::string& concept) const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
-
-struct Skill {
-    std::string name;
+// Procedural memory: skills and behavioral patterns
+struct LearnedSkill {
+    std::string skillName;
     std::vector<NeuronId> neuralPattern;
+    std::vector<std::string> requiredStates;
     float proficiency;
+    float executionThreshold;
+    SimulationStep lastExecuted;
+    size_t executionCount;
+    float successRate;
     
-    Skill() : proficiency(0.0f) {}
+    LearnedSkill(const std::string& name, const std::vector<NeuronId>& pattern,
+                 const std::vector<std::string>& states,
+                 float threshold = 0.5f)
+        : skillName(name), neuralPattern(pattern), requiredStates(states),
+          proficiency(0.0f), executionThreshold(threshold),
+          lastExecuted(0), executionCount(0), successRate(0.0f) {}
+    
+    bool canExecute(const std::vector<std::string>& currentStates) const;
+    bool tryExecute(const std::vector<std::string>& currentStates, bool success);
+    float getExecutionProbability() const;
 };
 
-class ProceduralMemory {
+class ProceduralMemory : public IMemorySystem {
 public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    ProceduralMemory(const MemoryConfig& config);
+    ~ProceduralMemory() override;
     
-    // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
+    // IMemorySystem interface
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata) override;
     
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
+    std::vector<float> retrieve(const std::string& key) const override;
     
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
+    bool exists(const std::string& key) const override;
     
-    // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
+    void clear() override;
     
-    // Clear all
-    void clear();
+    size_t size() const override;
+    
+    void update(float deltaTime) override;
+    
+    std::string getTypeName() const override { return "ProceduralMemory"; }
+    
+    // Procedural memory specific methods
+    void learnSkill(const std::string& skillName,
+                   const std::vector<NeuronId>& neuralPattern,
+                   const std::vector<std::string>& requiredStates);
+    
+    LearnedSkill* getSkill(const std::string& skillName);
+    std::vector<LearnedSkill*> getAllSkills() const;
+    
+    // Skill execution
+    bool executeSkill(const std::string& skillName, const std::vector<std::string>& currentStates,
+                     std::vector<std::string>& resultingStates);
+    
+    // Proficiency and learning
+    void updateProficiency(const std::string& skillName, float delta, bool success);
+    void practiceSkill(const std::string& skillName, const std::vector<std::string>& currentStates);
+    
+    // Skill transfer
+    void transferSkill(const std::string& sourceSkill, const std::string& targetSkill,
+                      float transferRate);
+    
+    // Pattern matching
+    std::vector<std::string> findMatchingSkills(const std::vector<std::string>& currentStates) const;
+    float getSkillReadiness(const std::string& skillName) const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Associative memory: neural pattern associations
+struct NeuralAssociation {
+    NeuronId sourceNeuron;
+    NeuronId targetNeuron;
+    float strength;
+    SimulationStep lastActivation;
+    std::vector<float> contextVector;
+    
+    NeuralAssociation(NeuronId src, NeuronId tgt, float str = 1.0f)
+        : sourceNeuron(src), targetNeuron(tgt), strength(str),
+          lastActivation(0), contextVector(5, 0.0f) {}
+};
 
-class AssociativeMemory {
+class AssociativeMemory : public IMemorySystem {
 public:
-    AssociativeMemory();
-    ~AssociativeMemory();
+    AssociativeMemory(const MemoryConfig& config);
+    ~AssociativeMemory() override;
     
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
+    // IMemorySystem interface
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata) override;
     
-    // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    std::vector<float> retrieve(const std::string& key) const override;
     
-    // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    bool exists(const std::string& key) const override;
     
-    // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
+    void clear() override;
     
-    // Clear all
-    void clear();
+    size_t size() const override;
+    
+    void update(float deltaTime) override;
+    
+    std::string getTypeName() const override { return "AssociativeMemory"; }
+    
+    // Associative memory specific methods
+    void createAssociation(NeuronId source, NeuronId target, float strength = 1.0f);
+    void strengthenAssociation(NeuronId source, NeuronId target, float delta);
+    void weakenAssociation(NeuronId source, NeuronId target, float delta);
+    
+    std::vector<NeuronId> getAssociatedNeurons(NeuronId neuron) const;
+    float getAssociationStrength(NeuronId source, NeuronId target) const;
+    
+    // Hebbian learning
+    void hebbianLearning(const std::vector<NeuronId>& activeNeurons, float learningRate = 0.01f);
+    void antiHebbianLearning(const std::vector<NeuronId>& activeNeurons, float learningRate = 0.01f);
+    
+    // Context-dependent associations
+    void setContextForAssociation(NeuronId source, NeuronId target,
+                                  const std::vector<float>& context);
+    
+    std::vector<NeuronId> getAssociatedNeuronsInContext(NeuronId neuron,
+                                                      const std::vector<float>& context) const;
+    
+    // Association management
+    void decayAssociations(float decayRate);
+    void pruneWeakAssociations(float threshold);
+    size_t getAssociationCount() const;
+    
+    // Integration with working memory
+    void updateFromWorkingMemory(const WorkingMemory& workingMem);
+    std::vector<std::pair<NeuronId, NeuronId>> getStrongAssociations() const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Unified memory system manager
+class UnifiedMemorySystem {
+public:
+    UnifiedMemorySystem(const MemoryConfig& config);
+    ~UnifiedMemorySystem();
+    
+    // Memory system access
+    WorkingMemory* getWorkingMemory();
+    EpisodicMemory* getEpisodicMemory();
+    SemanticMemory* getSemanticMemory();
+    ProceduralMemory* getProceduralMemory();
+    AssociativeMemory* getAssociativeMemory();
+    
+    // IMemorySystem interface methods
+    void store(const std::string& key, const std::vector<float>& value,
+              const std::unordered_map<std::string, std::string>& metadata = {});
+    
+    std::vector<float> retrieve(const std::string& key) const;
+    
+    bool exists(const std::string& key) const;
+    
+    void clearAll();
+    
+    size_t getTotalMemorySize() const;
+    std::vector<std::string> getAllMemoryTypes() const;
+    
+    // Integration and coordination
+    void integrateAllSystems();
+    void updateAll(float deltaTime);
+    
+    // Replay and consolidation
+    void initiateSystemReplay();
+    void consolidateAll(float threshold);
+    
+    // Configuration
+    void updateConfig(const MemoryConfig& newConfig);
+    MemoryConfig getCurrentConfig() const;
+    
+    // Statistics and monitoring
+    std::string getMemoryStatusReport() const;
+    float getSystemIntegrationScore() const;
+    
+    // Development and plasticity
+    void applyDevelopmentChanges(float developmentalStage);
+    void adjustPlasticityRates(float plasticityFactor);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
