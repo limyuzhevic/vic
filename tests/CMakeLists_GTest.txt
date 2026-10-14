@@ -1,0 +1,38 @@
+// Google Test CMakeLists.txt for NLM Tests
+# This replaces the custom test framework with Google Test
+
+cmake_minimum_required(VERSION 3.16)
+
+project(nlm_tests_gtest LANGUAGES CXX)
+
+# Find GoogleTest
+find_package(GTest REQUIRED)
+
+# Test configuration
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Create test executable with Google Test
+add_executable(nlm_test_gtest
+    test_main_gtest.cpp
+    test_config_gtest.cpp
+    test_random.cpp
+    test_clock.cpp
+    test_neuron.cpp
+    test_synapse.cpp
+    test_stdp.cpp
+    test_brain.cpp
+)
+
+target_link_libraries(nlm_test_gtest PRIVATE nlm_core GTest::gtest GTest::gtest_main)
+target_compile_features(nlm_test_gtest PRIVATE cxx_std_20)
+
+# Enable testing
+enable_testing()
+add_test(NAME nlm_test_gtest COMMAND nlm_test_gtest)
+
+# Add test coverage if available
+# find_program(COVERAGE_COMMAND coverage)
+# if(COVERAGE_COMMAND)
+#     target_compile_options(nlm_test_gtest PRIVATE --coverage)
+#     target_link_options(nlm_test_gtest PRIVATE --coverage)
+# endif()
