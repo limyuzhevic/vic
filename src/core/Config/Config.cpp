@@ -3,11 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationRule> validationRules;
+    bool validationEnabled = true;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -186,6 +189,60 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Validation implementation
+ValidationResult Config::validate() const {
+    ValidationResult result;
+    
+    if (!pImpl->validationEnabled) {
+        result.valid = true;
+        return result;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        // Check validation rules for this key
+        for (const auto& rule : pImpl->validationRules) {
+            if (rule.key == entry.key) {
+                if (!rule.validator(entry.value)) {
+                    ValidationError error(ValidationError::Type::InvalidValue,
+                        "Validation failed for key '" + entry.key + "'", entry.key);
+                    result.errors.push_back(error);
+                    result.valid = false;
+                }
+            }
+        }
+    }
+    
+    return result;
+}
+
+bool Config::validate(const std::string& key, const ConfigValue& value) const {
+    for (const auto& rule : pImpl->validationRules) {
+        if (rule.key == key) {
+            return rule.validator(value);
+        }
+    }
+    return true; // No rule found, consider valid
+}
+
+void Config::addValidationRule(const ValidationRule& rule) {
+    pImpl->validationRules.push_back(rule);
+}
+
+std::string Config::getErrorMessage(const ValidationError& error) {
+    switch (error.getType()) {
+        case ValidationError::Type::InvalidType:
+            return "Invalid type for configuration key '" + error.getKey() + "'";
+        case ValidationError::Type::MissingRequired:
+            return "Missing required configuration key '" + error.getKey() + "'";
+        case ValidationError::Type::OutOfRange:
+            return "Value for key '" + error.getKey() + "' is out of range";
+        case ValidationError::Type::InvalidValue:
+            return "Invalid value for configuration key '" + error.getKey() + "'";
+        default:
+            return "Unknown validation error for key '" + error.getKey() + "'";
+    }
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +254,58 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::isValidInteger(const std::string& value, int64_t min, int64_t max) {
+    try {
+        size_t pos;
+        int64_t val = std::stoll(value, &pos);
+        if (pos != value.size()) return false;
+        return val >= min && val <= max;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::isValidDouble(const std::string& value, double min, double max) {
+    try {
+        size_t pos;
+        double val = std::stod(value, &pos);
+        if (pos != value.size()) return false;
+        return val >= min && val <= max;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::isValidBoolean(const std::string& value) {
+    std::string lower = toLower(value);
+    return lower == "true" || lower == "false" || lower == "1" || lower == "0";
+}
+
+bool Config::isValidString(const std::string& value) {
+    return !value.empty();
+}
+
+// Helper function implementations
+std::string ValidationResult::getSummary() const {
+    std::ostringstream oss;
+    if (valid && errors.empty() && warnings.empty()) {
+        return "Configuration is valid";
+    }
+    
+    if (!valid) {
+        oss << "Configuration validation failed:\n";
+        for (const auto& error : errors) {
+            oss << "  ERROR: " << error.getMessage() << "\n";
+        }
+    }
+    
+    for (const auto& warning : warnings) {
+        oss << "  WARNING: " << warning << "\n";
+    }
+    
+    return oss.str();
 }
 
 // Explicit template instantiations
@@ -213,3 +322,4 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+

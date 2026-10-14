@@ -82,6 +82,37 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 5 Demo (Continual Learning)
+```bash
+./nlm_phase5_demo [num_tasks] [cycles_per_task] [steps_per_cycle]
+```
+
+Examples:
+```bash
+./nlm_phase5_demo 3 5 1000    # 3 tasks, 5 cycles each, 1000 steps per cycle
+./nlm_phase5_demo 5           # Custom number of tasks
+```
+
+### Phase 4 Demo (Cognitive Development)
+```bash
+./nlm_phase4_demo
+```
+
+### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+## Available Demos
+
+| Demo | Description | File |
+|------|-------------|------|
+| `nlm` | Basic NLM brain simulation | `src/main.cpp` |
+| `nlm_phase3_demo` | World interaction and sensorimotor learning | `src/experiments/Phase3Demo.cpp` |
+| `nlm_phase4_demo` | Cognitive development and concept formation | `src/experiments/Phase4Demo.cpp` |
+| `nlm_phase5_demo` | Continual learning across multiple tasks | `src/experiments/Phase5Demo.cpp` |
+| `nlm_phase6_demo` | Final integration test and verification | `src/experiments/Phase6Demo.cpp` |
+
 ## Project Structure
 
 ```
@@ -104,15 +135,31 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── experiments/   # Experiment frameworks
+│   │   ├── Experiment.hpp
+│   │   ├── Experiment.cpp
+│   │   ├── Phase3Experiment.hpp
+│   │   ├── Phase3Experiment.cpp
+│   │   ├── Phase4Experiment.hpp
+│   │   ├── Phase4Experiment.cpp
+│   │   ├── Phase5Experiment.hpp
+│   │   ├── Phase5Experiment.cpp
+│   │   ├── Phase6Experiment.hpp
+│   │   ├── Phase6Experiment.cpp
+│   │   ├── Phase3Demo.cpp
+│   │   ├── Phase4Demo.cpp
+│   │   ├── Phase5Demo.cpp
+│   │   └── Phase6Demo.cpp
 │   └── visualization/  # Visualization
 ├── tests/
-└── configs/
-```
+├── configs/
+└── easy_usage.md
+
+HOW_TO_USE.md
 
 ## Phase Summary
 
@@ -151,6 +198,8 @@ NLM/
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
+- Continual learning across tasks
+- Multi-seed experiment runner
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
@@ -221,6 +270,91 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## Configuration
+
+NLM uses a flexible configuration system supporting:
+- File-based configuration (configs/default.cfg)
+- Command-line overrides
+- Runtime configuration
+- Configuration validation
+- Parameter type checking
+
+### Configuration File Example (configs/default.cfg)
+```
+# NLM Configuration File
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+log_level = INFO
+log_to_file = false
+max_simulation_steps = 10000
+```
+
+### Command Line Usage
+```bash
+./nlm_phase6_demo --neurons 500 --steps 2000 --checkpoint /tmp/test.bin
+./nlm_phase5_demo 3 5 1000
+./nlm_phase3_demo 10 500
+```
+
+## Output Formats
+
+The demos produce both human-readable console output and structured data:
+
+- **Console Output**: Detailed logging and progress reports
+- **JSON Reports**: Machine-readable data for analysis
+- **Configuration Summary**: Full parameter display
+- **Integration Status**: System connectivity verification
+
+## Debugging and Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Brain initialization fails**
+   - Check configuration parameters
+   - Verify system resources
+   - Ensure dependencies are built
+
+2. **Performance issues**
+   - Reduce neuron count for testing
+   - Disable development system
+   - Use `--quick` flag for Phase 6
+
+3. **Memory issues**
+   - Monitor memory usage
+   - Use checkpointing for long runs
+   - Consider system resources
+
+4. **Configuration errors**
+   - Validate config file syntax
+   - Use `loadFromFile` for testing
+   - Check type conversions
+
+### Debugging Options
+
+```bash
+# Enable verbose logging
+--verbose
+
+# Save output to file
+--output demo_output.txt
+
+# Run with debugging symbols
+make debug
+
+# Use performance profiler
+./nlm_phase6_demo --profile
+```
+
 ## License
 
 MIT
@@ -228,3 +362,35 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Getting Help
+
+- **Documentation**: See `docs/` directory for detailed technical information
+- **Experiments**: See `experiments/` directory for specific experiment implementations
+- **Source Code**: The `src/` directory contains all implementation files
+- **Issues**: Report bugs and feature requests in the issue tracker
+
+## Development Notes
+
+This is an active research project. New features are added incrementally through phases. Each phase builds upon previous phases, creating a coherent artificial brain system.
+
+### Research Focus
+
+- Neural integration and system coherence
+- Experience-driven learning and development
+- Memory consolidation and replay mechanisms
+- Neuromodulation and motivation systems
+- Prediction and planning capabilities
+- Continual learning and adaptation
+
+### Future Directions
+
+- Enhanced visualization tools
+- Distributed computing support
+- Multi-agent systems
+- Embodied cognition extensions
+- Social learning capabilities
+
+## Contact
+
+For questions, bug reports, or collaboration opportunities, please refer to the project documentation or issue tracker.

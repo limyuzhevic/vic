@@ -78,20 +78,47 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Configuration validation
+    class ValidationError {
+    public:
+        enum class Type {
+            InvalidType,
+            MissingRequired,
+            OutOfRange,
+            InvalidValue
+        };
+        
+        ValidationError(Type type, const std::string& message, const std::string& key = "")
+            : type(type), message(message), key(key) {}
+        
+        Type getType() const { return type; }
+        const std::string& getMessage() const { return message; }
+        const std::string& getKey() const { return key; }
+        
+    private:
+        Type type;
+        std::string message;
+        std::string key;
+    };
     
-    // Remove key
-    void remove(const std::string& key);
+    // Validation rules
+    struct ValidationRule {
+        std::string key;
+        std::string description;
+        bool required = false;
+        std::string minValue;
+        std::string maxValue;
+        std::function<bool(const ConfigValue&)> validator;
+    };
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Validation results
+    struct ValidationResult {
+        bool valid = true;
+        std::vector<ValidationError> errors;
+        std::vector<std::string> warnings;
+        
+        std::string getSummary() const;
+    };
     
 private:
     struct Impl;
