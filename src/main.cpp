@@ -28,24 +28,25 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printHelpAndExit() {
+    printBanner();
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file    Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  -h, --help       Show this help message and exit" << std::endl;
+    std::cout << "  --test           Run tests only (skips Phase 2/3/4 tests)" << std::endl;
+    std::cout << "  --mode=string    Run specific mode: basic|plasticity|stdp|all" << std::endl;
+    std::cout << "  --neuron=N       Set number of neurons" << std::endl;
+    std::cout << "  --seed=N         Set random seed" << std::endl;
+    std::cout << "  --steps=N        Set simulation steps per test" << std::endl;
+    std::cout << "  --verbose        Enable verbose logging" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --config=myconfig.cfg --mode=all" << std::endl;
+    std::cout << "  nlm --test --verbose" << std::endl;
+    std::cout << "  nlm --neuron=2000 --steps=500" << std::endl;
+    exit(0);
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -345,14 +346,33 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string mode = "all";  // Basic, plasticity, stdp, all
+    bool testOnly = false;
+    size_t steps = 0; // 0 means use config default
+    bool verbose = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--test" || arg == "--mode") {
+            // Will be processed later
+        } else if (arg.find("--mode=") == 0) {
+            mode = arg.substr(8);
+        } else if (arg.find("--steps=") == 0) {
+            steps = static_cast<size_t>(std::stoul(arg.substr(8)));
+        } else if (arg.find("--neuron=") == 0) {
+            // This will be handled in loadFromArgs later
+        } else if (arg.find("--seed=") == 0) {
+            // This will be handled in loadFromArgs later
+        } else if (arg == "--verbose") {
+            verbose = true;
         }
     }
     
@@ -392,37 +412,68 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
     }
     
-    brain->logStatus();
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Handle command line arguments for mode and steps
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.find("--mode=") == 0) {
+            mode = arg.substr(8);
+        } else if (arg.find("--steps=") == 0) {
+            steps = static_cast<size_t>(std::stoul(arg.substr(8)));
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Set verbose logging
+    if (verbose) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        logger->addLogger(consoleLogger);
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Mode selection
+    if (mode == "basic") {
+        NLM_LOG_INFO("Running BASIC mode - only connectivity test");
+        runBasicConnectivityTest(brain);
+    } else if (mode == "plasticity") {
+        NLM_LOG_INFO("Running PLASTICITY mode - only learning experiment");
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+    } else if (mode == "stdp") {
+        NLM_LOG_INFO("Running STDP mode - only STDP verification");
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } else if (mode == "all") {
+        NLM_LOG_INFO("Running ALL mode - complete test suite");
+        // Run all tests
+        brain->reset();
+        brain->initialize();
+        runBasicConnectivityTest(brain);
+        
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Test only mode (special flag)
+    if (testOnly) {
+        NLM_LOG_INFO("TEST MODE - Running integration verification only");
+        // Would normally run Phase 6 integration test here
+        NLM_LOG_INFO("Skipping Phase 6 integration test - requires separate executable");
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
