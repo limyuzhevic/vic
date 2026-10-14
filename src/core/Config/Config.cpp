@@ -19,16 +19,38 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
         return false;
     }
     
+    // Detect file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    if (ext == ".json") {
+        success = loadFromJSON(file);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        success = loadFromYAML(file);
+    } else {
+        // Default to simple key=value format
+        success = loadFromKeyValue(file);
+    }
+    
+    if (success) {
+        NLM_LOG_INFO("Loaded configuration from: " + filepath);
+    } else {
+        NLM_LOG_ERROR("Failed to parse configuration file: " + filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromKeyValue(std::istream& stream) {
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,16 +65,232 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        } else if (!line.empty()) {
+            NLM_LOG_WARNING("Ignoring malformed config line: " + line);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromJSON(std::istream& stream) {
+    // Simple JSON parser for key-value pairs
+    // TODO: Replace with nlohmann::json library when available
+    
+    std::string line;
+    std::string currentKey;
+    bool inObject = false;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        
+        // Remove trailing comma
+        if (!line.empty() && line.back() == ',') {
+            line.pop_back();
+        }
+        
+        // Skip comments and empty lines
+        size_t commentPos = line.find("//");
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            line = trim(line);
+        }
+        
+        if (line.empty()) {
+            continue;
+        }
+        
+        if (line.front() == '{' && line.back() == '}') {
+            inObject = true;
+            // Parse inline object { "key": "value", ... }
+            parseJSONObjectInline(line.substr(1, line.size() - 2));
+        } else if (inObject) {
+            if (line.front() == '}') {
+                inObject = false;
+            } else {
+                parseJSONObjectLine(line);
+            }
+        } else {
+            // Try to parse as simple key: value
+            parseJSONObjectLine(line);
         }
     }
     
     return true;
+}
+
+bool Config::loadFromYAML(std::istream& stream) {
+    // Simple YAML parser for key-value pairs
+    // TODO: Replace with yaml-cpp library when available
+    
+    std::string line;
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        
+        // Skip comments and empty lines
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            line = trim(line);
+        }
+        
+        if (line.empty()) {
+            continue;
+        }
+        
+        // Parse simple key: value format
+        size_t pos = line.find(':');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Ignoring malformed YAML line: " + line);
+        }
+    }
+    return true;
+}
+
+void Config::parseJSONObjectInline(const std::string& content) {
+    // Simple JSON object parsing for inline format: { "key": "value", "key2": 123 }
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        pos = keyEnd + 1;
+        
+        // Skip whitespace
+        while (pos < content.size() && std::isspace(content[pos])) pos++;
+        
+        if (pos >= content.size() || content[pos] != ':') break;
+        pos++;
+        
+        // Skip whitespace
+        while (pos < content.size() && std::isspace(content[pos])) pos++;
+        
+        if (pos >= content.size()) break;
+        
+        // Parse value
+        if (content[pos] == '"') {
+            // String value
+            size_t valueStart = pos;
+            size_t valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (std::isdigit(content[pos]) || content[pos] == '-') {
+            // Number value
+            size_t valueEnd = pos;
+            while (valueEnd < content.size() && (std::isdigit(content[valueEnd]) || content[valueEnd] == '.' || content[valueEnd] == 'e' || content[valueEnd] == 'E' || content[valueEnd] == '-')) {
+                valueEnd++;
+            }
+            std::string valueStr = content.substr(pos, valueEnd - pos);
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    set(key, std::stod(valueStr), ConfigSource::File);
+                } else {
+                    set(key, std::stoll(valueStr), ConfigSource::File);
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Failed to parse JSON number: " + valueStr);
+            }
+            pos = valueEnd;
+        } else if (content[pos] == 't' || content[pos] == 'f') {
+            // Boolean value
+            if (content.substr(pos, 4) == "true") {
+                set(key, true, ConfigSource::File);
+                pos += 4;
+            } else if (content.substr(pos, 5) == "false") {
+                set(key, false, ConfigSource::File);
+                pos += 5;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+        
+        // Skip whitespace and comma
+        while (pos < content.size() && std::isspace(content[pos])) pos++;
+        if (pos < content.size() && content[pos] == ',') pos++;
+        while (pos < content.size() && std::isspace(content[pos])) pos++;
+    }
+}
+
+void Config::parseJSONObjectLine(const std::string& line) {
+    // Parse a single line from JSON object: "key": value
+    size_t quoteStart = line.find('"');
+    if (quoteStart == std::string::npos) {
+        return;
+    }
+    
+    size_t quoteEnd = line.find('"', quoteStart + 1);
+    if (quoteEnd == std::string::npos) {
+        return;
+    }
+    
+    std::string key = line.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+    std::string rest = line.substr(quoteEnd + 1);
+    
+    // Skip whitespace
+    size_t pos = 0;
+    while (pos < rest.size() && std::isspace(rest[pos])) pos++;
+    
+    if (pos >= rest.size()) {
+        return;
+    }
+    
+    // Parse value based on type
+    if (rest[pos] == '\"') {
+        // String value
+        size_t valueStart = pos;
+        size_t valueEnd = rest.find('\"', valueStart + 1);
+        if (valueEnd == std::string::npos) return;
+        std::string value = rest.substr(valueStart + 1, valueEnd - valueStart - 1);
+        set(key, value, ConfigSource::File);
+    } else if (std::isdigit(rest[pos]) || rest[pos] == '-') {
+        // Number value
+        size_t valueEnd = pos;
+        while (valueEnd < rest.size() && (std::isdigit(rest[valueEnd]) || rest[valueEnd] == '.' || rest[valueEnd] == 'e' || rest[valueEnd] == 'E' || rest[valueEnd] == '-')) {
+            valueEnd++;
+        }
+        std::string valueStr = rest.substr(pos, valueEnd - pos);
+        try {
+            if (valueStr.find('.') != std::string::npos) {
+                set(key, std::stod(valueStr), ConfigSource::File);
+            } else {
+                set(key, std::stoll(valueStr), ConfigSource::File);
+            }
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse JSON number: " + valueStr);
+        }
+    } else if (rest.substr(pos, 4) == "true") {
+        // Boolean true
+        set(key, true, ConfigSource::File);
+    } else if (rest.substr(pos, 5) == "false") {
+        // Boolean false
+        set(key, false, ConfigSource::File);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +319,36 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open config file for writing: " + filepath);
         return false;
     }
     
+    // Write in key=value format with comments
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                file << arg;
+            } else {
+                // For other types (vectors, etc.)
+                file << "[]";  // Simple placeholder
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 

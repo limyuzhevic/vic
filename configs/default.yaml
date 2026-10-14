@@ -1,0 +1,94 @@
+# NLM Configuration File (YAML format)
+# Comprehensive configuration for NLM (熙然) Neural Learning Machine
+# Supports both JSON and YAML formats
+
+# Random seed for reproducible experiments
+random_seed: 42
+
+# Simulation timestep in seconds
+simulation_timestep: 0.001
+
+# Number of neurons in the brain
+neuron_count: 1000
+
+# Number of brain regions
+region_count: 2
+
+# Connection probability for random connectivity
+connection_probability: 0.1
+
+# Plasticity settings
+stdp_ltp_weight: 0.01
+stdp_ltd_weight: 0.012
+stdp_time_constant: 20.0
+plasticity_learning_rate: 0.01
+
+# Development system parameters
+development_synaptogenesis_rate: 0.001
+development_pruning_rate: 0.0001
+
+# Neuromodulation settings
+dopamine_baseline: 0.1
+
+# Reward and reinforcement learning
+reward_discount_factor: 0.99
+
+# Curiosity and exploration parameters
+curiosity_threshold: 0.5
+curiosity_gain: 0.1
+
+# Novelty detection sensitivity
+novelty_sensitivity: 0.3
+
+# Prediction error scaling
+prediction_error_scale: 1.0
+
+# Environment settings
+environment_name: GridWorld
+environment_width: 10
+environment_height: 10
+
+# Simulation control
+max_simulation_steps: 10000
+simulation_time_limit: 0.0
+
+# Logging configuration
+log_level: INFO
+log_to_file: false
+log_filename: nlm.log
+
+# Checkpoint configuration
+checkpoint_dir: ./checkpoints
+checkpoint_interval: 10000
+checkpoint_compression: Balanced
+checkpoint_max_files: 5
+
+# Visualization settings
+visualization_enabled: false
+visualization_update_rate: 30.0
+
+# Working memory configuration
+working_memory_capacity: 100
+working_memory_decay_rate: 0.1
+
+# Episodic memory configuration
+episodic_memory_max_episodes: 1000
+episodic_memory_consolidation_interval: 1000
+
+# Performance optimization
+use_memory_pools: true
+use_simd: true
+event_driven_spiking: true
+
+# Cognitive system parameters
+planner_planning_depth: 5
+concept_formation_threshold: 0.8
+attentional_inhibition_strength: 0.5
+attentional_excitation_strength: 1.5
+
+# Development stages
+developmental_stage: Initial
+
+# Simulation debugging and profiling
+debug_mode: false
+profile_performance: false
