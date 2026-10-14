@@ -3,6 +3,9 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"  // For SelfModel and SocialLearning
+#include "../cognition/ConceptFormation.hpp"  // For SpatialRepresentation and TemporalRelation
+#include "../prediction/NeuralPrediction.hpp"  // For NeuralPrediction
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -69,7 +72,113 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
+    // Brain cognitive system accessors (Phase 6 integration)
+    
+    // Planning and decision-making systems
+    NeuralPlanner* getPlanner() const {
+        return brain_ ? brain_->getPlanner() : nullptr;
+    }
+    
+    ConceptFormation* getConceptFormation() const {
+        return brain_ ? brain_->getConceptFormation() : nullptr;
+    }
+    
+    AttentionalSelection* getAttention() const {
+        return brain_ ? brain_->getAttention() : nullptr;
+    }
+    
+    // Advanced cognitive systems (Phase 6)
+    
+    // Self model of agent's own actions and capabilities
+    SelfModel* getSelfModel() const {
+        return brain_ ? brain_->getSelfModel() : nullptr;
+    }
+    
+    // Social learning from observing other agents
+    SocialLearning* getSocialLearning() const {
+        return brain_ ? brain_->getSocialLearning() : nullptr;
+    }
+    
+    // Spatial representation of environment
+    SpatialRepresentation* getSpatialRepresentation() const {
+        return brain_ ? brain_->getSpatialRepresentation() : nullptr;
+    }
+    
+    // Temporal relations and sequence processing
+    TemporalRelation* getTemporalRelation() const {
+        return brain_ ? brain_->getTemporalRelation() : nullptr;
+    }
+    
+    // Advanced prediction system
+    NeuralPrediction* getNeuralPrediction() const {
+        return brain_ ? brain_->getNeuralPrediction() : nullptr;
+    }
+    
+    // Basic prediction system
+    PredictionSystem* getPredictionSystem() const {
+        return brain_ ? brain_->getPredictionSystem() : nullptr;
+    }
+    
+    // Memory system access (Phase 6 integration)
+    
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory() const {
+        return brain_ ? brain_->getWorkingMemory() : nullptr;
+    }
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory() const {
+        return brain_ ? brain_->getEpisodicMemory() : nullptr;
+    }
+    
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory() const {
+        return brain_ ? brain_->getAssociativeMemory() : nullptr;
+    }
+    
+    // Neuromodulation system access
+    
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine() const {
+        return brain_ ? brain_->getDopamine() : nullptr;
+    }
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity() const {
+        return brain_ ? brain_->getCuriosity() : nullptr;
+    }
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty() const {
+        return brain_ ? brain_->getNovelty() : nullptr;
+    }
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal() const {
+        return brain_ ? brain_->getPredictionErrorSignal() : nullptr;
+    }
+    
+    // Development system
+    DevelopmentSystem* getDevelopmentSystem() const {
+        return brain_ ? brain_->getDevelopmentSystem() : nullptr;
+    }
+    
+    // Get current configuration
+    std::shared_ptr<const Config> getConfig() const {
+        return brain_ ? brain_->getConfig() : nullptr;
+    }
+    
+    // Get random generator
+    RandomGenerator* getRandomGenerator() const {
+        return brain_ ? brain_->getRandomGenerator() : nullptr;
+    }
+    
+    // Logging
+    void logStatus() const {
+        if (brain_) {
+            brain_->logStatus();
+        }
+    }
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     

@@ -20,6 +20,7 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -28,6 +29,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -153,36 +158,24 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== ADVANCED COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Self model of agent's own actions and capabilities
+    SelfModel* getSelfModel();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Social learning from observing other agents
+    SocialLearning* getSocialLearning();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Spatial representation of environment
+    SpatialRepresentation* getSpatialRepresentation();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Temporal relations and sequence processing
+    TemporalRelation* getTemporalRelation();
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // ========== ADVANCED PREDICTION SYSTEM ==========
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Neural prediction system with action-consequence and error signal
+    NeuralPrediction* getNeuralPrediction();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
