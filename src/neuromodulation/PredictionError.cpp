@@ -27,6 +27,11 @@ float PredictionError::getError() const {
     return pImpl->error;
 }
 
+void PredictionError::setError(float error) {
+    pImpl->error = error;
+    pImpl->history.push_back(error);
+}
+
 void PredictionError::computeError(float predicted, float actual) {
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;

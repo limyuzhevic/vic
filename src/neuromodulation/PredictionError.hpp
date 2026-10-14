@@ -18,6 +18,9 @@ public:
     // Get error value
     float getError() const;
     
+    // Set error value
+    void setError(float error);
+    
     // Compute prediction error
     void computeError(float predicted, float actual);
     

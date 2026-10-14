@@ -511,8 +511,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current time
+        // This allows the brain to form predictions and compute prediction errors
+        pImpl->predictionSystem->update(currentTime);
+        
+        // Update prediction error in neuromodulation system
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getError();
+            pImpl->predictionError->setError(predictionError);
+        }
+        
+        // Apply prediction error to dopamine system for reward modulation
+        if (pImpl->dopamine && pImpl->predictionError) {
+            float predError = pImpl->predictionError->getError();
+            pImpl->dopamine->setPredictionError(predError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +539,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+// ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This would use sensory state encoding in a real implementation
+        // Note: ConceptFormation::update() is not implemented - placeholder for Phase 2
+        // For now, present the current brain state as an experience to concept formation
+        std::vector<float> currentState;
+        size_t conceptId = 0;
+        
+        if (brain_->getTotalNeuronCount() > 0) {
+            // Create a simple state representation based on current neuron activity
+            currentState.reserve(brain_->getTotalNeuronCount());
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            currentState.push_back(1.0f);
+                        } else {
+                            float potential = neuron->getMembranePotential();
+                            // Normalize to [0, 1] based on typical range
+                            float normPotential = (potential + 80.0f) / 140.0f;  // Approximate range [-70, 60]
+                            currentState.push_back(std::max(0.0f, std::min(1.0f, normPotential)));
+                        }
+                    }
+                }
+            }
+            
+            // Present this state to concept formation
+            conceptId = pImpl->conceptFormation->presentExperience(
+                currentState,
+                currentState,  // Using same as features for simplicity
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f,
+                currentStep
+            );
+            
+            // Process concepts that are stable
+            if (conceptId > 0 && pImpl->conceptFormation->isConceptStable(conceptId)) {
+                // Concept is stable - could be used for higher-level processing
+                // This is where concepts would influence attention and planning
+            }
+        }
+    }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -1,23 +1,31 @@
-#include "PredictionSystem.hpp"
-
-namespace nlm {
-
-struct PredictionSystem::Impl {
-    float predictionError;
-    float confidence;
-    std::vector<float> errorHistory;
+void PredictionSystem::update(Timestamp currentTime) {
+    // Real predictive coding implementation:
+    // 1. Generate predictions for next sensory state
+    // 2. Compare predictions with actual sensory input
+    // 3. Compute prediction error
+    // 4. Update prediction model
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
-};
+    // For now, this is a placeholder - would be implemented with real neural mechanisms
+    // In a real implementation, this would:
+    // - Use predictive coding through recurrent connections
+    // - Generate expected sensory responses
+    // - Compare with actual input via prediction error units
+    // - Update weights in prediction network
+    
+    // Placeholder: Just track time for now
+    static Timestamp lastTime = 0.0;
+    if (currentTime > lastTime) {
+        lastTime = currentTime;
+    }
+}
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+void PredictionSystem::setPredictionError(float error) {
+    pImpl->predictionError = error;
+    pImpl->errorHistory.push_back(error);
+}
 
-PredictionSystem::~PredictionSystem() = default;
-
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+float PredictionSystem::getPredictionError() const {
+    return pImpl->predictionError;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
