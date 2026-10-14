@@ -94,13 +94,45 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    // Validate weight bounds with detailed error reporting
+    if (weight < Impl::MIN_WEIGHT) {
+        NLM_LOG_WARNING("Attempting to set synapse weight to " + std::to_string(weight) +
+                       " (below minimum " + std::to_string(Impl::MIN_WEIGHT) + ")");
+        pImpl->weight = Impl::MIN_WEIGHT;
+        NLM_LOG_INFO("Synapse weight clamped to minimum: " + std::to_string(Impl::MIN_WEIGHT));
+    } else if (weight > Impl::MAX_WEIGHT) {
+        NLM_LOG_WARNING("Attempting to set synapse weight to " + std::to_string(weight) +
+                       " (above maximum " + std::to_string(Impl::MAX_WEIGHT) + ")");
+        pImpl->weight = Impl::MAX_WEIGHT;
+        NLM_LOG_INFO("Synapse weight clamped to maximum: " + std::to_string(Impl::MAX_WEIGHT));
+    } else {
+        pImpl->weight = weight;
+    }
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    float oldWeight = pImpl->weight;
     pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Clamp to reasonable bounds with validation logging
+    if (pImpl->weight < Impl::MIN_WEIGHT) {
+        NLM_LOG_WARNING("Synapse weight overflow detected: " + std::to_string(pImpl->weight) +
+                       " < minimum " + std::to_string(Impl::MIN_WEIGHT) +
+                       ". Clamping to minimum.");
+        pImpl->weight = Impl::MIN_WEIGHT;
+    } else if (pImpl->weight > Impl::MAX_WEIGHT) {
+        NLM_LOG_WARNING("Synapse weight overflow detected: " + std::to_string(pImpl->weight) +
+                       " > maximum " + std::to_string(Impl::MAX_WEIGHT) +
+                       ". Clamping to maximum.");
+        pImpl->weight = Impl::MAX_WEIGHT;
+    }
+    
+    // Log significant weight changes
+    if (std::abs(pImpl->weight - oldWeight) > 0.1f) {
+        NLM_LOG_INFO("Significant weight change: " + std::to_string(oldWeight) +
+                    " -> " + std::to_string(pImpl->weight) +
+                    " (delta: " + std::to_string(delta) + ")");
+    }
 }
 
 Delay Synapse::getDelay() const {
