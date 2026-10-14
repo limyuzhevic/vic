@@ -28,6 +28,11 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize working memory with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
@@ -43,15 +48,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Set neuron activation more efficiently
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -70,6 +68,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    if (!brain_) return;
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -84,9 +84,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
+    brain_->injectCurrent(neuron, activation * 5.0f);
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
@@ -136,6 +134,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();
