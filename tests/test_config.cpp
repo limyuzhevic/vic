@@ -2,6 +2,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +79,78 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    // Test setting empty key
+    config.set("", 123, nlm::ConfigSource::Runtime);  // Should log error but not crash
+    assert(!config.has(""));  // Should not be set
+    
+    // Test getting empty key
+    auto val = config.get<int>("");
+    assert(!val.has_value());  // Should not be found
+    
+    // Test getOr with empty key
+    int defaultVal = config.getOr<int>("", 999);
+    assert(defaultVal == 999);  // Should use default
+    
+    // Test has with empty key
+    assert(!config.has(""));
+    
+    // Test removing empty key
+    config.remove("");  // Should not crash
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
+}
+
+void testConfigFileHandling() {
+    nlm::Config config;
+    
+    // Test saving to non-existent directory
+    config.set("test_value", 42, nlm::ConfigSource::Runtime);
+    bool saveSuccess = config.saveToFile("/nonexistent/path/config.cfg");
+    assert(!saveSuccess);  // Should fail
+    
+    // Test saving to temporary file
+    std::string tempPath = "/tmp/nlm_test_config.cfg";
+    bool saveSuccess2 = config.saveToFile(tempPath);
+    assert(saveSuccess2);  // Should succeed
+    
+    // Clean up
+    std::filesystem::remove(tempPath);
+    
+    std::cout << "    testConfigFileHandling passed" << std::endl;
+}
+
+void testConfigWhitespaceHandling() {
+    nlm::Config config;
+    
+    // Test keys with whitespace
+    config.set("  spaced_key  ", 123, nlm::ConfigSource::Runtime);
+    assert(config.has("spaced_key"));  // Should trim whitespace
+    
+    auto val = config.get<int>("spaced_key");
+    assert(val.has_value());
+    assert(*val == 123);
+    
+    // Test setting empty string value
+    config.set("empty_string", std::string(""), nlm::ConfigSource::Runtime);
+    auto emptyVal = config.get<std::string>("empty_string");
+    assert(emptyVal.has_value());
+    assert(emptyVal.value().empty());
+    
+    std::cout << "    testConfigWhitespaceHandling passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigErrorHandling();
+    testConfigFileHandling();
+    testConfigWhitespaceHandling();
 }
 
 } // namespace test_config
