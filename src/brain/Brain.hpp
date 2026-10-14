@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SensoryInput;
+class Action;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -64,21 +67,23 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
-    // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
+    // Main simulation step - modular implementation
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    // Modular step components for better testing and maintainability
+    void processNeuralDynamics(SimulationStep currentStep, Timestamp currentTime);
+    void processNeuronSpike(Neuron* neuron, SimulationStep currentStep, Timestamp currentTime, NeuralRegion* region);
+    void processSpikeEvents(SimulationStep currentStep);
+    void updateWorkingMemory(SimulationStep currentStep);
+    void applyNeuromodulationEffects(SimulationStep currentStep);
+    void applyModulationToPlasticity(SimulationStep currentStep);
+    void updateCognitiveSystems(SimulationStep currentStep);
+    void applyDevelopmentalUpdates(SimulationStep currentStep);
+    void updateMemorySystems(SimulationStep currentStep);
+    void checkForCheckpoint(SimulationStep currentStep, Timestamp currentTime);
     
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    // Backward compatibility
+    void step(SimulationStep currentStep);
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
@@ -94,25 +99,23 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Motor action production
+    std::unique_ptr<Action> produceAction();
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Neuromodulation
+    void applyNeuromodulation(const Neuromodulator& signal);
     
-    // Update plasticity rules (called automatically in step)
+    // Plasticity
     void updatePlasticity();
     
-    // Apply developmental changes (called automatically in step)
+    // Development
     void develop();
     
-    // Reset brain state
+    // Reset
     void reset();
     
-    // Save brain state to file (checkpointing)
+    // Checkpointing
     bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
     bool load(const std::string& filepath);
     
     // Region management
