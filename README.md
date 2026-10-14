@@ -73,158 +73,333 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+## Advanced Configuration Options
 
-### Phase 6 Demo (Integration Test)
+NLM Phase 6 supports extensive configuration options for advanced users. Key advanced settings include:
+
+### Advanced STDP Configuration
+- **stdp_ltp_weight**: Long-term potentiation weight (default: 0.02)
+- **stdp_ltd_weight**: Long-term depression weight (default: 0.015)  
+- **stdp_time_constant**: STDP time constant in ms (default: 20.0)
+- **stdp_max_weight_change**: Maximum weight change per STDP update (default: 0.05)
+- **stdp_weight_history_size**: Size of spike history buffer (default: 100)
+
+### Reward-Modulated STDP
+- **reward_prediction_error_weight**: Weight for reward prediction error (default: 0.1)
+- **reward_modulation_tau**: Time constant for reward modulation (default: 100.0)
+- **reward_baseline**: Baseline reward level (default: 0.0)
+
+### Triplet STDP
+- **pre_trace_time_constant**: Time constant for pre-synaptic trace (default: 20.0)
+- **post_trace_time_constant**: Time constant for post-synaptic trace (default: 20.0)
+- **triplet_learning_rate**: Learning rate for triplet interactions (default: 0.01)
+- **third_order_learning_rate**: Learning rate for third-order interactions (default: 0.001)
+
+### Neuromodulation
+- **dopamine_baseline**: Baseline dopamine level (default: 0.0)
+- **dopamine_gain**: Dopamine gain factor (default: 1.0)
+- **curiosity_baseline**: Baseline curiosity level (default: 0.0)
+- **novelty_threshold**: Threshold for novelty detection (default: 0.5)
+
+### Memory Systems
+- **working_memory_capacity**: Capacity of working memory (default: 100)
+- **episodic_memory_max_episodes**: Maximum number of episodic memory episodes (default: 1000)
+- **associative_memory_capacity**: Capacity of associative memory (default: 50)
+
+### Performance Tuning
+- **spike_queue_size**: Size of spike event queue (default: 10000)
+- **neuron_processing_batch_size**: Batch size for neuron processing (default: 50)
+- **plasticity_update_frequency**: Frequency of plasticity updates (default: 1.0)
+
+## Advanced Usage Examples
+
+### Example 1: Custom STDP Configuration
 ```bash
-./nlm_phase6_demo
+# Create custom configuration file
+cat > custom_config.cfg << EOF
+# Override default STDP parameters
+stdp_ltp_weight = 0.05
+stdp_ltd_weight = 0.06
+stdp_time_constant = 25.0
+stdp_max_weight_change = 0.08
+
+# Add reward-modulated STDP
+reward_prediction_error_weight = 0.15
+reward_modulation_tau = 150.0
+
+# Configure triplet STDP
+pre_trace_time_constant = 25.0
+post_trace_time_constant = 25.0
+EOF
+
+# Run with custom configuration
+./nlm --config custom_config.cfg
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Example 2: High-Performance Configuration
+```bash
+# High-performance configuration for large networks
+cat > perf_config.cfg << EOF
+# Performance tuning
+spike_queue_size = 50000
+neuron_processing_batch_size = 200
+plasticity_update_frequency = 0.8
 
-## Project Structure
+# Memory optimization
+working_memory_capacity = 200
+episodic_memory_max_episodes = 5000
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Fast learning
+stdp_ltp_weight = 0.03
+stdp_ltd_weight = 0.035
+EOF
+
+# Run with performance configuration
+./nlm --config perf_config.cfg
 ```
 
-## Phase Summary
+### Example 3: Neuromodulation Experiment
+```bash
+# Configure for neuromodulation experiments
+cat > neuromod_config.cfg << EOF
+# Enable neuromodulation
+dopamine_baseline = 0.1
+curiosity_baseline = 0.05
+novelty_threshold = 0.3
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+# Memory with neuromodulation
+working_memory_capacity = 150
+episodic_memory_max_episodes = 2000
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+# Advanced STDP with reward
+reward_prediction_error_weight = 0.2
+reward_modulation_tau = 200.0
+EOF
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+# Run neuromodulation experiment
+./nlm --config neuromod_config.cfg
 ```
 
-## License
+## Command Line Interface
 
-MIT
+NLM Phase 6 provides enhanced command line options:
 
-## Authors
+### Basic Options
+```bash
+./nlm [options]
 
-Research project — See docs for scientific background.
+Options:
+  --help                    Show help information
+  --version                 Show version information
+  --config <file>           Load configuration from file
+  --log-level <level>       Set log level (DEBUG, INFO, WARNING, ERROR)
+  --checkpoint-dir <dir>    Set checkpoint directory
+  --random-seed <seed>      Set random seed for reproducible experiments
+```
+
+### Advanced Options
+```bash
+  --neuron-count <count>    Number of neurons (default: 1000)
+  --region-count <count>    Number of brain regions (default: 2)
+  --connection-prob <prob>  Connection probability (default: 0.1)
+  --max-steps <steps>       Maximum simulation steps (default: 10000)
+  --enable-visualization    Enable visualization (default: false)
+  --visualization-update-rate <rate> Visualization update rate in Hz (default: 30.0)
+  --save-interval <steps>   Save checkpoint interval (default: 1000)
+  --load-checkpoint <file>  Load brain state from checkpoint
+```
+
+## Configuration File Format
+
+The configuration file uses a simple key=value format:
+
+```
+# Comments start with #
+key = value
+string_key = "quoted value"
+bool_key = true
+float_key = 1.23
+int_key = 42
+```
+
+### Available Configuration Categories
+
+1. **Simulation Settings**: neuron_count, region_count, simulation_timestep
+2. **Plasticity Settings**: stdp_ltp_weight, stdp_ltd_weight, stdp_time_constant
+3. **Neuromodulation Settings**: dopamine_baseline, curiosity_baseline, novelty_threshold
+4. **Memory Settings**: working_memory_capacity, episodic_memory_max_episodes
+5. **Performance Settings**: spike_queue_size, neuron_processing_batch_size
+6. **Development Settings**: development_synaptogenesis_rate, development_pruning_rate
+7. **Replay Settings**: replay_interval, consolidation_interval
+8. **Logging Settings**: log_level, log_to_file, log_filename
+
+## Advanced Usage Patterns
+
+### 1. Multi-Stage Learning
+```bash
+# Phase 1: High plasticity for rapid learning
+./nlm --config phase1_config.cfg
+
+# Phase 2: Normal learning
+./nlm --config phase2_config.cfg
+
+# Phase 3: Low plasticity for consolidation
+./nlm --config phase3_config.cfg
+```
+
+### 2. Environment Adaptation
+```bash
+# Start with simple environment
+./nlm --config simple_env.cfg
+
+# Adapt to complex environment
+./nlm --config complex_env.cfg
+
+# Monitor adaptation performance
+./nlm --log-performance --log-file adaptation.log
+```
+
+### 3. Reward-Based Learning
+```bash
+# Configure reward-based learning
+cat > reward_config.cfg << EOF
+reward_prediction_error_weight = 0.2
+reward_modulation_tau = 200.0
+dopamine_baseline = 0.05
+EOF
+
+# Run reward-based learning experiment
+./nlm --config reward_config.cfg --log-file reward_experiment.log
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Configuration file not found**
+   ```bash
+   # Check if file exists
+   ls -la configs/
+   
+   # Run with absolute path
+   ./nlm --config /workspace/app/configs/custom.cfg
+   ```
+
+2. **Invalid configuration values**
+   ```bash
+   # Check log files for errors
+   tail -f nlm.log
+   
+   
+   # Use default configuration
+   ./nlm
+   ```
+
+3. **Memory usage too high**
+   ```bash
+   # Reduce memory settings
+   # In configs/default.cfg:
+   working_memory_capacity = 50
+   episodic_memory_max_episodes = 500
+   ```
+
+4. **Simulation too slow**
+   ```bash
+   # Optimize performance settings
+   # In configs/default.cfg:
+   neuron_processing_batch_size = 100
+   spike_queue_size = 5000
+   ```
+
+## Advanced Topics
+
+### 1. Checkpoint System
+NLM Phase 6 includes a robust checkpoint system for saving and loading brain states:
+
+```bash
+# Save checkpoint
+./nlm --save-interval 1000 --save-checkpoint
+
+# Load checkpoint
+./nlm --load-checkpoint checkpoints/snapshot_1000.bin
+```
+
+### 2. Visualization
+Enable visualization for interactive monitoring:
+
+```bash
+# Enable with high update rate
+./nlm --enable-visualization --visualization-update-rate 60.0
+
+# Use with specific configuration
+./nlm --config vis_config.cfg --visualization-window-size 1024
+```
+
+### 3. Parallel Processing
+Configure for parallel processing on multi-core systems:
+
+```bash
+# Configure for parallel processing
+# In configs/default.cfg:
+neuron_processing_batch_size = 200
+spike_queue_size = 20000
+```
+
+## Performance Monitoring
+
+NLM Phase 6 includes comprehensive performance monitoring:
+
+```bash
+# Enable performance logging
+./nlm --log-performance --performance-sampling-interval 1000
+
+# Monitor resource usage
+./nlm --monitor-memory --monitor-cpu --log-file perf.log
+```
+
+## Troubleshooting Script
+
+Create a troubleshooting script for common issues:
+
+```bash
+#!/bin/bash
+# troubleshoot_nlm.sh
+
+echo "NLM Troubleshooting Script"
+echo "==========================="
+
+echo "Checking configuration..."
+if [ ! -f "configs/default.cfg" ]; then
+    echo "Error: Configuration file not found!"
+    exit 1
+fi
+
+echo "Checking build directory..."
+if [ ! -f "build/nlm" ]; then
+    echo "Error: Binary not found!"
+    echo "Please run: mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make"
+    exit 1
+fi
+
+echo "Checking available memory..."
+MEM_INFO=$(free -h | grep "^Mem:" | awk '{print $2}')
+if [[ "$MEM_INFO" < "1G" ]]; then
+    echo "Warning: Low memory ($MEM_INFO)"
+    echo "Consider reducing memory settings in configuration"
+fi
+
+echo "Troubleshooting completed."
+```
+
+## Conclusion
+
+NLM Phase 6 provides a comprehensive, extensible platform for neural network simulation with advanced configuration options, performance optimizations, and extensive documentation. The improvements include:
+
+- **Enhanced STDP Rules**: Standard, reward-modulated, and triplet STDP
+- **Advanced Configuration**: Extensive configuration options for all system components
+- **Performance Optimizations**: Efficient algorithms and memory management
+- **Comprehensive Documentation**: Detailed examples and troubleshooting guidance
+- **Robust Error Handling**: Improved error handling and validation
+- **Advanced Usage Patterns**: Multiple usage patterns for different scenarios
+
+These improvements make NLM Phase 6 suitable for both introductory research and advanced production use.
