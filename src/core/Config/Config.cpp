@@ -3,14 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+        std::vector<ConfigEntry> entries;
+        std::unordered_map<std::string, size_t> keyIndex;  // For O(1) key lookup
+    };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+    Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
@@ -18,42 +20,98 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    bool Config::loadFromFile(const std::string& filepath) {
+        // Phase 2: Implement proper JSON/YAML parser
+        // PLACEHOLDER - Phase 1 uses a simple key=value format
+        
+        // Validate file path
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Configuration file path is empty");
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Check if file exists and is readable
+        if (!std::filesystem::exists(filepath)) {
+            NLM_LOG_WARNING("Configuration file not found: " + filepath + ". Using defaults.");
+            return false;
+        }
+        
+        if (!std::filesystem::is_regular_file(filepath)) {
+            NLM_LOG_ERROR("Configuration path is not a file: " + filepath);
+            return false;
+        }
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+            return false;
+        }
+        
+        // Get file size for validation
+        file.seekg(0, std::ios::end);
+        size_t fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+        
+        if (fileSize == 0) {
+            NLM_LOG_WARNING("Configuration file is empty: " + filepath + ". Using defaults.");
+        } else if (fileSize > 1024 * 1024) {  // 1MB limit
+            NLM_LOG_ERROR("Configuration file too large: " + filepath);
+            return false;
+        }
+        
+        std::string line;
+        size_t lineNum = 0;
+        size_t errorCount = 0;
+        
+        while (std::getline(file, line)) {
+            lineNum++;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate line length
+            if (line.length() > 1024) {
+                NLM_LOG_WARNING("Skipping long configuration line " + std::to_string(lineNum));
+                errorCount++;
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Validate key
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Empty key found at line " + std::to_string(lineNum));
+                    errorCount++;
+                    continue;
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNum) + ": " + line);
+                errorCount++;
+            }
         }
+        
+        if (errorCount > 0) {
+            NLM_LOG_WARNING(std::to_string(errorCount) + " errors found while loading configuration");
+        }
+        
+        return true;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -78,35 +136,100 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // ========== IMPROVED SAVE TO FILE ==========
+    bool Config::saveToFile(const std::string& filepath) const {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
+            return false;
+        }
+        
+        file << "# NLM Configuration File\n";
+        file << "# Generated by NLM Configuration System\n\n";
+        
+        for (const auto& entry : pImpl->entries) {
+            // Add description as comment if not empty
+            if (!entry.description.empty()) {
+                file << "# " << entry.description << "\n";
+            }
+            
+            // Write key=value pair
+            file << entry.key << " = ";
+            
+            // Convert variant to string
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << arg[i];
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << arg[i];
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << "\"" << arg[i] << "\"";
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        file << "# End of configuration\n";
+        
+        if (file.fail()) {
+            NLM_LOG_ERROR("Error writing to configuration file: " + filepath);
+            return false;
+        }
+        
+        return true;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+    template<typename T>
+    std::optional<T> Config::get(const std::string& key) const {
+        // First try index lookup (O(1))
+        auto indexIt = pImpl->keyIndex.find(key);
+        if (indexIt != pImpl->keyIndex.end()) {
+            size_t index = indexIt->second;
+            if (index < pImpl->entries.size()) {
+                const ConfigEntry& entry = pImpl->entries[index];
+                try {
+                    return std::get<T>(entry.value);
+                } catch (const std::bad_variant_access&) {
+                    return std::nullopt;
+                }
+            }
+        }
+        
+        // Fall back to linear search for backward compatibility
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            return std::nullopt;
+        }
+        
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
     }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
@@ -114,17 +237,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+        // Check if key already exists
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            // Update existing entry
+            it->value = value;
+            it->source = source;
+        } else {
+            // Add new entry
+            pImpl->entries.emplace_back(key, value, source);
+            // Update index for O(1) lookup
+            pImpl->keyIndex[key] = pImpl->entries.size() - 1;
+        }
     }
-}
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
@@ -142,18 +270,22 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
+    bool Config::has(const std::string& key) const {
+        // Use index for O(1) lookup
+        return pImpl->keyIndex.find(key) != pImpl->keyIndex.end();
+    }
 
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
+    void Config::remove(const std::string& key) {
+        // Remove from entries vector
+        pImpl->entries.erase(
+            std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; }),
+            pImpl->entries.end()
+        );
+        
+        // Update index
+        pImpl->keyIndex.erase(key);
+    }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
@@ -164,40 +296,25 @@ std::vector<std::string> Config::getKeys() const {
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    void Config::rebuildIndex() {
+        pImpl->keyIndex.clear();
+        for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+            pImpl->keyIndex[pImpl->entries[i].key] = i;
+        }
     }
-    return oss.str();
-}
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
+    std::string Config::trim(const std::string& str) {
+        size_t start = str.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) return "";
+        size_t end = str.find_last_not_of(" \t\r\n");
+        return str.substr(start, end - start + 1);
+    }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
+    std::string Config::toLower(const std::string& str) {
+        std::string result = str;
+        std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+        return result;
+    }
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;

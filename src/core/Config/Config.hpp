@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers
+    void rebuildIndex();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
