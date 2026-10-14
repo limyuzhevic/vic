@@ -90,8 +90,20 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    bool validateParameter(const std::string& key, const ConfigValue& value) const;
+    
+    // Get configuration error message
+    static std::string getErrorMessage(ConfigError error);
+    
+    // Get all configuration keys with their values and sources
+    std::vector<std::pair<std::string, std::string>> getAllConfigInfo() const;
+    
+    // Check for configuration consistency
+    std::vector<ConfigError> validateConfigConsistency() const;
+    
+    // Get configuration statistics
+    std::string getConfigStatistics() const;
+};
     
 private:
     struct Impl;

@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <limits>
 
 using namespace nlm;
 
@@ -47,6 +49,9 @@ void printBanner() {
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
+
+// Forward declaration for batch processing
+void applyInputBatch(Brain& brain, size_t batchSize, float current);
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -159,6 +164,46 @@ struct LearningExperiment {
     }
 };
 
+// Optimized batch processing for plasticity experiment
+void applyInputBatch(Brain& brain, size_t batchSize, float current) {
+    for (size_t i = 0; i < batchSize; ++i) {
+        brain.injectCurrentToNeurons(NeuronType::Sensory, current);
+    }
+}
+
+// Optimized neuron statistics collection
+struct NeuronStats {
+    size_t totalSpikeCount = 0;
+    float totalMembranePotential = 0.0f;
+    float maxMembranePotential = std::numeric_limits<float>::lowest();
+    float minMembranePotential = std::numeric_limits<float>::max();
+    size_t neuronCount = 0;
+};
+
+NeuronStats collectNeuronStats(Brain& brain) {
+    NeuronStats stats;
+    auto regions = brain.getRegions();
+    
+    for (const auto& region : regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                stats.totalSpikeCount += neuron->getTotalSpikeCount();
+                stats.totalMembranePotential += state.membranePotential;
+                stats.maxMembranePotential = std::max(stats.maxMembranePotential, state.membranePotential);
+                stats.minMembranePotential = std::min(stats.minMembranePotential, state.membranePotential);
+                stats.neuronCount++;
+            }
+        }
+    }
+    
+    if (stats.neuronCount > 0) {
+        stats.totalMembranePotential /= stats.neuronCount;
+    }
+    
+    return stats;
+}
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -222,13 +267,16 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
+    // Use batch processing for better performance
+    const size_t batchSize = 10;  // Process in batches
+    const float current = 30.0f;
+    const size_t totalSteps = 1000;
+    
+    for (SimulationStep step = 0; step < totalSteps; step += batchSize) {
+        size_t actualBatchSize = std::min(batchSize, totalSteps - step);
+        applyInputBatch(*brain, actualBatchSize, current);
         
-        brain->step(step, step * 0.001);
+        brain->step(step + actualBatchSize/2, (step + actualBatchSize/2) * 0.001);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {

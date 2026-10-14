@@ -10,12 +10,25 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
+// Constant parameters for standard neuron behavior
+namespace NeuronConstants {
+    const float DEFAULT_MEMBRANE_POTENTIAL = -70.0f;    // mV
+    const float DEFAULT_RESTING_POTENTIAL = -70.0f;    // mV
+    const float DEFAULT_THRESHOLD = -55.0f;            // mV
+    const float DEFAULT_RESET_POTENTIAL = -70.0f;      // mV
+    const float DEFAULT_LEAK_CONDUCTANCE = 10.0f;       // nS
+    const float DEFAULT_REFractory_PERIOD = 5.0f;       // steps
+    const float DEFAULT_ADAPTATION_RATE = 0.1f;         // adaptation variable scaling
+    const size_t MAX_SPIKE_HISTORY = 100;               // maximum stored spikes
+    const float MAX_SYNAPTIC_INPUT = 1000.0f;           // protection against overflow
+}
+
 // Neuron state structure for efficient storage
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
     MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
+    MembranePotential resetPotential;      // Post-spike reset value (mV)
     MembranePotential leakConductance;      // Leak conductance (nS)
     MembranePotential synapseConductance;   // Synaptic conductance (nS)
     FiringRate firingRate;                 // Current firing rate (Hz)
@@ -24,20 +37,25 @@ struct NeuronState {
     uint32_t refractoryPeriod;             // Total refractory period (steps)
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    std::vector<float> spikeHistory;      // Recent spike times for adaptation
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(NeuronConstants::DEFAULT_MEMBRANE_POTENTIAL)
+        , restingPotential(NeuronConstants::DEFAULT_RESTING_POTENTIAL)
+        , threshold(NeuronConstants::DEFAULT_THRESHOLD)
+        , resetPotential(NeuronConstants::DEFAULT_RESET_POTENTIAL)
+        , leakConductance(NeuronConstants::DEFAULT_LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(static_cast<uint32_t>(NeuronConstants::DEFAULT_REFractory_PERIOD))
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+        , spikeHistory()
+    {
+        spikeHistory.reserve(NeuronConstants::MAX_SPIKE_HISTORY);
+    }
 };
 
 // Neuron class representing a single neuron
