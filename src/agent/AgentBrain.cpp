@@ -92,7 +92,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
+            // Validate input before processing
             float current = vision[i] * 5.0f;  // Scale factor
+            
+            // Clamp to reasonable range to prevent neuron overexcitation
+            if (current < -100.0f) current = -100.0f;
+            if (current > 100.0f) current = 100.0f;
+            
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +108,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            
+            // Validate and clamp input
+            if (current < -50.0f) current = -50.0f;
+            if (current > 50.0f) current = 50.0f;
+            
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +122,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            
+            // Validate range
+            if (current < -25.0f) current = -25.0f;
+            if (current > 25.0f) current = 25.0f;
+            
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,10 +136,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            
+            // Validate range
+            if (current < -15.0f) current = -15.0f;
+            if (current > 15.0f) current = 15.0f;
+            
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
-    
+
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -137,6 +158,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
+        
+        // Clamp novelty level to prevent overflow
+        if (noveltyLevel_ > 1.0f) noveltyLevel_ = 1.0f;
         
         // Store for next time
         previousVision_ = vision;

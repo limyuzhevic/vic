@@ -164,6 +164,70 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Add convenience methods for common configuration keys
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set sensible default values
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", 42);
+        
+        return config;
+    }, "Create a default configuration with sensible defaults");
+    
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            py::error_already_set();
+            return false;
+        }
+        
+        // Basic validation
+        bool isValid = true;
+        
+        // Check for required keys
+        if (!config->has("neuron_count")) {
+            py::print("Warning: neuron_count not set, using default (1000)");
+            config->set("neuron_count", 1000);
+            isValid = false;
+        }
+        
+        if (!config->has("simulation_timestep")) {
+            py::print("Warning: simulation_timestep not set, using default (0.001)");
+            config->set("simulation_timestep", 0.001);
+            isValid = false;
+        }
+        
+        return isValid;
+    }, py::arg("config"), "Validate configuration and fix missing defaults");
+    
+    // Add type-safe convenience methods for getting configuration values
+    m.def("getNeuronCount", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            py::error_already_set();
+            return 0;
+        }
+        return config->getOr<size_t>("neuron_count", 1000);
+    }, py::arg("config"), "Get neuron count from config with default");
+    
+    m.def("getRegionCount", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            py::error_already_set();
+            return 1;
+        }
+        return config->getOr<size_t>("region_count", 1);
+    }, py::arg("config"), "Get region count from config with default");
+    
+    m.def("getSimulationTimestep", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            py::error_already_set();
+            return 0.001;
+        }
+        return config->getOr<double>("simulation_timestep", 0.001);
+    }, py::arg("config"), "Get simulation timestep from config with default");
+
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
