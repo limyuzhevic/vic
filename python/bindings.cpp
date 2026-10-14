@@ -142,6 +142,164 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced configuration validation and advanced settings
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        config->validate();
+    }, py::arg("config"), "Validate configuration and log any errors");
+
+    m.def("create_advanced_config", []() {
+        return std::make_shared<Config>();
+    }, "Create an advanced configuration with optimized defaults");
+
+    m.def("create_research_config", []() {
+        return std::make_shared<Config>();
+    }, "Create a research-oriented configuration");
+
+    m.def("create_production_config", []() {
+        return std::make_shared<Config>();
+    }, "Create a production-optimized configuration");
+
+    // Batch processing utilities
+    m.def("run_batch_simulation", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t num_episodes,
+                                   size_t steps_per_episode) {
+        std::vector<std::vector<float>> rewards;
+        
+        for (size_t episode = 0; episode < num_episodes; ++episode) {
+            std::vector<float> episode_rewards;
+            brain->reset();
+            agent->reset();
+            world->reset();
+            
+            for (size_t step = 0; step < steps_per_episode; ++step) {
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Extract reward from sensory percept if available
+                float reward = 0.0f;
+                auto internal = percept.getInternal();
+                if (!internal.empty()) {
+                    reward = internal[0];
+                }
+                
+                episode_rewards.push_back(reward);
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1f);
+                world->update(0.1f);
+            }
+            
+            rewards.push_back(episode_rewards);
+        }
+        
+        return rewards;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+           py::arg("num_episodes"), py::arg("steps_per_episode"),
+           "Run multiple episodes and return rewards for analysis");
+
+    // Performance monitoring utilities
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain,
+                              size_t steps,
+                              size_t repeats) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (size_t repeat = 0; repeat < repeats; ++repeat) {
+            brain->reset();
+            for (size_t step = 0; step < steps; ++step) {
+                brain->step(step);
+            }
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end_time - start_time).count() / 1000.0;
+        
+        double steps_per_second = (steps * repeats) / duration;
+        return steps_per_second;
+    }, py::arg("brain"), py::arg("steps"), py::arg("repeats"),
+       "Benchmark brain performance and return steps per second");
+
+    // Simulation utilities
+    m.def("simulate_for_time", [](std::shared_ptr<Brain> brain,
+                                 double duration,
+                                 double timestep) {
+        size_t steps = static_cast<size_t>(duration / timestep);
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+        }
+        return steps;
+    }, py::arg("brain"), py::arg("duration"), py::arg("timestep"),
+       "Simulate brain for specified duration");
+
+    // Statistics utilities
+    m.def("get_spike_statistics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        
+        size_t total_spikes = brain->getTotalSpikeCount();
+        stats["total_spikes"] = total_spikes;
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["firing_neuron_count"] = brain->getFiringNeuronCount();
+        stats["active_neuron_count"] = brain->getActiveNeuronCount();
+        
+        return stats;
+    }, py::arg("brain"), "Get spike statistics as a dictionary");
+
+    m.def("get_neuron_statistics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        return stats;
+    }, py::arg("brain"), "Get neuron population statistics");
+
+    // Error handling utilities
+    m.def("safe_step", [](std::shared_ptr<Brain> brain,
+                        size_t step,
+                        double time = 0.0) {
+        try {
+            brain->step(step, time);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error during brain step: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = 0.0,
+       "Safely step brain with error handling");
+
+    m.def("validate_simulation", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent) {
+        std::vector<std::string> errors;
+        
+        if (!brain || !brain->initialize()) {
+            errors.push_back("Brain initialization failed");
+        }
+        
+        if (!world) {
+            errors.push_back("World object is null");
+        }
+        
+        if (!agent) {
+            errors.push_back("Agent brain interface is null");
+        }
+        
+        if (world && agent) {
+            auto percept = world->getSensoryPercept();
+            if (percept.getVisionWidth() == 0) {
+                errors.push_back("World vision not configured");
+            }
+        }
+        
+        return errors;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Validate simulation setup and return list of errors");
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
