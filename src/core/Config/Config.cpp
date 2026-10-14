@@ -19,14 +19,30 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Detect file format by checking for JSON structure
+    std::string firstLine;
+    if (std::getline(file, firstLine)) {
+        file.seekg(0); // Reset file pointer
+        
+        // Detect file format by checking for JSON structure
+        if (firstLine.find('{') == 0) {
+            // JSON format detected
+            return loadJsonFormat(filepath);
+        } else {
+            // INI format (default)
+            return loadIniFormat(file);
+        }
+    }
+    
+    return false;
+}
+
+bool Config::loadIniFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -51,30 +67,66 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+bool Config::loadJsonFormat(const std::string& filepath) {
+    // Simple JSON parsing for key-value pairs
+    // This handles basic JSON objects like: {"key": "value", "number": 123}
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
+    
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key (starts with " or {)
+        pos = content.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', pos + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+        trim(key);
+        
+        // Find value after colon
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        size_t valueStart = content.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find value end (comma, closing brace, or end of object)
+        char delim = content[valueStart];
+        size_t valueEnd;
+        if (delim == '"') {
+            valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+        } else if (std::isdigit(delim) || delim == '-' || delim == '.') {
+            valueEnd = content.find_first_of(",}", valueStart);
+        } else {
+            break; // Unsupported format
+        }
+        
+        std::string value = content.substr(valueStart, valueEnd - valueStart);
+        trim(value);
+        
+        // Remove surrounding quotes from value
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
+        
+        // Skip to next entry
+        pos = valueEnd;
+    }
+    
     return true;
 }
 
@@ -86,7 +138,30 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert value to string based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t> ||
+                                std::is_same_v<T, uint64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; // Simplified
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -177,6 +252,42 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << "\"" << item << "\"";
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<bool>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << (item ? "true" : "false");
+                    first = false;
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
@@ -200,6 +311,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

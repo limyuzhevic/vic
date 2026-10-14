@@ -25,9 +25,13 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,16 +168,34 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+// Get developmental stage
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // Log memory status and statistics
+    void logMemoryStatus() const;
+    
+    // Check for memory leaks
+    static void checkMemoryLeaks();
+    
+    // Get allocation statistics
+    static size_t getAllocationCount();
+    static size_t getDeallocationCount();
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and signal detection
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavioral flexibility
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

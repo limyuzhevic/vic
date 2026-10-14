@@ -121,6 +121,50 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test 1: Memory and cognitive system integration
+    std::vector<float> pattern;
+    for (int i = 0; i < 10; ++i) {
+        pattern.push_back(0.5f);
+    }
+    
+    brain.getWorkingMemory()->store(pattern, 1.0f);
+    
+    nlm::EpisodicMemoryItem episode;
+    episode.timestamp = 0;
+    episode.sensoryState = pattern;
+    episode.reward = 0.8f;
+    brain.getEpisodicMemory()->storeEpisode(episode);
+    
+    // Test 2: Neural planning and action production
+    auto action = brain.produceAction();
+    assert(action != nullptr);
+    
+    // Test 3: Neuromodulation effects on memory
+    brain.step(0);
+    float memoryActivity = brain.getWorkingMemory()->getMemoryActivity();
+    assert(memoryActivity >= 0.0f);
+    
+    // Test 4: Multiple steps to test continual integration
+    for (nlm::SimulationStep step = 1; step < 20; ++step) {
+        brain.step(step);
+    }
+    
+    // Verify all systems are still working
+    assert(brain.getTotalNeuronCount() == 100);
+    assert(brain.getWorkingMemory()->getMemoryActivity() >= 0.0f);
+    assert(brain.getEpisodicMemory()->getEpisodeCount() >= 1);
+    
+    std::cout << "    testBrainIntegration passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +173,5 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainIntegration();
 }
-
-} // namespace test_brain

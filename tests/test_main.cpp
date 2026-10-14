@@ -4,36 +4,19 @@
 #include <iostream>
 #include <cassert>
 
-// Forward declarations of test functions
-namespace test_types {
+namespace test_memory_retention {
     void runAll();
 }
 
-namespace test_config {
+namespace test_continual_learning {
     void runAll();
 }
 
-namespace test_random {
+namespace test_generalization {
     void runAll();
 }
 
-namespace test_clock {
-    void runAll();
-}
-
-namespace test_neuron {
-    void runAll();
-}
-
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
+namespace test_integration {
     void runAll();
 }
 
@@ -113,6 +96,42 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory Retention tests..." << std::endl;
+    try {
+        test_memory_retention::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Continual Learning tests..." << std::endl;
+    try {
+        test_continual_learning::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Generalization tests..." << std::endl;
+    try {
+        test_generalization::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

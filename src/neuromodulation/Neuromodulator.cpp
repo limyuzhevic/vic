@@ -25,11 +25,15 @@ float Dopamine::getLevel() const {
     return pImpl->level;
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
-}
-
-float Dopamine::getPlasticityFactor() const {
+    void Dopamine::setLevel(float level) {
+        pImpl->level = std::clamp(level, 0.0f, 1.0f);
+    }
+    
+    void Dopamine::setBaseline(float baseline) {
+        pImpl->baseline = std::clamp(baseline, 0.0f, 1.0f);
+    }
+    
+    float Dopamine::getPlasticityFactor() const {
     // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
     // PLACEHOLDER: Higher dopamine increases plasticity
     return 0.5f + 0.5f * pImpl->level;

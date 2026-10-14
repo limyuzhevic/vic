@@ -89,6 +89,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -97,14 +98,19 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_include_directories(nlm_agent PUBLIC
+    src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/performance
+)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
+target_include_directories(nlm_world PUBLIC
+    src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/performance
+)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
@@ -132,12 +138,20 @@ add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_include_directories(nlm_phase3_demo PUBLIC
+    src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/performance
+)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_include_directories(nlm_phase4_demo PUBLIC
+    src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/performance
+)
 
 # Testing
 enable_testing()

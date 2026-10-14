@@ -330,8 +330,16 @@ int main(int argc, char** argv) {
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
     
+    // Configure logging from config
+    bool logToFile = config->getOr<bool>("log_to_file", false);
+    std::string logFilename = config->getOr<std::string>("log_filename", "nlm.log");
+    if (logToFile) {
+        consoleLogger->setOutputFile(logFilename);
+        NLM_LOG_INFO("Logging to file: " + logFilename);
+    }
+    
+    Logger::setGlobal(logger);
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
@@ -344,7 +352,7 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    std::string configFile = "configs/default.json";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {

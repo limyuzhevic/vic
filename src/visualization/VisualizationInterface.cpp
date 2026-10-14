@@ -1,63 +1,51 @@
+// Stub implementation for VisualizationInterface.cpp
+// This is a placeholder to satisfy CMake build requirements
+// Phase 2 implementations will replace this stub
+
 #include "VisualizationInterface.hpp"
+#include <iostream>
 
 namespace nlm {
 
-struct VisualizationInterface::Impl {
-    bool active;
-    double updateRate;
-    
-    Impl() : active(false), updateRate(30.0) {}
-};
-
-VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
+// VisualizationInterface implementation (stub)
+VisualizationInterface::VisualizationInterface() {
+    std::cout << "VisualizationInterface initialized (stub)" << std::endl;
+}
 
 VisualizationInterface::~VisualizationInterface() = default;
 
-bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
-    pImpl->active = false;
-    return true;
+void VisualizationInterface::initialize() {
+    // Stub implementation
+    std::cout << "VisualizationInterface::initialize called (stub)" << std::endl;
 }
 
-void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+void VisualizationInterface::update(const Brain& brain) {
+    // Stub implementation - in real implementation, this would render neural activity
+    std::cout << "VisualizationInterface::update called (stub)" << std::endl;
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Stub implementation - in real implementation, this would render to screen
+    std::cout << "VisualizationInterface::render called (stub)" << std::endl;
 }
 
-void VisualizationInterface::close() {
-    pImpl->active = false;
+void VisualizationInterface::shutdown() {
+    // Stub implementation
+    std::cout << "VisualizationInterface::shutdown called (stub)" << std::endl;
 }
 
-bool VisualizationInterface::isActive() const {
-    return pImpl->active;
+void VisualizationInterface::setRenderingMode(RenderingMode mode) {
+    // Stub implementation
+    std::cout << "VisualizationInterface::setRenderingMode called (stub)" << std::endl;
 }
 
-void VisualizationInterface::setUpdateRate(double hz) {
-    pImpl->updateRate = hz;
+void VisualizationInterface::setScale(float scale) {
+    // Stub implementation
+    std::cout << "VisualizationInterface::setScale called (stub)" << std::endl;
 }
 
-double VisualizationInterface::getUpdateRate() const {
-    return pImpl->updateRate;
-}
-
-void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
-}
-
-void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
-}
-
-void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
-}
-
-void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+bool VisualizationInterface::isInitialized() const {
+    return true;  // Stub - always returns true
 }
 
 } // namespace nlm

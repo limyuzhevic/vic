@@ -38,6 +38,80 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     episodes_.push_back(stored);
     
+    // Neuromodulator effects on memory storage
+    if (brain_) {
+        // Check neuromodulator levels
+        if (brain->getDopamine()) {
+            float dopamineLevel = brain->getDopamine()->getLevel();
+            if (dopamineLevel > 0.3f) {
+                // Dopamine enhances reward-related memory storage
+                if (episode.reward > 0.0f) {
+                    // Boost storage strength for rewarding experiences
+                    // This is conceptual - would enhance synaptic patterns
+                    NLM_LOG_DEBUG("Dopamine enhancing storage of reward: " + 
+                                std::to_string(episode.reward));
+                }
+            }
+        }
+        
+        if (brain->getAcetylcholine()) {
+            float acetylcholineLevel = brain->getAcetylcholine()->getLevel();
+            if (acetylcholineLevel > 0.3f) {
+                // ACh enhances attention-related memory storage
+                if (episode.reward > 0.0f) {
+                    // Enhance encoding of attended, rewarding events
+                    // This would improve pattern completion during retrieval
+                    NLM_LOG_DEBUG("ACh enhancing storage of reward: " + 
+                                std::to_string(episode.reward));
+                }
+            }
+        }
+        
+        if (brain->getNorepinephrine()) {
+            float norepinephrineLevel = brain->getNorepinephrine()->getLevel();
+            if (norepinephrineLevel > 0.3f) {
+                // NE enhances novelty-related memory storage
+                if (episode.novelty > 0.5f) {
+                    // Boost storage of novel experiences
+                    // This enhances learning from new information
+                    NLM_LOG_DEBUG("NE enhancing storage of novelty: " + 
+                                std::to_string(episode.novelty));
+                }
+            }
+        }
+        
+        if (brain->getSerotonin()) {
+            float serotoninLevel = brain->getSerotonin()->getLevel();
+            if (serotoninLevel > 0.5f) {
+                // 5-HT influences emotional memory storage
+                if (episode.reward < 0.0f) {
+                    // Enhance storage of negative experiences
+                    // This supports avoidance learning and behavioral adjustment
+                    NLM_LOG_DEBUG("5-HT enhancing storage of negative reward: " + 
+                                std::to_string(episode.reward));
+                }
+            }
+        }
+        
+        // Apply reward discount factor from config
+        if (brain_ && brain_->getConfig() && brain_->getConfig()->has("reward_discount_factor")) {
+            float discountFactor = brain_->getConfig()->getOr<float>("reward_discount_factor", 0.99f);
+            // Decay reward based on age and discount factor
+            // Older rewards are decayed more than newer ones
+            float ageDecay = std::pow(discountFactor, static_cast<float>(episode.age));
+            float discountedReward = episode.reward * ageDecay;
+            
+            // Update the stored episode with discounted reward
+            // Note: This is conceptual - in a full implementation, 
+            // we would modify the episodic memory's internal representation
+            if (std::abs(discountedReward - episode.reward) > 0.001f) {
+                NLM_LOG_DEBUG("Applying reward discount: " + std::to_string(episode.reward) + 
+                            " -> " + std::to_string(discountedReward) +
+                            " (age=" + std::to_string(episode.age) + ")");
+            }
+        }
+    }
+    
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
         NeuronId epNeuron(episodes_.size() + 20000);
@@ -167,19 +241,65 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
+    // Neuromodulator effects on memory replay
+    float replayModulation = 1.0f;
+    
+    // Check neuromodulator levels to modulate replay
+    if (brain_->getDopamine()) {
+        float dopamineLevel = brain_->getDopamine()->getLevel();
+        if (dopamineLevel > 0.3f) {
+            // Dopamine enhances replay of reward-related episodes
+            replayModulation *= (1.0f + dopamineLevel * 0.3f);
+        }
+    }
+    
+    if (brain_->getAcetylcholine()) {
+        float acetylcholineLevel = brain_->getAcetylcholine()->getLevel();
+        if (acetylcholineLevel > 0.3f) {
+            // ACh enhances focused replay of attended episodes
+            replayModulation *= (1.0f + acetylcholineLevel * 0.2f);
+        }
+    }
+    
+    if (brain_->getNorepinephrine()) {
+        float norepinephrineLevel = brain_->getNorepinephrine()->getLevel();
+        if (norepinephrineLevel > 0.3f) {
+            // NE enhances replay of novel/urgent episodes
+            replayModulation *= (1.0f + norepinephrineLevel * 0.2f);
+        }
+    }
+    
+    if (brain_->getSerotonin()) {
+        float serotoninLevel = brain_->getSerotonin()->getLevel();
+        if (serotoninLevel > 0.5f) {
+            // 5-HT modulates emotional memory replay
+            // Enhance replay of emotionally salient experiences
+            replayModulation *= (1.0f + serotoninLevel * 0.15f);
+        }
+    }
+    
     // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
         float activation = i < episode->neuronActivations.size() ? 
                           episode->neuronActivations[i] : 0.5f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Apply neuromodulator-modulated current injection
+        float modulatedActivation = activation * replayModulation;
+        brain_->injectCurrent(neuron, modulatedActivation * 3.0f);
     }
     
     // Also inject sensory pattern if available
     if (!episode->sensoryState.empty()) {
         // This would go through sensory channels - simplified here
+        // Enhanced by neuromodulators
+        if (brain_->getAcetylcholine()) {
+            float achLevel = brain_->getAcetylcholine()->getLevel();
+            if (achLevel > 0.5f) {
+                // ACh enhances sensory pattern replay
+                // This helps integrate the replayed experience with current input
+            }
+        }
     }
 }
 

@@ -345,6 +345,28 @@ public:
         synapseProvider_ = provider;
     }
     
+    // Generic provider for other checkpoint sections
+    void setProvider(CheckpointSection section, 
+                     std::function<bool(const void*&, size_t&)> provider) {
+        providers_[section] = provider;
+    }
+    
+    /**
+     * Get checkpoint error message
+     */
+    const std::string& getError() const { return error_; }
+    
+    /**
+     * Get checkpoint directory
+     */
+    const std::string& getCheckpointDir() const { return checkpointDir_; }
+    
+    // Generic provider for other checkpoint sections
+    void setProvider(CheckpointSection section, 
+                     std::function<bool(const void*&, size_t&)> provider) {
+        providers_[section] = provider;
+    }
+    
     /**
      * Update checkpoint state (call each simulation step)
      */
@@ -405,6 +427,8 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::map<CheckpointSection, std::function<bool(const void*&, size_t&)>> providers_;
+    std::string error_;
 };
 
 // Checksum implementation

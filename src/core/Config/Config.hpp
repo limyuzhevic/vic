@@ -5,11 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,8 +53,12 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both INI and JSON formats, prefers JSON)
     bool loadFromFile(const std::string& filepath);
+    
+    // Internal parsing methods
+    bool loadIniFormat(std::ifstream& file);
+    bool loadJsonFormat(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
