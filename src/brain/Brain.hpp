@@ -67,7 +67,9 @@ public:
     // Main simulation step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with timestamp
+    // Using two step signatures to support different calling conventions
+    // The second signature allows more precise time control
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
@@ -75,9 +77,11 @@ public:
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
+    // Useful for targeted stimulation or testing
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
     // Inject current into all neurons of a specific type
+    // Useful for global modulation of neural populations
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access

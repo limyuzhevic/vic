@@ -41,45 +41,61 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with spike-frequency adaptation
+// Each neuron has unique identity and can be part of a larger network
 class Neuron {
 public:
-    // Create neuron with ID
+    // Create neuron with unique ID
+    // The neuron will be initialized with biologically plausible parameters:
+    // - Resting potential: -70 mV
+    // - Firing threshold: -55 mV  
+    // - Reset potential: -70 mV
+    // - Leak conductance: 10 nS
+    // - Refractory period: 2-10 ms (randomized during initialization)
     explicit Neuron(NeuronId id);
     
     ~Neuron();
     
     // Disable copying, enable moving
+    // Prevents accidental copies of neural state
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
+    // Identity management
+    // Returns the unique identifier for this neuron
     NeuronId getId() const;
     
-    // Type
+    // Type system
+    // Neurons can be sensory, motor, excitatory, inhibitory, internal, or modulatory
     NeuronType getType() const;
     void setType(NeuronType type);
     
     // State access
+    // Get current complete neuron state (copy)
     const NeuronState& getState() const;
+    // Get current complete neuron state (modifiable)
     NeuronState& getState();
     
-    // Membrane potential
+    // Membrane potential management
+    // Get current membrane potential (mV)
     MembranePotential getMembranePotential() const;
+    // Set membrane potential directly (use with caution)
     void setMembranePotential(MembranePotential potential);
+    // Add current to membrane potential (physically accurate)
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
+    // Firing state management
+    // Check if neuron is currently firing
     bool isFiring() const;
+    // Check if neuron is in refractory period
     bool isRefractory() const;
+    // Set firing state explicitly
     void setFiringState(FiringState state);
+    // Set refractory period in steps
     void setRefractoryPeriod(uint32_t steps);
+    // Decrement refractory period (called automatically during simulation)
     void decrementRefractory();
     
     // Firing rate (for rate-based computation)

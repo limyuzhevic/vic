@@ -10,98 +10,120 @@
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding for real-world interaction
+// Acts as the interface between neural processing and environmental interaction
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    // Create agent brain with neural processing core
+    // The agent brain provides the interface between neural computation and world interaction
+    explicit AgentBrain(std::shared_ptr<Brain> brain);
+    
     ~AgentBrain();
     
-    // Initialize with world
+    // Initialize agent with world model
+    // Sets up sensory neuron groups and motor command mapping based on world dimensions
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    // Sensory and motor system configuration
+    // Returns the size of sensory input vector expected by the brain
     size_t getSensoryInputSize() const;
     
-    // Get motor output size expected
+    // Returns the size of motor output vector produced by the brain
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    // Sensory processing
+    // Transforms environmental percepts into neural currents
+    // Updates working memory and novelty detection based on sensory input
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    // Motor decoding
+    // Converts neural activity patterns into actionable motor commands
+    // Applies curiosity-driven exploration when appropriate
     MotorCommand decodeMotorCommand();
     
-    // Apply neuromodulation based on reward
+    // Reward-based learning
+    // Applies reward prediction error to neural plasticity
+    // Updates dopamine levels and eligibility traces
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    // Developmental progression
+    // Advances agent's developmental stage based on simulated age
+    // Modulates plasticity rates according to developmental stage
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    // State queries
+    // Returns current developmental stage (Initial, CriticalPeriod, Maturation, Adult)
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+    // Neuromodulation state
+    // Returns current dopamine level (0.0 to 1.0 scale)
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
+    // Motivation state
+    // Returns curiosity level (0.0 to 1.0 scale)
     float getCuriosityLevel() const;
     
-    // Get novelty level
+    // Learning state
+    // Returns novelty detection level (0.0 to 1.0 scale)
     float getNoveltyLevel() const;
     
-    // Get prediction error
+    // Prediction error signal
+    // Returns the difference between expected and actual reward
     float getPredictionError() const;
     
-    // Reset agent for new episode
+    // Reset agent state for new episode
+    // Clears neuromodulation, novelty, and developmental state
     void reset();
     
-    // Get brain pointer
+    // Brain access
+    // Returns pointer to underlying brain for direct access when needed
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
-    // Configuration
+    // Subsystem configuration
+    // Enable/disable specific learning and adaptation subsystems
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Subsystem status
+    // Query whether subsystems are enabled
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+    // Neural processing core
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron group mapping
+    // Each action has a dedicated group of motor neurons
+    std::vector<Neuron*> motorForward_;    // Move forward
+    std::vector<Neuron*> motorBackward_;  // Move backward
+    std::vector<Neuron*> motorTurnLeft_;   // Rotate left
+    std::vector<Neuron*> motorTurnRight_;  // Rotate right
+    std::vector<Neuron*> motorInteract_;   // Interact with objects
+    std::vector<Neuron*> motorWait_;       // Stay still
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron group mapping
+    // Different sensory modalities use separate neuron populations
+    std::vector<Neuron*> sensoryVision_;          // Visual input (256 neurons)
+    std::vector<Neuron*> sensoryTouch_;           // Touch input (8 neurons)
+    std::vector<Neuron*> sensoryInternal_;        // Internal state (4 neurons)
+    std::vector<Neuron*> sensoryProprioception_;  // Body position (6 neurons)
     
     // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    float dopamineLevel_;      // Reward prediction error signal
+    float noveltyLevel_;       // Novelty detection
+    float curiosityLevel_;    // Exploration motivation
+    float predictionError_;   // Prediction error (reward - expected)
+    float expectedReward_;    // Running estimate of expected reward
     
     // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    double developmentalAge_;  // Simulated agent age in steps
+    float plasticityModifier_; // Modulates plasticity rates by developmental stage
     
     // Configuration flags
     bool rewardModulationEnabled_;
@@ -109,9 +131,10 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
+    // State persistence
+    // Previous vision state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    float sensoryNoveltyDecay_; // Decay rate for novelty signals
 };
 
 } // namespace nlm
