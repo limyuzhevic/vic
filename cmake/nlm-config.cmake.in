@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required packages
+find_dependency(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Create exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlmTargets.cmake")
+
+# Optional: Define package version compatibility
+check_required_components(NLM)

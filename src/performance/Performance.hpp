@@ -30,6 +30,12 @@
  *    - Thread-local neuron processing
  *    - Synchronized spike processing
  * 
+ * 6. Performance Monitoring
+ *    - Runtime metrics collection and analysis
+ *    - Profiling capabilities for bottleneck identification
+ *    - Performance alerting and visualization support
+ *    - Lightweight overhead monitoring
+ * 
  * This infrastructure is designed to scale from 10k to 100M+ neurons.
  */
 
@@ -44,6 +50,7 @@
     #define NLM_USE_SPARE_CONNECTIVITY 1
     #define NLM_USE_MULTITHREADING 1
     #define NLM_USE_SIMD 1
+    #define NLM_PERF_MON_ENABLED 1
 #else
     #define NLM_USE_MEMORY_POOL 0
     #define NLM_USE_SOA 0
@@ -51,6 +58,14 @@
     #define NLM_USE_SPARE_CONNECTIVITY 0
     #define NLM_USE_MULTITHREADING 0
     #define NLM_USE_SIMD 0
+    #define NLM_PERF_MON_ENABLED 0
+#endif
+
+// Performance monitoring configuration
+#ifdef NLM_PERF_MON_ENABLED
+    #define NLM_PERF_MON_SAMPLING_INTERVAL_MS 100
+    #define NLM_PERF_MON_PROFILE_SAMPLE_RATE 1000
+    #define NLM_PERF_MON_MAX_HISTORY_SAMPLES 10000
 #endif
 
 // SIMD configuration
@@ -75,11 +90,21 @@
 #define NLM_MEMORY_POOL_PAGE_SIZE 4096
 #define NLM_MAX_POOL_SIZE (1024 * 1024)  // Max objects per pool
 
+// Performance monitoring configuration flags
+#ifdef NLM_PERF_MON_ENABLED
+    #define NLM_USE_PERF_MON 1
+#else
+    #define NLM_USE_PERF_MON 0
+#endif
+
 namespace nlm {
 
 // Forward declarations
 class Neuron;
 class Synapse;
+class PerformanceMonitor;
+class PerformanceProfiler;
+class PerformanceAlerting;
 
 } // namespace nlm
 
