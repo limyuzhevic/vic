@@ -130,9 +130,19 @@ public:
     bool testCheckpointing();
     
     /**
-     * Test replay system
+     * Test cognitive integration
      */
-    bool testReplay();
-};
+    bool testCognitiveIntegration();
+    
+    /**
+     * Test prediction integration
+     */
+    bool testPredictionIntegration();
+    
+    /**
+     * Test development integration
+     */
+    bool testDevelopmentIntegration();
+}
 
 } // namespace nlm

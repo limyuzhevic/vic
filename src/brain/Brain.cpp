@@ -510,9 +510,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->novelty) {
+        // Predict next sensory state based on current activity
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create current sensory input pattern
+            SensoryInput currentInput;
+            currentInput.data.reserve(pImpl->sensoryNeurons.size());
+            
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                currentInput.data.push_back(std::abs(neuron->getState().membranePotential - 
+                                                    neuron->getState().restingPotential));
+            }
+            
+            // Make prediction using the prediction system
+            auto predictedNext = pImpl->predictionSystem->predictNextState(currentInput);
+            
+            // Compute prediction error and update system
+            if (predictedNext && !predictedNext->getData().empty()) {
+                // Compare predicted vs actual (using current input as "actual")
+                pImpl->predictionSystem->updatePredictions(*predictedNext, currentInput);
+            }
+            
+            // Novelty detection influences prediction learning
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.5f) {
+                // High novelty triggers stronger prediction updates
+                // (PredictionSystem doesn't have explicit strength control, 
+                // but novelty is logged and can affect downstream learning)
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +553,140 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->episodicMemory) {
+        // Form concepts from recent episodic experiences
+        // Extract neural patterns from recent episodes
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(10);
+        for (const auto* episode : recentEpisodes) {
+            // Use episode's sensory state and neuron activations for concept formation
+            // Create a combined pattern that represents the episode
+            std::vector<float> episodePattern = episode->sensoryState;
+            if (episodePattern.empty() && !pImpl->sensoryNeurons.empty()) {
+                // Fall back to current sensory neuron activity if no episode state
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    episodePattern.push_back(std::abs(neuron->getState().membranePotential - 
+                                                     neuron->getState().restingPotential));
+                }
+            }
+            
+            if (!episodePattern.empty()) {
+                // Use neuron activations as features for concept formation
+                std::vector<float> features = episode->neuronActivations;
+                
+                // Present the experience to concept formation system
+                pImpl->conceptFormation->presentExperience(episodePattern, 
+                                                           features,
+                                                           episode->reward,
+                                                           episode->timestamp);
+            }
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner for action selection ==========
+    if (pImpl->planner && pImpl->workingMemory && pImpl->episodicMemory) {
+        // Plan next action based on current working memory and episodic context
+        std::vector<float> currentState;
+        
+        // Get current sensory activity pattern
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                currentState.push_back(std::abs(neuron->getState().membranePotential - 
+                                               neuron->getState().restingPotential));
+            }
+        }
+        
+        // Get recent episode summary for context
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        std::vector<float> contextPattern;
+        for (const auto* episode : recentEpisodes) {
+            if (!episode->sensoryState.empty()) {
+                contextPattern.insert(contextPattern.end(), 
+                                     episode->sensoryState.begin(), 
+                                     episode->sensoryState.end());
+            }
+        }
+        
+        // Combine state and context for planning
+        std::vector<float> planningState = currentState;
+        if (!contextPattern.empty()) {
+            // Simple concatenation for now
+            planningState.insert(planningState.end(), 
+                               contextPattern.begin(), 
+                               contextPattern.end());
+        }
+        
+        // Plan action (target reward can be adjusted based on episodic memory average)
+        float targetReward = pImpl->episodicMemory->getAverageReward();
+        ActionType plannedAction = pImpl->planner->planAction(planningState, targetReward);
+        
+        // Store planned action in working memory for execution
+        pImpl->workingMemory->store(std::vector<float>(1, static_cast<float>(plannedAction)), 1.5f);
+    }
+    
+    // ========== STEP 12: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->novelty) {
+        // Predict next sensory state based on current activity
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create current sensory input pattern
+            SensoryInput currentInput;
+            currentInput.data.reserve(pImpl->sensoryNeurons.size());
+            
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                currentInput.data.push_back(std::abs(neuron->getState().membranePotential - 
+                                                    neuron->getState().restingPotential));
+            }
+            
+            // Make prediction using the prediction system
+            auto predictedNext = pImpl->predictionSystem->predictNextState(currentInput);
+            
+            // Compute prediction error and update system
+            if (predictedNext && !predictedNext->getData().empty()) {
+                // Compare predicted vs actual (using current input as "actual")
+                pImpl->predictionSystem->updatePredictions(*predictedNext, currentInput);
+            }
+            
+            // Novelty detection influences prediction learning
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.5f) {
+                // High novelty triggers stronger prediction updates
+                // (PredictionSystem doesn't have explicit strength control, 
+                // but novelty is logged and can affect downstream learning)
+            }
+        }
+    }
+    
+    // ========== STEP 13: Update development system ==========
+    if (pImpl->developmentSystem && currentStep % 500 == 0) {  // More frequent than just structural plasticity
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 500);
+        
+        // Apply development effects on cognitive systems
+        if (pImpl->planner) {
+            // Planning becomes more sophisticated with development
+            pImpl->planner->setPlanningDepth(std::min(pImpl->planner->getPlanningDepth() + 1, 10));
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Concept formation becomes more abstract with development
+            pImpl->conceptFormation->setFormationThreshold(std::max(0.5f, pImpl->conceptFormation->getFormationThreshold() - 0.05f));
+        }
+        
+        if (pImpl->attention) {
+            // Attention becomes more selective with development
+            pImpl->attention->setInhibitionStrength(0.6f);
+        }
+    }
+    
+    // ========== STEP 14: Novelty-based learning ==========
+    if (pImpl->novelty) {
+        // Update novelty detection based on recent sensory changes
+        pImpl->novelty->update(pImpl->timestep);
+        
+        // Use novelty to enhance working memory traces
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.3f) {
+            // Novel experiences are strongly encoded in working memory
+            pImpl->workingMemory->strengthenMemory(1.5f + noveltyLevel * 0.5f);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -544,42 +701,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
     }
     
     // ========== STEP 15: Checkpoint management ==========

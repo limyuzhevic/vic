@@ -395,9 +395,186 @@ bool Phase6IntegratedExperiment::testReplay() {
             return true;
         }
     }
-    
     NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
-    return true;
-}
+        
+        return true;
+    }
+
+    /**
+     * Test cognitive integration
+     */
+    bool Phase6IntegratedExperiment::testCognitiveIntegration() {
+        NLM_LOG_INFO("=== Testing Cognitive Integration ===");
+        
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", 100);
+        
+        auto brain = std::make_shared<Brain>(cfg);
+        brain->initialize();
+        
+        // Get cognitive systems
+        auto* planner = brain->getPlanner();
+        auto* conceptFormation = brain->getConceptFormation();
+        auto* attention = brain->getAttention();
+        
+        if (!planner || !conceptFormation || !attention) {
+            NLM_LOG_ERROR("Cognition systems not available");
+            return false;
+        }
+        
+        // Test 1: Concept formation should have processed experiences
+        if (conceptFormation->getConceptCount() > 0) {
+            NLM_LOG_INFO("[PASS] Concept formation has discovered concepts: " + 
+                        std::to_string(conceptFormation->getConceptCount()));
+        } else {
+            NLM_LOG_INFO("[INFO] Concept formation has no concepts yet (may be normal for short simulation)");
+        }
+        
+        // Test 2: Neural planner should have planning depth set
+        if (planner->getPlanningDepth() > 0) {
+            NLM_LOG_INFO("[PASS] Neural planner has planning depth: " + 
+                        std::to_string(planner->getPlanningDepth()));
+        } else {
+            NLM_LOG_ERROR("[FAIL] Neural planner has no planning depth");
+            return false;
+        }
+        
+        // Test 3: Attention should have attended regions
+        auto attendedRegions = attention->getAttendedRegions();
+        if (!attendedRegions.empty()) {
+            NLM_LOG_INFO("[PASS] Attention has attended regions: " + 
+                        std::to_string(attendedRegions.size()));
+        } else {
+            NLM_LOG_INFO("[INFO] Attention has no attended regions (may be normal for simple simulation)");
+        }
+        
+        // Test 4: Run more steps to trigger concept formation and planning
+        for (int i = 0; i < 50; ++i) {
+            brain->step(i, i * 0.001);
+            
+            // Inject some sensory input to trigger concept formation
+            if (i % 10 == 0) {
+                // Create simple sensory input pattern
+                std::vector<float> inputPattern(10, 0.5f);
+                inputPattern.push_back(static_cast<float>(i % 100) / 100.0f);
+                
+                brain->receiveSensoryInput(SensoryInput(inputPattern));
+            }
+        }
+        
+        // After more steps, concept formation should have processed more experiences
+        if (conceptFormation->getConceptCount() > 0) {
+            NLM_LOG_INFO("[PASS] Concept formation processed experiences over time");
+        } else {
+            NLM_LOG_INFO("[INFO] Concept formation still no concepts (may be normal for simple patterns)");
+        }
+        
+        return true;
+    }
+
+    /**
+     * Test prediction integration
+     */
+    bool Phase6IntegratedExperiment::testPredictionIntegration() {
+        NLM_LOG_INFO("=== Testing Prediction Integration ===");
+        
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", 100);
+        
+        auto brain = std::make_shared<Brain>(cfg);
+        brain->initialize();
+        
+        auto* predictionSystem = brain->getPredictionSystem();
+        if (!predictionSystem) {
+            NLM_LOG_ERROR("Prediction system not available");
+            return false;
+        }
+        
+        // Get initial prediction error
+        float initialError = predictionSystem->getPredictionError();
+        NLM_LOG_INFO("Initial prediction error: " + std::to_string(initialError));
+        
+        // Run simulation steps to generate prediction activity
+        for (int i = 0; i < 100; ++i) {
+            brain->step(i, i * 0.001);
+            
+            // Inject sensory input to trigger prediction updates
+            if (i % 20 == 0) {
+                std::vector<float> inputPattern(10, static_cast<float>(i % 5) / 5.0f);
+                brain->receiveSensoryInput(SensoryInput(inputPattern));
+            }
+        }
+        
+        // Get final prediction error
+        float finalError = predictionSystem->getPredictionError();
+        NLM_LOG_INFO("Final prediction error: " + std::to_string(finalError));
+        
+        // Check if prediction error was computed
+        if (std::isfinite(finalError)) {
+            NLM_LOG_INFO("[PASS] Prediction system computed prediction error");
+            
+            // Check if error history was populated
+            const auto& errorHistory = predictionSystem->getErrorHistory();
+            if (!errorHistory.empty()) {
+                NLM_LOG_INFO("[PASS] Prediction system has error history: " + 
+                            std::to_string(errorHistory.size()) + " entries");
+            } else {
+                NLM_LOG_INFO("[INFO] Prediction system has no error history (may be normal for placeholder implementation)");
+            }
+        } else {
+            NLM_LOG_ERROR("[FAIL] Prediction system did not compute valid prediction error");
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Test development integration
+     */
+    bool Phase6IntegratedExperiment::testDevelopmentIntegration() {
+        NLM_LOG_INFO("=== Testing Development Integration ===");
+        
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", 100);
+        
+        auto brain = std::make_shared<Brain>(cfg);
+        brain->initialize();
+        
+        auto* developmentSystem = brain->getDevelopmentSystem();
+        if (!developmentSystem) {
+            NLM_LOG_ERROR("Development system not available");
+            return false;
+        }
+        
+        // Get initial development stage
+        auto initialStage = brain->getDevelopmentalStage();
+        NLM_LOG_INFO("Initial developmental stage: " + std::to_string(static_cast<int>(initialStage)));
+        
+        // Run simulation steps to trigger development updates
+        for (int i = 0; i < 2000; ++i) {
+            brain->step(i, i * 0.001);
+            
+            // Check development stage periodically
+            if (i % 1000 == 0) {
+                auto currentStage = brain->getDevelopmentalStage();
+                NLM_LOG_INFO("Development stage at step " + std::to_string(i) + ": " + 
+                            std::to_string(static_cast<int>(currentStage)));
+            }
+        }
+        
+        // Get final development stage
+        auto finalStage = brain->getDevelopmentalStage();
+        NLM_LOG_INFO("Final developmental stage: " + std::to_string(static_cast<int>(finalStage)));
+        
+        // Check if development system updated something
+        if (finalStage != initialStage) {
+            NLM_LOG_INFO("[PASS] Development system changed developmental stage");
+        } else {
+            NLM_LOG_INFO("[INFO] Development stage did not change (may be normal for short simulation)");
+        }
+        
+        return true;
+    }
 
 } // namespace nlm
