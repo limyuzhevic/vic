@@ -5,6 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <stdexcept>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
 
 namespace nlm {
 
@@ -20,7 +27,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<bool>
 >;
 
 // Configuration source
@@ -28,78 +36,69 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
 };
 
-// Configuration entry
+// Configuration validation rules
+struct ValidationRule {
+    std::string errorMessage;
+    std::function<bool(const ConfigValue&)> validator;
+    
+    ValidationRule(const std::string& msg, std::function<bool(const ConfigValue&)> func)
+        : errorMessage(msg), validator(func) {}
+    
+    bool validate(const ConfigValue& value) const {
+        return validator(value);
+    }
+};
+
+// Configuration metadata
+struct ConfigMetadata {
+    std::string description;
+    std::vector<ValidationRule> validationRules;
+    ConfigSource defaultSource;
+    bool required;
+    
+    ConfigMetadata(const std::string& desc = "") 
+        : description(desc), defaultSource(ConfigSource::Default), required(false) {}
+    
+    void addValidation(const std::string& errorMsg, std::function<bool(const ConfigValue&)> validator) {
+        validationRules.emplace_back(errorMsg, validator);
+    }
+    
+    bool validate(const ConfigValue& value) const {
+        for (const auto& rule : validationRules) {
+            if (!rule.validate(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    std::string getError(const ConfigValue& value) const {
+        for (const auto& rule : validationRules) {
+            if (!rule.validate(value)) {
+                return rule.errorMessage;
+            }
+        }
+        return "";
+    }
+};
+
+// Configuration entry with metadata
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
-    std::string description;
+    ConfigMetadata metadata;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), metadata() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", ConfigSource defaultSrc = ConfigSource::Default)
+        : key(k), value(v), source(s), metadata(desc, defaultSrc) {}
+    
+    bool validate() const {
+        return metadata.validate(value);
+    }
 };
-
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
