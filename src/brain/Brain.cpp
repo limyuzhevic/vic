@@ -417,6 +417,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
+    // Update prediction error signal
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+    }
+    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -425,14 +430,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Apply combined neuromodulation effects (dopamine + curiosity + novelty)
+        float totalModulation = 1.0f;
+        
+        // Dopamine enhances plasticity and excites neurons
+        if (dopamineLevel > 0.5f) {
+            totalModulation *= (1.0f + dopamineLevel * 0.5f);
+        }
+        
+        // Neuromodulation affects working memory competition strength
+        if (pImpl->workingMemory) {
+            // Higher neuromodulation strengthens memory competition
+            pImpl->workingMemory->strengthenMemory(totalModulation);
+        }
+        
+        // Apply neuromodulation effects on neural excitability
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    float excitabilityMod = dopamineLevel * 0.5f * totalModulation;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
+                    }
+                    
+                    // Neuromodulation affects spike threshold
+                    if (dopamineLevel > 0.0f) {
+                        // Dopamine lowers spike threshold (makes neurons more excitable)
+                        float originalThreshold = neuron->getState().threshold;
+                        neuron->setThreshold(originalThreshold * (1.0f - dopamineLevel * 0.3f));
+                    }
+                }
+            }
+        }
+        
+        // Neuromodulation affects plasticity strength
+        // The dopamine system should influence the plasticity modulator used in step 6
+        float neuromodulationPlasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        // This will be used in step 6 for more sophisticated plasticity control
+    }
+    
+    // Apply curiosity-based exploration motivation
+    if (pImpl->curiosity && pImpl->curiosity->getLevel() > 0.5f) {
+        // High curiosity encourages exploration by increasing neural variability
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Add small random current for exploration
+                    if (pImpl->rng) {
+                        float explorationNoise = pImpl->rng->uniform(-0.5f, 0.5f);
+                        neuron->injectCurrent(explorationNoise * pImpl->curiosity->getLevel());
                     }
                 }
             }
@@ -442,38 +491,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
-    }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+    // First, try to get the neuromodulationPlasticityFactor from neuromodulation step
+    // (In a real implementation, we would pass this through a shared state)
+    if (pImpl->dopamine) {
+        // Get plasticity factor from dopamine system
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        
+        // Apply neuromodulation to STDP parameters
+        // Dopamine modulates STDP learning rates
+        float stdpModulation = 1.0f + (plasticityMod - 1.0f) * 0.5f; // Scale modulation
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stddp) {
+                    // Apply dopamine modulation to STDP
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        // Update STDP with neuromodulation
+                        pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                        
+                        // Apply dopamine-based weight modulation
+                        float weight = syn->getWeight();
+                        float dopamineInfluence = (plasticityMod - 1.0f) * 0.001f; // Scale effect
+                        weight += (weight > 0 ? 1.0f : -1.0f) * dopamineInfluence;
+                        syn->setWeight(weight);
+                    }
+                }
+            }
+        }
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Apply Hebbian learning with neuromodulation
+                if (syn->getPlasticityFlags().hebbian) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
+                    
+                    // Apply dopamine modulation to Hebbian learning
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight *= plasticityMod; // Scale Hebbian effects
                     syn->setWeight(weight);
                 }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
                 
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
+                // Update synapse state
+                syn->step(currentTime);
             }
-            
-            // Update synapse state
-            syn->step(currentTime);
         }
     }
     
@@ -511,8 +580,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get recent sensory input for prediction
+        // (In a real implementation, this would get actual sensory observations)
+        // For now, we'll use the working memory content as a simplified prediction
+        auto workingMemoryContent = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        // Create a simple prediction based on working memory
+        std::unique_ptr<SensoryInput> predictedInput;
+        if (!workingMemoryContent.empty()) {
+            // Create predicted sensory input based on working memory content
+            auto predictedData = workingMemoryContent;
+            predictedInput = std::make_unique<SensoryInput>(predictedData);
+            
+            // Get current sensory input (would need to track this in a real implementation)
+            // For now, we'll just use a placeholder
+            const std::vector<float> currentData = {0.0f}; // Placeholder
+            auto currentInput = std::make_unique<SensoryInput>(currentData);
+            
+            // Update prediction with error
+            pImpl->predictionSystem->updatePredictions(*predictedInput, *currentInput);
+            
+            // Train the prediction system
+            pImpl->predictionSystem->train(*currentInput);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -609,9 +699,23 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store in working memory (all sensory input for better learning)
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Also add to episodic memory for experience storage
+        if (pImpl->episodicMemory) {
+            // Create episodic memory item for this sensory input
+            EpisodicMemoryItem episode;
+            episode.timestamp = pImpl->currentStep;
+            episode.sensoryState.push_back(normalizedValue / 10.0f); // Store normalized value
+            episode.reward = (normalizedValue > 0.0f) ? normalizedValue : 0.0f;
+            episode.action = ActionType::Wait; // No action taken yet
+            episode.activeNeurons.push_back(pImpl->sensoryNeurons[i]->getId());
+            episode.neuronActivations.push_back(std::abs(normalizedValue / 10.0f));
+            
+            pImpl->episodicMemory->storeEpisode(episode);
         }
     }
 }

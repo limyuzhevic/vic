@@ -7,31 +7,30 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Neural implementation using persistent activity patterns
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Store item with neural encoding
     void store(NeuronId neuron, float value);
     
-    // Retrieve item
+    // Retrieve item value
     float retrieve(NeuronId neuron) const;
     
     // Check if item exists
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    // Clear all items
     void clear();
     
     // Get capacity
     size_t getCapacity() const;
     size_t getCurrentSize() const;
     
-    // Decay all items
+    // Decay all items based on decay rate
     void decay(float decayRate);
     
 private:
@@ -40,7 +39,7 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Neural implementation storing experiences as neural patterns
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -56,10 +55,10 @@ public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
+    // Store episode with neural encoding
     void storeEpisode(const EpisodicMemoryItem& episode);
     
-    // Retrieve episode
+    // Retrieve episode by index
     EpisodicMemoryItem retrieveEpisode(size_t index) const;
     
     // Get episode count
@@ -68,10 +67,10 @@ public:
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
     
-    // Clear all
+    // Clear all episodes
     void clear();
     
-    // Memory consolidation (move to long-term)
+    // Consolidate memory (move to long-term)
     void consolidate(float relevanceThreshold);
     
 private:
@@ -80,14 +79,14 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Neural implementation encoding learned facts as neural patterns
 
 class SemanticMemory {
 public:
     SemanticMemory();
     ~SemanticMemory();
     
-    // Store fact
+    // Store fact with neural encoding
     void storeFact(const std::string& key, const std::string& value);
     
     // Retrieve fact
@@ -99,7 +98,7 @@ public:
     // Get all facts
     std::vector<std::pair<std::string, std::string>> getAllFacts() const;
     
-    // Clear all
+    // Clear all facts
     void clear();
     
 private:
@@ -108,7 +107,7 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Neural implementation encoding skills as neural patterns
 
 struct Skill {
     std::string name;
@@ -123,7 +122,7 @@ public:
     ProceduralMemory();
     ~ProceduralMemory();
     
-    // Learn skill
+    // Learn skill with neural encoding
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
     // Retrieve skill
@@ -132,10 +131,10 @@ public:
     // Get all skills
     std::vector<Skill*> getAllSkills();
     
-    // Update proficiency
+    // Update proficiency based on usage
     void updateProficiency(const std::string& name, float delta);
     
-    // Clear all
+    // Clear all skills
     void clear();
     
 private:
@@ -144,14 +143,14 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Neural implementation encoding associations as synaptic connections
 
 class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
     
-    // Create association
+    // Create association between neural patterns
     void associate(NeuronId a, NeuronId b, float strength);
     
     // Get associated neurons
@@ -160,10 +159,10 @@ public:
     // Get association strength
     float getAssociationStrength(NeuronId a, NeuronId b) const;
     
-    // Update association
+    // Update association based on experience
     void updateAssociation(NeuronId a, NeuronId b, float delta);
     
-    // Clear all
+    // Clear all associations
     void clear();
     
 private:

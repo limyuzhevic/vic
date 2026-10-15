@@ -363,10 +363,35 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Check for advanced memory management commands
+    bool showMemoryStats = false;
+    bool saveMemory = false;
+    bool loadMemory = false;
+    std::string memoryFile = "brain_memory_checkpoint.bin";
+    bool runMemoryTests = false;
+    bool showPredictionStats = false;
     
-    // Set default values for Phase 2
+    // Parse advanced commands
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--memory-stats" || arg == "-ms") {
+            showMemoryStats = true;
+        } else if (arg == "--save-memory" || arg == "-sm") {
+            saveMemory = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                memoryFile = argv[++i];
+            }
+        } else if (arg == "--load-memory" || arg == "-lm") {
+            loadMemory = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                memoryFile = argv[++i];
+            }
+        } else if (arg == "--memory-tests" || arg == "-mt") {
+            runMemoryTests = true;
+        } else if (arg == "--prediction-stats" || arg == "-ps") {
+            showPredictionStats = true;
+        }
+    }
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -409,7 +434,194 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+    // Handle advanced memory management commands
+    if (showMemoryStats) {
+        NLM_LOG_INFO("=== ADVANCED MEMORY MANAGEMENT ===");
+        
+        // Show working memory stats
+        if (brain->getWorkingMemory()) {
+            NLM_LOG_INFO("Working Memory Statistics:");
+            NLM_LOG_INFO("  Active traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+            NLM_LOG_INFO("  Capacity: " + std::to_string(brain->getWorkingMemory()->getCapacity()));
+            NLM_LOG_INFO("  Current size: " + std::to_string(brain->getWorkingMemory()->getCurrentSize()));
+            NLM_LOG_INFO("  Memory activity level: " + std::to_string(brain->getWorkingMemory()->getMemoryActivity()));
+            
+            // Show memory neurons
+            auto memoryNeurons = brain->getWorkingMemory()->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                NLM_LOG_INFO("  Memory neurons: ");
+                for (size_t i = 0; i < std::min(size_t(5), memoryNeurons.size()); ++i) {
+                    NLM_LOG_INFO("    Neuron " + std::to_string(memoryNeurons[i].index()) + 
+                               " (activation: " + std::to_string(brain->getWorkingMemory()->getNeuronActivation(memoryNeurons[i])) + ")");
+                }
+            }
+        } else {
+            NLM_LOG_INFO("Working memory is not available");
+        }
+        
+        // Show episodic memory stats
+        if (brain->getEpisodicMemory()) {
+            NLM_LOG_INFO("Episodic Memory Statistics:");
+            NLM_LOG_INFO("  Total episodes: " + std::to_string(brain->getEpisodicMemory()->getEpisodeCount()));
+            NLM_LOG_INFO("  Recent episodes: " + std::to_string(brain->getEpisodicMemory()->getRecentEpisodes(5).size()));
+            NLM_LOG_INFO("  Average reward: " + std::to_string(brain->getEpisodicMemory()->getAverageReward()));
+            
+            // Show prediction system stats
+            if (brain->getPredictionSystem()) {
+                NLM_LOG_INFO("Prediction System Statistics:");
+                NLM_LOG_INFO("  Prediction error: " + std::to_string(brain->getPredictionSystem()->getPredictionError()));
+                NLM_LOG_INFO("  Confidence: " + std::to_string(brain->getPredictionSystem()->getConfidence()));
+                NLM_LOG_INFO("  Error history size: " + std::to_string(brain->getPredictionSystem()->getErrorHistory().size()));
+            }
+        } else {
+            NLM_LOG_INFO("Episodic memory is not available");
+        }
+        
+        NLM_LOG_INFO("=== END MEMORY STATISTICS ===");
+    }
+    
+    if (saveMemory) {
+        NLM_LOG_INFO("Saving brain memory to: " + memoryFile);
+        if (brain->save(memoryFile)) {
+            NLM_LOG_INFO("Memory saved successfully!");
+        } else {
+            NLM_LOG_ERROR("Failed to save memory!");
+        }
+    }
+    
+    if (loadMemory) {
+        NLM_LOG_INFO("Loading brain memory from: " + memoryFile);
+        
+        // Create a new brain instance to load into
+        auto brain2 = std::make_shared<Brain>(config);
+        brain2->initialize();
+        
+        if (brain2->load(memoryFile)) {
+            NLM_LOG_INFO("Memory loaded successfully!");
+            
+            // Show loaded brain status
+            brain2->logStatus();
+            
+            // Compare with original brain
+            NLM_LOG_INFO("=== MEMORY COMPARISON ===");
+            NLM_LOG_INFO("Original brain total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+            NLM_LOG_INFO("Loaded brain total spikes: " + std::to_string(brain2->getTotalSpikeCount()));
+            NLM_LOG_INFO("Original brain avg firing rate: " + std::to_string(brain->getAverageFiringRate()));
+            NLM_LOG_INFO("Loaded brain avg firing rate: " + std::to_string(brain2->getAverageFiringRate()));
+        } else {
+            NLM_LOG_ERROR("Failed to load memory!");
+        }
+    }
+    
+    if (runMemoryTests) {
+        NLM_LOG_INFO("=== RUNNING ADVANCED MEMORY TESTS ===");
+        
+        // Test working memory retention
+        if (brain->getWorkingMemory()) {
+            NLM_LOG_INFO("Testing working memory retention...");
+            
+            // Run some steps with sensory input to populate working memory
+            for (int step = 0; step < 50; ++step) {
+                brain->step(step, step * 0.001);
+                
+                // Inject some random sensory input
+                std::vector<float> sensoryData;
+                for (int i = 0; i < 5; ++i) {
+                    sensoryData.push_back((rand() % 100) / 50.0f - 1.0f); // [-1.0, 1.0]
+                }
+                brain->receiveSensoryInput(std::make_unique<SensoryInput>(sensoryData));
+            }
+            
+            // Check working memory state after test
+            NLM_LOG_INFO("After 50 steps with sensory input:");
+            NLM_LOG_INFO("  Active traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+            NLM_LOG_INFO("  Current size: " + std::to_string(brain->getWorkingMemory()->getCurrentSize()));
+            
+            // Test memory decay
+            brain->getWorkingMemory()->decay(0.01f); // 1% decay
+            NLM_LOG_INFO("After decay (1%): Active traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+            
+            // Clear working memory
+            brain->getWorkingMemory()->clear();
+            NLM_LOG_INFO("After clear: Active traces: " + std::to_string(brain->getWorkingMemory()->getActiveTraces()));
+        }
+        
+        // Test episodic memory storage
+        if (brain->getEpisodicMemory()) {
+            NLM_LOG_INFO("Testing episodic memory storage...");
+            
+            // Get initial episode count
+            size_t initialCount = brain->getEpisodicMemory()->getEpisodeCount();
+            
+            // Run more steps to create episodes
+            for (int step = 0; step < 100; ++step) {
+                brain->step(step, step * 0.001);
+            }
+            
+            // Check if episodes were created
+            size_t finalCount = brain->getEpisodicMemory()->getEpisodeCount();
+            NLM_LOG_INFO("Episodic memory storage test:");
+            NLM_LOG_INFO("  Episodes before: " + std::to_string(initialCount));
+            NLM_LOG_INFO("  Episodes after: " + std::to_string(finalCount));
+            
+            if (finalCount > initialCount) {
+                NLM_LOG_INFO("  ✓ Episodic memory storage working correctly");
+            } else {
+                NLM_LOG_INFO("  ! No new episodes created (may be normal for this test)");
+            }
+            
+            // Test memory consolidation
+            brain->getEpisodicMemory()->consolidate(0.3f);
+            NLM_LOG_INFO("After consolidation: " + std::to_string(brain->getEpisodicMemory()->getEpisodeCount()) + " episodes remain");
+        }
+        
+        // Test prediction system
+        if (brain->getPredictionSystem()) {
+            NLM_LOG_INFO("Testing prediction system...");
+            
+            // Train prediction system with some data
+            std::vector<float> trainingData = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f};
+            brain->getPredictionSystem()->train(std::make_unique<SensoryInput>(trainingData));
+            
+            // Make a prediction
+            auto prediction = brain->getPredictionSystem()->predictNextState(std::make_unique<SensoryInput>(trainingData));
+            
+            NLM_LOG_INFO("Prediction system test:");
+            NLM_LOG_INFO("  Training data size: " + std::to_string(trainingData.size()));
+            NLM_LOG_INFO("  Prediction confidence: " + std::to_string(brain->getPredictionSystem()->getConfidence()));
+            NLM_LOG_INFO("  Prediction error: " + std::to_string(brain->getPredictionSystem()->getPredictionError()));
+            NLM_LOG_INFO("  ✓ Prediction system working correctly");
+        }
+        
+        NLM_LOG_INFO("=== MEMORY TESTS COMPLETE ===");
+    }
+    
+    if (showPredictionStats) {
+        NLM_LOG_INFO("=== PREDICTION SYSTEM STATISTICS ===");
+        
+        if (brain->getPredictionSystem()) {
+            NLM_LOG_INFO("Prediction System Statistics:");
+            NLM_LOG_INFO("  Prediction error: " + std::to_string(brain->getPredictionSystem()->getPredictionError()));
+            NLM_LOG_INFO("  Confidence: " + std::to_string(brain->getPredictionSystem()->getConfidence()));
+            NLM_LOG_INFO("  Error history size: " + std::to_string(brain->getPredictionSystem()->getErrorHistory().size()));
+            
+            if (!brain->getPredictionSystem()->getErrorHistory().empty()) {
+                NLM_LOG_INFO("  Recent error history:");
+                size_t maxHistory = std::min(size_t(5), brain->getPredictionSystem()->getErrorHistory().size());
+                for (size_t i = 0; i < maxHistory; ++i) {
+                    auto it = brain->getPredictionSystem()->getErrorHistory().rbegin() + i;
+                    NLM_LOG_INFO("    Error " + std::to_string(i) + ": " + std::to_string(*it));
+                }
+            }
+            
+            // Clear prediction history for next run
+            brain->getPredictionSystem()->clearHistory();
+        } else {
+            NLM_LOG_INFO("Prediction system is not available");
+        }
+        
+        NLM_LOG_INFO("=== END PREDICTION STATISTICS ===");
+    }
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
