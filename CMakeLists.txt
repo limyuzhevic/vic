@@ -1,3 +1,7 @@
+# NLM (熙然) - Neural Learning Machine
+# Phase 2: Real Neural Computation
+# Modular Build System
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -121,11 +125,29 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Modular components
+
+# CLI (Command Line Interface)
+add_library(nlm_cli STATIC
+    src/cli/CLI.cpp
+)
+target_include_directories(nlm_cli PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+# Statistics Export
+add_library(nlm_statistics STATIC
+    src/statistics/Statistics.cpp
+)
+target_include_directories(nlm_statistics PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+# Main executable with modular design
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli nlm_statistics)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -142,6 +164,9 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Python bindings
+add_subdirectory(python)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
