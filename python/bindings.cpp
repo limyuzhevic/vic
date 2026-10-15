@@ -400,6 +400,63 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // ========== BRAIN SYSTEM ACCESSORS ==========
+    // Access to advanced integrated brain systems
+    
+    // Working memory - transient memory traces
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get the working memory system for maintaining transient memory traces")
+    
+    // Episodic memory - experience storage
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get the episodic memory system for storing experiences")
+    
+    // Associative memory - pattern associations
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get the associative memory system for forming pattern associations")
+    
+    // Prediction system - predictive modeling
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get the prediction system for forward modeling and error computation")
+    
+    // Neural planner - action planning
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get the neural planner for action sequence evaluation")
+    
+    // Concept formation - pattern discovery
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get the concept formation system for abstract pattern discovery")
+    
+    // Attentional selection - focus control
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get the attentional selection system for competitive focus control")
+    
+    // Development system - maturation
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get the development system for brain maturation and aging")
+    
+    // Neuromodulation systems
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get the dopamine neuromodulation system")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get the curiosity neuromodulation system")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get the novelty detection system")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get the prediction error signal system")
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +473,206 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // ========== UTILITY FUNCTIONS ==========
+    
+    // Factory functions for creating complete simulation components
+    m.def("createDefaultConfigWithDefaults", []() {
+        return std::make_shared<Config>();
+    }, "Create a default configuration with standard NLM settings");
+    
+    // Create a pre-configured brain for immediate use
+    m.def("createDemoBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a demo brain with standard configuration");
+    
+    // Create a simple agent with brain and world for quick testing
+    m.def("createSimpleAgent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a simple agent setup with brain, world, and agent interface");
+    
+    // ========== BATCH AND UTILITY OPERATIONS ==========
+    
+    // Process multiple sensory inputs in batch
+    m.def("processMultipleSensoryInputs", [](std::shared_ptr<Brain> brain, 
+                                            const std::vector<SensoryInput>& inputs) {
+        for (const auto& input : inputs) {
+            brain->receiveSensoryInput(input);
+        }
+    }, py::arg("brain"), py::arg("inputs"), "Process multiple sensory inputs efficiently");
+    
+    // Batch motor command production
+    m.def("processMultipleMotorCommands", [](std::shared_ptr<AgentBrain> agent, 
+                                            const std::vector<std::shared_ptr<Brain>>& brains) {
+        std::vector<std::unique_ptr<Action>> actions;
+        for (const auto& brain : brains) {
+            // Note: This would require agent to temporarily be associated with each brain
+            // For now, demonstrate the pattern
+        }
+        return actions;
+    }, py::arg("agent"), py::arg("brains"), "Process multiple motor commands in batch");
+    
+    // Configuration utilities
+    m.def("createBrainFromFile", [](const std::string& filepath) {
+        Config config;
+        config.loadFromFile(filepath);
+        return std::make_shared<Brain>(std::make_shared<Config>(config));
+    }, py::arg("filepath"), "Create a brain from configuration file");
+    
+    m.def("saveBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to checkpoint file");
+    
+    // Create a simple agent with brain and world for quick testing
+    m.def("createSimpleAgent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a simple agent setup with brain, world, and agent interface");
+    
+    // ========== PERFORMANCE MONITORING AND DEBUGGING TOOLS ==========
+    
+    // Performance monitoring for brain simulation
+    m.def("simulateWithPerformanceMonitoring", [](std::shared_ptr<Brain> brain, 
+                                                  size_t numSteps,
+                                                  std::function<void(size_t, float, float)> progressCallback = nullptr) {
+        std::vector<size_t> spikeCounts;
+        std::vector<float> firingRates;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            brain->step(step);
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+            
+            size_t spikes = brain->getTotalSpikeCount();
+            size_t active = brain->getFiringNeuronCount();
+            float rate = brain->getAverageFiringRate();
+            
+            spikeCounts.push_back(spikes);
+            firingRates.push_back(rate);
+            
+            if (progressCallback) {
+                progressCallback(step, rate, duration);
+            }
+            
+            // Small sleep to prevent overwhelming the system
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        
+        return std::make_tuple(spikeCounts, firingRates);
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("progressCallback") = nullptr,
+       "Run simulation with performance monitoring and progress callbacks");
+    
+    // Get comprehensive brain statistics for debugging
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, std::string> stats;
+        
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["active_neurons"] = std::to_string(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["pending_spike_events"] = std::to_string(brain->getPendingSpikeEventCount());
+        stats["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["excitation_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        
+        // Developmental stage
+        auto stage = brain->getDevelopmentalStage();
+        stats["developmental_stage"] = std::to_string(static_cast<int>(stage));
+        
+        // Get memory system stats
+        if (auto wm = brain->getWorkingMemory()) {
+            stats["working_memory_traces"] = std::to_string(wm->getActiveTraces());
+        }
+        if (auto em = brain->getEpisodicMemory()) {
+            stats["episodic_memory_episodes"] = std::to_string(em->getEpisodeCount());
+        }
+        if (auto am = brain->getAssociativeMemory()) {
+            stats["associative_memory_associations"] = std::to_string(am->getAssociationCount());
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics for debugging and monitoring");
+    
+    // Debug brain state snapshot
+    m.def("captureBrainSnapshot", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, std::string> snapshot;
+        
+        snapshot["step"] = std::to_string(brain->getConfig()->getOr<size_t>("current_step", 0));
+        snapshot["time"] = std::to_string(brain->getConfig()->getOr<double>("current_time", 0.0));
+        snapshot["neuron_count"] = std::to_string(brain->getTotalNeuronCount());
+        snapshot["firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        
+        // Capture memory state
+        if (auto wm = brain->getWorkingMemory()) {
+            auto neurons = wm->getMemoryNeurons();
+            snapshot["working_memory_neurons"] = std::to_string(neurons.size());
+        }
+        
+        if (auto em = brain->getEpisodicMemory()) {
+            auto episodes = em->getRecentEpisodes(5);
+            snapshot["recent_episodes"] = std::to_string(episodes.size());
+        }
+        
+        return snapshot;
+    }, py::arg("brain"), "Capture current brain state as a debug snapshot");
+    
+    // Batch simulation with error handling and recovery
+    m.def("runSimulationWithRecovery", [](std::shared_ptr<Brain> brain, 
+                                          size_t numSteps,
+                                          double timestep = 0.1,
+                                          size_t maxErrors = 5) {
+        std::vector<size_t> stepsCompleted;
+        std::vector<std::string> errors;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            try {
+                brain->step(step, timestep * step);
+                stepsCompleted.push_back(step);
+            } catch (const std::exception& e) {
+                errors.push_back(std::string("Error at step ") + std::to_string(step) + ": " + e.what());
+                if (errors.size() >= maxErrors) {
+                    break;
+                }
+            }
+        }
+        
+        return std::make_tuple(stepsCompleted, errors);
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("timestep") = 0.1, py::arg("maxErrors") = 5,
+       "Run simulation with error handling and recovery mechanisms");

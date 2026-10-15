@@ -36,22 +36,34 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
+    // Initialize memory neurons from brain's sensory neurons if empty
+    if (memoryNeurons_.empty() && brain_) {
+        // Get sensory neurons from the brain for working memory encoding
+        const auto& sensoryNeurons = brain_->getSensoryNeurons();
+        if (!sensoryNeurons.empty()) {
+            // Use up to capacity or all sensory neurons
+            size_t neuronsToUse = std::min(capacity_, sensoryNeurons.size());
+            for (size_t i = 0; i < neuronsToUse; ++i) {
+                memoryNeurons_.push_back(sensoryNeurons[i]->getId());
+                memoryActivations_.push_back(0.0f);
+                memoryTimestamps_.push_back(0);
+            }
+        }
+    }
+    
+    if (memoryNeurons_.empty()) {
+        return; // No neurons available for encoding
+    }
+    
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        NeuronId neuron = memoryNeurons_[i];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Set neuron activation using brain's injection method
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {

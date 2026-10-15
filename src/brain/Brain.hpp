@@ -187,6 +187,18 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
+    // Get all neurons across all regions
+    const std::vector<Neuron*>& getAllNeurons() const;
+    std::vector<Neuron*>& getAllNeurons();
+    
+    // Get sensory neurons for input processing
+    const std::vector<Neuron*>& getSensoryNeurons() const;
+    std::vector<Neuron*>& getSensoryNeurons();
+    
+    // Get motor neurons for output processing
+    const std::vector<Neuron*>& getMotorNeurons() const;
+    std::vector<Neuron*>& getMotorNeurons();
+    
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
