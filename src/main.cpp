@@ -404,6 +404,33 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("");
+        NLM_LOG_ERROR("Initialization failed for the following reasons:");
+        
+        // Check configuration validity
+        if (!config->has("neuron_count") || config->getOr<int64_t>("neuron_count", 0) <= 0) {
+            NLM_LOG_ERROR("  - Invalid neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 0)));
+        }
+        
+        if (!config->has("region_count") || config->getOr<int64_t>("region_count", 0) <= 0) {
+            NLM_LOG_ERROR("  - Invalid region_count: " + std::to_string(config->getOr<int64_t>("region_count", 0)));
+        }
+        
+        if (!config->has("connection_probability") || 
+            config->getOr<float>("connection_probability", 0.0f) < 0.0f || 
+            config->getOr<float>("connection_probability", 0.0f) > 1.0f) {
+            NLM_LOG_ERROR("  - Invalid connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.0f)));
+        }
+        
+        // Check if we have enough resources
+        NLM_LOG_ERROR("");
+        NLM_LOG_ERROR("Troubleshooting suggestions:");
+        NLM_LOG_ERROR("  - Ensure configuration file is valid");
+        NLM_LOG_ERROR("  - Try increasing neuron_count to at least 1");
+        NLM_LOG_ERROR("  - Try increasing region_count to at least 1");
+        NLM_LOG_ERROR("  - Ensure connection_probability is between 0.0 and 1.0");
+        NLM_LOG_ERROR("  - Check system resources (memory, CPU)");
+        
         return 1;
     }
     

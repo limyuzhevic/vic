@@ -93,13 +93,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    bool validateWithDetails(std::vector<std::string>& errors, std::vector<std::string>& warnings) const;
+    std::vector<std::string> validateKeys(const std::vector<std::string>& validKeys) const;
+    std::vector<std::string> getInvalidValues(const std::string& key) const;
+    bool validateConfigurationFile(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    std::string trim(const std::string& str);
+    std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

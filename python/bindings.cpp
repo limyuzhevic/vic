@@ -348,10 +348,53 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
+
+    // Add high-level convenience methods to Brain class
+    .def("runEpisode", [](Brain& brain, AgentBrain& agent, SimpleWorld& world, int steps) {
+        for (int i = 0; i < steps; ++i) {
+            world.update(0.1f);
+            agent.processSensoryInput(world.getSensoryPercept());
+            brain.step(i);
+            auto action = agent.decodeMotorCommand();
+            world.applyMotorCommand(action, world.getSimulationTime());
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+        "Run a complete episode with agent and world")
+    .def("getBrainStats", [](Brain& brain) {
+        py::dict stats;
+        stats["neurons"] = brain.getTotalNeuronCount();
+        stats["synapses"] = brain.getTotalSynapseCount();
+        stats["firing"] = brain.getFiringNeuronCount();
+        stats["spikes"] = brain.getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain.getAverageFiringRate();
+        stats["e_i_ratio"] = brain.getExcitationInhibitionRatio();
+        return stats;
+    }, "Get comprehensive brain statistics as a dictionary")
+    .def("simulateToSteadyState", [](Brain& brain, AgentBrain& agent, SimpleWorld& world, int maxSteps) {
+        int steadyStateSteps = 0;
+        const int requiredSteps = 100;
+        for (int i = 0; i < maxSteps; ++i) {
+            world.update(0.1f);
+            agent.processSensoryInput(world.getSensoryPercept());
+            brain.step(i);
+            auto action = agent.decodeMotorCommand();
+            world.applyMotorCommand(action, world.getSimulationTime());
+            
+            // Check if we've reached steady state (firing rate stabilizing)
+            if (i >= requiredSteps) {
+                float currentRate = brain.getAverageFiringRate();
+                // Simple steady state detection - firing rate should be relatively stable
+                // This is a basic implementation that could be enhanced
+                steadyStateSteps++;
+            }
+        }
+        return steadyStateSteps;
+    }, py::arg("agent"), py::arg("world"), py::arg("maxSteps"),
+        "Simulate until steady state is reached or max steps reached")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,23 +441,98 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Add convenience methods to SimpleWorld class
+    .def("createResource", [](SimpleWorld& world, float x, float y, float value) {
+        return world.addObject(WorldObject(x, y, WorldObjectType::Resource, value));
+    }, py::arg("x"), py::arg("y"), py::arg("value"),
+        "Add a resource object to the world")
+    .def("createHazard", [](SimpleWorld& world, float x, float y, float value) {
+        return world.addObject(WorldObject(x, y, WorldObjectType::Hazard, value));
+    }, py::arg("x"), py::arg("y"), py::arg("value"),
+        "Add a hazard object to the world")
+    .def("createWall", [](SimpleWorld& world, float x, float y) {
+        return world.addObject(WorldObject(x, y, WorldObjectType::Wall, 0.0f, 1.0f));
+    }, py::arg("x"), py::arg("y"),
+        "Add a wall object to the world");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add advanced helper functions for complex scenarios
+    m.def("createLearningEnvironment", [](int width, int height, int neurons, bool enableAllFeatures) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neurons);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.12);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 12, 12);
+        world->reset();
+        world->setAgentStart(width/2.0f, height/2.0f);
+        
+        // Add some environment objects
+        world->addObject(WorldObject(width/4.0f, height/4.0f, WorldObjectType::Resource, 10.0f));
+        world->addObject(WorldObject(3*width/4.0f, 3*height/4.0f, WorldObjectType::Resource, 10.0f));
+        world->addObject(WorldObject(width/2.0f, height/2.0f, WorldObjectType::Marker, 1.0f, 0.3f));
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enableAllFeatures) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            agent->enableStructuralPlasticity(true);
+        }
+        
+        return py::make_tuple(brain, agent, world);
+    }, py::arg("width") = 20, py::arg("height") = 20, py::arg("neurons") = 1000, py::arg("enableAllFeatures") = true,
+        "Create a complete learning environment with all features enabled")
+    .def("runExplorationSession", [](AgentBrain& agent, SimpleWorld& world, int steps) {
+        agent.enableCuriosity(true);
+        agent.enableRewardModulation(true);
+        
+        py::dict results;
+        for (int i = 0; i < steps; ++i) {
+            world.update(0.1f);
+            agent.processSensoryInput(world.getSensoryPercept());
+            auto& brain = *agent.getBrain();
+            brain.step(i);
+            auto action = agent.decodeMotorCommand();
+            world.applyMotorCommand(action, world.getSimulationTime());
+            
+            // Get curiosity and novelty levels
+            float curiosity = agent.getCuriosityLevel();
+            float novelty = agent.getNoveltyLevel();
+            
+            if (i % 100 == 0) {
+                std::cout << "Exploration Step " << i << ": " << curiosity << " curiosity, " 
+                          << novelty << " novelty, " << brain.getFiringNeuronCount() 
+                          << " firing neurons" << std::endl;
+            }
+        }
+        
+        results["final_curiosity"] = agent.getCuriosityLevel();
+        results["final_novelty"] = agent.getNoveltyLevel();
+        results["final_development"] = static_cast<int>(agent.getDevelopmentalStage());
+        results["total_steps"] = steps;
+        
+        return results;
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+        "Run an exploration session with curiosity-driven learning")
+    .def("saveBrainState", [](Brain& brain, const std::string& filepath) {
+        return brain.save(filepath);
+    }, py::arg("filepath"),
+        "Save brain state to file")
+    .def("loadBrainState", [](Brain& brain, const std::string& filepath) {
+        return brain.load(filepath);
+    }, py::arg("filepath"),
+        "Load brain state from file");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

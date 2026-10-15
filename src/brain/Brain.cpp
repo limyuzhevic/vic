@@ -272,7 +272,7 @@ bool Brain::initialize() {
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
+                if (neuron && neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
                     if (event.is_excitatory) {

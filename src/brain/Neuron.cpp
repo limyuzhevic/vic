@@ -24,7 +24,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), spikeHistory(), incomingSynapses(), outgoingSynapses(), plasticityFlags() {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
