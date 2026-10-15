@@ -4,12 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_EXTENSIONS OFF)
 
 # Enable warnings
 if(MSVC)
@@ -17,6 +12,9 @@ if(MSVC)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+# Find nlohmann/json dependency
+find_package(nlohmann_json REQUIRED)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -90,7 +88,10 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${NLOHMANN_JSON_INCLUDE_DIR}>
 )
+
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -121,11 +122,17 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
+# Main executable (original Phase 2 implementation - preserved for backward compatibility)
+add_executable(nlm_original
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_original PUBLIC nlm_core)
+
+# Main executable (advanced CLI interface)
+add_executable(nlm
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,12 +146,78 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Testing framework and benchmarks
+add_executable(nlm_tests
+    src/nlm_tests.cpp
+)
+target_link_libraries(nlm_tests PUBLIC nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json)
+
+# Visualization and monitoring tools
+add_executable(nlm_visualization
+    src/nlm_visualization.cpp
+)
+target_link_libraries(nlm_visualization PUBLIC nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json)
+
+# Plugin system
+add_executable(nlm_plugin_system
+    src/nlm_plugin_system.cpp
+)
+target_link_libraries(nlm_plugin_system PUBLIC nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Enable testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm_original nlm nlm_tests nlm_visualization nlm_plugin_system nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
