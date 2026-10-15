@@ -7,7 +7,7 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the enhanced NLM Python API (with new convenience features)
 
 ---
 
@@ -115,9 +115,9 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced Python Library
 
-### Basic Usage
+### Basic Usage with New Convenience Features
 
 #### Creating a Brain
 
@@ -128,11 +128,11 @@ import pynlm
 config = pynlm.createDefaultConfig()
 
 # Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
+# Create and initialize the brain using enhanced convenience method
+brain = pynlm.createBrainWithDefaults(neuronCount=1000, enableDevelopment=True)
 brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
@@ -144,9 +144,8 @@ print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```python
 import pynlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Create brain with advanced features
+brain = pynlm.createBrainWithDefaults(neuronCount=500, enableLearning=True)
 brain.initialize()
 
 # Run simulation for 1000 steps
@@ -158,66 +157,47 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
-#### Creating a Simple World
+#### Enhanced Agent Simulation
 
 ```python
 import pynlm
 
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
-```
-
-### Complete Agent Example
-
-```python
-import pynlm
-
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_advanced_agent_simulation(world_width=20, world_height=20, 
+                                   num_steps=1000, strategy="balanced"):
+    """Run a complete agent simulation with brain and world using new features."""
     
-    # 1. Create configuration
+    # 1. Create configuration with advanced settings
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
+    # 2. Create brain and initialize using convenience method
+    brain = pynlm.createBrainWithDefaults(
+        neuronCount=1000,
+        regionCount=1,
+        connectionProbability=0.1,
+        enableLearning=True,
+        enableDevelopment=True
+    )
     brain.initialize()
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    # 3. Create agent brain interface with strategy
+    agent = pynlm.create_advanced_agent(brain, None, strategy)
     
     # 4. Create and configure world
     world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.configure(width=world_width, height=world_height, 
+                   visionWidth=8, visionHeight=8)
     world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.setAgentStart(world_width // 2, world_height // 2)
     
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable subsystems based on strategy
     agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
     agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
+    # 7. Run simulation loop with logging
+    logs = []
     for step in range(num_steps):
         # Update world
         world.update(timestep=0.1)
@@ -244,17 +224,55 @@ def run_agent_simulation(num_steps=1000):
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Collect logs
         if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            log_msg = f"Step {step}: "
+            log_msg += f"Firing: {brain.getFiringNeuronCount()}, "
+            log_msg += f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+            log_msg += f"Dev: {brain.getDevelopmentalStage()}"
+            logs.append(log_msg)
+            print(log_msg)
+    
+    # 8. Get brain statistics
+    stats = pynlm.getBrainStats(brain)
+    
+    return logs, stats
 
 # Run the simulation
-run_agent_simulation(1000)
+logs, stats = run_advanced_agent_simulation(world_width=15, world_height=15, num_steps=500)
+
+# Save experiment data
+pynlm.export_experiment_data(logs, stats, "./experiments/advanced_agent_test")
+
+# Print summary
+print(f"\n=== Simulation Summary ===")
+print(f"Total steps: {len(logs)}")
+print(f"Final firing neurons: {stats['firing_neurons']}")
+print(f"Final learning rate: {stats['excitatory_inhibition_ratio']:.3f}")
+print(f"Development stage: {stats['developmental_stage']}")
 ```
+
+#### Configuration from Dictionary
+
+```python
+import pynlm
+
+# Create configuration from Python dictionary
+config_dict = {
+    "brain.neuron_count": 2000,
+    "brain.synapse_density": 0.05,
+    "plasticity.stdp.enable": True,
+    "plasticity.hebbian.enable": True,
+    "neuromod.dopamine.scale": 1.0,
+    "neuromod.curiosity.enable": True,
+    "development_synaptogenesis_rate": 0.001
+}
+
+config = pynlm.createConfigFromDict(config_dict)
+brain = pynlm.createBrain(config)
+```
+
+---
 
 ### Key Classes and Methods
 
@@ -273,8 +291,8 @@ brain.step(step_number, time)    # Run step with timestamp
 brain.reset()                     # Reset brain state
 
 # Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+brain.receiveSensoryInput(input)  # Inject sensory data
+action = brain.produceAction()   # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -416,7 +434,71 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+## Part 4: Advanced Features and Convenience Methods
+
+The enhanced NLM Python bindings now include advanced features for expert users:
+
+### 1. Convenience Methods
+
+```python
+# Create brain with optimized defaults
+brain = pynlm.createBrainWithDefaults(neuronCount=1000, enableDevelopment=True)
+
+# Run complete agent simulation with logging
+logs = pynlm.run_agent_episode(brain, world, agent, 1000, verbose=True)
+
+# Get comprehensive brain statistics
+stats = pynlm.getBrainStats(brain)
+
+# Create configuration from dictionary
+config = pynlm.createConfigFromDict({"brain.neuron_count": 2000})
+```
+
+### 2. Advanced Functions
+
+```python
+# Explore neural network structure
+exploration = pynlm.neural_network_explorer(brain)
+
+# Save/load checkpoints with validation
+pynlm.save_brain_checkpoint(brain, "./checkpoints/brain_state.bin")
+pynlm.load_brain_checkpoint(brain, "./checkpoints/brain_state.bin")
+
+# Benchmark performance
+benchmark = pynlm.benchmark_brain_performance(brain, 1000, detailed=True)
+
+# Create agent with specific strategy
+agent = pynlm.create_advanced_agent(brain, world, "curiosity")
+
+# Simulate to developmental stage
+logs = pynlm.simulate_to_development_stage(brain, world, agent, pynlm.DevelopmentalStage.Maturation)
+
+# Create brain from template
+brain = pynlm.create_brain_from_template("learning", {"neuron_count": 3000})
+
+# Export experiment data
+pynlm.export_experiment_data(logs, metrics, "experiment_001")
+```
+
+### 3. Error Handling
+
+The enhanced bindings provide custom Python exceptions:
+
+```python
+try:
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+except pynlm.InitializationError as e:
+    print(f"Initialization failed: {e}")
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+except pynlm.ConfigError as e:
+    print(f"Configuration error: {e}")
+```
+
+---
+
+## Part 5: Configuration Options
 
 ### Brain Configuration
 
@@ -454,9 +536,9 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+## Part 6: Advanced Experiment Scripts
 
-### Minimal Example
+### Enhanced Minimal Example
 
 ```python
 import pynlm
@@ -473,16 +555,16 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+### Enhanced Environment Interaction
 
 ```python
 import pynlm
 
-# Setup
+# Setup with advanced features
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
-agent = pynlm.createAgentBrain(brain)
+agent = pynlm.create_advanced_agent(brain, None, "balanced")
 world = pynlm.createSimpleWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
@@ -498,7 +580,7 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 7: Troubleshooting
 
 ### Build Issues
 
@@ -524,10 +606,104 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### Enhanced Error Handling
+
+```python
+# The enhanced bindings provide more informative error messages
+try:
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+except pynlm.InitializationError as e:
+    print(f"Brain initialization failed: {e}")
+    print("Please check your configuration settings")
+except pynlm.ConfigError as e:
+    print(f"Configuration error: {e}")
+    print("Please verify configuration values")
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+    print("Please check simulation parameters")
+```
+
 ---
 
-## Further Reading
+## Part 8: Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+## New: Advanced Usage Guide
+
+The enhanced NLM now includes several new advanced features:
+
+### 1. Convenience Functions
+
+These functions simplify common tasks and provide enhanced functionality:
+
+| Function | Description | Use Case |
+|----------|-------------|----------|
+| `createBrainWithDefaults()` | Create brain with optimized defaults | Quick setup |
+| `run_agent_episode()` | Run agent simulation with logging | Experimentation |
+| `getBrainStats()` | Get comprehensive brain statistics | Analysis |
+| `createConfigFromDict()` | Create config from Python dict | Programmatic config |
+
+### 2. Advanced Features
+
+| Feature | Description | Benefit |
+|---------|-------------|---------|
+| Custom exceptions | Pythonic error handling | Better debugging |
+| Network explorer | Analyze brain structure | Network analysis |
+| Checkpoint management | Save/load with validation | State persistence |
+| Performance benchmarking | Measure simulation speed | Optimization |
+| Brain templates | Create from presets | Quick prototyping |
+| Strategy agents | Different agent behaviors | Behavioral studies |
+
+### 3. Example Advanced Workflows
+
+```python
+import pynlm
+
+# Example 1: Compare different brain templates
+print("=== Brain Template Comparison ===")
+templates = ["small", "medium", "large", "learning", "stable"]
+results = {}
+
+for template in templates:
+    brain = pynlm.create_brain_from_template(template)
+    brain.initialize()
+    pynlm.run_simulation(brain, None, None, 100)
+    stats = pynlm.getBrainStats(brain)
+    results[template] = stats
+    print(f"{template:10s}: {stats['total_neurons']} neurons, "
+          f"{stats['average_firing_rate']:.2f} Hz avg")
+
+# Example 2: Performance benchmarking
+print("\n=== Performance Benchmarking ===")
+brain = pynlm.createBrainWithDefaults(500)
+benchmark = pynlm.benchmark_brain_performance(brain, 1000, detailed=True)
+print(f"Speed: {benchmark['steps_per_second']:.0f} steps/sec")
+print(f"Memory per step: {benchmark['simulation_time_per_step_ms']:.2f} ms")
+
+# Example 3: Experiment with different strategies
+print("\n=== Strategy Comparison ===")
+strategies = ["curiosity", "exploitation", "balanced", "creative"]
+for strategy in strategies:
+    brain = pynlm.createBrainWithDefaults(300)
+    world = pynlm.createSimpleWorld()
+    agent = pynlm.create_advanced_agent(brain, world, strategy)
+    logs = pynlm.run_agent_episode(brain, world, agent, 200)
+    stats = pynlm.getBrainStats(brain)
+    print(f"{strategy:12s}: {stats['average_firing_rate']:.2f} Hz, "
+          f"{stats['excitatory_inhibition_ratio']:.3f} E/I ratio")
+```
+
+### 4. Getting Started with Advanced Features
+
+1. **Start with convenience functions**: Use `createBrainWithDefaults()` and `run_agent_episode()`
+2. **Explore brain statistics**: Use `getBrainStats()` to understand brain behavior
+3. **Experiment with strategies**: Try different agent strategies for behavioral studies
+4. **Benchmark performance**: Use `benchmark_brain_performance()` for optimization
+5. **Save/load experiments**: Use enhanced checkpoint functions
+
+The enhanced NLM provides tools for both simple usage and advanced research tasks, making it suitable for beginners, researchers, and developers alike.
+

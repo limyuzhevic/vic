@@ -71,40 +71,53 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
+### NEW: Using Advanced Convenience Methods
 
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+The enhanced Python bindings now include convenience methods to make common tasks easier:
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create a brain with optimized defaults
+brain = pynlm.createBrainWithDefaults(neuronCount=500, enableDevelopment=True)
 
-# Initialize it
-brain.initialize()
+# Run complete simulation with logging
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+agent = pynlm.create_advanced_agent(brain, world, "exploration")
 
-# Make it active
-brain.step(0)
+logs = pynlm.run_agent_episode(brain, world, agent, 1000, verbose=True)
+for log in logs:
+    print(log)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Analyze brain statistics
+stats = pynlm.getBrainStats(brain)
+print(f"Network health: {stats['firing_neurons']}/{stats['total_neurons']} neurons firing")
+print(f"Average firing rate: {stats['average_firing_rate']:.2f} Hz")
+print(f"Learning efficiency: {stats['excitatory_inhibition_ratio']:.3f}")
 ```
 
----
+### NEW: Using Brain Templates
 
-## Common Patterns
+```python
+import pynlm
+
+# Create brains from predefined templates
+templates = ["small", "medium", "large", "learning", "stable"]
+
+for template in templates:
+    brain = pynlm.create_brain_from_template(template)
+    print(f"{template:10s} brain: {brain.getTotalNeuronCount()} neurons")
+
+# Create custom brain with parameters
+custom_params = {
+    "brain.neuron_count": 3000,
+    "neuromod.dopamine.scale": 1.5,
+    "development_synaptogenesis_rate": 0.001
+}
+custom_brain = pynlm.create_brain_from_template("learning", custom_params)
+print(f"Custom brain: {custom_brain.getTotalNeuronCount()} neurons")
+```
 
 ### Pattern 1: Run a Simulation
 
@@ -221,26 +234,29 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### NEW: Project 3: Advanced Agent with Custom Features
 
 ```python
 import pynlm
 
-# Setup
+# Setup with advanced features
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
 
-# Enable learning
+# Create agent with curiosity strategy
+agent = pynlm.create_advanced_agent(brain, world, "curiosity")
+
+# Enable advanced features
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
 
-# Run agent
+# Run agent with monitoring
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -250,8 +266,10 @@ for step in range(100):
     
     if step % 20 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"Development: {brain.getDevelopmentalStage()}")
 
-print("Agent simulation complete!")
+print("Advanced agent simulation complete!")
 ```
 
 ---
@@ -271,6 +289,36 @@ print("Agent simulation complete!")
 
 ---
 
+## Quick Start with Advanced Features
+
+The enhanced NLM Python bindings now provide several convenience functions:
+
+```python
+import pynlm
+
+# 1. Create optimized brain
+brain = pynlm.createBrainWithDefaults(neuronCount=1000, enableDevelopment=True)
+
+# 2. Create specialized agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.create_advanced_agent(brain, world, "balanced")
+
+# 3. Run with monitoring and logging
+logs = pynlm.run_agent_episode(brain, world, agent, 500, verbose=True)
+
+# 4. Analyze results
+stats = pynlm.getBrainStats(brain)
+print(f"Simulation completed with {stats['total_spikes']} spikes")
+
+# 5. Export data
+pynlm.export_experiment_data(logs, stats, "experiment_001")
+```
+
+---
+
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
@@ -287,6 +335,21 @@ print("Agent simulation complete!")
 
 ---
 
+## New: Advanced Features Tutorial
+
+The enhanced Python bindings provide advanced features for expert users:
+
+1. **Brain Exploration**: Analyze network structure and statistics
+2. **Checkpoint Management**: Save and load brain states with validation
+3. **Performance Benchmarking**: Measure simulation speed and efficiency
+4. **Brain Templates**: Create brains from predefined configurations
+5. **Development Stage Simulation**: Simulate to specific developmental stages
+6. **Experiment Data Export**: Export results for analysis and sharing
+
+See the individual function docstrings for detailed usage examples.
+
+---
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +357,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use the enhanced NLM with all its new features and improvements.
