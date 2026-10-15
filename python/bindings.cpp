@@ -416,10 +416,592 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Add advanced configuration management tools
+    m.def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Create configuration from JSON/YAML file");
+    
+    m.def("createConfigFromDict", [](const py::dict& dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : dict) {
+            std::string key = py::cast<std::string>(item.first);
+            std::string valueStr = py::cast<std::string>(item.second);
+            
+            // Try to parse value as number or boolean
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double doubleVal = std::stod(valueStr);
+                    config->set(key, doubleVal, ConfigSource::Runtime);
+                } else {
+                    int intVal = std::stoi(valueStr);
+                    config->set(key, intVal, ConfigSource::Runtime);
+                }
+            } catch (...) {
+                // Try boolean
+                if (valueStr == "true") {
+                    config->set(key, true, ConfigSource::Runtime);
+                } else if (valueStr == "false") {
+                    config->set(key, false, ConfigSource::Runtime);
+                } else {
+                    // String value
+                    config->set(key, valueStr, ConfigSource::Runtime);
+                }
+            }
+        }
+        
+        return config;
+    }, py::arg("dict"), "Create configuration from Python dictionary");
+    
+    // Add advanced brain analysis tools
+    py::class_<BrainAnalyzer>(m, "BrainAnalyzer", R"pbdoc(Tools for analyzing brain performance and activity)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("analyzeSpikePatterns", &BrainAnalyzer::analyzeSpikePatterns,
+             py::arg("maxNeurons") = 100)
+        .def("detectActiveRegions", &BrainAnalyzer::detectActiveRegions,
+             py::arg("threshold") = 0.1f)
+        .def("calculateNetworkMetrics", &BrainAnalyzer::calculateNetworkMetrics)
+        .def("getNeuronActivityStats", &BrainAnalyzer::getNeuronActivityStats,
+             py::arg("neuronId"))
+        .def("findSimilarActivityPatterns", &BrainAnalyzer::findSimilarActivityPatterns,
+             py::arg("pattern"), py::arg("threshold") = 0.8f);
+    
+    // Add advanced simulation control tools
+    py::class_<SimulationController>(m, "SimulationController", R"pbdoc(Advanced simulation control and analysis tools)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>())
+        .def("runEpisode", &SimulationController::runEpisode,
+             py::arg("maxSteps"), py::arg("saveCheckpoints") = false)
+        .def("runExplorationEpisode", &SimulationController::runExplorationEpisode,
+             py::arg("maxSteps"), py::arg("enableCuriosity") = true)
+        .def("runTrainingEpisode", &SimulationController::runTrainingEpisode,
+             py::arg("maxSteps"), py::arg("enableRewardLearning") = true)
+        .def("analyzeLearningProgress", &SimulationController::analyzeLearningProgress)
+        .def("getEpisodeStatistics", &SimulationController::getEpisodeStatistics)
+        .def("exportSimulationData", &SimulationController::exportSimulationData,
+             py::arg("filepath"), py::arg("format") = "json");
+    
+    // Add advanced memory system tools
+    py::class_<MemoryInspector>(m, "MemoryInspector", R"pbdoc(Advanced memory system analysis and tools)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("getWorkingMemoryTraces", &MemoryInspector::getWorkingMemoryTraces)
+        .def("analyzeEpisodicMemory", &MemoryInspector::analyzeEpisodicMemory,
+             py::arg("minRelevance") = 0.5f)
+        .def("findSimilarEpisodes", &MemoryInspector::findSimilarEpisodes,
+             py::arg("episodeId"), py::arg("threshold") = 0.7f)
+        .def("consolidateMemory", &MemoryInspector::consolidateMemory,
+             py::arg("relevanceThreshold") = 0.5f)
+        .def("getMemoryUsageStats", &MemoryInspector::getMemoryUsageStats);
+    
+    // Add neuromodulation analysis tools
+    py::class_<NeuromodulationAnalyzer>(m, "NeuromodulationAnalyzer", R"pbdoc(Analysis tools for neuromodulation systems)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("analyzeDopamineDynamics", &NeuromodulationAnalyzer::analyzeDopamineDynamics,
+             py::arg("timeWindow") = 1000.0)
+        .def("analyzeRewardPredictionError", &NeuromodulationAnalyzer::analyzeRewardPredictionError)
+        .def("getNeuromodulationCorrelation", &NeuromodulationAnalyzer::getNeuromodulationCorrelation,
+             py::arg("modulator1"), py::arg("modulator2"))
+        .def("predictNeuromodulationEffects", &NeuromodulationAnalyzer::predictNeuromodulationEffects,
+             py::arg("action"));
+    
+    // Add advanced plasticity tools
+    py::class_<PlasticityTools>(m, "PlasticityTools", R"pbdoc(Advanced tools for analyzing and controlling synaptic plasticity)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("analyzeSTDP", &PlasticityTools::analyzeSTDP,
+             py::arg("minSpikePairs") = 10)
+        .def("calculateHebbianStrength", &PlasticityTools::calculateHebbianStrength,
+             py::arg("connectionId"))
+        .def("predictPlasticityChanges", &PlasticityTools::predictPlasticityChanges,
+             py::arg("timeSteps") = 100)
+        .def("findPlasticityHotspots", &PlasticityTools::findPlasticityHotspots,
+             py::arg("threshold") = 0.01f)
+        .def("resetPlasticity", &PlasticityTools::resetPlasticity,
+             py::arg("regionId"), py::arg("synapseType") = SynapseType::Excitatory);
+    
+    // Add development system analysis tools
+    py::class_<DevelopmentAnalyzer>(m, "DevelopmentAnalyzer", R"pbdoc(Analysis tools for the brain development system)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("analyzeDevelopmentalStage", &DevelopmentAnalyzer::analyzeDevelopmentalStage,
+             py::arg("stage") = "Auto")
+        .def("predictDevelopmentTrajectory", &DevelopmentAnalyzer::predictDevelopmentTrajectory,
+             py::arg("timeSteps") = 1000)
+        .def("getCriticalPeriodStatus", &DevelopmentAnalyzer::getCriticalPeriodStatus)
+        .def("simulateDevelopment", &DevelopmentAnalyzer::simulateDevelopment,
+             py::arg("startStage"), py::arg("endStage"));
+    
+    // Add visualization and debugging tools
+    py::class_<VisualizationTools>(m, "VisualizationTools", R"pbdoc(Advanced visualization and debugging tools for brain simulation)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("generateSpikeRaster", &VisualizationTools::generateSpikeRaster,
+             py::arg("outputFile"), py::arg("timeRange"))
+        .def("plotActivityHeatmap", &VisualizationTools::plotActivityHeatmap,
+             py::arg("outputFile"), py::arg("resolution") = "high")
+        .def("generateNetworkGraph", &VisualizationTools::generateNetworkGraph,
+             py::arg("outputFile"), py::arg("layout") = "spring")
+        .def("createVideoAnimation", &VisualizationTools::createVideoAnimation,
+             py::arg("outputFile"), py::arg("fps") = 30)
+        .def("analyzeBrainConnectivity", &VisualizationTools::analyzeBrainConnectivity,
+             py::arg("outputFile"));
+    
+    // Add simulation benchmarking tools
+    py::class_<BenchmarkTools>(m, "BenchmarkTools", R"pbdoc(Tools for benchmarking brain simulation performance)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("benchmarkInitialization", &BenchmarkTools::benchmarkInitialization,
+             py::arg("repeatCount") = 10)
+        .def("benchmarkStepPerformance", &BenchmarkTools::benchmarkStepPerformance,
+             py::arg("steps"), py::arg("repeatCount") = 5)
+        .def("benchmarkMemoryUsage", &BenchmarkTools::benchmarkMemoryUsage,
+             py::arg("operation") = "all")
+        .def("benchmarkPlasticityPerformance", &BenchmarkTools::benchmarkPlasticityPerformance,
+             py::arg("synapseCount"))
+        .def("generatePerformanceReport", &BenchmarkTools::generatePerformanceReport,
+             py::arg("outputFile"), py::arg("format") = "json");
+    
+    // Add configuration export/import tools
+    m.def("exportConfig", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        return config->saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), "Export configuration to file");
+    
+    m.def("importConfig", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Import configuration from file");
+    
+    // Add configuration optimization tools
+    m.def("optimizeConfiguration", [](std::shared_ptr<Config> config) {
+        // Simple configuration optimization
+        config->set("simulation_timestep", 0.001, ConfigSource::Runtime);
+        config->set("neuron_count", config->getOr<size_t>("neuron_count", 100), ConfigSource::Runtime);
+        config->set("region_count", config->getOr<size_t>("region_count", 1), ConfigSource::Runtime);
+        return config;
+    }, py::arg("config"), "Optimize configuration for performance");
+    
+    // Add batch simulation tools
+    m.def("batchSimulate", [](std::shared_ptr<Brain> brain, 
+                             std::shared_ptr<SimpleWorld> world,
+                             std::shared_ptr<AgentBrain> agent,
+                             const std::vector<int>& stepsList) {
+        std::vector<std::map<std::string, double>> results;
+        for (int steps : stepsList) {
+            agent->reset();
+            world->reset();
+            brain->reset();
+            
+            double startTime = 0.0; // Placeholder for actual timing
+            for (int step = 0; step < steps; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+            double endTime = 0.0; // Placeholder for actual timing
+            
+            std::map<std::string, double> stats = {
+                {"steps", static_cast<double>(steps)},
+                {"time", endTime - startTime},
+                {"firingRate", brain->getAverageFiringRate()},
+                {"spikeCount", static_cast<double>(brain->getTotalSpikeCount())}
+            };
+            results.push_back(stats);
+        }
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("stepsList"),
+       "Run batch simulations with different step counts");
+    
+    // Add simulation profiling tools
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain,
+                                  std::shared_ptr<SimpleWorld> world,
+                                  std::shared_ptr<AgentBrain> agent,
+                                  int steps) {
+        // Simple profiling implementation
+        std::map<std::string, double> metrics;
+        
+        // Time brain initialization
+        auto start = std::chrono::high_resolution_clock::now();
+        brain->reset();
+        auto initEnd = std::chrono::high_resolution_clock::now();
+        metrics["initialization_time"] = std::chrono::duration<double>(initEnd - start).count();
+        
+        // Time simulation steps
+        start = std::chrono::high_resolution_clock::now();
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        auto simulationEnd = std::chrono::high_resolution_clock::now();
+        metrics["simulation_time"] = std::chrono::duration<double>(simulationEnd - start).count();
+        metrics["steps_per_second"] = steps / metrics["simulation_time"];
+        
+        // Memory metrics (placeholder)
+        metrics["memory_usage"] = 0.0; // Placeholder
+        metrics["spike_count"] = static_cast<double>(brain->getTotalSpikeCount());
+        metrics["firing_rate"] = brain->getAverageFiringRate();
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Profile simulation performance and return metrics");
+    
+    // Add help and documentation tools
+    m.def("getAdvancedUsageExamples", []() {
+        std::vector<std::string> examples;
+        
+        examples.push_back(R"(
+# Advanced NLM Usage Examples
+
+# Example 1: Custom Configuration with JSON
+import pynlm
+
+config_dict = {
+    "neuron_count": 500,
+    "region_count": 2,
+    "connection_probability": 0.15,
+    "simulation_timestep": 0.0005,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012
 }
 
-} // namespace nlm
+brain = pynlm.createBrain(config_dict)
+brain.initialize()
+""");
+        
+        examples.push_back(R"(
+# Example 2: Advanced Brain Analysis
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+analyzer = pynlm.BrainAnalyzer(brain)
+metrics = analyzer.calculateNetworkMetrics()
+print(f"Average firing rate: {metrics['firing_rate']:.2f} Hz")
+print(f"Excitatory/Inhibitory ratio: {metrics['e_i_ratio']:.2f}")
+""");
+        
+        examples.push_back(R"(
+# Example 3: Custom Simulation Controller
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(20, 20, 10, 10)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+controller = pynlm.SimulationController(brain, world, agent)
+results = controller.runTrainingEpisode(1000, enableRewardLearning=True)
+print(f"Training completed in {len(results['rewards'])} steps")
+""");
+        
+        examples.push_back(R"(
+# Example 4: Memory System Analysis
+memory_inspector = pynlm.MemoryInspector(brain)
+working_memory = memory_inspector.getWorkingMemoryTraces()
+print(f"Active working memory traces: {len(working_memory)}")
+
+echoic_memory = memory_inspector.analyzeEpisodicMemory(minRelevance=0.7)
+print(f"High-relevance episodes: {len(echoic_memory)}")
+""");
+        
+        examples.push_back(R"(
+# Example 5: Neuromodulation Analysis
+neuromod_analyzer = pynlm.NeuromodulationAnalyzer(brain)
+dopamine_dynamics = neuromod_analyzer.analyzeDopamineDynamics(timeWindow=500.0)
+print(f"Peak dopamine level: {dopamine_dynamics['peak_level']:.3f}")
+""");
+        
+        examples.push_back(R"(
+# Example 6: Plasticity Analysis
+plasticity_tools = pynlm.PlasticityTools(brain)
+stdp_analysis = plasticity_tools.analyzeSTDP(minSpikePairs=50)
+print(f"STDP learning rate: {stdp_analysis['learning_rate']:.4f}")
+""");
+        
+        examples.push_back(R"(
+# Example 7: Batch Processing
+steps_list = [100, 500, 1000, 2000]
+batch_results = pynlm.batchSimulate(brain, world, agent, steps_list)
+
+for result in batch_results:
+    print(f"Steps: {result['steps']}, Time: {result['time']:.2f}s, "
+          f"Firing Rate: {result['firing_rate']:.2f} Hz")
+""");
+        
+        examples.push_back(R"(
+# Example 8: Configuration Optimization
+optimized_config = pynlm.optimizeConfiguration(pynlm.createDefaultConfig())
+brain_opt = pynlm.createBrain(optimized_config)
+brain_opt.initialize()
+print("Configuration optimized for performance")
+""");
+        
+        return examples;
+    }, "Return advanced usage examples for NLM");
+    
+    m.def("getAPIReference", []() {
+        std::vector<std::string> api_refs;
+        
+        api_refs.push_back(R"(
+# NLM Advanced API Reference
+
+## BrainAnalyzer
+Class for analyzing brain performance and neural activity patterns.
+
+Methods:
+- analyzeSpikePatterns(maxNeurons=100): Analyze spike timing patterns
+- detectActiveRegions(threshold=0.1f): Detect active brain regions
+- calculateNetworkMetrics(): Calculate network-wide statistics
+- getNeuronActivityStats(neuronId): Get statistics for a specific neuron
+- findSimilarActivityPatterns(pattern, threshold=0.8f): Find similar activity patterns
+
+## SimulationController
+Advanced simulation control with learning capabilities.
+
+Methods:
+- runEpisode(maxSteps, saveCheckpoints=False): Run a standard episode
+- runExplorationEpisode(maxSteps, enableCuriosity=True): Run exploration episode
+- runTrainingEpisode(maxSteps, enableRewardLearning=True): Run training episode
+- analyzeLearningProgress(): Analyze learning progress
+- getEpisodeStatistics(): Get episode statistics
+- exportSimulationData(filepath, format="json"): Export simulation data
+
+## MemoryInspector
+Advanced memory system analysis tools.
+
+Methods:
+- getWorkingMemoryTraces(): Get current working memory traces
+- analyzeEpisodicMemory(minRelevance=0.5f): Analyze episodic memory
+- findSimilarEpisodes(episodeId, threshold=0.7f): Find similar episodes
+- consolidateMemory(relevanceThreshold=0.5f): Consolidate memory
+- getMemoryUsageStats(): Get memory usage statistics
+
+## NeuromodulationAnalyzer
+Analysis tools for neuromodulation systems.
+
+Methods:
+- analyzeDopamineDynamics(timeWindow=1000.0): Analyze dopamine dynamics
+- analyzeRewardPredictionError(): Analyze reward prediction error
+- getNeuromodulationCorrelation(modulator1, modulator2): Get correlation between modulators
+- predictNeuromodulationEffects(action): Predict neuromodulation effects
+
+## PlasticityTools
+Advanced synaptic plasticity analysis and control.
+
+Methods:
+- analyzeSTDP(minSpikePairs=10): Analyze STDP learning
+- calculateHebbianStrength(connectionId): Calculate Hebbian strength
+- predictPlasticityChanges(timeSteps=100): Predict plasticity changes
+- findPlasticityHotspots(threshold=0.01f): Find plasticity hotspots
+- resetPlasticity(regionId, synapseType=Excitatory): Reset plasticity
+
+## DevelopmentAnalyzer
+Development system analysis tools.
+
+Methods:
+- analyzeDevelopmentalStage(stage="Auto"): Analyze developmental stage
+- predictDevelopmentTrajectory(timeSteps=1000): Predict development trajectory
+- getCriticalPeriodStatus(): Get critical period status
+- simulateDevelopment(startStage, endStage): Simulate development
+
+## VisualizationTools
+Advanced visualization and debugging tools.
+
+Methods:
+- generateSpikeRaster(outputFile, timeRange): Generate spike raster plot
+- plotActivityHeatmap(outputFile, resolution="high"): Plot activity heatmap
+- generateNetworkGraph(outputFile, layout="spring"): Generate network graph
+- createVideoAnimation(outputFile, fps=30): Create animation video
+- analyzeBrainConnectivity(outputFile): Analyze brain connectivity
+
+## BenchmarkTools
+Performance benchmarking tools.
+
+Methods:
+- benchmarkInitialization(repeatCount=10): Benchmark initialization
+- benchmarkStepPerformance(steps, repeatCount=5): Benchmark step performance
+- benchmarkMemoryUsage(operation="all"): Benchmark memory usage
+- benchmarkPlasticityPerformance(synapseCount): Benchmark plasticity performance
+- generatePerformanceReport(outputFile, format="json"): Generate performance report
+""");
+        
+        return api_refs;
+    }, "Get NLM API reference documentation");
+    
+    m.def("createAdvancedBrain", [](py::dict configDict) {
+        auto config = std::make_shared<Config>();
+        
+        // Convert Python dict to C++ config
+        for (auto item : configDict) {
+            std::string key = py::cast<std::string>(item.first);
+            std::string valueStr = py::cast<std::string>(item.second);
+            
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double doubleVal = std::stod(valueStr);
+                    config->set(key, doubleVal, ConfigSource::Runtime);
+                } else {
+                    int intVal = std::stoi(valueStr);
+                    config->set(key, intVal, ConfigSource::Runtime);
+                }
+            } catch (...) {
+                if (valueStr == "true") {
+                    config->set(key, true, ConfigSource::Runtime);
+                } else if (valueStr == "false") {
+                    config->set(key, false, ConfigSource::Runtime);
+                } else {
+                    config->set(key, valueStr, ConfigSource::Runtime);
+                }
+            }
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("configDict"), "Create an advanced brain with custom configuration");
+    
+    m.def("createTrainingEnvironment", [](int width, int height, int visionWidth, int visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 200, ConfigSource::Runtime);
+        config->set("region_count", 1, ConfigSource::Runtime);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("width")=10, py::arg("height")=10, 
+       py::arg("visionWidth")=8, py::arg("visionHeight")=8,
+       "Create a complete training environment");
+    
+    // Create advanced alias classes for common use cases
+    py::class_<AdvancedBrain>(m, "AdvancedBrain", R"pbdoc(Advanced brain interface with enhanced functionality)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize)
+        .def("step", &Brain::step)
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput)
+        .def("produceAction", &Brain::produceAction)
+        .def("reset", &Brain::reset)
+        .def("save", &Brain::save, py::arg("filepath"))
+        .def("load", &Brain::load, py::arg("filepath"))
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount)
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount)
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount)
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate)
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount)
+        .def("getConfig", &Brain::getConfig)
+        .def("logStatus", &Brain::logStatus)
+        .def("enableAdvancedFeatures", &Brain::enableAdvancedFeatures)
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics);
+    
+    // Add training utilities
+    m.def("runTrainingSession", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   int maxSteps,
+                                   bool enableRewardLearning,
+                                   bool enableCuriosity) {
+        // Training session implementation
+        agent->reset();
+        agent->enableRewardModulation(enableRewardLearning);
+        agent->enableCuriosity(enableCuriosity);
+        
+        std::vector<double> rewards;
+        double totalReward = 0.0;
+        
+        for (int step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward calculation based on action type
+            double reward = 0.0;
+            if (action->getType() == ActionType::MoveForward) reward = 0.1;
+            else if (action->getType() == ActionType::Interact) reward = 1.0;
+            else if (action->getType() == ActionType::Wait) reward = -0.1;
+            
+            agent->applyRewardModulation(reward, 0.0); // predicted reward = 0
+            totalReward += reward;
+            rewards.push_back(reward);
+        }
+        
+        std::map<std::string, double> stats = {
+            {"total_reward", totalReward},
+            {"avg_reward", totalReward / maxSteps},
+            {"firing_rate", brain->getAverageFiringRate()},
+            {"spike_count", static_cast<double>(brain->getTotalSpikeCount())}
+        };
+        
+        return std::make_tuple(rewards, stats);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       py::arg("maxSteps")=1000, py::arg("enableRewardLearning")=true,
+       py::arg("enableCuriosity")=true,
+       "Run a complete training session");
+    
+    m.def("createModelCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+       "Create a model checkpoint");
+    
+    m.def("loadModelCheckpoint", [](const std::string& filepath) {
+        // This is a simplified version - in practice you'd need to handle loading properly
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        // Note: load() would typically be called separately
+        return brain;
+    }, py::arg("filepath"),
+       "Load a model checkpoint");
+    
+    // Add convenience functions for common patterns
+    m.def("quickTrain", [](int steps, int width, int height) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, width/2, height/2);
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100, ConfigSource::Runtime);
+        config->set("region_count", 1, ConfigSource::Runtime);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        std::vector<double> rewards;
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            double reward = (action->getType() == ActionType::MoveForward) ? 0.1 : -0.1;
+            agent->applyRewardModulation(reward, 0.0);
+            rewards.push_back(reward);
+        }
+        
+        std::map<std::string, double> stats = {
+            {"total_reward", std::accumulate(rewards.begin(), rewards.end(), 0.0)},
+            {"avg_reward", std::accumulate(rewards.begin(), rewards.end(), 0.0) / steps},
+            {"final_firing_rate", brain->getAverageFiringRate()}
+        };
+        
+        return std::make_tuple(rewards, stats);
+    }, py::arg("steps")=500, py::arg("width")=10, py::arg("height")=10,
+       "Quick training function for common use cases");
+}

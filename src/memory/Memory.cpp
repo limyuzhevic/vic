@@ -109,6 +109,88 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    
+    if (relevanceThreshold <= 0.0f || pImpl->episodes.empty()) {
+        return;
+    }
+    
+    // Sort episodes by relevance (activation, reward, temporal proximity)
+    std::vector<std::pair<size_t, float>> episodeRelevance;
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Calculate episode relevance based on multiple factors
+        float relevance = 0.0f;
+        
+        // Factor 1: Total activation (neural activity during episode)
+        float totalActivation = 0.0f;
+        for (float activation : episode.neuronActivations) {
+            totalActivation += activation;
+        }
+        relevance += totalActivation * 0.3f;
+        
+        // Factor 2: Reward value (dopamine-like signal)
+        relevance += episode.reward * 0.4f;
+        
+        // Factor 3: Recency (more recent = higher relevance)
+        float recencyWeight = std::max(0.0f, 1.0f - static_cast<float>(i) / static_cast<float>(pImpl->episodes.size()));
+        relevance += recencyWeight * 0.2f;
+        
+        // Factor 4: Novelty (difference from previous episodes)
+        if (i > 0) {
+            const auto& prevEpisode = pImpl->episodes[i - 1];
+            float similarity = 0.0f;
+            if (!episode.activeNeurons.empty() && !prevEpisode.activeNeurons.empty()) {
+                // Simple similarity calculation based on shared neurons
+                std::unordered_set<NeuronId> prevNeurons(prevEpisode.activeNeurons.begin(), prevEpisode.activeNeurons.end());
+                size_t sharedNeurons = 0;
+                for (const auto& neuronId : episode.activeNeurons) {
+                    if (prevNeurons.find(neuronId) != prevNeurons.end()) {
+                        sharedNeurons++;
+                    }
+                }
+                similarity = static_cast<float>(sharedNeurons) / 
+                           std::max(1.0f, static_cast<float>(std::max(episode.activeNeurons.size(), prevEpisode.activeNeurons.size())));
+            }
+            float novelty = 1.0f - similarity;
+            relevance += novelty * 0.1f;
+        }
+        
+        episodeRelevance.emplace_back(i, relevance);
+    }
+    
+    // Sort by relevance (highest first)
+    std::sort(episodeRelevance.begin(), episodeRelevance.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Determine which episodes to keep based on threshold
+    std::vector<EpisodicMemoryItem> consolidatedEpisodes;
+    consolidatedEpisodes.reserve(pImpl->episodes.size());
+    
+    float totalRelevance = 0.0f;
+    for (const auto& pair : episodeRelevance) {
+        totalRelevance += pair.second;
+    }
+    
+    // Keep episodes above threshold or until capacity limit is reached
+    size_t maxEpisodes = pImpl->maxEpisodes;
+    for (const auto& pair : episodeRelevance) {
+        if (totalRelevance > 0.0f && pair.second / totalRelevance >= relevanceThreshold) {
+            // Keep this episode if it meets relevance threshold
+            consolidatedEpisodes.push_back(pImpl->episodes[pair.first]);
+            
+            if (consolidatedEpisodes.size() >= maxEpisodes) {
+                break; // Capacity reached
+            }
+        }
+    }
+    
+    // Replace old episodes with consolidated ones
+    pImpl->episodes = std::move(consolidatedEpisodes);
+    
+    // Also update working memory if it was consolidated
+    // This would require access to the parent brain, but for now we'll just log the consolidation
 }
 
 // Semantic Memory Implementation
