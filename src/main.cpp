@@ -111,6 +111,20 @@ struct LearningExperiment {
             return;
         }
         
+        printLearningHeader();
+        computeAndPrintWeightStatistics();
+        computeAndPrintSynapticChanges();
+        computeAndPrintSpikeActivity();
+        evaluateAndReportLearning();
+    }
+    
+    void printLearningHeader() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Learning Experiment Results ===");
+        NLM_LOG_INFO("");
+    }
+    
+    void computeAndPrintWeightStatistics() {
         // Compute weight changes
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
@@ -121,7 +135,9 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
-        
+    }
+    
+    void computeAndPrintSynapticChanges() {
         // Count synapses that changed significantly
         size_t strengthened = 0;
         size_t weakened = 0;
@@ -140,15 +156,19 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
         NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
         NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
+    }
+    
+    void computeAndPrintSpikeActivity() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
+    }
+    
+    void evaluateAndReportLearning() {
         // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+        bool learningOccurred = (std::abs(finalWeights.size() > 0 ? std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f) / finalWeights.size() : 0.0f - (initialWeights.size() > 0 ? std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f) / initialWeights.size() : 0.0f) > 0.001f) ||
+                                (strengthened > 0 || weakened > 0));
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -212,17 +232,31 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
-    }
+    enablePlasticityForRegion(brain);
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    applyInputPattern(brain, 1000);
+    
+    // Record final state
+    experiment.recordFinalState();
+    
+    // Compute and display statistics
+    experiment.computeStatistics();
+}
+
+void enablePlasticityForRegion(std::shared_ptr<Brain> brain) {
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        }
+    }
+}
+
+void applyInputPattern(std::shared_ptr<Brain> brain, SimulationStep steps) {
+    for (SimulationStep step = 0; step < steps; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
@@ -232,17 +266,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            logProgress(step, brain->getTotalSpikeCount(), brain->getFiringNeuronCount());
         }
     }
-    
-    // Record final state
-    experiment.recordFinalState();
-    
-    // Compute and display statistics
-    experiment.computeStatistics();
+}
+
+void logProgress(SimulationStep step, size_t spikeCount, size_t firingCount) {
+    NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                 " | Spikes: " + std::to_string(spikeCount) +
+                 " | Firing: " + std::to_string(firingCount));
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -262,17 +294,34 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
     // Record initial weights
+    std::vector<float> beforeWeights = recordInitialWeights(synapses);
+    
+    // Create correlated activity: fire pre then post to trigger LTP
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    
+    createCorrelatedActivity(brain, region);
+    
+    // Record final weights
+    recordFinalWeights(synapses, beforeWeights);
+    
+    // Check if weights increased (LTP)
+    evaluateStdpResult(synapses, beforeWeights);
+}
+
+std::vector<float> recordInitialWeights(const std::vector<std::unique_ptr<Synapse>>& synapses) {
     std::vector<float> beforeWeights;
     for (size_t i = 0; i < 5; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                     " before: " + std::to_string(beforeWeights[i]));
     }
-    
-    // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    return beforeWeights;
+}
+
+void createCorrelatedActivity(std::shared_ptr<Brain> brain, NeuralRegion* region) {
+    if (!region) return;
     
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
@@ -295,16 +344,19 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }
-    
-    // Record after weights
+}
+
+void recordFinalWeights(const std::vector<std::unique_ptr<Synapse>>& synapses, const std::vector<float>& beforeWeights) {
     NLM_LOG_INFO("  After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                     " after: " + std::to_string(synapses[i]->getWeight()) +
+                     " (Δ=" + std::to_string(delta) + ")");
     }
-    
+}
+
+void evaluateStdpResult(const std::vector<std::unique_ptr<Synapse>>& synapses, const std::vector<float>& beforeWeights) {
     // Check if weights increased (LTP)
     float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
