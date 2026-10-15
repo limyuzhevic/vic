@@ -47,10 +47,16 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DENHANCED_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+ENHANCED_BINDINGS = "ON"
+
+[tool.scikit-build.cmake.options]
+NLM_SOURCE_DIR = "src"
+ENHANCED_BINDINGS = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

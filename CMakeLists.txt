@@ -127,6 +127,23 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Enhanced bindings executable
+if (ENHANCED_BINDINGS)
+    add_executable(nlm_enhanced_python
+        python/bindings_enhanced.cpp
+        src/core/Config/Config.cpp
+        src/core/Types/Types.cpp
+        src/agent/AgentBrain.cpp
+        src/brain/Brain.cpp
+    )
+    target_include_directories(nlm_enhanced_python PRIVATE python src)
+    target_link_libraries(nlm_enhanced_python PRIVATE nlm_core nlm_agent nlm_world)
+    set_target_properties(nlm_enhanced_python PROPERTIES
+        OUTPUT_NAME "nlm_enhanced_python"
+        SUFFIX ".so"
+    )
+endif()
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp

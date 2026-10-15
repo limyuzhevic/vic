@@ -70,34 +70,104 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2.5: Enhanced Python API (NEW!)
 
-### From Source (Recommended for Development)
+The enhanced NLM Python API provides significant improvements over the original bindings:
 
-```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+### Key Improvements
 
-# Build and install
-pip install .
+1. **Better Error Handling**: Custom `NLMError` exceptions for more precise error handling
+2. **Convenience Methods**: Ready-to-use methods for common operations
+3. **Enhanced Configuration Presets**: Predefined configurations for different use cases
+4. **Statistical Analysis Tools**: Built-in methods for performance monitoring
+5. **High-Level Agent Interfaces**: Simplified agent interaction with learning automation
+6. **Backward Compatibility**: Original API still available alongside enhanced features
 
-# Or install in development mode
-pip install -e .
-```
-
-### Using pyproject.toml (Modern Python Packaging)
+### Installation with Enhanced Bindings
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
+# Install with enhanced bindings (recommended)
+pip install --force-reinstall . --no-build-isolation
+
+# For development with enhanced bindings
+pip install -e . --no-build-isolation
 
 # Build only (without installing)
 pip install build
 python -m build
 
-# Install specific build from wheel
-pip install dist/*.whl
+# To verify enhanced bindings were built
+python -c "import pynlm; print('NLM version:', pynlm.__version__)"
 ```
+
+### Enhanced API Usage
+
+#### Basic Usage with Enhanced API
+
+```python
+import pynlm
+
+# Create enhanced configuration with preset
+config = pynlm.ConfigWrapper()
+config.setNeuronCount(1000)
+config.enablePlasticity()
+
+# Create enhanced brain
+brain = pynlm.createEnhancedBrain(config)
+brain.initialize()
+
+# Run simulation with progress logging
+brain.runSteps(500, logProgress=True)
+
+# Get statistics
+stats = brain.getStatistics()
+print(f"Average firing rate: {stats['average_firing_rate']}")
+```
+
+#### Agent with Enhanced Features
+
+```python
+import pynlm
+
+# Setup with preset configuration
+brain = pynlm.createBrainWithPreset("advanced")
+brain.initialize()
+
+# Create enhanced agent
+agent = pynlm.createEnhancedAgent(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initializeWorld(world)
+
+# Run episode with automatic learning
+rewards = agent.runEpisode(world, maxSteps=1000, enableLearning=True)
+print(f"Episode completed with {len(rewards)} steps")
+```
+
+### Presets Available
+
+- **"beginner"**: 500 neurons, ideal for testing and learning
+- **"advanced"**: 5000 neurons, good for realistic simulations
+- **"research"**: 20000 neurons, for intensive research
+
+### Error Handling
+
+```python
+import pynlm
+
+try:
+    config = pynlm.ConfigWrapper("my_config.json")
+    brain = pynlm.createEnhancedBrain(config)
+    brain.initialize()
+except pynlm.NLMError as e:
+    print(f"NLM Error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+---
 
 ### Verifying Installation
 
@@ -115,74 +185,235 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced NLM Python API
 
-### Basic Usage
+This section covers the enhanced Python API, which provides significant improvements over the original bindings.
 
-#### Creating a Brain
+### 3.1 Enhanced Configuration API
+
+#### Enhanced Config Class
 
 ```python
 import pynlm
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+# Create enhanced configuration
+config = pynlm.ConfigWrapper()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Convenience methods
+config.setNeuronCount(1000)                    # Set neuron count
+config.setSynapseDensity(0.1)                   # Set synapse density
+config.setConnectionProbability(0.05)          # Set connection probability
+config.enablePlasticity()                       # Enable all plasticity
+config.enableNeuromodulation()                  # Enable neuromodulation
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Check configuration
+if config.hasPlasticityEnabled():
+    print("Plasticity is enabled")
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# Get values
+print(f"Neuron count: {config.getNeuronCount()}")
+print(f"Synapse density: {config.getSynapseDensity()}")
+
+# Save configuration
+config.saveToFile("my_config.json")
 ```
 
-#### Running a Simulation
+#### Configuration Presets
 
 ```python
 import pynlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Create configuration with preset
+config = pynlm.createConfigWithPreset("advanced")
+brain = pynlm.createBrainWithPreset("advanced")
 brain.initialize()
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+print(f"Created brain with {config.getNeuronCount()} neurons")
 ```
 
-#### Creating a Simple World
+### 3.2 Enhanced Brain API
+
+#### Enhanced Brain Class
 
 ```python
 import pynlm
 
-# Create a simple 2D world
+# Create enhanced brain
+config = pynlm.ConfigWrapper()
+brain = pynlm.createEnhancedBrain(config)
+
+# Initialize with all features enabled
+brain.initialize(enableRewardModulation=True,
+                 enableCuriosity=True,
+                 enableDevelopment=True)
+
+# Run simulation with progress logging
+brain.runSteps(500, logProgress=True)
+
+# Get comprehensive statistics
+stats = brain.getStatistics()
+print(f"Total neurons: {stats['total_neurons']}")
+print(f"Total synapses: {stats['total_synapses']}")
+print(f"Average firing rate: {stats['average_firing_rate']}")
+print(f"Total spikes: {stats['total_spikes']}")
+```
+
+#### Development Features
+
+```python
+# Advance through developmental stages
+brain.advanceDevelopmentalStage()
+print(f"Current stage: {brain.getBrain().getDevelopmentalStage()}")
+
+# Track development
+for stage_name in pynlm.DevelopmentalStage.__members__:
+    if stage_name == "Adult":
+        brain.setDevelopmentalStage(pynlm.DevelopmentalStage.Adult)
+        print("Reached adult development stage")
+        break
+```
+
+### 3.3 Enhanced Agent API
+
+#### Enhanced Agent Class
+
+```python
+import pynlm
+
+# Create enhanced agent
+brain = pynlm.createBrainWithPreset("advanced")
+brain.initialize()
+
+agent = pynlm.createEnhancedAgent(brain)
 world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
 
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
+agent.initializeWorld(world)
 
-# Run world update
-world.update(timestep=0.1)
+# Run episode with automatic learning
+rewards = agent.runEpisode(world, maxSteps=500, enableLearning=True)
+
+print(f"Episode completed with {len(rewards)} steps")
+print(f"Total reward: {sum(rewards):.2f}")
+print(f"Average reward: {sum(rewards) / len(rewards):.2f}")
 ```
+
+#### Agent Statistical Analysis
+
+```python
+import pynlm
+
+# Create and run agent
+brain = pynlm.createBrainWithPreset("advanced")
+brain.initialize()
+
+agent = pynlm.createEnhancedAgent(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initializeWorld(world)
+
+# Run multiple episodes
+all_rewards = []
+for episode in range(10):
+    rewards = agent.runEpisode(world, maxSteps=200, enableLearning=True)
+    all_rewards.append(rewards)
+    print(f"Episode {episode + 1}: {sum(rewards):.2f} total reward")
+
+# Calculate statistics
+total_rewards = [sum(rewards) for rewards in all_rewards]
+avg_reward = sum(total_rewards) / len(total_rewards)
+best_reward = max(total_rewards)
+
+print(f"\nTraining Statistics:")
+print(f"Average reward per episode: {avg_reward:.2f}")
+print(f"Best episode reward: {best_reward:.2f}")
+print(f"Consistency (std dev): {sum([(r - avg_reward)**2 for r in total_rewards]) / len(total_rewards):.2f}")
+```
+
+### 3.4 Error Handling
+
+```python
+import pynlm
+
+# Error handling examples
+
+try:
+    # Load configuration from file
+    config = pynlm.ConfigWrapper("nonexistent_config.json")
+except pynlm.NLMError as e:
+    print(f"Configuration error: {e}")
+    # Fallback to default
+    config = pynlm.ConfigWrapper()
+
+try:
+    # Create and initialize brain
+    brain = pynlm.createEnhancedBrain(config)
+    if not brain.initialize():
+        raise pynlm.NLMError("Brain initialization failed")
+except pynlm.NLMError as e:
+    print(f"Brain setup error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### 3.5 Mixed Usage (Original + Enhanced API)
+
+```python
+import pynlm
+
+# Use enhanced API for setup
+config = pynlm.createConfigWithPreset("beginner")
+brain = pynlm.createEnhancedBrain(config)
+brain.initialize()
+
+# Use original API for specific operations
+original_brain = brain.getBrain()  # Get original C++ brain
+print(f"Using original API: {original_brain.getTotalNeuronCount()} neurons")
+
+# Use enhanced API for advanced features
+stats = brain.getStatistics()
+print(f"Enhanced API stats: {stats['total_spikes']} total spikes")
+
+# Both APIs work together seamlessly
+```
+
+### 3.6 Statistical Analysis Tools
+
+```python
+import pynlm
+
+# Create brain and get statistics
+brain = pynlm.createBrainWithPreset("advanced")
+brain.initialize()
+
+# Basic statistics
+stats = brain.getStatistics()
+print("=== Basic Statistics ===")
+for key, value in stats.items():
+    if isinstance(value, float):
+        print(f"{key}: {value:.3f}")
+    else:
+        print(f"{key}: {value}")
+
+# Run simulation and track changes
+print("\n=== Simulation Tracking ===")
+previous_spikes = stats['total_spikes']
+for step in range(100):
+    brain.runSteps(10)
+    stats = brain.getStatistics()
+    current_spikes = stats['total_spikes']
+    spike_increase = current_spikes - previous_spikes
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {spike_increase} new spikes, {stats['total_spikes']} total")
+    
+    previous_spikes = current_spikes
+```
+
+---
 
 ### Complete Agent Example
 

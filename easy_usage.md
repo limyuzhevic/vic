@@ -12,6 +12,12 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+**Enhanced Edition Available!**
+
+This guide covers both the original NLM Python API and the new **Enhanced NLM Python API**. If you're new to NLM, start with the basic examples. If you want more convenience features and better error handling, use the enhanced API.
+
+**Quick Recommendation:** Start with the enhanced API for the best experience!
+
 ---
 
 ## The 3 Things You Need to Know
@@ -287,6 +293,26 @@ print("Agent simulation complete!")
 
 ---
 
+## Enhanced API Introduction (NEW!)
+
+**This document now includes examples of both the original and enhanced NLM Python APIs!**
+
+The enhanced API provides significant improvements:
+
+- **Better error handling** with custom `NLMError` exceptions
+- **Convenience methods** for common operations
+- **Enhanced configuration presets** for different use cases
+- **Statistical analysis tools** for performance monitoring
+- **High-level agent interfaces** for easier simulation control
+
+**Recommendation:** Start with the enhanced API for the best experience!
+
+For more detailed information about the enhanced API, see:
+- `ENHANCED_API_DOCS.md` - Complete enhanced API documentation
+- `python/bindings_enhanced.cpp` - Enhanced C++ bindings source
+
+---
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +320,6 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**Try the enhanced API!** It's easier to use and provides better error handling and more features.
+
+That's it! You're now ready to use NLM - both the original and enhanced versions!
