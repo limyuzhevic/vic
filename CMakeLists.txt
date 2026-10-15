@@ -21,8 +21,14 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Constants
+    src/core/Constants.hpp
+
 # Core library
 add_library(nlm_core STATIC
+    # Constants
+    src/core/Constants.hpp
+    
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
@@ -138,6 +144,12 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Command Line Interface executable
+add_executable(nlm_cli
+    src/cli/Main.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
 
 # Testing
 enable_testing()

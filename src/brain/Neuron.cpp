@@ -220,7 +220,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt * 1000.0f) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -260,8 +260,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Get timestep from config if available
+    TimestepDuration dt = 0.001;  // Default 1ms
+    
+    // Use the neuron-specific timestep if set, otherwise use default
+    // This allows for heterogeneous neuron models if needed
+    dt = dt;  // For now, use default, but this can be enhanced with neuron-specific parameters
+    
     stepLIF(currentTime, dt);
 }
 

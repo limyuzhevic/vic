@@ -202,7 +202,10 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Use constants for STP time constants
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Clamp to valid range
+        pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, Impl::STP_U_MAX);
     }
     
     // Decay short-term depression
@@ -213,6 +216,8 @@ void Synapse::step(Timestamp currentTime) {
         );
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Clamp to valid range
+        pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, Impl::STP_U_MAX);
     }
     
     // Decay eligibility trace for reward-modulated learning
