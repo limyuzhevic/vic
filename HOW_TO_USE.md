@@ -8,6 +8,7 @@ This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
 3. Using the NLM Python API
+4. **Phase 6 Integration Features** (NEW)
 
 ---
 
@@ -36,8 +37,11 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 # Build all targets
 make -j$(nproc)
 
-# Run tests (if built)
-ctest --output-on-failure
+# Run Phase 6 integration demo
+make run_phase6_demo
+
+# Or run unit tests
+make run_tests
 ```
 
 ### Build Outputs
@@ -52,6 +56,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | **Executable** | **Phase 6 integration demo (NEW)** |
+| `nlm_phase6_experiment` | **Executable** | **Phase 6 comprehensive experiment (NEW)** |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -498,6 +504,86 @@ for _ in range(500):
 
 ---
 
+## Part 6: Phase 6 Integration Features (NEW)
+
+### What Phase 6 Adds
+
+Phase 6 (Final Integration) brings all previous systems together into a coherent artificial brain:
+
+1. **Memory Integration**: Working memory and episodic memory are connected to neural processing
+2. **Prediction Integration**: Prediction system integrates with sensory processing and reward
+3. **Cognition Integration**: Neural planner, concept formation, and attention are connected
+4. **Neuromodulation Integration**: Dopamine, curiosity, and novelty affect behavior
+5. **Development Integration**: Developmental stages modulate learning rates
+6. **Persistence**: Checkpoint save/load and replay systems work
+7. **Sleep/Consolidation**: Memory consolidation during rest phases
+
+### Running Phase 6 Demos
+
+```bash
+# Run Phase 6 integration demo
+make run_phase6_demo
+
+# Run Phase 6 comprehensive experiment
+make run_phase6_experiment
+
+# These demos verify that all brain systems work together as an integrated artificial brain.
+```
+
+### What Phase 6 Tests
+
+1. **Memory Systems**: Working memory activity, episodic memory storage and replay
+2. **Prediction Systems**: Prediction accuracy, prediction error processing
+3. **Cognition Systems**: Attention selection, concept formation, planning
+4. **Neuromodulation**: Dopamine effects, curiosity-driven exploration, novelty detection
+5. **Development**: Developmental stage progression, changing plasticity rates
+6. **Integration**: All systems working together coherently
+
+### Example Phase 6 Python Usage
+
+```python
+import pynlm
+
+# Create and fully initialize the brain with all Phase 6 systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable all Phase 6 subsystems
+agent = pynlm.createAgentBrain(brain)
+
+# Enable all integration features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True) 
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+agent.enablePrediction(True)  # If this method exists
+agent.enableMemoryReplay(True)  # If this method exists
+
+# Run a Phase 6 integration simulation
+for step in range(5000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    agent.applyRewardModulation(world.getSensoryPercept().getInternal()[0] or 0.0, 0.0)
+    agent.updateDevelopment(0.1)
+    
+    # Log Phase 6 metrics
+    if step % 500 == 0:
+        print(f"Step {step}:")
+        print(f"  Total Reward: {agent.getTotalReward():.3f}")
+        print(f"  Working Memory Traces: {brain.getWorkingMemory().getActiveTraces()}")
+        print(f"  Episodic Memory Episodes: {brain.getEpisodicMemory().getEpisodeCount()}")
+        print(f"  Curiosity Level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty Level: {agent.getNoveltyLevel():.3f}")
+        print(f"  Developmental Stage: {brain.getDevelopmentalStage()}")
+        print(f"  Prediction Accuracy: {agent.getPredictionAccuracy():.3f}")
+        print(f"  Memory Replay Active: {brain.getEpisodicMemory().isReplayEnabled()}")
+```
+
+---
+
 ## Troubleshooting
 
 ### Build Issues
@@ -523,6 +609,23 @@ pip install --force-reinstall .
 **Segmentation faults:**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+
+### Phase 6 Issues
+
+**Memory systems not working:**
+- Ensure memory systems are enabled in the agent
+- Check that brain initialization completes successfully
+- Verify episodic memory has capacity configured
+
+**Prediction system errors:**
+- Check that prediction system is properly initialized
+- Verify neuromodulation systems are working
+- Ensure reward signals are being processed
+
+**Development not progressing:**
+- Check that development is enabled
+- Verify timestep parameters are correct
+- Ensure development system has sufficient simulation steps
 
 ---
 

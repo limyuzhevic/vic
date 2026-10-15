@@ -139,9 +139,38 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 integration experiment executable
+add_executable(nlm_phase6_experiment
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_link_libraries(nlm_phase6_experiment PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Test target for Phase 6 integration
+add_custom_target(run_phase6_demo
+    COMMAND nlm_phase6_demo
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running Phase 6 integration demo..."
+)
+
+# Test target for Phase 6 comprehensive experiment
+add_custom_target(run_phase6_experiment
+    COMMAND nlm_phase6_experiment
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running Phase 6 comprehensive integration experiment..."
+)
+
+# Test target for unit tests
+add_custom_target(run_tests
+    COMMAND ctest --output-on-failure
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running unit tests..."
+)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

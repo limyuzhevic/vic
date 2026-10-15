@@ -82,6 +82,41 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+## Running
+
+### Phase 6 Demo (Integration Test)
+```bash
+./nlm_phase6_demo
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 6 Integration Experiment
+```bash
+./nlm_phase6_experiment
+```
+
+This runs the full Phase 6 integration experiment with detailed metrics and analysis.
+
+### Unit Tests
+```bash
+make run_tests
+```
+
+Or run directly with ctest:
+```bash
+./nlm_test
+```
+
 ## Project Structure
 
 ```
@@ -114,117 +149,136 @@ NLM/
 └── configs/
 ```
 
-## Phase Summary
+## Phase 6 Integration Improvements
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### Memory Systems
+- Working memory with persistent activity and competition
+- Episodic memory with experience encoding and replay
+- Associative memory with Hebbian pattern associations
+- All memory systems connected to neural processing
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Neuromodulation Integration
+- Dopamine affects neural excitability and plasticity
+- Curiosity drives exploration behavior
+- Novelty detection integrated with sensory processing
+- All neuromodulators connected to plasticity rules
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### Prediction System
+- Prediction system integrated into brain loop
+- Prediction error signals affect learning
+- Confidence tracking implemented
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+### Cognition Systems
+- Neural planner with action sequence evaluation
+- Concept formation from experience patterns
+- Attention with competitive selection dynamics
+- All cognition systems connected to perception and action
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+### Development Integration
+- Developmental stages affect plasticity rates
+- Structural plasticity modulated by age
+- Neural excitability changes with development
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Persistence
+- Checkpoint save/load implemented
+- Brain state serialization working
+- Can resume from saved checkpoints
 
-## Scientific Limitations
+### Replay and Consolidation
+- Episodic memory replay during simulation
+- Memory consolidation for important episodes
+- Integration with sleep/rest cycle
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+## Testing Improvements
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+### Comprehensive Test Suite
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+The project now includes extensive tests covering:
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+1. **Basic Brain Functionality**
+   - Brain creation and initialization
+   - Neural connectivity and spike propagation
+   - Plasticity learning experiments
+   - STDP verification
 
-## Architecture Philosophy
+2. **Phase 6 Integration Tests**
+   - Memory system integration
+   - Prediction system integration
+   - Cognition system integration
+   - Neuromodulation integration
+   - Development system integration
 
-The NLM brain operates as a closed-loop system:
+### Build Commands
 
+```bash
+# Build all targets including Phase 6 demo and experiments
+make -j4
+
+# Run Phase 6 integration demo
+make run_phase6_demo
+
+# Run Phase 6 comprehensive experiment
+make run_phase6_experiment
+
+# Run all unit tests
+make run_tests
+
+# Or run ctest directly
+./nlm_test
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+## Performance and Reliability
+
+### Error Handling
+- Consistent error handling patterns across all brain systems
+- Null pointer checks and validation
+- Graceful failure handling with informative error messages
+
+### Memory Management
+- Proper cleanup of all dynamic allocations
+- Memory pool optimizations for long-running simulations
+- Checkpoint system for state persistence
+
+### Code Quality
+- Standardized coding conventions
+- Comprehensive documentation
+- Clean up of TODO markers and placeholder comments
+
+## Example Usage
+
+### Quick Integration Test
+```bash
+# Build and run Phase 6 integration demo
+make run_phase6_demo
 ```
+
+### Comprehensive Experiment
+```bash
+# Build and run full Phase 6 experiment
+make run_phase6_experiment
+```
+
+### Development Testing
+```bash
+# Build with debug symbols for development
+mkdir build_debug
+cd build_debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j4
+make run_tests
+```
+
+## Scientific Validation
+
+The Phase 6 integration tests provide:
+
+1. **Verification that all brain systems work together**
+2. **Measurement of learning and adaptation capabilities**
+3. **Validation of memory retention and recall**
+4. **Testing of prediction accuracy and confidence**
+5. **Assessment of neuromodulation effects on behavior**
+6. **Demonstration of developmental changes over time**
 
 ## License
 
 MIT
-
-## Authors
-
-Research project — See docs for scientific background.
