@@ -62,10 +62,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        auto* brainPtr = agent.getBrain();
+        if (brainPtr) {
+            auto* region = brainPtr->getRegions()[0].get();
+            if (region) {
+                SensoryPercept percept = world.observe(region);
+                agent.processSensoryInput(percept);
+            }
+        }
         
         // Brain step
         brain->step(step, step * 0.001);
@@ -74,10 +78,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        if (brainPtr && brainPtr->getRegions()[0].get()) {
+            world.applyAction(brainPtr->getRegions()[0].get(), cmd);
+        }
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = 0.0f;
+        if (brainPtr && brainPtr->getRegions()[0].get()) {
+            reward = world.computeReward(brainPtr->getRegions()[0].get());
+        }
         totalReward += reward;
         
         // Apply reward modulation
@@ -131,16 +140,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+            // Create new brain and load with exception safety
+            std::shared_ptr<Brain> brain2;  // Declare variable for exception safety
+            try {
+                brain2 = std::make_shared<Brain>(cfg);
+                brain2->initialize();
+                
+                if (brain2->load(config.checkpointPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint");
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Exception during checkpoint test: ") + e.what());
             }
+            // brain2 is automatically cleaned up when it goes out of scope
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
         }

@@ -273,9 +273,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
              py::arg("cmd"), py::arg("currentTime"))
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::copy)
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::copy)
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
@@ -318,16 +318,17 @@ PYBIND11_MODULE(pynlm, m) {
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
+.def("getRegion", &Brain::getRegion,
+             py::arg("id"),
+             "Get a region by ID",
+             py::return_value_policy::reference)
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
         .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
+             "Get all regions",
+             py::return_value_policy::copy)
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -348,8 +349,8 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+             "Get the configuration",
+             py::return_value_policy::copy)
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
@@ -385,8 +386,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             "Get the underlying brain",
+             py::return_value_policy::reference)
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -405,15 +406,27 @@ PYBIND11_MODULE(pynlm, m) {
     }, "Create a default configuration");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
+        try {
+            return std::make_shared<Brain>(config);
+        } catch (const std::exception& e) {
+            throw py::exception<std::runtime_error>(e.what());
+        }
     }, py::arg("config"), "Create a new brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
+        try {
+            return std::make_shared<SimpleWorld>();
+        } catch (const std::exception& e) {
+            throw py::exception<std::runtime_error>(e.what());
+        }
     }, "Create a new simple world");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
+        try {
+            return std::make_shared<AgentBrain>(brain);
+        } catch (const std::exception& e) {
+            throw py::exception<std::runtime_error>(e.what());
+        }
     }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
