@@ -103,6 +103,9 @@ public:
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
     
+// Update plasticity rules (called automatically in step)
+    void updatePlasticity();
+    
     // Apply developmental changes (called automatically in step)
     void develop();
     
@@ -194,6 +197,22 @@ public:
     void logStatus() const;
     
 private:
+    // Step helper methods - break down the main step() method
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(Timestamp currentTime, TimestepDuration timestep);
+    void detectSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory(TimestepDuration timestep);
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void collectStatistics();
+    
     struct Impl;
     Impl* pImpl;
 };

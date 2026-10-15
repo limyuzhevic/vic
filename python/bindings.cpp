@@ -28,6 +28,17 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Register additional C++ standard exceptions for better Python error handling
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+    py::register_exception<std::domain_error>(m, "DomainError");
+    py::register_exception<std::length_error>(m, "LengthError");
+    py::register_exception<std::logic_error>(m, "LogicError");
+    
+    // Register memory-related exceptions
+    py::register_exception<std::bad_alloc>(m, "MemoryError");
+    py::register_exception<std::bad_exception>(m, "BadExceptionError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
