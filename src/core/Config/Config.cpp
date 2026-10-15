@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <ctime>
+#include <cmath>
+#include <limits>
+#include <numeric>
 
 namespace nlm {
 
@@ -27,6 +32,48 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Try to detect file format based on extension
+    std::string ext = "." + std::string(std::filesystem::path(filepath).extension().string());
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    
+    // First try JSON format
+    if (ext == ".json") {
+        success = loadFromJSON(filepath);
+    } 
+    // Then try YAML format  
+    else if (ext == ".yaml" || ext == ".yml") {
+        success = loadFromYAML(filepath);
+    }
+    // Default to simple format
+    else {
+        success = loadFromSimpleFormat(filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO: Implement proper JSON parsing using nlohmann::json or similar
+    // For now, fall back to simple format
+    NLM_LOG_WARNING("JSON parsing not implemented, using simple format fallback");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO: Implement proper YAML parsing using yaml-cpp or similar
+    // For now, fall back to simple format
+    NLM_LOG_WARNING("YAML parsing not implemented, using simple format fallback");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -43,7 +90,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }

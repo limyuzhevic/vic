@@ -333,67 +333,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    
+    // Optimize neuron stepping by reducing redundant loops
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    
+    // Optimize by collecting neurons and regions in a single pass
+    // to reduce redundant loops through the data structure
+    std::vector<std::pair<NeuralRegion*, Neuron*>> neuronRegionPairs;
+    neuronRegionPairs.reserve(pImpl->totalNeuronCount() * 2);
+    
+    // First pass: collect all neuron-region pairs
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                neuronRegionPairs.emplace_back(region.get(), neuron);
+            }
+        }
+    }
+    
+    // Process spikes in a single optimized loop
+    for (const auto& [region, neuron] : neuronRegionPairs) {
+        // Check if neuron just fired this step
+        const auto& state = neuron->getState();
+        bool justFired = (state.firingState == FiringState::Refractory &&
+                         state.lastSpikeTime >= 0.0f &&
+                         std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+        if (justFired) {
+            // Neuron fired this step - queue the spike
+            SpikeEvent event(neuron->getId(), currentTime, currentStep);
+            pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
+            // Record post-synaptic spike for incoming synapses (plasticity)
+            auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+            for (Synapse* syn : incomingSynapses) {
+                syn->recordPostSpike(currentTime);
+            }
 
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+            // Get outgoing synapses and schedule delayed spike events
+            auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+            for (Synapse* syn : outgoingSynapses) {
+                // Create delayed spike event
+                Delay delay = syn->getDelay();
+                SimulationStep deliveryStep = currentStep + delay;
+                Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
+                DelayedSpikeEvent delayedEvent(
+                    neuron->getId(),
+                    syn->getDestinationNeuron(),
+                    syn->getId(),
+                    syn->getWeight(),
+                    syn->getType(),
+                    currentTime,
+                    deliveryTime,
+                    currentStep,
+                    deliveryStep
+                );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
-                    }
-                }
+                // Record pre-synaptic spike for plasticity
+                syn->recordPreSpike(currentTime);
+            }
+            
+            // Store to working memory - neurons that fire become part of working memory
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                    std::abs(state.membranePotential - state.restingPotential) / 10.0f);
             }
         }
     }

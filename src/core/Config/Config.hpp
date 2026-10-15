@@ -1,13 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -42,6 +32,30 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Helper function to convert string to ConfigSource
+inline ConfigSource stringToConfigSource(const std::string& sourceStr) {
+    std::string lower = sourceStr;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    if (lower == "default") return ConfigSource::Default;
+    if (lower == "file") return ConfigSource::File;
+    if (lower == "commandline" || lower == "command_line") return ConfigSource::CommandLine;
+    if (lower == "runtime") return ConfigSource::Runtime;
+    
+    return ConfigSource::Default;
+}
+
+// Helper function to convert ConfigSource to string
+inline std::string configSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
+}
 
 // Main configuration class
 class Config {
