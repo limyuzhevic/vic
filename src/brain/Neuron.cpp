@@ -204,7 +204,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Exact solution: V(t+dt) = V_rest + (V - V_rest) * exp(-dt/tau) + I/C * tau * (1 - exp(-dt/tau))
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -213,28 +213,33 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Convert timestep from seconds to milliseconds for consistency
+    float dt_ms = static_cast<float>(dt) * 1000.0f;
+    
+    // Precompute exponential factor for stability
+    float alpha = std::exp(-dt_ms / tau);
+    
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = (pImpl->synapticInput / C) * tau * (1.0f - alpha);
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Exact exponential integration: V_new = V_rest + (V - V_rest) * alpha + synapticContribution
+    MembranePotential V_new = V_rest + (V - V_rest) * alpha + synapticContribution;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
+        V_new -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // More robust clamping with wider bounds to prevent instability
+    V_new = std::clamp(V_new, -150.0f, 100.0f);
+    
+    // Update membrane potential
+    V = V_new;
     
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike

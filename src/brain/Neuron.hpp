@@ -106,8 +106,7 @@ public:
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
     
-    // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
+    // Get total current injected into the neuron
     MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
     

@@ -345,20 +345,47 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFromFile = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
+                configFromFile = true;
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+                configFromFile = true;
             }
+        } else if (arg == "--help" || arg == "-h") {
+            printBanner();
+            NLM_LOG_INFO("\nUsage: nlm [options]\n");
+            NLM_LOG_INFO("Options:");
+            NLM_LOG_INFO("  --config=<file>    Specify configuration file (default: configs/default.cfg)");
+            NLM_LOG_INFO("  --help, -h         Show this help message");
+            NLM_LOG_INFO("  --version          Show version information");
+            NLM_LOG_INFO("  --neurons=<N>      Set neuron count");
+            NLM_LOG_INFO("  --regions=<N>      Set region count");
+            NLM_LOG_INFO("  --timestep=<t>     Set simulation timestep");
+            NLM_LOG_INFO("  --seed=<s>         Set random seed");
+            NLM_LOG_INFO("  --quiet            Run quietly (minimal output)");
+            NLM_LOG_INFO("  --verbose          Run with verbose output");
+            NLM_LOG_INFO("  --validate-only    Only validate configuration, don't run simulation");
+            return 0;
+        } else if (arg == "--version") {
+            printBanner();
+            NLM_LOG_INFO("Version: NLM Phase 2: Real Neural Computation");
+            NLM_LOG_INFO("Build: Enhanced with advanced memory systems and neuromodulation");
+            return 0;
         }
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (configFromFile) {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults.");
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -382,6 +409,33 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Add new advanced configuration options for Phase 3
+    config->set("enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("enable_short_term_plasticity", true, ConfigSource::Default);
+    config->set("enable_eligibility_traces", true, ConfigSource::Default);
+    config->set("enable_neuromodulation", true, ConfigSource::Default);
+    config->set("enable_curiosity", true, ConfigSource::Default);
+    config->set("enable_prediction_error", true, ConfigSource::Default);
+    config->set("enable_working_memory", true, ConfigSource::Default);
+    config->set("enable_episodic_memory", true, ConfigSource::Default);
+    config->set("enable_associative_memory", true, ConfigSource::Default);
+    
+    // Enhanced neuromodulation parameters
+    config->set("dopamine_plasticity_factor", 1.0f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+    config->set("reward_decay_rate", 0.95f, ConfigSource::Default);
+    
+    // Memory system parameters
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("max_episodes", 1000, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+    
+    // Performance and optimization parameters
+    config->set("checkpoint_interval", 10000, ConfigSource::Default);
+    config->set("checkpoint_compression", "balanced", ConfigSource::Default);
+    config->set("enable_parallel_processing", false, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,20 +444,40 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  enable_structural_plasticity: " + std::to_string(config->getOr<bool>("enable_structural_plasticity", true)));
+    NLM_LOG_INFO("  enable_short_term_plasticity: " + std::to_string(config->getOr<bool>("enable_short_term_plasticity", true)));
+    NLM_LOG_INFO("  enable_neuromodulation: " + std::to_string(config->getOr<bool>("enable_neuromodulation", true)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Validate timestep (must be positive and reasonable)
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep) + ". Must be positive.");
+        return 1;
+    }
+    if (timestep > 0.1) {
+        NLM_LOG_WARNING("Large simulation timestep may cause instability: " + std::to_string(timestep) + "s");
+    }
+    
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("This may be due to invalid configuration parameters");
+        return 1;
+    }
+    
+    // Validate brain initialization by checking essential components
+    if (brain->getTotalNeuronCount() <= 0) {
+        NLM_LOG_ERROR("Brain initialized with no neurons!");
         return 1;
     }
     
