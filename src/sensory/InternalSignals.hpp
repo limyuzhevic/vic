@@ -1,25 +1,24 @@
 #pragma once
 
-#include "SensoryInput.hpp"
+#include <vector>
+#include <string>
 
 namespace nlm {
 
-// Internal signals processor
-// PLACEHOLDER - Phase 2 will process signals from within the brain
-
-class InternalSignalsProcessor {
+// Internal signals (来自大脑内部状态)
+class InternalSignals : public SensoryInput {
 public:
-    InternalSignalsProcessor();
-    ~InternalSignalsProcessor();
+    InternalSignals();
+    ~InternalSignals() override;
     
-    // Process internal signals
-    void process(const InternalSignals& signals);
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
     
-    // Get processed representation
-    const std::vector<float>& getProcessedSignals() const;
-    
-    // Get homeostasis signals
-    const std::vector<float>& getHomeostaticSignals() const;
+    // Add signal
+    void addSignal(float value);
+    void clearSignals();
     
 private:
     struct Impl;

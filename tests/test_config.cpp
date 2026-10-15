@@ -1,7 +1,7 @@
-// Config Tests
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 namespace test_config {
 
@@ -79,11 +79,18 @@ void testConfigKeys() {
 }
 
 void runAll() {
+    std::cout << "Running Config tests..." << std::endl;
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    std::cout << "All Config tests passed!" << std::endl;
 }
 
 } // namespace test_config
+
+int main() {
+    test_config::runAll();
+    return 0;
+}

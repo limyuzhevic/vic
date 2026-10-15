@@ -1,31 +1,74 @@
+// Vision implementation for NLM - Vision.cpp
+// This implements the Vision class defined in SensoryInput.hpp
+
 #include "Vision.hpp"
 
 namespace nlm {
 
-struct VisionProcessor::Impl {
-    std::vector<float> features;
-    size_t featureDimensions;
+struct Vision::Impl {
+    std::vector<float> data_;
+    size_t width_;
+    size_t height_;
+    size_t channels_;
     
-    Impl() : featureDimensions(0) {}
+    Impl() : width_(0), height_(0), channels_(0) {}
 };
 
-VisionProcessor::VisionProcessor() : pImpl(new Impl) {}
+Vision::Vision() : pImpl(new Impl) {}
 
-VisionProcessor::~VisionProcessor() = default;
-
-void VisionProcessor::process(const Vision& input) {
-    // TODO PHASE 2: Implement real vision processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
-    pImpl->features = input.getData();
-    pImpl->featureDimensions = input.getDimensions();
+Vision::Vision(size_t width, size_t height, size_t channels)
+    : pImpl(new Impl) {
+    pImpl->width_ = width;
+    pImpl->height_ = height;
+    pImpl->channels_ = channels;
+    pImpl->data_.resize(width * height * channels, 0.0f);
 }
 
-const std::vector<float>& VisionProcessor::getFeatures() const {
-    return pImpl->features;
+Vision::~Vision() = default;
+
+const char* Vision::getType() const {
+    return "Vision";
 }
 
-size_t VisionProcessor::getFeatureDimensions() const {
-    return pImpl->featureDimensions;
+const std::vector<float>& Vision::getData() const {
+    return pImpl->data_;
+}
+
+size_t Vision::getDimensions() const {
+    return pImpl->width_ * pImpl->height_ * pImpl->channels_;
+}
+
+std::unique_ptr<SensoryInput> Vision::clone() const {
+    auto clone = std::make_unique<Vision>(pImpl->width_, pImpl->height_, pImpl->channels_);
+    clone->pImpl->data_ = pImpl->data_;
+    clone->setTimestamp(timestamp_);
+    return clone;
+}
+
+void Vision::setData(const std::vector<float>& data) {
+    if (data.size() != pImpl->data_.size()) {
+        pImpl->data_.resize(data.size());
+    }
+    std::copy(data.begin(), data.end(), pImpl->data_.begin());
+}
+
+void Vision::setData(float* data, size_t size) {
+    if (size != pImpl->data_.size()) {
+        pImpl->data_.resize(size);
+    }
+    std::copy(data, data + size, pImpl->data_.begin());
+}
+
+size_t Vision::getWidth() const {
+    return pImpl->width_;
+}
+
+size_t Vision::getHeight() const {
+    return pImpl->height_;
+}
+
+size_t Vision::getChannels() const {
+    return pImpl->channels_;
 }
 
 } // namespace nlm

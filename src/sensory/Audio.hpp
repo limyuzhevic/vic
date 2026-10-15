@@ -1,25 +1,28 @@
 #pragma once
 
-#include "SensoryInput.hpp"
+#include <vector>
+#include <string>
 
 namespace nlm {
 
-// Audio processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real audio processing using NLM's own neurons
-
-class AudioProcessor {
+// Audio input placeholder
+class Audio : public SensoryInput {
 public:
-    AudioProcessor();
-    ~AudioProcessor();
+    Audio();
+    explicit Audio(size_t sampleRate, size_t numSamples);
+    ~Audio() override;
     
-    // Process audio input
-    void process(const Audio& input);
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
     
-    // Get feature representation
-    const std::vector<float>& getFeatures() const;
+    // Set audio data
+    void setData(const std::vector<float>& data);
+    void setSampleRate(size_t rate);
     
-    // Get feature dimensionality
-    size_t getFeatureDimensions() const;
+    size_t getSampleRate() const;
+    size_t getNumSamples() const;
     
 private:
     struct Impl;
