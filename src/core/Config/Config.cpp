@@ -86,7 +86,22 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Properly serialize the value based on its type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t> ||
+                                std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else {
+                // For complex types, use string representation
+                file << entry.key << " = \"" << arg << "\"\n";
+            }
+        }, entry.value);
     }
     
     return true;

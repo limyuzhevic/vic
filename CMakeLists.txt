@@ -92,13 +92,12 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Performance monitoring system
+add_library(nlm_performance STATIC
+    src/performance/NLMPerformanceMonitoring.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_include_directories(nlm_performance PUBLIC src/performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core nlm_agent nlm_world nlm_scripting nlm_debugging)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
@@ -125,6 +124,13 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
+
+# Advanced CLI executable for expert users
+add_executable(nlm_advanced
+    src/advanced_cli.cpp
+)
+target_link_libraries(nlm_advanced PUBLIC nlm_core nlm_agent nlm_world nlm_scripting nlm_debugging nlm_performance)
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
@@ -133,11 +139,11 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Advanced systems test executable
+add_executable(nlm_advanced_tests
+    src/test/AdvancedSystemsTests.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_advanced_tests PUBLIC nlm_core nlm_agent nlm_world nlm_scripting nlm_debugging nlm_performance)
 
 # Testing
 enable_testing()
