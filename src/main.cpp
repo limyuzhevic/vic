@@ -340,13 +340,19 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Enhanced command line argument parsing
+    bool enableProgressReporting = false;
+    bool enableDebugMode = false;
+    bool saveAfterCompletion = false;
+    bool loadFromCheckpoint = false;
+    std::string checkpointFile;
+    std::string simulationMode = "standard";
+    uint64_t debugLevel = 0;
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Parse enhanced command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
@@ -354,17 +360,49 @@ int main(int argc, char** argv) {
                 configFile = argv[++i];
             }
         }
+        else if (arg == "--progress") {
+            enableProgressReporting = true;
+        }
+        else if (arg == "--debug") {
+            enableDebugMode = true;
+            debugLevel = 1;
+        }
+        else if (arg == "--verbose-debug") {
+            enableDebugMode = true;
+            debugLevel = 2;
+        }
+        else if (arg == "--debug-level" && i + 1 < argc) {
+            enableDebugMode = true;
+            debugLevel = std::stoi(argv[++i]);
+        }
+        else if (arg == "--save") {
+            saveAfterCompletion = true;
+        }
+        else if (arg == "--load" && i + 1 < argc) {
+            loadFromCheckpoint = true;
+            checkpointFile = argv[++i];
+        }
+        else if (arg == "--simulation-mode" && i + 1 < argc) {
+            simulationMode = argv[++i];
+            // Validate mode
+            if (simulationMode != "standard" && simulationMode != "fast" && 
+                simulationMode != "precise" && simulationMode != "debug") {
+                NLM_LOG_WARNING("Unknown simulation mode: " + simulationMode + ", using 'standard'");
+                simulationMode = "standard";
+            }
+        }
+        else if (arg == "--checkpoint-dir" && i + 1 < argc) {
+            // Set checkpoint directory for CheckpointManager
+            // This would require creating a CheckpointManager instance
+            checkpointDir = argv[++i];
+        }
+        else if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+        }
+        else if (arg == "--version") {
+            printVersionAndExit();
+        }
     }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,7 +420,30 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Simulation mode specific settings
+    if (simulationMode == "fast") {
+        config->set("simulation_timestep", 0.01, ConfigSource::Runtime); // Larger timestep for speed
+        config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Runtime); // Fewer neurons
+    } else if (simulationMode == "precise") {
+        config->set("simulation_timestep", 0.0001, ConfigSource::Runtime); // Smaller timestep for accuracy
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime); // More neurons
+    } else if (simulationMode == "debug") {
+        config->set("random_seed", static_cast<int64_t>(12345), ConfigSource::Runtime); // Deterministic debug run
+    }
+    
+    // Log configuration summary with enhanced information
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== NLM Phase 2 Configuration Summary ===");
+    NLM_LOG_INFO("Configuration file: " + configFile);
+    NLM_LOG_INFO("Simulation mode: " + simulationMode);
+    if (enableDebugMode) {
+        NLM_LOG_INFO("Debug mode: Enabled (level " + std::to_string(debugLevel) + ")");
+    }
+    if (enableProgressReporting) {
+        NLM_LOG_INFO("Progress reporting: Enabled");
+    }
+    NLM_LOG_INFO("Save after completion: " + std::string(saveAfterCompletion ? "Enabled" : "Disabled"));
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -396,6 +457,15 @@ int main(int argc, char** argv) {
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Load checkpoint if requested (after initialization to ensure proper state)
+    if (loadFromCheckpoint) {
+        NLM_LOG_INFO("Loading from checkpoint: " + checkpointFile);
+        if (!brain->load(checkpointFile)) {
+            NLM_LOG_ERROR("Failed to load checkpoint: " + checkpointFile);
+            // Continue with initialization instead of failing
+        }
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");
@@ -445,5 +515,69 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
+    // Save checkpoint if requested
+    if (saveAfterCompletion) {
+        // Generate a timestamp-based filename since we can't access internal brain state
+        auto now = std::chrono::system_clock::now();
+        auto now_time = std::chrono::system_clock::to_time_t(now);
+        std::string timestamp = std::to_string(now_time);
+        std::string checkpointFile = "nlm_checkpoint_" + timestamp + ".nlmckpt";
+        NLM_LOG_INFO("Saving checkpoint: " + checkpointFile);
+        if (!brain->save(checkpointFile)) {
+            NLM_LOG_ERROR("Failed to save checkpoint: " + checkpointFile);
+        } else {
+            NLM_LOG_INFO("Checkpoint saved successfully");
+        }
+    }
+    
     return 0;
+}
+
+// Helper function to print help information
+void printHelpAndExit() {
+    std::cout << "=== NLM Phase 2 Help ===" << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration options:" << std::endl;
+    std::cout << "  --config=<file>           Configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Simulation options:" << std::endl;
+    std::cout << "  --simulation-mode=<mode>  Simulation mode: standard|fast|precise|debug" << std::endl;
+    std::cout << "  --progress                Enable progress reporting" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Checkpoint options:" << std::endl;
+    std::cout << "  --load=<file>             Load from checkpoint file" << std::endl;
+    std::cout << "  --save                    Save checkpoint after completion" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Debug options:" << std::endl;
+    std::cout << "  --debug                   Enable debug mode (level 1)" << std::endl;
+    std::cout << "  --verbose-debug           Enable verbose debug mode (level 2)" << std::endl;
+    std::cout << "  --debug-level=<level>     Set debug level (0-3)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Info options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --version                 Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --debug --progress" << std::endl;
+    std::cout << "  nlm --simulation-mode=fast --save" << std::endl;
+    std::cout << "  nlm --load=saved_checkpoint.nlmckpt --progress" << std::endl;
+    std::exit(0);
+}
+
+// Helper function to print version information
+void printVersionAndExit() {
+    std::cout << "=== NLM Phase 2 Version ===" << std::endl;
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2: Real Neural Computation)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "This is an experimental artificial developmental brain project." << std::endl;
+    std::cout << "Phase 2 implements real spiking neural computation with:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neurons" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+    std::exit(0);
 }

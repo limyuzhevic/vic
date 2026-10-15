@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,14 +20,93 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Parse JSON and convert to internal format
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
+            
+            // Convert JSON value to appropriate ConfigValue type
+            if (it->is_boolean()) {
+                value = it->get<bool>();
+            } else if (it->is_number_integer()) {
+                value = it->get<int64_t>();
+            } else if (it->is_number_float()) {
+                value = it->get<double>();
+            } else if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_array()) {
+                // Handle arrays - determine element type
+                const auto& arr = *it;
+                if (arr.empty()) {
+                    continue;  // Skip empty arrays
+                }
+                
+                // Check if all elements are same type
+                bool allInts = std::all_of(arr.begin(), arr.end(), [](const auto& el) { return el.is_number_integer(); });
+                bool allDoubles = std::all_of(arr.begin(), arr.end(), [](const auto& el) { return el.is_number_float(); });
+                bool allStrings = std::all_of(arr.begin(), arr.end(), [](const auto& el) { return el.is_string(); });
+                
+                if (allInts) {
+                    std::vector<int64_t> intArray;
+                    intArray.reserve(arr.size());
+                    for (const auto& el : arr) {
+                        intArray.push_back(el.get<int64_t>());
+                    }
+                    value = intArray;
+                } else if (allDoubles) {
+                    std::vector<double> doubleArray;
+                    doubleArray.reserve(arr.size());
+                    for (const auto& el : arr) {
+                        doubleArray.push_back(el.get<double>());
+                    }
+                    value = doubleArray;
+                } else if (allStrings) {
+                    std::vector<std::string> stringArray;
+                    stringArray.reserve(arr.size());
+                    for (const auto& el : arr) {
+                        stringArray.push_back(el.get<std::string>());
+                    }
+                    value = stringArray;
+                } else {
+                    // Mixed types - store as string representation
+                    std::string arrayStr = "[";
+                    for (size_t i = 0; i < arr.size(); ++i) {
+                        if (i > 0) arrayStr += ", ";
+                        arrayStr += arr[i].dump();
+                    }
+                    arrayStr += "]";
+                    value = arrayStr;
+                }
+            } else {
+                // For other types (objects, null), store as string representation
+                value = it->dump();
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // Not valid JSON, fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+    } catch (...) {
+        // Any other error, fall back to simple format
+        file.clear();
+        file.seekg(0);
+    }
+    
+    // Fallback to simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -84,10 +164,40 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object
+    nlohmann::json jsonConfig;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to JSON based on its type
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            
+            if constexpr (std::is_same_v<T, int64_t>) {
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                // Convert int64_t vector to array
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                // Convert double vector to array
+                jsonConfig[entry.key] = val;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // Convert string vector to array
+                jsonConfig[entry.key] = val;
+            } else {
+                // For any other type, use string representation
+                jsonConfig[entry.key] = "[UNSUPPORTED_TYPE]";
+            }
+        }, entry.value);
     }
+    
+    // Write JSON to file with indentation for readability
+    file << jsonConfig.dump(2);
     
     return true;
 }

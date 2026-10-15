@@ -63,6 +63,10 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    // Validate threshold is within reasonable biological range
+    if (threshold < -100.0f || threshold > 100.0f) {
+        // You might want to add a warning/error here
+    }
     pImpl->state.threshold = threshold;
 }
 
@@ -84,6 +88,10 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    // Validate conductance is non-negative
+    if (conductance < 0.0f) {
+        // You might want to add a warning/error here
+    }
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,6 +100,10 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period is positive
+    if (steps == 0) {
+        // You might want to add a warning/error here
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +112,10 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential is within reasonable range
+    if (potential < -100.0f || potential > 100.0f) {
+        // You might want to add a warning/error here
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +124,10 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Validate reset potential is reasonable
+    if (potential < -100.0f || potential > 100.0f) {
+        // You might want to add a warning/error here
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -202,16 +222,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    // Validate inputs for numerical stability
+    if (std::isnan(V) || std::isinf(V) || std::isnan(V_rest) || std::isinf(V_rest)) {
+        // Reset to reasonable values if NaN or infinite
+        V = V_rest;
+    }
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;

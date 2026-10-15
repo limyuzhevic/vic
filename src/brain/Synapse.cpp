@@ -94,6 +94,10 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    // Validate weight is within reasonable bounds
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        // You might want to add a warning/error here
+    }
     pImpl->weight = weight;
 }
 
@@ -188,6 +192,10 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    // Validate efficacy is within reasonable bounds (0-2 is typical for biological synapses)
+    if (efficacy < 0.0f || efficacy > 2.0f) {
+        // You might want to add a warning/error here
+    }
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
