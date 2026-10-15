@@ -2,109 +2,56 @@
 
 #include <cstdint>
 #include <random>
-#include <functional>
+#include <algorithm>
 
 namespace nlm {
 
-// Deterministic random number generator
-// Supports explicit seeds for reproducible experiments
-
 class RandomGenerator {
 public:
-    using result_type = uint32_t;
-    
-    // Create with explicit seed
+    RandomGenerator();
     explicit RandomGenerator(uint64_t seed);
     
-    // Create with time-based seed (not deterministic)
-    RandomGenerator();
+    // Generate random integer in range [min, max]
+    int64_t uniformInt(int64_t min, int64_t max);
     
-    ~RandomGenerator();
+    // Generate random float in range [0.0, 1.0)
+    float uniformReal();
     
-    // Disable copying
-    RandomGenerator(const RandomGenerator&) = delete;
-    RandomGenerator& operator=(const RandomGenerator&) = delete;
-    
-    // Enable moving
-    RandomGenerator(RandomGenerator&&) noexcept;
-    RandomGenerator& operator=(RandomGenerator&&) noexcept;
-    
-    // Seed operations
-    void seed(uint64_t seed);
-    uint64_t getSeed() const;
-    
-    // Random number generation
-    // Uniform integer in [min, max]
-    uint32_t uniformInt(uint32_t min, uint32_t max);
-    uint64_t uniformInt(uint64_t min, uint64_t max);
-    
-    // Uniform real in [min, max)
-    double uniformReal(double min, double max);
+    // Generate random float in range [min, max]
     float uniformReal(float min, float max);
     
-    // Normal distribution
-    double normal(double mean, double stddev);
-    float normal(float mean, float stddev);
+    // Generate random double in range [0.0, 1.0)
+    double uniformDouble();
     
-    // Bernoulli distribution
-    bool bernoulli(double p = 0.5);
+    // Generate random double in range [min, max]
+    double uniformDouble(double min, double max);
     
-    // Poisson distribution
-    uint32_t poisson(double lambda);
+    // Generate random boolean with probability p
+    bool randomBool(float p = 0.5f);
     
-    // Exponential distribution
-    double exponential(double lambda);
+    // Get current seed
+    uint64_t getSeed() const;
     
-    // Random boolean
-    bool randomBool();
+    // Set seed
+    void setSeed(uint64_t seed);
     
-    // Random bit
-    uint32_t randomBit();
+    // Generate random number from normal distribution
+    float normalRandom(float mean = 0.0f, float stddev = 1.0f);
     
-    // Shuffle container
-    template<typename Container>
-    void shuffle(Container& container);
+    // Generate random number from exponential distribution
+    float exponentialRandom(float lambda = 1.0f);
     
-    // Pick random element from container
-    template<typename Container>
-    auto pickRandom(const Container& container) -> typename Container::const_reference;
+    // Shuffle array
+    template<typename T>
+    void shuffle(T* array, size_t n);
     
-    // Pick random index from 0 to n-1
-    uint64_t pickRandomIndex(uint64_t n);
-    
-    // Fill range with random bytes
-    void fillBytes(void* data, size_t size);
-    
-    // Get underlying engine for advanced use
-    std::mt19937_64& engine();
-    const std::mt19937_64& engine() const;
-    
-    // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
-    
-    // Operator for compatibility with std functions
-    result_type operator()() { return static_cast<result_type>(engine()()); }
+    // Generate random permutation
+    template<typename T>
+    std::vector<T> randomPermutation(const std::vector<T>& vec);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
-
-// Template implementations
-template<typename Container>
-void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
-}
-
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
-    }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
 
 } // namespace nlm

@@ -1,105 +1,154 @@
 #pragma once
 
 #include <string>
-#include <memory>
-#include <vector>
+#include <map>
 #include <variant>
-#include <optional>
+#include <cstdint>
+#include <vector>
+#include <memory>
+#include <functional>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
+// Configuration types
 using ConfigValue = std::variant<
-    int,
     int64_t,
+    float,
     double,
-    bool,
     std::string,
-    std::vector<int>,
+    bool,
+    std::vector<int64_t>,
+    std::vector<float>,
     std::vector<double>,
     std::vector<std::string>
 >;
 
-// Configuration source
 enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Programmatic
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
 class Config {
 public:
     Config();
     ~Config();
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    // Set configuration value
+    bool set(const std::string& key, const ConfigValue& value, 
+             ConfigSource source = ConfigSource::Programmatic);
     
-    // Load from file (JSON format)
+    // Get configuration value with type conversion
+    template<typename T>
+    bool get(const std::string& key, T& value) const;
+    
+    // GetOr: Get value with default fallback
+    template<typename T>
+    T getOr(const std::string& key, T defaultValue) const;
+    
+    // Check if key exists
+    bool has(const std::string& key) const;
+    
+    // Load from file
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
+    // Get configuration keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration schema validation
+    bool validate() const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Get configuration source
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Clear configuration
+    void clear();
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+};
+
+// Configuration schema for validation
+struct ConfigSchema {
+    std::string key;
+    std::string type;           // "int64", "float", "double", "string", "bool", "vector"
+    ConfigSource requiredSource;  // Minimum source allowed
+    ConfigValue defaultValue;
+    std::string description;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    bool (ConfigSchema::*validateFn)(const ConfigValue& value) const = nullptr;
+};
+
+// Global configuration instance
+extern std::shared_ptr<Config> globalConfig;
+
+// Helper functions for common configuration keys
+namespace ConfigKeys {
+    // Core simulation parameters
+    static constexpr const char* SIMULATION_TIMESTEP = "simulation_timestep";
+    static constexpr const char* NEURON_COUNT = "neuron_count";
+    static constexpr const char* REGION_COUNT = "region_count";
+    static constexpr const char* CONNECTION_PROBABILITY = "connection_probability";
+    static constexpr const char* RANDOM_SEED = "random_seed";
+    
+    // Plasticity parameters
+    static constexpr const char* STDP_LTP_WEIGHT = "stdp_ltp_weight";
+    static constexpr const char* STDP_LTD_WEIGHT = "stdp_ltd_weight";
+    static constexpr const char* STDP_TAU = "stdp_tau";
+    static constexpr const char* SYNAPTOGENESIS_RATE = "synaptogenesis_rate";
+    static constexpr const char* PRUNING_RATE = "pruning_rate";
+    
+    // Memory parameters
+    static constexpr const char* WORKING_MEMORY_CAPACITY = "working_memory_capacity";
+    static constexpr const char* EPISODIC_MEMORY_MAX_EPISODES = "episodic_memory_max_episodes";
+    static constexpr const char* ASSOC_MEMORY_PATTERN_COUNT = "assoc_memory_pattern_count";
+    
+    // Neuromodulation parameters
+    static constexpr const char* DOPAMINE_INITIAL_LEVEL = "dopamine_initial_level";
+    static constexpr const char* CURIOUSY_INITIAL_LEVEL = "curiosity_initial_level";
+    static constexpr const char* NOVELTY_INITIAL_LEVEL = "novelty_initial_level";
+    
+    // Development parameters
+    static constexpr const char* DEVELOPMENT_ENABLED = "development_enabled";
+    static constexpr const char* DEVELOPMENT_STAGES = "development_stages";
+    
+    // Checkpoint parameters
+    static constexpr const char* CHECKPOINT_DIR = "checkpoint_dir";
+    static constexpr const char* CHECKPOINT_FREQUENCY = "checkpoint_frequency";
+    static constexpr const char* CHECKPOINT_COMPRESSION = "checkpoint_compression";
+    
+    // Experiment parameters
+    static constexpr const char* EXPERIMENT_MAX_STEPS = "experiment_max_steps";
+    static constexpr const char* EXPERIMENT_REWARD_FUNCTION = "experiment_reward_function";
+};
+
+// Configuration initialization
+void initializeConfig();
+Config& getConfig();
+
+// Configuration validation
+class ConfigValidator {
+public:
+    ConfigValidator();
+    ~ConfigValidator();
+    
+    // Add validation rule
+    void addValidation(const std::string& key, bool (ConfigValidator::*validator)(const ConfigValue&)) const;
+    
+    // Validate configuration
+    bool validate(const Config& config) const;
+    
+    // Get validation errors
+    std::vector<std::string> getErrors() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
