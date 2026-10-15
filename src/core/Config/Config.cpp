@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -19,40 +21,184 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Implement proper JSON/YAML parser
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Determine file format by extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
     
-    return true;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple JSON parsing (basic key-value support)
+    // This is a minimal implementation - for production, use nlohmann/json library
+    try {
+        // Remove whitespace and comments
+        std::string clean;
+        for (size_t i = 0; i < content.size(); ++i) {
+            if (content[i] == '/') {
+                // Skip comments
+                if (i + 1 < content.size() && content[i + 1] == '/') {
+                    while (i < content.size() && content[i] != '\n') i++;
+                } else if (i + 1 < content.size() && content[i + 1] == '*') {
+                    // Skip block comments
+                    while (i + 1 < content.size() && !(content[i] == '*' && content[i + 1] == '/')) {
+                        i++;
+                    }
+                    if (i < content.size()) i++; // Skip '/' in "*/"
+                } else {
+                    clean += content[i];
+                }
+            } else if (!std::isspace(content[i])) {
+                clean += content[i];
+            }
+        }
+        
+        // Parse simple JSON objects with key-value pairs
+        if (clean.empty() || clean[0] != '{' || clean.back() != '}') {
+            return false;
+        }
+        
+        // Extract key-value pairs from JSON
+        std::string inner = clean.substr(1, clean.size() - 2);
+        size_t pos = 0;
+        while (pos < inner.size()) {
+            // Find next key
+            size_t keyStart = inner.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = inner.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Find value (skip comma)
+            size_t valuePos = inner.find(':', keyEnd);
+            if (valuePos == std::string::npos) break;
+            size_t valueStart = inner.find_first_not_of(' ', valuePos + 1);
+            if (valueStart == std::string::npos) break;
+            
+            // Find end of value (next comma or })
+            size_t valueEnd = inner.find(',', valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = inner.find('}', valueStart);
+                if (valueEnd == std::string::npos) break;
+            }
+            
+            std::string valueStr = inner.substr(valueStart, valueEnd - valueStart);
+            
+            // Clean up value string
+            valueStr = trim(valueStr);
+            
+            // Parse value based on content
+            ConfigValue configValue;
+            if (valueStr == "true" || valueStr == "false") {
+                configValue = (valueStr == "true");
+            } else if (valueStr.find('.') != std::string::npos || valueStr.find('e') != std::string::npos || valueStr.find('E') != std::string::npos) {
+                configValue = std::stod(valueStr);
+            } else {
+                configValue = valueStr;
+            }
+            
+            set(key, configValue, ConfigSource::File);
+            
+            pos = valueEnd + 1;
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple YAML parsing (basic key=value format support)
+    // This handles YAML with simple key-value pairs and lists
+    try {
+        std::vector<std::string> lines;
+        std::stringstream lineStream(content);
+        std::string line;
+        
+        while (std::getline(lineStream, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            
+            // Handle YAML list indicators
+            if (line.find("-") == 0) {
+                // For now, skip YAML lists in simple parsing
+                // Could be expanded to support [1, 2, 3] syntax
+                continue;
+            }
+            
+            lines.push_back(line);
+        }
+        
+        // Parse each line as key=value
+        for (const std::string& line : lines) {
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                ConfigValue configValue;
+                if (value == "true" || value == "false") {
+                    configValue = (value == "true");
+                } else if (value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos) {
+                    configValue = std::stod(value);
+                } else {
+                    configValue = value;
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    return loadFromFile(filepath); // Backward compatibility
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -200,16 +346,25 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
+
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+
 template std::optional<double> Config::get<double>(const std::string&) const;
+
 template std::optional<bool> Config::get<bool>(const std::string&) const;
+
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
+
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+
 template double Config::getOr<double>(const std::string&, const double&) const;
+
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
+
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

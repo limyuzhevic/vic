@@ -119,7 +119,14 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced experiments (Phase 2-3 level)
+add_library(nlm_advanced_experiments STATIC
+    src/experiments/AdvancedLearningExperiments.cpp
+)
+target_include_directories(nlm_advanced_experiments PUBLIC src)
+target_link_libraries(nlm_advanced_experiments PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Main executable
 add_executable(nlm
@@ -131,20 +138,26 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_advanced_experiments)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced_experiments)
+
+# Checkpoint demonstration executable
+add_executable(nlm_checkpoint_demo
+    src/experiments/CheckpointDemo.cpp
+)
+target_link_libraries(nlm_checkpoint_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced_experiments)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_checkpoint_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
