@@ -19,36 +19,45 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    // Try to detect file format and parse appropriately
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    if (firstLine.find('{') != std::string::npos || firstLine.find('[') != std::string::npos) {
+        // Try JSON parsing
+        return loadFromJSON(filepath);
+    } else {
+        // Use simple key=value format (original implementation)
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,9 +93,69 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save in a simple key=value format with descriptions
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (entry.description.empty()) {
+            file << entry.key << " = ";
+        } else {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+        }
+        
+        // Serialize the value based on its type
+        if (std::holds_alternative<int>(entry.value)) {
+            file << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            file << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << (std::get<bool>(entry.value) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            // Quote strings with spaces or special characters
+            const std::string& str = std::get<std::string>(entry.value);
+            if (str.find(' ') != std::string::npos || str.find('=') != std::string::npos || 
+                str.find('"') != std::string::npos) {
+                file << '"' << str << '"';
+            } else {
+                file << str;
+            }
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            const auto& vec = std::get<std::vector<int>>(entry.value);
+            file << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << vec[i];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            const auto& vec = std::get<std::vector<double>>(entry.value);
+            file << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << vec[i];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            const auto& vec = std::get<std::vector<std::string>>(entry.value);
+            file << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                // Quote strings with spaces or special characters
+                const std::string& str = vec[i];
+                if (str.find(' ') != std::string::npos || str.find('=') != std::string::npos || 
+                    str.find('"') != std::string::npos) {
+                    file << '"' << str << '"';
+                } else {
+                    file << str;
+                }
+            }
+            file << "]";
+        } else {
+            file << "UNSUPPORTED_TYPE";
+        }
+        
+        file << "\n\n";
     }
     
     return true;
@@ -199,17 +268,151 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Helper function to convert string to appropriate type
+    void setTypedValue(const std::string& key, const std::string& value, ConfigSource source) {
+        // Try different types in order of preference
+        try {
+            // Try int
+            size_t pos;
+            int intVal = std::stoi(value, &pos);
+            if (pos == value.size()) {
+                set(key, intVal, source);
+                return;
+            }
+        } catch (...) {}
+        
+        try {
+            // Try double
+            size_t pos;
+            double doubleVal = std::stod(value, &pos);
+            if (pos == value.size()) {
+                set(key, doubleVal, source);
+                return;
+            }
+        } catch (...) {}
+        
+        // Try boolean
+        std::string lowerValue = toLower(value);
+        if (lowerValue == "true" || lowerValue == "yes" || lowerValue == "1") {
+            set(key, true, source);
+            return;
+        }
+        if (lowerValue == "false" || lowerValue == "no" || lowerValue == "0") {
+            set(key, false, source);
+            return;
+        }
+        
+        // Default to string
+        set(key, value, source);
+    }
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    // Parse JSON-like format
+    bool loadFromJSON(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+        // Simple JSON parsing for key-value pairs (supports basic objects)
+        // This is a simplified implementation - in production would use a proper JSON library
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Skip whitespace and find key name (quoted)
+            pos = content.find('"', pos);
+            if (pos == std::string::npos) break;
+            
+            size_t keyEnd = content.find('"', pos + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+            pos = content.find(':', keyEnd);
+            if (pos == std::string::npos) break;
+            
+            // Skip whitespace after colon
+            pos = content.find_first_not_of(" \t\n\r", pos + 1);
+            if (pos == std::string::npos) break;
+            
+            // Parse value (simple types)
+            if (content[pos] == '"') {
+                // String value
+                size_t valueEnd = content.find('"', pos + 1);
+                if (valueEnd == std::string::npos) break;
+                std::string value = content.substr(pos + 1, valueEnd - pos - 1);
+                setTypedValue(key, value, ConfigSource::File);
+                pos = valueEnd + 1;
+            } else if (content[pos] == 't' || content[pos] == 'f') {
+                // Boolean value
+                if (content.substr(pos, 4) == "true") {
+                    setTypedValue(key, "true", ConfigSource::File);
+                    pos += 4;
+                } else if (content.substr(pos, 5) == "false") {
+                    setTypedValue(key, "false", ConfigSource::File);
+                    pos += 5;
+                } else {
+                    break;
+                }
+            } else if (content[pos] == 'n') {
+                // null value (ignore)
+                size_t commaPos = content.find(',', pos);
+                if (commaPos == std::string::npos) {
+                    commaPos = content.find('}', pos);
+                }
+                if (commaPos == std::string::npos) break;
+                pos = commaPos;
+            } else {
+                // Number value
+                size_t valueEnd = content.find_first_of(",}", pos);
+                if (valueEnd == std::string::npos) break;
+                std::string value = content.substr(pos, valueEnd - pos);
+                setTypedValue(key, value, ConfigSource::File);
+                pos = valueEnd;
+            }
+            
+            // Skip to next key-value pair
+            pos = content.find_first_not_of(" \t,\n\r", pos);
+        }
+        
+        return true;
+    }
 
-} // namespace nlm
+    // Parse YAML-like format  
+    bool loadFromYAML(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Remove comments
+            size_t commentPos = line.find('#');
+            if (commentPos != std::string::npos) {
+                line = line.substr(0, commentPos);
+            }
+            
+            // Remove trailing whitespace
+            line = trim(line);
+            if (line.empty()) continue;
+            
+            // Parse YAML key: value format
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove surrounding quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                setTypedValue(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    }
+}

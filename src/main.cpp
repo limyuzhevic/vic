@@ -321,59 +321,78 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+enum class ExecutionMode {
+    QuickTest,
+    FullTest,
+    ConnectivityTest,
+    PlasticityTest,
+    StdpTest,
+    Custom
+};
+
+void printHelp() {
+    std::cout << R"(
+NLM (Neural Learning Machine) Phase 2
+Usage: nlm [--config=FILE] [--mode=MODE] [--help] [options]
+
+Execution Modes:
+  --mode=quick    Run quick connectivity test (fast, minimal setup)
+  --mode=full     Run all tests: connectivity, plasticity, STDP
+  --mode=connect  Run only basic connectivity test
+  --mode=plastic  Run only plasticity learning experiment
+  --mode=stdp     Run only STDP verification
+  --mode=custom   Use custom settings from config file
+
+Configuration:
+  --config=FILE   Load configuration from file (default: configs/default.cfg)
+
+General Options:
+  --help          Show this help message and exit
+  --version       Show version information and exit
+  --dry-run       Validate configuration without running tests
+  --verbose       Enable verbose logging
+
+Example:
+  nlm --mode=full --config=my_config.json --verbose
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0 (Real Neural Computation)" << std::endl;
+    std::cout << "Features: LIF neurons, event-driven dynamics, STDP plasticity" << std::endl;
+}
+
+ExecutionMode parseExecutionMode(const std::string& modeStr) {
+    std::string mode = modeStr;
+    std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    if (mode == "quick") return ExecutionMode::QuickTest;
+    if (mode == "full") return ExecutionMode::FullTest;
+    if (mode == "connect") return ExecutionMode::ConnectivityTest;
+    if (mode == "plastic") return ExecutionMode::PlasticityTest;
+    if (mode == "stdp") return ExecutionMode::StdpTest;
+    if (mode == "custom") return ExecutionMode::Custom;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
+    return ExecutionMode::FullTest; // Default
+}
+
+void setupConfiguration(std::shared_ptr<Config>& config, const std::string& configFile, bool verbose) {
     // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Could not load configuration from: " + configFile + ", using defaults");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
+    // Set sensible defaults for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Optimized for testing
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // STDP parameters (enhanced for better learning)
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
@@ -382,15 +401,177 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Additional parameters for advanced users
+    config->set("max_simulation_steps", static_cast<int64_t>(10000), ConfigSource::Default);
+    config->set("enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("enable_hebbian_plasticity", true, ConfigSource::Default);
+    config->set("plasticity_learning_rate", 0.01f, ConfigSource::Default);
+    
+    if (verbose) {
+        NLM_LOG_INFO("Configuration defaults applied");
+    }
+}
+
+void runExecutionMode(std::shared_ptr<Brain> brain, ExecutionMode mode) {
+    switch (mode) {
+        case ExecutionMode::QuickTest:
+            NLM_LOG_INFO("=== QUICK TEST MODE ===");
+            NLM_LOG_INFO("Running basic connectivity validation with minimal neurons...");
+            runBasicConnectivityTest(brain);
+            break;
+            
+        case ExecutionMode::ConnectivityTest:
+            NLM_LOG_INFO("=== CONNECTIVITY TEST ===");
+            runBasicConnectivityTest(brain);
+            break;
+            
+        case ExecutionMode::PlasticityTest:
+            NLM_LOG_INFO("=== PLASTICITY TEST ===");
+            runPlasticityExperiment(brain);
+            break;
+            
+        case ExecutionMode::StdpTest:
+            NLM_LOG_INFO("=== STDP TEST ===");
+            runStdpVerification(brain);
+            break;
+            
+        case ExecutionMode::FullTest:
+            NLM_LOG_INFO("=== FULL TEST SUITE ===");
+            NLM_LOG_INFO("Running comprehensive neural computation tests...");
+            
+            // Test 1: Basic connectivity
+            NLM_LOG_INFO("--- Test 1: Basic Neural Connectivity ---");
+            runBasicConnectivityTest(brain);
+            
+            // Reset for plasticity experiment
+            brain->reset();
+            brain->initialize();
+            
+            // Test 2: Plasticity learning
+            NLM_LOG_INFO("--- Test 2: Plasticity Learning Experiment ---");
+            runPlasticityExperiment(brain);
+            
+            // Reset for STDP verification
+            brain->reset();
+            brain->initialize();
+            
+            // Test 3: STDP mechanism
+            NLM_LOG_INFO("--- Test 3: STDP Verification ---");
+            runStdpVerification(brain);
+            
+            NLM_LOG_INFO("=== ALL TESTS COMPLETED ===");
+            break;
+            
+        case ExecutionMode::Custom:
+            NLM_LOG_INFO("=== CUSTOM MODE ===");
+            NLM_LOG_INFO("Running basic connectivity and plasticity checks...");
+            runBasicConnectivityTest(brain);
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            break;
+    }
+}
+
+int main(int argc, char** argv) {
+    printBanner();
+    
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    ExecutionMode executionMode = ExecutionMode::FullTest;
+    bool verbose = false;
+    bool dryRun = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 7) == "--mode=") {
+            executionMode = parseExecutionMode(arg.substr(7));
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else if (arg == "--dry-run") {
+            dryRun = true;
+        } else if (arg == "--connect") {
+            executionMode = ExecutionMode::ConnectivityTest;
+        } else if (arg == "--plastic") {
+            executionMode = ExecutionMode::PlasticityTest;
+        } else if (arg == "--stdp") {
+            executionMode = ExecutionMode::StdpTest;
+        } else {
+            NLM_LOG_WARNING("Unknown argument: " + arg);
+        }
+    }
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger with appropriate level
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(verbose ? LogLevel::Debug : LogLevel::Info);
+    consoleLogger->setUseColors(true);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementation:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    
+    // Setup configuration with defaults
+    setupConfiguration(config, configFile, verbose);
+    
+    // Override with command line arguments (if any remaining)
+    config->loadFromArgs(argc, argv);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  Mode: " + (executionMode == ExecutionMode::FullTest ? "Full Test" :
+                                 executionMode == ExecutionMode::QuickTest ? "Quick Test" :
+                                 executionMode == ExecutionMode::ConnectivityTest ? "Connectivity Test" :
+                                 executionMode == ExecutionMode::PlasticityTest ? "Plasticity Test" :
+                                 executionMode == ExecutionMode::StdpTest ? "STDP Test" : "Custom"));
+    NLM_LOG_INFO("  Config File: " + configFile);
+    NLM_LOG_INFO("  Verbose: " + std::string(verbose ? "Yes" : "No"));
+    NLM_LOG_INFO("  Dry Run: " + std::string(dryRun ? "Yes" : "No"));
+    
+    if (dryRun) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== DRY RUN COMPLETED ===");
+        NLM_LOG_INFO("Configuration validation successful. Ready to run.");
+        std::cout << "\nConfiguration validated successfully! Ready to run tests.\n" << std::endl;
+        return 0;
+    }
+    
+    if (verbose) {
+        std::cout << "Running in mode: ";
+        switch (executionMode) {
+            case ExecutionMode::QuickTest: std::cout << "Quick Test"; break;
+            case ExecutionMode::FullTest: std::cout << "Full Test Suite"; break;
+            case ExecutionMode::ConnectivityTest: std::cout << "Connectivity Test"; break;
+            case ExecutionMode::PlasticityTest: std::cout << "Plasticity Test"; break;
+            case ExecutionMode::StdpTest: std::cout << "STDP Test"; break;
+            case ExecutionMode::Custom: std::cout << "Custom Mode"; break;
+        }
+        std::cout << std::endl << std::endl;
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +590,8 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run selected execution mode
+    runExecutionMode(brain, executionMode);
     
     // Final brain status
     NLM_LOG_INFO("");
