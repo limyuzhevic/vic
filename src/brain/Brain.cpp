@@ -74,9 +74,13 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    float predictionModulation;  // Prediction error modulation for learning
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -92,6 +96,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , predictionModulation(1.0f)  // Start with baseline modulation
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -152,9 +157,6 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -445,6 +447,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
+    // Combine with prediction error modulation
+    plasticityMod *= (1.0f + pImpl->predictionModulation - 1.0f);
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
@@ -488,15 +492,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store working memory traces (working memory representation)
+            if (pImpl->workingMemory) {
+                // Include current working memory content in the episode
+                episode.activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+                // Add working memory activation values
+                for (const auto& neuronId : episode.activeNeurons) {
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    episode.neuronActivations.push_back(activation);
+                }
+                // Store working memory activity level
+                episode.reward = std::max(episode.reward, pImpl->workingMemory->getMemoryActivity());
+            }
+            
+            // Also store from direct neural activity (for comparison)
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            bool alreadyInWorkingMemory = false;
+                            if (pImpl->workingMemory) {
+                                alreadyInWorkingMemory = pImpl->workingMemory->contains(neuron->getId());
+                            }
+                            // Only add to episodic memory if not already represented in working memory
+                            if (!alreadyInWorkingMemory) {
+                                episode.activeNeurons.push_back(neuron->getId());
+                                episode.neuronActivations.push_back(
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            }
                         }
                     }
                 }
@@ -511,8 +535,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // Note: Need sensory input for proper prediction
+        // For now, we just record the current state for prediction
+        // The prediction error will be computed and used in plasticity
+        // Predict next state based on current pattern
+        // Update prediction error based on actual neural activity
+        // Use prediction error to modulate learning rate
+        
+        // Get current neural activity pattern (simplified)
+        std::vector<float> currentPattern;
+        for (float act : pImpl->predictionSystem->getErrorHistory()) {
+            currentPattern.push_back(act);
+        }
+        
+        // Simple self-prediction for error computation
+        if (!currentPattern.empty()) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            // Store prediction error for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->recordError(predictionError, currentStep);
+            }
+            // Use prediction error to modulate plasticity
+            float predictionModulation = pImpl->predictionError ? pImpl->predictionError->getModulationSignal() : 0.0f;
+            
+            // Store prediction modulation for plasticity application
+            pImpl->predictionModulation = predictionModulation;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -573,6 +622,84 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neural excitability
+        // Neural excitability decreases with development to increase stability
+        float excitabilityMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                excitabilityMod = 1.2f;  // High excitability in early stages
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                excitabilityMod = 1.1f;  // Slightly reduced excitability
+                break;
+            case DevelopmentalStage::Maturation:
+                excitabilityMod = 1.0f;  // Normal excitability
+                break;
+            case DevelopmentalStage::Adult:
+                excitabilityMod = 0.8f;  // Reduced excitability for stability
+                break;
+        }
+        
+        // Apply excitability modulation to all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Modulate leak conductance (inversely related to excitability)
+                    float currentLeak = neuron->getState().leakConductance;
+                    float newLeak = currentLeak * (2.0f / excitabilityMod);
+                    neuron->setLeakConductance(newLeak);
+                    
+                    // Modulate threshold based on developmental stage
+                    float currentThreshold = neuron->getState().threshold;
+                    if (stage == DevelopmentalStage::Adult) {
+                        // Reduce threshold fluctuation in adult stage
+                        neuron->setThreshold(-55.0f);
+                    }
+                }
+            }
+        }
+        
+        // Development affects attention system
+        if (pImpl->attention) {
+            // Development modulates attention parameters
+            float attentionInhibition = 0.5f;
+            float attentionExcitation = 1.5f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // High salience-based attention in early stages
+                    attentionInhibition = 0.4f;
+                    attentionExcitation = 2.0f;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Transition to goal-directed attention
+                    attentionInhibition = 0.45f;
+                    attentionExcitation = 1.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Mature attention control
+                    attentionInhibition = 0.5f;
+                    attentionExcitation = 1.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Focused attention with filtering
+                    attentionInhibition = 0.6f;
+                    attentionExcitation = 1.2f;
+                    break;
+            }
+            
+            pImpl->attention->setInhibitionStrength(attentionInhibition);
+            pImpl->attention->setExcitationStrength(attentionExcitation);
+            
+            // Development affects top-down vs bottom-up attention balance
+            if (stage == DevelopmentalStage::Adult) {
+                // Increase top-down control in adult stage
+                for (auto* neuron : pImpl->motorNeurons) {
+                    pImpl->attention->applyTopDownBias(neuron->getId(), 0.3f);
+                }
+            }
         }
     }
     
@@ -712,6 +839,52 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
+    
+    return action;
+}
+
+// Enhanced action selection using NeuralPlanner
+std::unique_ptr<class Action> Brain::produceActionWithPlanner() {
+    // Use NeuralPlanner for sophisticated action selection based on current state
+    // Get NeuralPlanner instance
+    NeuralPlanner* planner = getPlanner();
+    if (!planner) {
+        // Fallback to simple action selection if planner not available
+        return produceAction();
+    }
+    
+    // Create current state representation from neural activity
+    std::vector<float> currentState;
+    
+    // Get working memory content if available (representation of current goals/plans)
+    if (pImpl->workingMemory) {
+        // Use working memory activation as part of the state
+        currentState = pImpl->workingMemory->retrieve();
+        
+        // Add motor neuron activity to the state
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                currentState.push_back(1.0f);
+            } else {
+                currentState.push_back(0.0f);
+            }
+        }
+    } else {
+        // Simple fallback: just motor neuron activity
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                currentState.push_back(1.0f);
+            } else {
+                currentState.push_back(0.0f);
+            }
+        }
+    }
+    
+    // Use NeuralPlanner to plan the best action
+    ActionType plannedAction = planner->planAction(currentState, 0.5f);
+    
+    // Convert planned action to Action object
+    auto action = std::make_unique<Action>(plannedAction);
     
     return action;
 }

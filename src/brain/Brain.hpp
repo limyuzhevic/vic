@@ -97,6 +97,10 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
+    // Enhanced action selection using NeuralPlanner
+    // Incorporates working memory, episodic memory, and prediction into action planning
+    std::unique_ptr<class Action> produceActionWithPlanner();
+    
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
