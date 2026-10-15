@@ -15,18 +15,184 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/PerformanceProfiler.hpp"
+#include "../performance/AdvancedMemoryManager.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <chrono>
+#include <thread>
+#include <mutex>
+#include <unordered_set>
 
 namespace nlm {
+
+namespace nlm {
+
+// Global performance monitoring
+struct PerformanceProfiler {
+    struct ProfilerData {
+        std::chrono::steady_clock::time_point startTime;
+        std::chrono::steady_clock::time_point lastFrameTime;
+        double totalTime;
+        double frameTime;
+        size_t frames;
+        size_t spikeProcessTime;
+        size_t neuronStepTime;
+        size_t memoryAllocationTime;
+        size_t plasticityUpdateTime;
+        
+        ProfilerData() : totalTime(0.0), frameTime(0.0), frames(0),
+                        spikeProcessTime(0), neuronStepTime(0),
+                        memoryAllocationTime(0), plasticityUpdateTime(0) {}
+    };
+    
+    static ProfilerData& getData() {
+        static ProfilerData data;
+        return data;
+    }
+    
+    static void startFrame() {
+        auto& data = getData();
+        data.startTime = std::chrono::steady_clock::now();
+    }
+    
+    static void endFrame() {
+        auto& data = getData();
+        auto endTime = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration<double>(endTime - data.startTime).count();
+        data.totalTime += duration;
+        data.frameTime = duration;
+        data.frames++;
+        
+        // Log performance every 100 frames
+        if (data.frames % 100 == 0) {
+            reportPerformance();
+        }
+    }
+    
+    static void recordSpikeProcessing(size_t timeNs) {
+        getData().spikeProcessTime += timeNs;
+    }
+    
+    static void recordNeuronStepping(size_t timeNs) {
+        getData().neuronStepTime += timeNs;
+    }
+    
+    static void recordMemoryAllocation(size_t timeNs) {
+        getData().memoryAllocationTime += timeNs;
+    }
+    
+    static void recordPlasticityUpdate(size_t timeNs) {
+        getData().plasticityUpdateTime += timeNs;
+    }
+    
+    static void reportPerformance() {
+        auto& data = getData();
+        if (data.frames == 0) return;
+        
+        double avgFrameTime = data.totalTime / data.frames;
+        double avgSpikeTime = static_cast<double>(data.spikeProcessTime) / data.frames / 1e6;
+        double avgNeuronTime = static_cast<double>(data.neuronStepTime) / data.frames / 1e6;
+        double avgMemoryTime = static_cast<double>(data.memoryAllocationTime) / data.frames / 1e6;
+        double avgPlasticityTime = static_cast<double>(data.plasticityUpdateTime) / data.frames / 1e6;
+        
+        NLM_LOG_INFO("Performance: " + std::to_string(avgFrameTime * 1000) + "ms frame, " +
+                    std::to_string(1000.0 / avgFrameTime) + " fps, " +
+                    "Spike: " + std::to_string(avgSpikeTime) + "ms, " +
+                    "Neuron: " + std::to_string(avgNeuronTime) + "ms, " +
+                    "Memory: " + std::to_string(avgMemoryTime) + "ms, " +
+                    "Plasticity: " + std::to_string(avgPlasticityTime) + "ms");
+    }
+};
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== MEMORY POOLS FOR PERFORMANCE ==========
+    EnhancedMemoryPool<NeuronState> neuronPool;
+    EnhancedMemoryPool<SynapseState> synapsePool;
+    EnhancedNeuronPool neuronMemoryPool;
+    EnhancedSynapsePool synapseMemoryPool;
+    
+    // ========== CACHE FOR FREQUENTLY COMPUTED VALUES ==========
+    struct NeuronCache {
+        std::vector<float> membranePotentials;
+        std::vector<float> firingRates;
+        std::vector<float> activations;
+        bool dirty;
+        
+        NeuronCache(size_t size) : membranePotentials(size), firingRates(size), 
+                                  activations(size), dirty(true) {}
+    };
+    
+    std::vector<NeuronCache> neuronCaches;
+    std::unordered_map<NeuronId, float> neuronCache;
+    std::unordered_map<SynapseId, float> synapseCache;
+    
+    // ========== INTELLECTUAL OPTIMIZATION ==========
+    struct IntellectualOptimizer {
+        double temperature;  // For simulated annealing
+        double explorationRate;
+        double exploitationRate;
+        size_t adaptationSteps;
+        
+        IntellectualOptimizer() : temperature(1.0), explorationRate(0.1), 
+                                exploitationRate(0.9), adaptationSteps(0) {}
+        
+        void adapt(double error) {
+            adaptationSteps++;
+            temperature *= 0.999;  // Gradually reduce temperature
+            explorationRate = std::min(1.0, explorationRate * 1.01);
+            exploitationRate = 1.0 - explorationRate;
+        }
+        
+        float getExplorationBias() const {
+            return static_cast<float>(explorationRate * temperature);
+        }
+    } intellectualOptimizer;
+    
+    // ========== ADVANCED MEMORY MANAGEMENT ==========
+    struct AdvancedMemoryManager {
+        size_t allocationCount;
+        size_t deallocationCount;
+        size_t cacheHits;
+        size_t cacheMisses;
+        std::chrono::steady_clock::time_point lastCleanup;
+        
+        AdvancedMemoryManager() : allocationCount(0), deallocationCount(0),
+                                 cacheHits(0), cacheMisses(0) {
+            lastCleanup = std::chrono::steady_clock::now();
+        }
+        
+        void trackAllocation() { allocationCount++; }
+        void trackDeallocation() { deallocationCount++; }
+        void trackCacheHit() { cacheHits++; }
+        void trackCacheMiss() { cacheMisses++; }
+        
+        double getCacheHitRate() const {
+            size_t total = cacheHits + cacheMisses;
+            return total > 0 ? static_cast<double>(cacheHits) / total : 0.0;
+        }
+        
+        bool needsCleanup() const {
+            auto now = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - lastCleanup);
+            return duration.count() > 300; // Cleanup every 5 minutes
+        }
+        
+        void performCleanup() {
+            lastCleanup = std::chrono::steady_clock::now();
+            // Clean up inactive neurons and weak synapses
+            NLM_LOG_INFO("Performing advanced memory cleanup...");
+        }
+    } advancedMemoryManager;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;

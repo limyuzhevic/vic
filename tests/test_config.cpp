@@ -2,6 +2,10 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace test_config {
 
@@ -65,25 +69,96 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigErrorHandling() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Add a schema to trigger validation errors
+    nlm::ConfigSchema schema;
+    schema.name = "strict_schema";
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    nlm::ParameterBounds strictBounds;
+    strictBounds.min = 1;
+    strictBounds.max = 10;
+    strictBounds.allowNegative = false;
+    strictBounds.allowZero = false;
+    strictBounds.unit = "count";
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    schema.parameterBounds["strict_key"] = strictBounds;
+    config.addSchema("strict_schema", schema);
+    
+    // Test that setting invalid value throws ConfigValidationError
+    bool exceptionThrown = false;
+    try {
+        config.set("strict_key", 15, nlm::ConfigSource::Runtime);  // Too large
+    } catch (const nlm::ConfigValidationError& e) {
+        exceptionThrown = true;
+        assert(e.key == "strict_key");
+        assert(e.source == nlm::ConfigSource::Runtime);
+    }
+    assert(exceptionThrown);
+    
+    // Test setting negative value
+    exceptionThrown = false;
+    try {
+        config.set("strict_key", -5, nlm::ConfigSource::Runtime);  // Negative
+    } catch (const nlm::ConfigValidationError& e) {
+        exceptionThrown = true;
+        assert(e.key == "strict_key");
+    }
+    assert(exceptionThrown);
+    
+    // Test setting zero
+    exceptionThrown = false;
+    try {
+        config.set("strict_key", 0, nlm::ConfigSource::Runtime);  // Zero not allowed
+    } catch (const nlm::ConfigValidationError& e) {
+        exceptionThrown = true;
+        assert(e.key == "strict_key");
+    }
+    assert(exceptionThrown);
+    
+    // Test that setting valid value doesn't throw
+    try {
+        config.set("strict_key", 5, nlm::ConfigSource::Runtime);  // Valid
+        assert(config.has("strict_key"));
+    } catch (...) {
+        assert(false); // Should not throw
+    }
+    
+    // Test loadFromFile with non-existent file
+    bool loadResult = config.loadFromFile("/nonexistent/file.txt");
+    assert(!loadResult);
+    
+    // Test saveToFile (this should work if file can be created)
+    // We'll create a temp file path
+    std::string tempFile = "/tmp/test_config_save.txt";
+    
+    // Clean up if exists
+    std::remove(tempFile.c_str());
+    
+    bool saveResult = config.saveToFile(tempFile);
+    assert(saveResult);
+    assert(std::ifstream(tempFile).good());
+    
+    // Clean up
+    std::remove(tempFile.c_str());
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
 }
 
 void runAll() {
+    std::cout << "Running Config tests..." << std::endl;
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigBatchOperations();
+    testConfigCopyAndMerge();
+    testConfigPresets();
+    testConfigExportImport();
+    testConfigErrorHandling();
 }
 
 } // namespace test_config

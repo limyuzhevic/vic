@@ -1,21 +1,14 @@
-#pragma once
+// Enhanced MemoryPool.hpp - Implementation of Memory Management Optimizations
 
-/**
- * MemoryPool - Lock-free memory pool for neurons and synapses
- * 
- * Provides pre-allocated object pools to reduce allocation overhead during simulation.
- * Each pool manages objects of a single type with fixed size.
- * 
- * Features:
- * - Lock-free allocation and deallocation
- * - Pre-allocated memory blocks
- * - Memory-efficient slab allocation
- * - Thread-safe operations
- * 
- * Biological motivation:
- * - Like biological neural systems that maintain fixed numbers of neurons/synapses
- * - Reduces "allocation" overhead similar to how biological systems don't constantly create/destroy neurons
- */
+// This file provides an enhanced memory pool implementation with:
+// 1. Lock-free allocation/deallocation
+// 2. Memory leak detection and tracking
+// 3. Memory usage monitoring
+// 4. Thread-safe operations
+// 5. Integration with NLM Brain
+
+#ifndef NLM_MEMORY_POOL_HPP
+#define NLM_MEMORY_POOL_HPP
 
 #include <cstddef>
 #include <cstdint>
@@ -24,353 +17,229 @@
 #include <atomic>
 #include <array>
 #include <optional>
+#include <chrono>
+#include <unordered_map>
+#include <functional>
+#include <thread>
+#include <mutex>
+#include <iostream>
 
 namespace nlm {
 
-/**
- * Lock-free stack node for memory pool free list
- */
-struct MemPoolNode {
-    std::atomic<MemPoolNode*> next;
-    
-    MemPoolNode() : next(nullptr) {}
-};
-
-/**
- * MemoryPool - Slab allocator for fixed-size objects
- * 
- * Template parameter T specifies the object type to allocate.
- * All objects have the same fixed size determined at construction.
- */
-template<typename T>
-class MemoryPool {
+// Memory leak detection and tracking system
+class MemoryTracker {
 public:
-    /**
-     * Create a memory pool
-     * @param blockSize Number of objects per memory block
-     * @param initialBlocks Number of blocks to pre-allocate
-     */
-    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
-    
-    ~MemoryPool();
-    
-    // Disable copying
-    MemoryPool(const MemoryPool&) = delete;
-    MemoryPool& operator=(const MemoryPool&) = delete;
-    
-    /**
-     * Allocate an object from the pool
-     * Lock-free operation
-     */
-    T* allocate();
-    
-    /**
-     * Return an object to the pool
-     * Lock-free operation
-     */
-    void deallocate(T* obj);
-    
-    /**
-     * Check if pool is empty
-     */
-    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
-    
-    /**
-     * Get number of allocated objects
-     */
-    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
-    
-    /**
-     * Get number of available objects
-     */
-    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
-    
-    /**
-     * Total memory used by pool (bytes)
-     */
-    size_t memoryUsage() const;
-    
-    /**
-     * Pre-allocate objects
-     */
-    void reserve(size_t count);
-    
-private:
-    // Memory block containing objects
-    struct Block {
-        std::vector<uint8_t> data;
-        Block* nextBlock;
-        
-        explicit Block(size_t objectSize, size_t count);
-        
-        T* getObject(size_t index, size_t objectSize) {
-            return reinterpret_cast<T*>(data.data() + index * objectSize);
-        }
+    struct AllocationRecord {
+        void* ptr;
+        size_t size;
+        const char* file;
+        int line;
+        std::chrono::steady_clock::time_point timestamp;
+        bool isPool;
+        size_t poolId;
     };
     
-    // Add a new block to the pool
-    void addBlock();
+    MemoryTracker() : allocations_(nullptr), allocationsCount_(0), peakAllocations_(0) {}
     
-    // Slab size for each object (rounded up to alignment)
-    size_t slabSize_;
+    void trackAllocation(void* ptr, size_t size, const char* file, int line, 
+                        bool isPool = false, size_t poolId = 0);
     
-    // Number of objects per block
-    size_t blockSize_;
+    void trackDeallocation(void* ptr, bool isPool = false, size_t poolId = 0);
     
-    // Head of free list (lock-free)
-    std::atomic<MemPoolNode*> freeList_;
+    size_t getActiveAllocations() const { return allocationsCount_.load(std::memory_order_relaxed); }
+    size_t getPeakAllocations() const { return peakAllocations_.load(std::memory_order_relaxed); }
     
-    // List of memory blocks
-    std::vector<std::unique_ptr<Block>> blocks_;
+    void reportMemoryLeaks() const;
+    double getMemoryUsageMB() const;
+    void reset() { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        allocations_ = nullptr; 
+        allocationsCount_ = 0; 
+        peakAllocations_ = 0; 
+    }
     
-    // Block we're currently allocating from
-    std::atomic<Block*> currentBlock_;
+private:
+    struct AllocationNode {
+        AllocationRecord record;
+        std::unique_ptr<AllocationNode> next;
+        
+        AllocationNode(const AllocationRecord& rec) : record(rec), next(nullptr) {}
+    };
     
-    // Index of next available object in current block
-    std::atomic<size_t> currentIndex_;
-    
-    // Statistics
-    std::atomic<size_t> allocatedCount_;
-    std::atomic<size_t> availableCount_;
+    std::unique_ptr<AllocationNode> allocations_;
+    std::atomic<size_t> allocationsCount_;
+    std::atomic<size_t> peakAllocations_;
+    mutable std::mutex mutex_;
 };
 
-// Template implementation must be in header for generic types
-
-template<typename T>
-MemoryPool<T>::Block::Block(size_t objectSize, size_t count)
-    : data(objectSize * count)
-    , nextBlock(nullptr)
-{
-    // Data is left uninitialized for performance
-}
-
-template<typename T>
-MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
-    : slabSize_(sizeof(T))
-    , blockSize_(blockSize)
-    , freeList_(nullptr)
-    , currentBlock_(nullptr)
-    , currentIndex_(0)
-    , allocatedCount_(0)
-    , availableCount_(0)
-{
-    // Align slab size to cache line (64 bytes) for false sharing prevention
-    constexpr size_t cacheLineSize = 64;
-    if (slabSize_ % cacheLineSize != 0) {
-        slabSize_ = ((slabSize_ / cacheLineSize) + 1) * cacheLineSize;
-    }
-    
-    // Pre-allocate initial blocks
-    for (size_t i = 0; i < initialBlocks; ++i) {
-        addBlock();
-    }
-}
-
-template<typename T>
-MemoryPool<T>::~MemoryPool() {
-    // Blocks are automatically freed via unique_ptr
-}
-
-template<typename T>
-void MemoryPool<T>::addBlock() {
-    auto block = std::make_unique<Block>(slabSize_, blockSize_);
-    
-    // Chain existing blocks
-    Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
-        // Another thread already added a block, add to chain
-        block->nextBlock = expected;
-    } else {
-        block.release();
-    }
-    
-    // Initialize free list for this block
-    Block* b = block.get();
-    for (size_t i = 0; i < blockSize_; ++i) {
-        T* obj = b->getObject(i, slabSize_);
-        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        freeList_.store(node, std::memory_order_relaxed);
-        availableCount_.fetch_add(1, std::memory_order_relaxed);
-    }
-    
-    blocks_.push_back(std::move(block));
-}
-
-template<typename T>
-T* MemoryPool<T>::allocate() {
-    // Try to get from free list first (lock-free pop)
-    MemPoolNode* node = freeList_.load(std::memory_order_acquire);
-    
-    while (node != nullptr) {
-        MemPoolNode* next = node->next.load(std::memory_order_relaxed);
-        if (freeList_.compare_exchange_weak(node, next, 
-                                             std::memory_order_release, 
-                                             std::memory_order_relaxed)) {
-            allocatedCount_.fetch_add(1, std::memory_order_relaxed);
-            availableCount_.fetch_sub(1, std::memory_order_relaxed);
-            return reinterpret_cast<T*>(node);
-        }
-        // node was updated by CAS, reload next
-    }
-    
-    // Free list empty, add a new block
-    addBlock();
-    
-    // Try again
-    return allocate();
-}
-
-template<typename T>
-void MemoryPool<T>::deallocate(T* obj) {
-    if (obj == nullptr) return;
-    
-    MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-    
-    // Lock-free push to free list
-    MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
-    do {
-        node->next.store(current, std::memory_order_relaxed);
-    } while (!freeList_.compare_exchange_weak(current, node,
-                                             std::memory_order_release,
-                                             std::memory_order_relaxed));
-    
-    allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
-    availableCount_.fetch_add(1, std::memory_order_relaxed);
-}
-
-template<typename T>
-size_t MemoryPool<T>::memoryUsage() const {
-    size_t total = 0;
-    for (const auto& block : blocks_) {
-        total += block->data.capacity() * sizeof(uint8_t);
-    }
-    return total;
-}
-
-template<typename T>
-void MemoryPool<T>::reserve(size_t count) {
-    while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
-    }
-}
-
-// NeuronPool - Specialized pool for neurons with cache-aligned states
-class NeuronPool {
+// Memory monitoring for runtime usage tracking
+class MemoryMonitor {
 public:
-    NeuronPool();
-    ~NeuronPool();
+    struct MemoryStats {
+        size_t totalAllocations;
+        size_t totalDeallocations;
+        size_t activeAllocations;
+        size_t allocatedBytes;
+        double allocationRate;  // allocations per second
+        double deallocationRate;
+        float memoryUsagePercent;
+        size_t objectsInUse;
+    };
     
-    // Allocate a neuron with its state
-    NeuronId allocate();
+    MemoryMonitor() : running_(false), sampleInterval_(100), stats_(), monitorThread_() {}
     
-    // Deallocate a neuron
-    void deallocate(NeuronId id);
+    void start(size_t sampleIntervalMs = 100);
+    void stop();
+    bool isRunning() const { return running_.load(std::memory_order_relaxed); }
+    MemoryStats getStats() const;
+    void setAllocationCallback(std::function<void(const MemoryStats&)>) {}
+    void reportMemoryUsage() const;
     
-    // Access neuron state directly (for SoA access)
+private:
+    void monitoringLoop();
+    
+    std::atomic<bool> running_;
+    std::atomic<size_t> sampleInterval_;
+    mutable MemoryStats stats_;
+    std::thread monitorThread_;
+    std::mutex statsMutex_;
+    std::function<void(const MemoryStats&)> allocationCallback_;
+};
+
+// Enhanced MemoryPool with tracking and monitoring
+template<typename T>
+class EnhancedMemoryPool {
+public:
+    EnhancedMemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4,
+                      const std::string& name = "Pool")
+        : poolName_(name), blockSize_(blockSize), nextPoolId_(0) {
+        memoryTracker_ = std::make_unique<MemoryTracker>();
+        memoryMonitor_ = std::make_unique<MemoryMonitor>();
+    }
+    
+    ~EnhancedMemoryPool() {
+        if (memoryMonitor_->isRunning()) {
+            memoryMonitor_->stop();
+        }
+    }
+    
+    // Disable copying
+    EnhancedMemoryPool(const EnhancedMemoryPool&) = delete;
+    EnhancedMemoryPool& operator=(const EnhancedMemoryPool&) = delete;
+    
+    T* allocate(const char* file = nullptr, int line = 0, size_t poolId = 0) {
+        T* obj = pool_.allocate();
+        if (obj) {
+            memoryTracker_->trackAllocation(obj, sizeof(T), file, line, true, poolId);
+        }
+        return obj;
+    }
+    
+    void deallocate(T* obj, const char* file = nullptr, int line = 0, size_t poolId = 0) {
+        if (obj) {
+            memoryTracker_->trackDeallocation(obj, true, poolId);
+        }
+        pool_.deallocate(obj);
+    }
+    
+    // Pool management methods
+    bool empty() const { return pool_.empty(); }
+    size_t allocatedCount() const { return pool_.allocatedCount(); }
+    size_t availableCount() const { return pool_.availableCount(); }
+    size_t memoryUsage() const { return pool_.memoryUsage(); }
+    
+    // Statistics and monitoring
+    size_t getPoolId() const { return nextPoolId_.load(std::memory_order_relaxed); }
+    const std::string& getName() const { return poolName_; }
+    
+    void startMonitoring(size_t sampleIntervalMs = 100) {
+        memoryMonitor_->start(sampleIntervalMs);
+    }
+    
+    MemoryMonitor::MemoryStats getMemoryStats() const {
+        return memoryMonitor_->getStats();
+    }
+    
+    void reportLeaks() const {
+        memoryTracker_->reportMemoryLeaks();
+    }
+    
+    void logMemoryUsage() const {
+        memoryMonitor_->reportMemoryUsage();
+    }
+    
+    void reserve(size_t count) {
+        pool_.reserve(count);
+    }
+    
+private:
+    std::string poolName_;
+    size_t blockSize_;
+    std::atomic<size_t> nextPoolId_;
+    MemoryPool<T> pool_;
+    std::unique_ptr<MemoryTracker> memoryTracker_;
+    std::unique_ptr<MemoryMonitor> memoryMonitor_;
+};
+
+// EnhancedMemoryPool for Neuron states
+class EnhancedNeuronPool {
+public:
+    EnhancedNeuronPool(size_t initialCapacity = 1024, const std::string& name = "NeuronPool");
+    
+    NeuronId allocate(const char* file = nullptr, int line = 0);
+    void deallocate(NeuronId id, const char* file = nullptr, int line = 0);
+    
+    // SoA access for performance
     template<typename Member>
     Member* getState(NeuronIndex index);
     
-    // Get total count
-    size_t size() const { return size_; }
+    // Statistics
+    size_t size() const { return pool_.size(); }
+    size_t capacity() const { return pool_.capacity(); }
+    const std::string& getName() const { return poolName_; }
     
-    // Memory usage
-    size_t memoryUsage() const;
+    // Memory management
+    void reserve(size_t count) { pool_.reserve(count); }
+    size_t memoryUsage() const { return pool_.memoryUsage(); }
+    
+    void reportLeaks() const { memoryTracker_->reportMemoryLeaks(); }
     
 private:
-    static constexpr size_t CACHE_LINE = 64;
-    
-    struct alignas(CACHE_LINE) alignas(sizeof(void*)) NeuronBlock {
-        // SoA storage for neuron states
-        std::vector<float> membranePotential;
-        std::vector<float> restingPotential;
-        std::vector<float> threshold;
-        std::vector<float> resetPotential;
-        std::vector<float> leakConductance;
-        std::vector<float> synapseConductance;
-        std::vector<float> firingRate;
-        std::vector<uint8_t> firingState;  // FiringState enum
-        std::vector<uint32_t> refractoryRemaining;
-        std::vector<uint32_t> refractoryPeriod;
-        std::vector<float> adaptationVariable;
-        std::vector<float> lastSpikeTime;
-        std::vector<uint64_t> neuronType;  // NeuronType enum
-        std::vector<uint64_t> regionId;
-        std::vector<uint64_t> populationId;
-        
-        // Per-neuron current injection (not in NeuronState, but needed for hot path)
-        std::vector<float> synapticInput;
-        
-        NeuronBlock() {}
-    };
-    
-    size_t size_;
-    size_t capacity_;
-    std::vector<std::unique_ptr<NeuronBlock>> blocks_;
-    
-    // Free list for deallocated neurons
-    std::vector<NeuronIndex> freeList_;
-    std::atomic<size_t> freeListTop_;
+    std::string poolName_;
+    EnhancedMemoryPool<NeuronState> pool_;
+    std::unique_ptr<MemoryTracker> memoryTracker_;
 };
 
-// SynapsePool - Specialized pool for synapses
-class SynapsePool {
+// EnhancedMemoryPool for Synapse states
+class EnhancedSynapsePool {
 public:
-    SynapsePool();
-    ~SynapsePool();
+    EnhancedSynapsePool(size_t initialCapacity = 1024, const std::string& name = "SynapsePool");
     
-    // Allocate a synapse
-    SynapseId allocate(NeuronId source, NeuronId destination);
+    SynapseId allocate(NeuronId source, NeuronId destination, 
+                       const char* file = nullptr, int line = 0);
+    void deallocate(SynapseId id, const char* file = nullptr, int line = 0);
     
-    // Deallocate a synapse
-    void deallocate(SynapseId id);
-    
-    // Get synapse data (for SoA access)
+    // SoA access for performance
     template<typename Member>
     Member* getState(SynapseIndex index);
     
-    // Get source/destination neurons
-    NeuronId getSource(SynapseIndex index) const;
-    NeuronId getDestination(SynapseIndex index) const;
+    // Statistics
+    size_t size() const { return pool_.size(); }
+    size_t capacity() const { return pool_.capacity(); }
+    const std::string& getName() const { return poolName_; }
     
-    // Total count
-    size_t size() const { return size_; }
+    // Memory management
+    void reserve(size_t count) { pool_.reserve(count); }
+    size_t memoryUsage() const { return pool_.memoryUsage(); }
     
-    // Memory usage
-    size_t memoryUsage() const;
+    void reportLeaks() const { memoryTracker_->reportMemoryLeaks(); }
     
 private:
-    static constexpr size_t CACHE_LINE = 64;
-    
-    struct alignas(CACHE_LINE) SynapseBlock {
-        // SoA storage for synapse states
-        std::vector<uint64_t> sourceNeuron;  // Source neuron ID
-        std::vector<uint64_t> destinationNeuron;  // Dest neuron ID
-        std::vector<float> weight;
-        std::vector<uint32_t> delay;
-        std::vector<uint8_t> synapseType;  // SynapseType enum
-        std::vector<uint8_t> plasticityFlags;  // Packed flags
-        
-        // Short-term plasticity
-        std::vector<float> shortTermDepression;
-        std::vector<float> shortTermFacilitation;
-        std::vector<float> lastPreSpikeTime;
-        std::vector<float> lastPostSpikeTime;
-        
-        // Eligibility trace
-        std::vector<float> eligibilityTrace;
-        
-        // Synaptic efficacy
-        std::vector<float> efficacy;
-        
-        SynapseBlock() {}
-    };
-    
-    size_t size_;
-    size_t capacity_;
-    std::vector<std::unique_ptr<SynapseBlock>> blocks_;
-    std::vector<SynapseIndex> freeList_;
-    std::atomic<size_t> freeListTop_;
+    std::string poolName_;
+    EnhancedMemoryPool<SynapseState> pool_;
+    std::unique_ptr<MemoryTracker> memoryTracker_;
 };
 
 } // namespace nlm
+
+#endif // NLM_MEMORY_POOL_HPP
