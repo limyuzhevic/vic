@@ -43,6 +43,60 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+#pragma once
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <variant>
+#include <optional>
+
+// Forward declarations for external libraries
+#ifdef NLM_USE_JSON
+struct nlohmann_json_t;
+#endif
+
+#ifdef NLM_USE_YAML
+struct YAML_Node_t;
+#endif
+
+namespace nlm {
+
+// Forward declarations
+class Config;
+
+// Configuration value types
+using ConfigValue = std::variant<
+    int,
+    int64_t,
+    double,
+    bool,
+    std::string,
+    std::vector<int>,
+    std::vector<double>,
+    std::vector<std::string>
+>;
+
+// Configuration source
+enum class ConfigSource {
+    Default,
+    File,
+    CommandLine,
+    Runtime
+};
+
+// Configuration entry
+struct ConfigEntry {
+    std::string key;
+    ConfigValue value;
+    ConfigSource source;
+    std::string description;
+    
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,14 +109,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML preferred, key=value as fallback)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (formats determined by file extension)
     bool saveToFile(const std::string& filepath) const;
+    
+    // JSON/YAML support
+    bool saveToJson(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -100,6 +157,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format-specific loading
+    bool loadFromKeyValue(const std::string& filepath);
+#ifdef NLM_USE_JSON
+    bool loadFromJson(const struct nlohmann_json_t& jsonData);
+#endif
+#ifdef NLM_USE_YAML
+    bool loadFromYaml(const struct YAML_Node_t& yamlData);
+#endif
 };
 
 } // namespace nlm

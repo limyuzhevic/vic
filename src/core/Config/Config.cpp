@@ -3,6 +3,21 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <regex>
+#include <map>
+#include <vector>
+#include <stdexcept>
+
+// Include nlohmann/json if available
+#ifdef NLM_USE_JSON
+#include "nlohmann/json.hpp"
+#endif
+
+// Include YAML-cpp if available  
+#ifdef NLM_USE_YAML
+#include "yaml-cpp/yaml.h"
+#endif
 
 namespace nlm {
 
@@ -19,9 +34,41 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try JSON format first (if enabled)
+#ifdef NLM_USE_JSON
+    // Try to parse as JSON
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.good()) {
+        nlohmann::json jsonData;
+        try {
+            jsonFile >> jsonData;
+            return loadFromJson(jsonData);
+        } catch (const nlohmann::json::parse_error& e) {
+            NLM_LOG_WARN("JSON parse error: " + std::string(e.what()) + ". Trying other formats.");
+        }
+    }
+#endif
+
+    // Try YAML format second (if enabled)
+#ifdef NLM_USE_YAML
+    // Try to parse as YAML
+    std::ifstream yamlFile(filepath);
+    if (yamlFile.good()) {
+        try {
+            YAML::Node yamlData = YAML::LoadFile(filepath);
+            return loadFromYaml(yamlData);
+        } catch (const YAML::Exception& e) {
+            NLM_LOG_WARN("YAML parse error: " + std::string(e.what()) + ". Trying other formats.");
+        }
+    }
+#endif
+
+    // Fall back to the basic key=value format
+    return loadFromKeyValue(filepath);
+}
+
+// Load from key=value format (original implementation)
+bool Config::loadFromKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -49,6 +96,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Invalid line format
+            NLM_LOG_WARN("Invalid config line (no '=' found): " + line);
         }
     }
     
@@ -92,20 +142,78 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
+// Load configuration from JSON data
+#ifdef NLM_USE_JSON
+bool Config::loadFromJson(const nlohmann::json& jsonData) {
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        for (const auto& [key, value] : jsonData.items()) {
+            set(key, value, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config: " + std::string(e.what()));
+        return false;
     }
+}
+
+// Load configuration from YAML data  
+#ifdef NLM_USE_YAML
+bool Config::loadFromYaml(const YAML::Node& yamlData) {
+    try {
+        // Convert YAML to our internal format
+        std::function<void(const YAML::Node&, const std::string&)> convertNode = 
+            [&](const YAML::Node& node, const std::string& prefix) {
+                if (node.IsScalar()) {
+                    set(prefix, node.as<std::string>(), ConfigSource::File);
+                } else if (node.IsSequence()) {
+                    // Convert to vector representation
+                    std::vector<std::string> values;
+                    for (const auto& item : node) {
+                        if (item.IsScalar()) {
+                            values.push_back(item.as<std::string>());
+                        }
+                    }
+                    set(prefix, values, ConfigSource::File);
+                } else if (node.IsMap()) {
+                    // Handle nested objects - convert to flattened key with dot notation
+                    for (const auto& kv : node) {
+                        std::string newPrefix = prefix.empty() ? kv.first.as<std::string>() : 
+                                               prefix + "." + kv.first.as<std::string>();
+                        convertNode(kv.second, newPrefix);
+                    }
+                }
+            };
+        
+        convertNode(yamlData, "");
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML config: " + std::string(e.what()));
+        return false;
+    }
+}
+#endif
+
+// Save configuration to JSON file (for backward compatibility)
+bool Config::saveToJson(const std::string& filepath) const {
+#ifdef NLM_USE_JSON
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    nlohmann::json jsonData;
+    for (const auto& entry : pImpl->entries) {
+        std::visit([&jsonData, &entry](auto&& arg) {
+            jsonData[entry.key] = arg;
+        }, entry.value);
+    }
+    
+    file << jsonData.dump(2); // Pretty print with 2-space indentation
+    return true;
+#else
+    NLM_LOG_ERROR("JSON support not compiled in");
+    return false;
+#endif
 }
 
 template<typename T>
