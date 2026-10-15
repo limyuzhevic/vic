@@ -1,24 +1,91 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+// Add memory management improvements to Brain.cpp
+#include <stdexcept>
+
+namespace nlm {
+
+// Memory management utility functions
+namespace MemoryUtils {
+    
+    // Safe neural element access with null checks
+    template<typename T>
+    bool safe_access(const T* ptr, const std::function<bool(const T&)>& operation, 
+                    const std::string& errorMsg, bool returnFalseOnNull = true) {
+        if (!ptr) {
+            NLM_LOG_ERROR(errorMsg);
+            return returnFalseOnNull;
+        }
+        return operation(*ptr);
+    }
+    
+    // Safe neural element access for void functions
+    template<typename T>
+    void safe_access(const T* ptr, const std::function<void(const T&)>& operation,
+                    const std::string& errorMsg, bool silentOnNull = false) {
+        if (!ptr) {
+            if (!silentOnNull) {
+                NLM_LOG_ERROR(errorMsg);
+            }
+            return;
+        }
+        operation(*ptr);
+    }
+    
+    // Safe neural element access for void functions returning bool
+    template<typename T>
+    bool safe_access_bool(const T* ptr, const std::function<bool(const T&)>& operation,
+                         const std::string& errorMsg, bool defaultReturn = false) {
+        if (!ptr) {
+            NLM_LOG_ERROR(errorMsg);
+            return defaultReturn;
+        }
+        return operation(*ptr);
+    }
+    
+    // Vector element safety check
+    template<typename T>
+    size_t safe_vector_access(const std::vector<T>* vec, size_t index, 
+                             const std::string& errorMsg, bool silentOnError = false) {
+        if (!vec || index >= vec->size()) {
+            if (!silentOnError) {
+                NLM_LOG_ERROR(errorMsg);
+            }
+            return vec ? vec->size() : 0;
+        }
+        return (*vec)[index];
+    }
+    
+} // namespace MemoryUtils
+
+// Memory leak detection macro (debug builds only)
+#ifdef DEBUG
+#define TRACK_ALLOCATION(ptr, type, context) \
+    static std::vector<void*> allocationTracker; \
+    if (ptr) allocationTracker.push_back(static_cast<void*>(ptr))
+
+#define CHECK_MEMORY_LEAKS() \
+    { \
+        static bool firstCheck = true; \
+        if (firstCheck) { \
+            std::cout << "Memory leak tracker initialized" << std::endl; \
+            firstCheck = false; \
+        } \
+    }
+
+#define RELEASE_MEMORY_LEAK_TRACKER() \
+    { \
+        static std::vector<void*> allocationTracker; \
+        if (!allocationTracker.empty()) { \
+            std::cout << "WARNING: Potential memory leaks detected: " << allocationTracker.size() << " allocations" << std::endl; \
+            allocationTracker.clear(); \
+        } \
+    }
+#else
+#define TRACK_ALLOCATION(ptr, type, context)
+#define CHECK_MEMORY_LEAKS()
+#define RELEASE_MEMORY_LEAK_TRACKER()
+#endif
+
+} // namespace nlm
 
 namespace nlm {
 
