@@ -6,6 +6,10 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainCore.hpp"
+#include "BrainIntegration.hpp"
+#include "BrainIO.hpp"
+#include "BrainState.hpp"
 #include <memory>
 #include <string>
 
@@ -44,9 +48,13 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Environment interface for brain-world interaction
+class Environment;
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Now uses modular architecture with BrainCore, BrainIntegration, BrainIO, and BrainState components
 
 class Brain {
 public:
@@ -190,8 +198,25 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get checkpoint manager
+    CheckpointManager* getCheckpointManager();
+    
     // Logging
     void logStatus() const;
+    
+    // State management
+    void checkpointState(const std::string& label = "");
+    void loadState(const std::string& label = "");
+    
+    // Module-specific access
+    BrainCore* getBrainCore();
+    BrainIntegration* getBrainIntegration();
+    BrainIO* getBrainIO();
+    BrainState* getBrainState();
+    
+    // Environment access
+    Environment* getEnvironment();
+    void setEnvironment(Environment* env);
     
 private:
     struct Impl;
