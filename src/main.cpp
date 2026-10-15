@@ -72,11 +72,13 @@ struct LearningExperiment {
         }
         
         NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        std::string synapsesMsg = "  Synapses: " + std::to_string(initialSynapseCount);
+        NLM_LOG_INFO(synapsesMsg);
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            std::string meanMsg = "  Mean weight: " + std::to_string(mean);
+            NLM_LOG_INFO(meanMsg);
         }
     }
     
@@ -93,11 +95,13 @@ struct LearningExperiment {
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        std::string spikesMsg = "  Total spikes: " + std::to_string(brain->getTotalSpikeCount());
+        NLM_LOG_INFO(spikesMsg);
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            std::string finalMeanMsg = "  Mean weight: " + std::to_string(mean);
+            NLM_LOG_INFO(finalMeanMsg);
         }
     }
     
@@ -118,9 +122,12 @@ struct LearningExperiment {
         float finalMean = finalSum / finalWeights.size();
         
         NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        std::string initialMeanMsg = "  Initial mean weight: " + std::to_string(initialMean);
+        NLM_LOG_INFO(initialMeanMsg);
+        std::string finalMeanMsg = "  Final mean weight: " + std::to_string(finalMean);
+        NLM_LOG_INFO(finalMeanMsg);
+        std::string changeMsg = "  Change: " + std::to_string(finalMean - initialMean);
+        NLM_LOG_INFO(changeMsg);
         
         // Count synapses that changed significantly
         size_t strengthened = 0;
@@ -137,14 +144,19 @@ struct LearningExperiment {
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        std::string strengthenedMsg = "  Strengthened: " + std::to_string(strengthened);
+        NLM_LOG_INFO(strengthenedMsg);
+        std::string weakenedMsg = "  Weakened: " + std::to_string(weakened);
+        NLM_LOG_INFO(weakenedMsg);
+        std::string unchangedMsg = "  Unchanged: " + std::to_string(unchanged);
+        NLM_LOG_INFO(unchangedMsg);
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
+        std::string spikesMsg = "  Total spikes: " + std::to_string(brain->getTotalSpikeCount());
+        NLM_LOG_INFO(spikesMsg);
+        std::string mostActiveMsg = "  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size());
+        NLM_LOG_INFO(mostActiveMsg);
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
@@ -188,16 +200,18 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
-    
+    std::string spikesMsg = "  Spikes generated: " + std::to_string(spikes);
+    NLM_LOG_INFO(spikesMsg);
+
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            std::string neuronMsg = "    Neuron " + std::to_string(i) +
+                                    " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                                    " thresh=" + std::to_string(neurons[i]->getThreshold());
+            NLM_LOG_INFO(neuronMsg);
         }
     }
 }
@@ -232,9 +246,10 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            std::string progressMsg = "  Step " + std::to_string(step) +
+                                     " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                                     " | Firing: " + std::to_string(brain->getFiringNeuronCount());
+            NLM_LOG_INFO(progressMsg);
         }
     }
     
@@ -266,8 +281,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+        std::string synapseMsg = "    Synapse " + std::to_string(i) +
+                                 " before: " + std::to_string(beforeWeights[i]);
+        NLM_LOG_INFO(synapseMsg);
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -300,9 +316,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+        std::string afterMsg = "    Synapse " + std::to_string(i) +
+                               " after: " + std::to_string(synapses[i]->getWeight()) +
+                               " (Δ=" + std::to_string(delta) + ")";
+        NLM_LOG_INFO(afterMsg);
     }
     
     // Check if weights increased (LTP)
@@ -385,17 +402,23 @@ int main(int argc, char** argv) {
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    std::string seedMsg = "  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42));
+    NLM_LOG_INFO(seedMsg);
+    std::string timestepMsg = "  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s";
+    NLM_LOG_INFO(timestepMsg);
+    std::string neuronCountMsg = "  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500));
+    NLM_LOG_INFO(neuronCountMsg);
+    std::string regionCountMsg = "  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1));
+    NLM_LOG_INFO(regionCountMsg);
+    std::string connProbMsg = "  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f));
+    NLM_LOG_INFO(connProbMsg);
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    std::string clockMsg = "Simulation clock initialized with timestep: " + std::to_string(timestep) + "s";
+    NLM_LOG_INFO(clockMsg);
     
     // Initialize brain
     NLM_LOG_INFO("");

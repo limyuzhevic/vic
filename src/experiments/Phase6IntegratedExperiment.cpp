@@ -20,8 +20,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     auto startWall = std::chrono::high_resolution_clock::now();
     
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
-    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+    std::string configMsg = "Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
+                            std::to_string(config.maxSteps) + " steps";
+    NLM_LOG_INFO(configMsg);
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
