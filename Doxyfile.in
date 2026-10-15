@@ -1,0 +1,142 @@
+DOXYGEN_MEMORY_FOR_PROFILING ?= yes
+
+PROJECT_NAME           = "NLM - Neural Learning Machine"
+PROJECT_NUMBER        = 1.0.0
+PROJECT_BRIEF         = "An integrated artificial brain implementation with spiking neural computation, memory systems, prediction, and cognition"
+OUTPUT_DIRECTORY       = docs
+GENERATE_LATEX         = NO
+GENERATE_RTF          = NO
+GENERATE_MAN          = NO
+GENERATE_XML          = YES
+GENERATE_HTML         = YES
+GENERATE_DOCSET       = YES
+GENERATE_DATATYPES    = YES
+GENERATE_QHP         = YES
+GENERATE_XML_NS       = YES
+QUIET                = YES
+WARNINGS             = YES
+WARN_IF_UNDOCUMENTED = NO
+WARN_IF_DOC_ERROR    = YES
+WARN_IF_UNEXPECTED_TAGS = NO
+WARN_IF_DUPLICATED_DOCUMENTATION = YES
+WARN_IF_CIRCULAR = YES
+WARN_LEVEL            = 4
+EXCLUDE              = 
+EXCLUDE_SYMLINKS     = YES
+EXAMPLE_RECURSIVE    = NO
+EXTENSION_MAPPING     = 
+SKIP_FUNCTION_MACROS = YES
+
+INPUT                = src
+INPUT                += src/agent
+INPUT                += src/brain
+INPUT                += src/core
+INPUT                += src/plasticity
+INPUT                += src/cognition
+INPUT                += src/neuromodulation
+INPUT                += src/memory
+INPUT                += src/prediction
+INPUT                += src/sensory
+INPUT                += src/motor
+INPUT                += src/development
+INPUT                += src/performance
+INPUT                += src/agent
+
+INPUT                += README.md
+INPUT                += easy_usage.md
+INPUT                += HOW_TO_USE.md
+
+C_FILE_EXTENSIONS     = cpp
+H_FILE_EXTENSIONS     = hpp
+
+INCLUDE_PATH          = src
+INCLUDE_PATH         += src/agent
+INCLUDE_PATH         += src/brain
+INCLUDE_PATH         += src/core
+INCLUDE_PATH         += src/plasticity
+INCLUDE_PATH         += src/cognition
+INCLUDE_PATH         += src/neuromodulation
+INCLUDE_PATH         += src/memory
+INCLUDE_PATH         += src/prediction
+INCLUDE_PATH         += src/sensory
+INCLUDE_PATH         += src/motor
+INCLUDE_PATH         += src/development
+INCLUDE_PATH         += src/performance
+INCLUDE_PATH         += src/agent
+
+CREATE_SUBDIRS       = NO
+
+ALLEXTERNFILES        = NO
+
+CREATE_XML_CHARSET_UTF8 = YES
+USE_XHTML = YES
+XML_OUTPUT = xml
+
+XML_PROGRAMLISTING   = YES
+XML_NS_MEMB_FILE_SCOPE = NO
+XML_DOCBOOK_OUTPUT   = docs
+
+HTML_OUTPUT          = html
+HTML_FILE_EXTENSION  = .html
+HTML_COLORSTYLE_HUE  = 220
+HTML_COLORSTYLE_SATURATION = 85
+HTML_COLORSTYLE_GAMMA = 80
+HTML_TIMESTAMP = YES
+
+GENERATE_CUSTOM_PROTECTED_SECTIONS = YES
+
+SHOW_USED_FILES      = NO
+SHOW_DIRECTORIES      = YES
+
+GENERATE_TAGFILE     = nlm.tag
+GENERATE_AUTOGEN_PREFIX = YES
+GENERATE_BRIEF_MEMBER_DESC = YES
+GENERATE_LONG_MEMBER_DESC = YES
+GENERATE_TESTS = NO
+
+JAVADOC_AUTOBRIEF    = NO
+JAVADOC_BRIEF_MERGE  = NO
+
+CONSTRUCTORS_EXPLICIT_IN_LOCAL = NO
+INCLUDE_INHERITANCE_GRAPH = YES
+INCLUDE_UNDOC_CLASSES = NO
+
+HIDE_UNDOC_MEMBERS   = NO
+HIDE_UNDOC_CLASSES  = NO
+HIDE_UNDOC_ENUMVALUES = NO
+HIDE_UNDOC_FILES    = NO
+HIDE_UNDOC_RELATIONS = NO
+HIDE_UNDOC_MEMMbr_NAMES = NO
+
+OPTIMIZE_OUTPUT_FOR_C = YES
+OPTIMIZE_OUTPUT_FOR_CPLUSPLUS = YES
+
+DIV_GROUP_NAMES     = "Neuronal Dynamics|Systems Integration|Cognitive Processing|Memory Systems|Plasticity and Learning|Neuromodulation"
+
+TYPEDEF_HIDES_STRUCT = NO
+
+ENUM_VALUES_AS_COLUMNS = NO
+
+SOURCE_BROWSER       = YES
+INLINE_SOURCES       = NO
+STRIP_CODE_COMMENTS = NO
+STRIP_PRIVATE_NAMESPACES = YES
+HIDE_SCOPE_NAMES    = NO
+
+IGNORE_PREFIX        = 
+
+    
+FAILOVER_GENERATE_HTML = NO
+
+GENERATE_HTMLCOPY     = NO
+
+GENERATE_LATEXCOPY   = NO
+
+GENERATE_XMLCOPY     = NO
+
+GENERATE_RTF_EXCLUDE_STYLESHEET  = YES
+
+QT_AUTOBRIEF        = NO
+
+MULTILINE_CPP_EXPR  = NO
+

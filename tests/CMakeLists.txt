@@ -16,9 +16,9 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core GTest::gtest GTest::gtest_main)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
-# Enable testing
-enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+# Enable GoogleTest test discovery
+include(GoogleTest)
+gtest_discover_tests(nlm_test)

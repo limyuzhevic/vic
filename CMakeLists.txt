@@ -141,6 +141,21 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 
 # Testing
 enable_testing()
+
+# GoogleTest integration
+find_package(GTest QUIET)
+if(NOT GTest_FOUND)
+    message(STATUS "GoogleTest not found, attempting to download and configure")
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG release-1.14.0
+    )
+    FetchContent_MakeAvailable(googletest)
+    set(GTest_FOUND TRUE)
+endif()
+
 add_subdirectory(tests)
 
 # Install targets (future)

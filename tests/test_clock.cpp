@@ -1,132 +1,190 @@
-// SimulationClock Tests
+// SimulationClock Tests - GoogleTest Version
 #include "core/SimulationClock/SimulationClock.hpp"
-#include <cassert>
-#include <iostream>
+#include <gtest/gtest.h>
 
-namespace test_clock {
+namespace {
 
-void testClockCreation() {
+TEST(ClockTest, ClockCreation) {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
-    assert(clock.getTimestep() == 0.001);
-    
-    std::cout << "    testClockCreation passed" << std::endl;
+    EXPECT_EQ(clock.getStep(), 0);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.0);
+    EXPECT_DOUBLE_EQ(clock.getTimestep(), 0.001);
 }
 
-void testClockAdvance() {
+TEST(ClockTest, ClockAdvance) {
     nlm::SimulationClock clock(0.001);
     
     clock.advance();
-    assert(clock.getStep() == 1);
-    assert(clock.getTime() == 0.001);
+    EXPECT_EQ(clock.getStep(), 1);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.001);
     
     clock.advance();
-    assert(clock.getStep() == 2);
-    assert(clock.getTime() == 0.002);
-    
-    std::cout << "    testClockAdvance passed" << std::endl;
+    EXPECT_EQ(clock.getStep(), 2);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.002);
 }
 
-void testClockReset() {
+TEST(ClockTest, ClockReset) {
     nlm::SimulationClock clock(0.001);
     
     clock.advance();
     clock.advance();
     clock.advance();
     
-    assert(clock.getStep() == 3);
+    EXPECT_EQ(clock.getStep(), 3);
     
     clock.reset();
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
-    
-    std::cout << "    testClockReset passed" << std::endl;
+    EXPECT_EQ(clock.getStep(), 0);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.0);
 }
 
-void testClockSetStep() {
+TEST(ClockTest, ClockSetStep) {
     nlm::SimulationClock clock(0.001);
     
     clock.setStep(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
-    
-    std::cout << "    testClockSetStep passed" << std::endl;
+    EXPECT_EQ(clock.getStep(), 100);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.1);
 }
 
-void testClockSetTime() {
+TEST(ClockTest, ClockSetTime) {
     nlm::SimulationClock clock(0.001);
     
     clock.setTime(0.5);
-    assert(clock.getTime() == 0.5);
-    assert(clock.getStep() == 500);
-    
-    std::cout << "    testClockSetTime passed" << std::endl;
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.5);
+    EXPECT_EQ(clock.getStep(), 500);
 }
 
-void testClockAdvanceBy() {
+TEST(ClockTest, ClockAdvanceBy) {
     nlm::SimulationClock clock(0.001);
     
     clock.advanceBy(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
-    
-    std::cout << "    testClockAdvanceBy passed" << std::endl;
+    EXPECT_EQ(clock.getStep(), 100);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.1);
 }
 
-void testClockConversions() {
+TEST(ClockTest, ClockConversions) {
     nlm::SimulationClock clock(0.001);
     
     nlm::Timestamp ts = clock.stepToTime(500);
-    assert(ts == 0.5);
+    EXPECT_DOUBLE_EQ(ts, 0.5);
     
     nlm::SimulationStep st = clock.timeToStep(0.5);
-    assert(st == 500);
-    
-    std::cout << "    testClockConversions passed" << std::endl;
+    EXPECT_EQ(st, 500);
 }
 
-void testClockFirstLastStep() {
+TEST(ClockTest, ClockFirstLastStep) {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.isFirstStep());
+    EXPECT_TRUE(clock.isFirstStep());
     
     clock.advance();
-    assert(!clock.isFirstStep());
+    EXPECT_FALSE(clock.isFirstStep());
     
     clock.reset();
-    assert(clock.isFirstStep());
+    EXPECT_TRUE(clock.isFirstStep());
     
-    assert(clock.isLastStep(0));  // With 0 total steps, step 0 is last
+    EXPECT_TRUE(clock.isLastStep(0));
     clock.advance();
-    assert(!clock.isLastStep(0));
-    assert(clock.isLastStep(1));  // With 1 total step, step 1 is last
-    
-    std::cout << "    testClockFirstLastStep passed" << std::endl;
+    EXPECT_FALSE(clock.isLastStep(0));
+    EXPECT_TRUE(clock.isLastStep(1));
 }
 
-void testClockTimeAtFutureStep() {
+TEST(ClockTest, ClockTimeAtFutureStep) {
     nlm::SimulationClock clock(0.001);
     
     clock.advanceBy(100);
     
     nlm::Timestamp future = clock.timeAtFutureStep(50);
-    assert(future == 0.15);  // 100 steps + 50 steps = 150 steps * 0.001
+    EXPECT_DOUBLE_EQ(future, 0.15);
+}
+
+TEST(ClockTest, ClockAdvanceEdgeCases) {
+    nlm::SimulationClock clock(0.001);
     
-    std::cout << "    testClockTimeAtFutureStep passed" << std::endl;
+    // Test multiple advances
+    for (int i = 0; i < 100; ++i) {
+        clock.advance();
+    }
+    EXPECT_EQ(clock.getStep(), 100);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.1);
+    
+    // Test reset after many advances
+    clock.reset();
+    EXPECT_EQ(clock.getStep(), 0);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.0);
 }
 
-void runAll() {
-    testClockCreation();
-    testClockAdvance();
-    testClockReset();
-    testClockSetStep();
-    testClockSetTime();
-    testClockAdvanceBy();
-    testClockConversions();
-    testClockFirstLastStep();
-    testClockTimeAtFutureStep();
+TEST(ClockTest, ClockTimeRelationships) {
+    nlm::SimulationClock clock(0.001);
+    
+    clock.setTime(0.1);
+    EXPECT_EQ(clock.getStep(), 100);
+    
+    clock.setStep(500);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.5);
+    
+    // Round trip conversion
+    nlm::Timestamp ts = clock.stepToTime(clock.getStep());
+    EXPECT_DOUBLE_EQ(ts, clock.getTime());
+    
+    nlm::SimulationStep st = clock.timeToStep(clock.getTime());
+    EXPECT_EQ(st, clock.getStep());
 }
 
-} // namespace test_clock
+TEST(ClockTest, ClockTimestepVariation) {
+    // Test with different timestep values
+    nlm::SimulationClock clock1(0.01);
+    nlm::SimulationClock clock2(0.001);
+    nlm::SimulationClock clock3(1.0);
+    
+    clock1.advance();
+    clock2.advance();
+    clock3.advance();
+    
+    EXPECT_DOUBLE_EQ(clock1.getTime(), 0.01);
+    EXPECT_DOUBLE_EQ(clock2.getTime(), 0.001);
+    EXPECT_DOUBLE_EQ(clock3.getTime(), 1.0);
+}
+
+TEST(ClockTest, ClockFirstStepAlwaysFirst) {
+    nlm::SimulationClock clock(0.001);
+    
+    EXPECT_TRUE(clock.isFirstStep());
+    clock.reset();
+    EXPECT_TRUE(clock.isFirstStep());
+    
+    clock.advance();
+    EXPECT_FALSE(clock.isFirstStep());
+}
+
+TEST(ClockTest, ClockLastStepLogic) {
+    nlm::SimulationClock clock(0.001);
+    
+    // Test isLastStep with different parameters
+    EXPECT_TRUE(clock.isLastStep(0));  // With 0 total steps, step 0 is last
+    EXPECT_TRUE(clock.isLastStep(1));  // With 1 total step, step 1 is last
+    
+    clock.advance();
+    EXPECT_FALSE(clock.isLastStep(0));
+    EXPECT_TRUE(clock.isLastStep(1));
+    EXPECT_FALSE(clock.isLastStep(2));
+}
+
+TEST(ClockTest, ClockAdvanceByEdgeCases) {
+    nlm::SimulationClock clock(0.001);
+    
+    clock.advanceBy(0);
+    EXPECT_EQ(clock.getStep(), 0);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 0.0);
+    
+    clock.advanceBy(1000);
+    EXPECT_EQ(clock.getStep(), 1000);
+    EXPECT_DOUBLE_EQ(clock.getTime(), 1.0);
+}
+
+} // namespace
+
+// Backward compatibility - keep the runAll function for existing test_main.cpp
+namespace test_clock {
+    void runAll();
+}

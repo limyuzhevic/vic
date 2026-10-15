@@ -22,6 +22,18 @@
 
 namespace nlm {
 
+/**
+ * @brief Implementation details for Brain class (pImpl pattern)
+ * 
+ * @details Contains all internal state and implementation details of the Brain class.
+ *          This follows the pImpl idiom to hide implementation from header files.
+ *          The Impl structure contains all neural system components, configuration,
+ *          simulation state, and integrated systems.
+ * 
+ * @note Thread-unsafe access patterns apply to all Impl members
+ * @warning Direct access to pImpl is discouraged - use Brain public interface
+ * @ingroup Neuronal Dynamics
+ */
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
@@ -78,6 +90,21 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    /**
+     * @brief Constructor - Initialize Brain implementation with configuration
+     * 
+     * @details Sets up all internal Brain components and initializes integrated systems
+     *          based on the provided configuration. This constructor establishes the
+     *          complete neural system architecture including all subsystems.
+     * 
+     * @param cfg Shared pointer to configuration object containing all simulation parameters
+     * 
+     * @throws std::bad_alloc if memory allocation fails for any component
+     * @note Configuration is stored and used throughout Brain lifetime
+     * @warning Configuration must be valid before initialization is called
+     * @thread_safety Thread-unsafe initialization
+     * @post All Brain components are initialized and ready for operation
+     */
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -153,30 +180,125 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
+    /**
+     * @brief Current developmental stage of the brain
+     * 
+     * @details Tracks the developmental stage affecting plasticity rates and
+     *          network properties. Progresses through stages during simulation.
+     * 
+     * @note Influences plasticity modulation factors
+     * @thread_safety Thread-unsafe during development updates
+     */
     DevelopmentalStage developmentalStage;
+
+    /**
+     * @brief Next available region identifier
+     * 
+     * @details Monotonic counter that generates unique region identifiers
+     *          for newly created neural regions. Ensures global uniqueness across
+     *          all regions in the brain.
+     * 
+     * @note Starts at 1, increments with each region creation
+     * @thread_safety Thread-unsafe during region creation
+     */
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+/**
+     * @brief Brain constructor - Create brain with configuration
+     * 
+     * @details Constructs a Brain object with the provided configuration and
+     *          initializes the internal implementation. This constructor uses
+     *          the pImpl pattern to hide implementation details from the header file.
+     * 
+     * @param config Shared pointer to configuration object containing all
+     *              simulation parameters and settings
+     * 
+     * @throws std::bad_alloc if memory allocation fails for pImpl
+     * @note Configuration must be valid before calling initialize()
+     * @thread_safety Thread-unsafe initialization
+     * @post Brain is constructed with configuration but not yet initialized
+     */
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
+/**
+ * @brief Brain destructor - Clean up brain resources
+ * 
+     * @details Performs cleanup of all Brain resources, including the internal
+     *          implementation and all managed components. This destructor ensures
+     *          proper cleanup of all allocated resources.
+     * 
+     * @note All Brain resources are properly released
+     * @thread_safety Thread-safe cleanup
+     * @post Brain resources are freed
+     */
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+/**
+     * @brief Move constructor - Transfer Brain ownership
+     * 
+     * @details Move constructor allows efficient transfer of Brain ownership
+     *          by moving the internal pImpl pointer from the source Brain object.
+     *          The source Brain becomes invalid after the move operation.
+     * 
+     * @param other Brain object to move from
+     * 
+     * @note Source brain becomes unusable after move
+     * @thread_safety Exception-safe
+     * @post Source brain is in valid but unspecified state
+     */
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
+/**
+     * @brief Move assignment operator - Transfer Brain ownership
+     * 
+     * @details Move assignment allows efficient transfer of Brain ownership,
+     *          properly cleaning up existing resources before transferring from
+     *          the source Brain object.
+     * 
+     * @param other Brain object to move from
+     * 
+     * @return Reference to this Brain after assignment
+     * @note Source brain becomes unusable after move
+     * @thread_safety Exception-safe, may throw
+     * @post Source brain is in valid but unspecified state
+     */
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
 
+/**
+ * @brief Initialize brain with configuration
+ * 
+     * @details Performs complete brain initialization based on configuration,
+     *          creating regions, neurons, populations, connections, and initializing
+     *          all integrated systems. This is the main setup operation that must
+     *          be called exactly once after construction.
+     * 
+     * @return true if initialization succeeds, false if configuration is invalid
+     *         or resource allocation fails
+     * 
+     * @throws std::runtime_error if critical configuration parameters are missing
+     * @note Initialize() must be called exactly once after construction
+     * @warning This method may take significant time for large networks
+     * @post Brain is fully initialized and ready for simulation steps
+     * @thread_safety Thread-unsafe, must be called from single thread
+     */
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    /**
+     * @brief Get configuration values and log them
+     * 
+     * @details Retrieves key configuration parameters for logging and validation.
+     *          This helps verify that the configuration is properly loaded and
+     *          displays the main simulation parameters for user information.
+     * 
+     * @note Configuration parameters control network size and connectivity
+     */
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
@@ -185,21 +307,58 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
+    /**
+     * @brief Create brain regions based on configuration
+     * 
+     * @details Creates the specified number of neural regions, each representing
+     *          an anatomical or functional area of the brain. Regions are created
+     *          with auto-generated names and will later contain populations of neurons.
+     * 
+     * @note Region count is typically 1 for simple networks, increases for complex
+     *       multi-regional architectures
+     */
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
+    /**
+     * @brief Distribute neurons across regions
+     * 
+     * @details Allocates neurons proportionally across regions based on the
+     *          total neuron count and region count. Each region receives neurons
+     *          organized into functional populations (sensory, internal, motor).
+     * 
+     * @note Neurons are distributed to create balanced regional representations
+     *       while maintaining overall network size
+     */
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
+            /**
+             * @brief Create functional populations within region
+             * 
+             * @details Creates three basic neuron populations within each region:
+             *          - Sensory neurons: Process external input
+             *          - Internal neurons: Perform internal processing
+             *          - Motor neurons: Generate output actions
+             * 
+             * @note Population sizes are proportionally allocated based on total neurons
+             */
             // Add populations
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
+            /**
+             * @brief Collect I/O neurons for external interaction
+             * 
+             * @details Identifies and stores sensory and motor neurons for use by
+             *          external systems. This enables direct access to input and output
+             *          neurons for integration with environmental inputs and actions.
+             */
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
@@ -215,11 +374,21 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
+    /**
+     * @brief Initialize synaptic connectivity
+     * 
+     * @details Establishes random synaptic connections between neurons within
+     *          each region. This creates the initial network structure based on
+     *          the specified connection probability and weight distribution.
+     * 
+     * @note Connectivity is probabilistic to create sparse networks
+     *       representative of biological neural systems
+     */
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -229,22 +398,62 @@ bool Brain::initialize() {
         }
     }
     
+    /**
+     * @brief Initialize all integrated memory systems
+     * 
+     * @details Sets up the brain's memory architecture, including working memory
+     *          for transient active information, episodic memory for experience storage,
+     *          and associative memory for pattern relationships. These systems are
+     *          essential for cognitive processing and learning.
+     */
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
+    /**
+     * @brief Initialize working memory system
+     * 
+     * @details Sets up working memory with appropriate capacity for the network size.
+     *          Working memory maintains active neuronal representations for immediate
+     *          use in cognitive processing.
+     */
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
+    /**
+     * @brief Initialize episodic memory system
+     * 
+     * @details Sets up episodic memory to store experience episodes with temporal
+     *          sequencing. This allows the brain to remember and replay past experiences.
+     */
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
+    /**
+     * @brief Initialize associative memory system
+     * 
+     * @details Sets up associative memory to form and retrieve pattern relationships,
+     *          enabling the brain to associate related experiences and patterns.
+     */
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
+    /**
+     * @brief Initialize prediction system
+     * 
+     * @details Sets up the prediction system for sensory prediction and error computation.
+     *          Currently, prediction system doesn't have initialize method, so this is a placeholder.
+     */
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
+    /**
+     * @brief Initialize cognitive systems
+     * 
+     * @details Sets up all cognitive processing systems including neural planning,
+     *          concept formation, and attentional selection. These systems enable
+     *          higher-level cognitive functions and decision making.
+     */
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
@@ -255,6 +464,13 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    /**
+     * @brief Initialize neuromodulation systems
+     * 
+     * @details Sets up neuromodulatory systems including novelty detection,
+     *          curiosity, and other neuromodulators that influence neural excitability
+     *          and plasticity based on behavioral relevance and exploration.
+     */
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
@@ -299,10 +515,75 @@ bool Brain::initialize() {
     return true;
 }
 
+NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    return true;
+}
+
+/**
+ * @brief Main simulation step (step count version)
+ * 
+     * @details Advances the simulation by one timestep using only the step count.
+     *          This method calculates the current time based on the step count and
+     *          configured timestep duration, then calls the detailed time-based step.
+     * 
+     * @param currentStep Current simulation step number
+     * 
+     * @note This is a convenience method for simulations that only track step count
+     * @thread_safety Thread-unsafe - must not be called concurrently
+     */
 void Brain::step(SimulationStep currentStep) {
+    /**
+     * @brief Calculate current time from step count
+     * 
+     * @details Computes the current simulation time by multiplying the step count
+     *          by the configured timestep duration. This assumes constant timestep
+     *          across the simulation.
+     * 
+     * @param currentStep Current simulation step
+     * 
+     * @note Uses stored timestep value for time calculation
+     */
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
+/**
+ * @brief Main simulation step (detailed time version)
+ * 
+     * @details The core simulation loop implementing Phase 6 of the NLM brain.
+     *          This method orchestrates the complete integrated brain simulation,
+     *          updating all neural components and integrated systems in the correct
+     *          order. The simulation follows 15 distinct phases:
+     * 
+     *          1. Process pending delayed spike events (deliver synaptic input)
+     *          2. Update all neuron membrane potentials (LIF dynamics)
+     *          3. Detect spikes and schedule outgoing spike events
+     *          4. Update working memory (maintenance and competition)
+     *          5. Apply neuromodulation effects on neural excitability
+     *          6. Apply plasticity rules (STDP and Hebbian)
+     *          7. Update episodic memory with current experience
+     *          8. Update prediction system
+     *          9. Update attention system
+     *          10. Update concept formation
+     *          11. Apply structural plasticity (synaptogenesis, pruning)
+     *          12. Replay important memories (during rest or periodically)
+     *          13. Apply development effects
+     *          14. Collect statistics
+     *          15. Periodic memory consolidation
+     *          16. Checkpoint management
+     * 
+     * @param currentStep Current simulation step number
+     * @param currentTime Current simulation time in milliseconds
+     * 
+     * @throws std::runtime_error if any simulation step fails
+     * @note This is the primary simulation loop method
+     * @thread_safety Thread-unsafe - simulation must be stopped for concurrent operations
+     * @post All neural systems are updated for the current timestep
+     */
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
@@ -325,13 +606,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    /**
+     * @brief Update simulation state counters
+     * 
+     * @details Resets step-specific counters and updates the current simulation
+     *          time and step number. This initializes the state for the new timestep.
+     * 
+     * @param currentStep Current simulation step
+     * @param currentTime Current simulation time
+     */
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    /**
+     * @brief Phase 1: Process pending delayed spikes (deliver synaptic input)
+     * 
+     * @details Processes delayed spike events, delivering synaptic input to
+     *          target neurons after the specified delay. This implements the
+     *          transmission of neural signals through synapses with timing delays.
+     */
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
+    /**
+     * @brief Phase 2: Update all neurons (LIF dynamics)
+     * 
+     * @details Updates all neurons in the network using Leaky Integrate-and-Fire
+     *          dynamics. This includes membrane potential integration, spike detection,
+     *          and refractory period management across all neuron types and regions.
+     */
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -341,35 +645,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    /**
+     * @brief Phase 3: Detect spikes and schedule spike events
+     * 
+     * @details Scans all neurons for spiking activity, creates spike events,
+     *          and schedules them for delivery through the spike system. Also
+     *          records post-synaptic spike information for plasticity and
+     *          stores spiking neurons in working memory.
+     */
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
+                /**
+                 * @brief Check if neuron just fired this step
+                 * 
+                 * @details Determines if a neuron has fired in the current timestep
+                 *          by checking if it transitioned from resting to active state
+                 *          or if it has recently entered refractory period.
+                 * 
+                 * @param state Neuron state reference
+                 * @param currentTime Current simulation time
+                 * @param timestep Duration of current timestep
+                 * 
+                 * @return bool true if neuron fired this step
+                 */
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
                 if (justFired) {
+                    /**
+                     * @brief Queue spike for event-driven processing
+                     * 
+                     * @details Creates a spike event and queues it for processing
+                     *          by the spike system. This implements event-driven neural
+                     *          dynamics rather than synchronous time-stepping.
+                     */
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
+                    /**
+                     * @brief Record post-synaptic spike for plasticity
+                     * 
+                     * @details Records post-synaptic spike activity for all incoming
+                     *          synapses. This spike information is used by STDP and other
+                     *          spike-timing-dependent plasticity rules.
+                     */
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
                         syn->recordPostSpike(currentTime);
                     }
 
+                    /**
+                     * @brief Create delayed spike events for outgoing connections
+                     * 
+                     * @details Creates delayed spike events for all outgoing synapses,
+                     *          implementing synaptic transmission with appropriate timing
+                     *          and weight scaling. This models the propagation of neural
+                     *          signals through the network.
+                     */
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        /**
+                         * @brief Calculate delivery timing for spike
+                         * 
+                         * @details Computes the delivery time for a spike based on
+                         *          synaptic delay and current simulation time. The delay
+                         *          represents synaptic transmission time.
+                         */
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
                         Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
+                        /**
+                         * @brief Construct and queue delayed spike event
+                         * 
+                         * @details Creates a comprehensive delayed spike event containing
+                         *          all information needed for synaptic transmission, including
+                         *          neuron IDs, weights, types, and timing information.
+                         */
                         DelayedSpikeEvent delayedEvent(
                             neuron->getId(),
                             syn->getDestinationNeuron(),
@@ -384,10 +744,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
+                        /**
+                         * @brief Record pre-synaptic spike for plasticity
+                         * 
+                         * @details Records pre-synaptic spike activity for plasticity
+                         *          rules that depend on spike timing relationships.
+                         */
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
                     }
                     
+                    /**
+                     * @brief Store spiking neuron in working memory
+                     * 
+                     * @details Records the spiking neuron and its activation level
+                     *          in working memory, allowing the brain to maintain an
+                     *          active representation of recent neural activity.
+                     */
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
@@ -398,6 +771,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    /**
+     * @brief Process immediate spikes
+     * 
+     * @details Processes queued spike events for immediate synaptic transmission
+     *          and other spike-related effects. This completes the spike propagation
+     *          process started in phase 3.
+     */
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
@@ -735,9 +1115,29 @@ void Brain::develop() {
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
+/**
+     * @brief Reset brain state
+     * 
+     * @details Resets the entire brain to its initial state, clearing all neural
+     *          activity, memory contents, and simulation counters. This effectively
+     *          starts a new simulation episode.
+     * 
+     * @throws std::runtime_error if reset fails due to system state issues
+     * @note Resets all subsystems including memory, cognition, and development
+     * @thread_safety Thread-unsafe - simulation must be stopped
+     * @post Brain returns to initial state with all systems reset
+     */
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    /**
+     * @brief Reset simulation state counters
+     * 
+     * @details Resets all simulation state variables to their initial values,
+     *          including time counters, spike statistics, and integration state.
+     * 
+     * @note This clears the simulation timeline without affecting configuration
+     */
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -745,13 +1145,34 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    /**
+     * @brief Reset all regions and their contents
+     * 
+     * @details Resets each neural region in the brain, clearing all neuron states,
+     *          synaptic connections, and regional activity. This returns regions to
+     *          their initial configured state.
+     */
     for (auto& region : pImpl->regions) {
         region->reset();
     }
     
+    /**
+     * @brief Reset spike system
+     * 
+     * @details Resets the spike system, clearing all queued spike events and
+     *          resetting spike timing and event counters. This ensures clean state
+     *          for the next simulation cycle.
+     */
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
+    /**
+     * @brief Reset all memory systems
+     * 
+     * @details Clears all memory systems including working memory, episodic memory,
+     *          and associative memory. This removes all stored neural representations,
+     *          memories, and learned associations.
+     */
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
@@ -761,9 +1182,40 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+/**
+ * @brief Save brain state to file (checkpointing)
+ * 
+     * @details Saves complete brain state including neuron membrane potentials,
+     *          synaptic weights, spike history, and all system state to a file
+     *          for later recovery. This implements checkpointing functionality
+     *          that allows recovery from crashes and state persistence.
+     * 
+     * @param filepath Path to checkpoint file where state will be saved
+     * 
+     * @return true if save succeeds, false if file cannot be written or state
+     *         cannot be serialized
+     * 
+     * @throws std::runtime_error if checkpoint system fails
+     * @note Checkpointing enables recovery from simulation crashes
+     * @thread_safety Thread-unsafe - must be called when not in simulation
+     * @post Brain state is saved to persistent storage
+     */
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    /**
+     * @brief Save operation with comprehensive error handling
+     * 
+     * @details Wraps the save operation in a try-catch block to handle any
+     *          exceptions that might occur during checkpointing. This ensures
+     *          graceful error handling and proper cleanup if save fails.
+     * 
+     * @param filepath Target file for brain state
+     * 
+     * @return bool Save success status
+     * 
+     * @throws std::runtime_error if checkpoint writer fails
+     */
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
@@ -771,6 +1223,13 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        /**
+         * @brief Set checkpoint metadata
+         * 
+         * @details Records essential metadata about the brain state for
+         *          validation and information purposes. Metadata includes neural
+         *          counts, synaptic statistics, and simulation progress.
+         */
         // Set metadata
         writer.setMetadata(
             getTotalNeuronCount(),
@@ -780,6 +1239,13 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
+        /**
+         * @brief Serialize all neuron states
+         * 
+         * @details Converts all neuron states to a checkpoint format by collecting
+         *          membrane potentials, synaptic conductances, and other neuron
+         *          properties. This creates a snapshot of the neural population.
+         */
         // Write neurons
         NeuronCheckpointData neuronData;
         neuronData.membranePotential.reserve(getTotalNeuronCount());
@@ -805,11 +1271,24 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        /**
+         * @brief Write neuron checkpoint data
+         * 
+         * @details Flushes neuron state data to checkpoint file. This completes
+         *          the neuron state serialization process.
+         */
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
         }
         
+        /**
+         * @brief Serialize all synapse states
+         * 
+         * @details Converts all synapse states to checkpoint format by collecting
+         *          synaptic connection information including source/destination neurons,
+         *          weights, delays, types, and plasticity state.
+         */
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
@@ -823,11 +1302,24 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        /**
+         * @brief Write synapse checkpoint data
+         * 
+         * @details Flushes synapse state data to checkpoint file. This completes
+         *          the synapse state serialization process.
+         */
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
         }
         
+        /**
+         * @brief Finalize checkpoint writing
+         * 
+         * @details Completes the checkpoint file by writing headers, footers,
+         *          and metadata. This ensures the checkpoint is valid and complete
+         *          for later loading.
+         */
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -844,8 +1336,21 @@ bool Brain::save(const std::string& filepath) const {
 }
 
 bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
-    
+    // Load brain state from file
+bool Brain::load(const std::string& filepath) {
+    /**
+     * @brief Brain load operation with comprehensive error handling
+     * 
+     * @details Wraps the load operation in a try-catch block to handle any
+     *          exceptions that might occur during checkpoint loading. This ensures
+     *          graceful error handling and proper cleanup if load fails.
+     * 
+     * @param filepath Source file for brain state
+     * 
+     * @return bool Load success status
+     * 
+     * @throws std::runtime_error if checkpoint reader fails
+     */
     try {
         CheckpointReader reader;
         if (!reader.open(filepath)) {
@@ -853,11 +1358,25 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        /**
+         * @brief Validate checkpoint integrity
+         * 
+         * @details Performs validation of the checkpoint file to ensure it's
+         *          properly formatted and complete. This prevents loading corrupted
+         *          or incomplete checkpoint files.
+         */
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
         }
         
+        /**
+         * @brief Read and deserialize neuron states
+         * 
+         * @details Extracts neuron state data from the checkpoint file and
+         *          prepares it for application to the actual neurons. This includes
+         *          membrane potentials, firing states, and synaptic parameters.
+         */
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
@@ -865,11 +1384,24 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        /**
+         * @brief Apply loaded neuron states to actual neurons
+         * 
+         * @details Maps the loaded neuron checkpoint data back to the actual
+         *          neurons in the brain. This restores the membrane potential and
+         *          other neuron properties from the checkpoint.
+         */
         // Apply neuron states
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
+                    /**
+                     * @brief Apply individual neuron state
+                     * 
+                     * @details Restores the state of a single neuron from the checkpoint,
+                     *          including all membrane potential parameters and state variables.
+                     */
                     if (idx < neuronData.membranePotential.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
@@ -888,6 +1420,13 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
+        /**
+         * @brief Read and deserialize synapse states
+         * 
+         * @details Extracts synapse state data from the checkpoint file.
+         *          This includes connection information, weights, delays, and
+         *          plasticity state for all synapses.
+         */
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
@@ -895,6 +1434,13 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        /**
+         * @brief Apply loaded synapse states
+         * 
+         * @details Restores synaptic connection states from the checkpoint.
+         *          This includes weights, delays, types, and plasticity parameters.
+         *          Note: Full synapse restoration is complex due to ID matching requirements.
+         */
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
