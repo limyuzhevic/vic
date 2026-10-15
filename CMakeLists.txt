@@ -83,6 +83,10 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/ExperimentOrchestrator.cpp
+    src/experiments/BasicConnectivityExperiment.cpp
+    src/experiments/PlasticityLearningExperiment.cpp
+    src/experiments/STDPVerificationExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -125,7 +129,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
