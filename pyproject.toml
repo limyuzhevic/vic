@@ -4,17 +4,17 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "1.0.0-enhanced"
+description = "Enhanced Python interface for NLM (Neural Learning Machine) C++ neural simulation framework with Pythonic APIs, properties, context managers, and high-level convenience functions"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "pythonic", "interface", "bindings"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -25,15 +25,44 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific Computing",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "pybind11>=2.11.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov",
+    "black>=22.0",
+    "flake8>=5.0",
+    "mypy>=0.991",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme",
+    "jupyter>=1.0",
 ]
+
+examples = [
+    "matplotlib>=3.0",
+    "jupyter",
+]
+
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme",
+    "myst-parser>=0.13",
+]
+
+[project.scripts]
+nlm-pynlm = "pynlm.examples.basic_usage:main"
+nlm-demo = "pynlm.examples.advanced_usage:main"
+
+[project.gui-scripts]
+nlm-explorer = "pynlm.examples.advanced_usage:main"
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
