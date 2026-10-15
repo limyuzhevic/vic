@@ -416,6 +416,82 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Expose LearningExperiment for high-level learning tracking
+    py::class_<SynapticChangeRecord>(m, "SynapticChangeRecord", R"pbdoc(Record of synaptic weight change)pbdoc")
+        .def(py::init<>())
+        .def(py::init<NeuronId, NeuronId, float, float>(), py::arg("pre_neuron"), py::arg("post_neuron"), py::arg("old_weight"), py::arg("new_weight"))
+        .def_readonly("pre_neuron", &SynapticChangeRecord::preNeuron)
+        .def_readonly("post_neuron", &SynapticChangeRecord::postNeuron)
+        .def_readonly("old_weight", &SynapticChangeRecord::oldWeight)
+        .def_readonly("new_weight", &SynapticChangeRecord::newWeight)
+        .def("weight_change", &SynapticChangeRecord::getWeightChange)
+        .def("is_potentiation", &SynapticChangeRecord::isPotentiation)
+        .def("is_depression", &SynapticChangeRecord::isDepression);
+
+    py::class_<LearningExperiment>(m, "LearningExperiment", R"pbdoc(High-level class for tracking neural learning)pbdoc")
+        .def(py::init<>())
+        .def("add_brain", &LearningExperiment::addBrain, py::arg("brain_name"), py::arg("brain"))
+        .def("record_change", &LearningExperiment::recordChange, py::arg("change"))
+        .def("total_changes", &LearningExperiment::getTotalChangesRecorded)
+        .def("reset", &LearningExperiment::reset)
+        .def("export_to_json", &LearningExperiment::exportToJSON, py::arg("filename"))
+        .def("export_to_csv", &LearningExperiment::exportToCSV, py::arg("filename"))
+        .def("training_summary", &LearningExperiment::getTrainingSummary);
+
+    m.def("create_minimal_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100);
+        config->set("brain.synapse_density", 0.05f);
+        return config;
+    }, "Create a minimal configuration for quick testing");
+
+    m.def("quick_test", []() {
+        auto config = create_minimal_config();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int i = 0; i < 100; ++i) {
+            brain->step(i);
+        }
+        
+        py::dict result;
+        result["neurons"] = brain->getTotalNeuronCount();
+        result["spikes"] = brain->getTotalSpikeCount();
+        result["firing"] = brain->getFiringNeuronCount();
+        return result;
+    }, "Quick smoke test that verifies the bindings work");
+
+    m.doc() = R"pbdoc(
+        Improved NLM Python Bindings
+        -----------------------------
+        
+        Key improvements over the original bindings:
+        
+        1. **Convenience Functions**:
+           - create_minimal_config() - Quick testing config
+           - quick_test() - Verify bindings work
+           - create_simple_config() - Optimized for typical use
+        
+        2. **Learning Experiment Tracking**:
+           - LearningExperiment class to track synaptic changes
+           - SynapticChangeRecord class for detailed change tracking
+           - Export to JSON and CSV formats
+        
+        3. **Hidden Low-Level Types**:
+           - NeuronId, SynapseId, etc. accessible via formatting functions
+        
+        4. **Better Error Handling**:
+           - Clear error messages for common issues
+        
+        Usage examples:
+        >>> import pynlm
+        >>> brain = pynlm.createBrain(pynlm.create_simple_config())
+        >>> brain.initialize()
+        >>> for i in range(100):
+        ...     brain.step(i)
+        >>> print(f"Neurons: {brain.getTotalNeuronCount()}")
+    )pbdoc";
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

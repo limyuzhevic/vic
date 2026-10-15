@@ -1,0 +1,469 @@
+#include "LearningExperiment.hpp"
+#include "Experiment.hpp"
+#include "../brain/Brain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <algorithm>
+#include <numeric>
+#include <iomanip>
+
+using json = nlohmann::json;
+
+namespace nlm {
+
+struct LearningExperiment::Impl {
+    // Brains being monitored
+    std::vector<std::pair<std::string, std::shared_ptr<Brain>>> brains;
+    
+    // Synaptic changes recorded
+    std::vector<SynapticChangeRecord> changes;
+    
+    // Timestamps for the experiment
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point endTime;
+    
+    // Statistics
+    mutable size_t totalChanges;
+    mutable std::unordered_map<SynapseType, size_t> changesByType;
+    
+    Impl() : totalChanges(0) {
+        startTime = std::chrono::steady_clock::now();
+    }
+};
+
+LearningExperiment::LearningExperiment() : pImpl(new Impl) {}
+
+LearningExperiment::~LearningExperiment() = default;
+
+void LearningExperiment::addBrain(const std::string& brainName, std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot add null brain to experiment");
+        return;
+    }
+    
+    // Check if brain with this name already exists
+    for (const auto& pair : pImpl->brains) {
+        if (pair.first == brainName) {
+            NLM_LOG_WARNING("Brain with name " + brainName + " already exists, replacing");
+            // Replace existing brain
+            for (auto it = pImpl->brains.begin(); it != pImpl->brains.end(); ++it) {
+                if (it->first == brainName) {
+                    it->second = brain;
+                    NLM_LOG_INFO("Replaced brain " + brainName + " in experiment");
+                    return;
+                }
+            }
+        }
+    }
+    
+    pImpl->brains.emplace_back(brainName, brain);
+    NLM_LOG_INFO("Added brain " + brainName + " to experiment (total: " + 
+                std::to_string(pImpl->brains.size()) + " brains)");
+}
+
+void LearningExperiment::recordChange(const SynapticChangeRecord& change) {
+    pImpl->changes.push_back(change);
+    pImpl->totalChanges++;
+    pImpl->changesByType[change.synapseType]++;
+    
+    // Log significant changes
+    float weightChange = change.getWeightChange();
+    if (std::abs(weightChange) > 0.01f) {  // Significant change threshold
+        NLM_LOG_INFO("Recorded significant synaptic change: " + change.preNeuron.value + 
+                    " -> " + change.postNeuron.value + 
+                    " (weight: " + std::to_string(change.oldWeight) + " -> " +
+                    std::to_string(change.newWeight) + ", change: " +
+                    std::to_string(weightChange) + ")");
+    }
+}
+
+const std::vector<std::pair<std::string, std::shared_ptr<Brain>>>& LearningExperiment::getBrainsMonitored() const {
+    return pImpl->brains;
+}
+
+size_t LearningExperiment::getTotalChangesRecorded() const {
+    return pImpl->changes.size();
+}
+
+size_t LearningExperiment::getPlasticityEvents() const {
+    size_t count = 0;
+    for (const auto& change : pImpl->changes) {
+        float magnitude = std::abs(change.getWeightChange());
+        if (magnitude > 0.01f) {  // Threshold for plasticity event
+            count++;
+        }
+    }
+    return count;
+}
+
+float LearningExperiment::getAverageLearningRate() const {
+    if (pImpl->changes.empty()) return 0.0f;
+    
+    float totalChange = 0.0f;
+    for (const auto& change : pImpl->changes) {
+        totalChange += change.getWeightChange();
+    }
+    return totalChange / pImpl->changes.size();
+}
+
+const std::vector<SynapticChangeRecord>& LearningExperiment::getAllChanges() const {
+    // Sort by timestamp
+    static std::vector<SynapticChangeRecord> sortedChanges;
+    sortedChanges = pImpl->changes;
+    std::sort(sortedChanges.begin(), sortedChanges.end(),
+              [](const SynapticChangeRecord& a, const SynapticChangeRecord& b) {
+                  return a.timestamp < b.timestamp;
+              });
+    return sortedChanges;
+}
+
+void LearningExperiment::reset() {
+    pImpl->brains.clear();
+    pImpl->changes.clear();
+    pImpl->totalChanges = 0;
+    pImpl->changesByType.clear();
+    pImpl->startTime = std::chrono::steady_clock::now();
+    NLM_LOG_INFO("Learning experiment reset");
+}
+
+void LearningExperiment::exportToJSON(const std::string& filename) const {
+    json experimentData;
+    
+    // Export brains
+    json brainsArray = json::array();
+    for (const auto& pair : pImpl->brains) {
+        json brainData;
+        brainData["name"] = pair.first;
+        brainData["neuron_count"] = pair.second->getTotalNeuronCount();
+        brainData["synapse_count"] = pair.second->getTotalSynapseCount();
+        brainArray.push_back(brainData);
+    }
+    experimentData["brains"] = brainsArray;
+    
+    // Export changes
+    json changesArray = json::array();
+    for (const auto& change : pImpl->changes) {
+        json changeData;
+        changeData["timestamp"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+            change.timestamp.time_since_epoch()).count();
+        changeData["pre_neuron"] = change.preNeuron.value;
+        changeData["post_neuron"] = change.postNeuron.value;
+        changeData["old_weight"] = change.oldWeight;
+        changeData["new_weight"] = change.newWeight;
+        changeData["synapse_type"] = static_cast<int>(change.synapseType);
+        changeData["weight_change"] = change.getWeightChange();
+        changesArray.push_back(changeData);
+    }
+    experimentData["changes"] = changesArray;
+    
+    // Export metadata
+    experimentData["start_time"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+        pImpl->startTime.time_since_epoch()).count();
+    if (pImpl->endTime > pImpl->startTime) {
+        experimentData["end_time"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+            pImpl->endTime.time_since_epoch()).count();
+    }
+    
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        file << experimentData.dump(2);
+        NLM_LOG_INFO("Exported experiment data to JSON: " + filename);
+    } else {
+        NLM_LOG_ERROR("Failed to export experiment data to JSON: " + filename);
+    }
+}
+
+void LearningExperiment::exportToCSV(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to export experiment data to CSV: " + filename);
+        return;
+    }
+    
+    // Write header
+    file << "timestamp,pre_neuron,post_neuron,old_weight,new_weight,weight_change,synapse_type,mechanism\n";
+    
+    // Write changes
+    for (const auto& change : getAllChanges()) {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            change.timestamp.time_since_epoch()).count();
+        file << duration << "," << change.preNeuron.value << "," 
+             << change.postNeuron.value << "," << change.oldWeight << 
+             "," << change.newWeight << "," << change.getWeightChange() << 
+             "," << static_cast<int>(change.synapseType) << "," 
+             << change.getMechanismName() << "\n";
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Exported experiment data to CSV: " + filename);
+}
+
+std::string LearningExperiment::getTrainingSummary() const {
+    std::stringstream ss;
+    ss << "Learning Experiment Summary" << std::endl;
+    ss << "===========================" << std::endl;
+    ss << "Brains monitored: " << pImpl->brains.size() << std::endl;
+    ss << "Total synaptic changes: " << pImpl->changes.size() << std::endl;
+    ss << "Plasticity events: " << getPlasticityEvents() << std::endl;
+    ss << "Average learning rate: " << getAverageLearningRate() << std::endl;
+    ss << "Start time: " << std::chrono::duration_cast<std::chrono::milliseconds>(
+        pImpl->startTime.time_since_epoch()).count() << " ms" << std::endl;
+    
+    if (!pImpl->changes.empty()) {
+        ss << "Last change: " << pImpl->changes.back().getWeightChange() << " weight change" << std::endl;
+    }
+    
+    return ss.str();
+}
+
+std::vector<std::string> LearningExperiment::analyzeLearningPatterns() const {
+    std::vector<std::string> insights;
+    
+    if (pImpl->changes.empty()) {
+        insights.push_back("No synaptic changes recorded - experiment is empty");
+        return insights;
+    }
+    
+    // Analyze weight changes
+    float totalPositive = 0.0f, totalNegative = 0.0f;
+    size_t positiveCount = 0, negativeCount = 0;
+    
+    for (const auto& change : pImpl->changes) {
+        float weightChange = change.getWeightChange();
+        if (weightChange > 0.0f) {
+            totalPositive += weightChange;
+            positiveCount++;
+        } else if (weightChange < 0.0f) {
+            totalNegative += weightChange;
+            negativeCount++;
+        }
+    }
+    
+    float avgPositive = positiveCount > 0 ? totalPositive / positiveCount : 0.0f;
+    float avgNegative = negativeCount > 0 ? totalNegative / negativeCount : 0.0f;
+    
+    insights.push_back("Learning pattern analysis:");
+    insights.push_back("  - Average potentiation: " + std::to_string(avgPositive) + 
+                      " (" + std::to_string(positiveCount) + " events)");
+    insights.push_back("  - Average depression: " + std::to_string(avgNegative) + 
+                      " (" + std::to_string(negativeCount) + " events)");
+    
+    // Check for stability
+    float stability = getStabilityMeasure();
+    if (stability < 0.01f) {
+        insights.push_back("  - Low stability: Synaptic weights are changing rapidly (unstable learning)");
+    } else if (stability < 0.05f) {
+        insights.push_back("  - Moderate stability: Normal learning dynamics");
+    } else {
+        insights.push_back("  - High stability: Learning is stabilizing (weights converging)");
+    }
+    
+    // Check for symmetry
+    if (std::abs(avgPositive + avgNegative) < 0.001f) {
+        insights.push_back("  - Balanced learning: Equal potentiation and depression");
+    } else if (avgPositive > -avgNegative) {
+        insights.push_back("  - Bias towards potentiation: Network is strengthening connections");
+    } else {
+        insights.push_back("  - Bias towards depression: Network is weakening connections");
+    }
+    
+    // Check for learning rate trends
+    if (pImpl->changes.size() > 10) {
+        std::vector<float> recentChanges;
+        size_t recentCount = std::min(static_cast<size_t>(10), pImpl->changes.size());
+        for (size_t i = pImpl->changes.size() - recentCount; i < pImpl->changes.size(); ++i) {
+            recentChanges.push_back(pImpl->changes[i].getWeightChange());
+        }
+        
+        float recentAvg = 0.0f;
+        for (float change : recentChanges) recentAvg += change;
+        recentAvg /= recentChanges.size();
+        
+        insights.push_back("  - Recent learning rate: " + std::to_string(recentAvg) + 
+                          " (last " + std::to_string(recentCount) + " changes)");
+    }
+    
+    return insights;
+}
+
+LearningExperiment::getBrainStats(const std::string& brainName) const {
+    stats;
+    
+    for (const auto& pair : pImpl->brains) {
+        if (pair.first == brainName) {
+            stats["name"] = brainName;
+            stats["neuron_count"] = pair.second->getTotalNeuronCount();
+            stats["synapse_count"] = pair.second->getTotalSynapseCount();
+            stats["active_neurons"] = pair.second->getActiveNeuronCount();
+            stats["firing_neurons"] = pair.second->getFiringNeuronCount();
+            stats["average_firing_rate"] = pair.second->getAverageFiringRate();
+            stats["total_spikes"] = pair.second->getTotalSpikeCount();
+            stats["developmental_stage"] = static_cast<int>(pair.second->getDevelopmentalStage());
+            return stats;
+        }
+    }
+    
+    // Return empty stats if brain not found
+    stats["error"] = "Brain not found: " + brainName;
+    return stats;
+}
+
+LearningExperiment::getExperimentStats() const {
+    stats;
+    
+    stats["brains_monitored"] = pImpl->brains.size();
+    stats["total_changes"] = pImpl->changes.size();
+    stats["plasticity_events"] = getPlasticityEvents();
+    stats["average_learning_rate"] = getAverageLearningRate();
+    
+    // Calculate time span
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - pImpl->startTime);
+    stats["experiment_duration_ms"] = duration.count();
+    
+    // Count changes by type
+    json changesByType;
+    for (const auto& pair : pImpl->changesByType) {
+        changesByType[static_cast<int>(pair.first)] = pair.second;
+    }
+    stats["changes_by_type"] = changesByType;
+    
+    return stats;
+}
+
+bool LearningExperiment::hasData() const {
+    return !pImpl->brains.empty() || !pImpl->changes.empty();
+}
+
+std::vector<SynapticChangeRecord> LearningExperiment::getRecentChanges(size_t count) const {
+    if (count > pImpl->changes.size()) {
+        count = pImpl->changes.size();
+    }
+    
+    std::vector<SynapticChangeRecord> recent;
+    recent.reserve(count);
+    
+    auto it = pImpl->changes.end();
+    for (size_t i = 0; i < count && it != pImpl->changes.begin(); ++i) {
+        --it;
+        recent.push_back(*it);
+    }
+    
+    // Sort by timestamp (newest first)
+    std::sort(recent.begin(), recent.end(),
+              [](const SynapticChangeRecord& a, const SynapticChangeRecord& b) {
+                  return a.timestamp > b.timestamp;
+              });
+    
+    return recent;
+}
+
+std::vector<SynapticChangeRecord> LearningExperiment::getChangesInTimeRange(
+    std::chrono::steady_clock::time_point start,
+    std::chrono::steady_clock::time_point end
+) const {
+    std::vector<SynapticChangeRecord> result;
+    
+    for (const auto& change : pImpl->changes) {
+        if (change.timestamp >= start && change.timestamp <= end) {
+            result.push_back(change);
+        }
+    }
+    
+    return result;
+}
+
+std::vector<SynapticChangeRecord> LearningExperiment::getChangesForSynapseType(SynapseType type) const {
+    std::vector<SynapticChangeRecord> result;
+    
+    for (const auto& change : pImpl->changes) {
+        if (change.synapseType == type) {
+            result.push_back(change);
+        }
+    }
+    
+    return result;
+}
+
+LearningExperiment::PlasticityStats LearningExperiment::getPlasticityStats() const {
+    PlasticityStats stats;
+    
+    for (const auto& change : pImpl->changes) {
+        float magnitude = std::abs(change.getWeightChange());
+        if (change.isPotentiation()) {
+            stats.potentiation++;
+            if (magnitude > stats.maxPotentiation) {
+                stats.maxPotentiation = magnitude;
+            }
+        } else if (change.isDepression()) {
+            stats.depression++;
+            if (magnitude > stats.maxDepression) {
+                stats.maxDepression = magnitude;
+            }
+        }
+        
+        stats.avgMagnitude += magnitude;
+    }
+    
+    size_t totalChanges = stats.potentiation + stats.depression;
+    if (totalChanges > 0) {
+        stats.avgMagnitude /= totalChanges;
+    }
+    
+    return stats;
+}
+
+std::vector<std::pair<std::chrono::steady_clock::time_point, float>> LearningExperiment::getWeightEvolution(
+    NeuronId neuronId
+) const {
+    std::vector<std::pair<std::chrono::steady_clock::time_point, float>> evolution;
+    
+    for (const auto& change : pImpl->changes) {
+        if (change.preNeuron == neuronId || change.postNeuron == neuronId) {
+            evolution.emplace_back(change.timestamp, change.getWeightChange());
+        }
+    }
+    
+    std::sort(evolution.begin(), evolution.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    
+    return evolution;
+}
+
+float LearningExperiment::getStabilityMeasure() const {
+    if (pImpl->changes.size() < 2) return 0.0f;
+    
+    // Calculate coefficient of variation of weight changes
+    std::vector<float> changes;
+    changes.reserve(pImpl->changes.size());
+    
+    for (const auto& change : pImpl->changes) {
+        changes.push_back(change.getWeightChange());
+    }
+    
+    float mean = std::accumulate(changes.begin(), changes.end(), 0.0f) / changes.size();
+    
+    float variance = 0.0f;
+    for (float change : changes) {
+        variance += (change - mean) * (change - mean);
+    }
+    variance /= changes.size();
+    
+    float stdDev = std::sqrt(variance);
+    
+    return (mean == 0.0f) ? 0.0f : (stdDev / std::abs(mean));
+}
+
+float LearningExperiment::calculateLearningEfficiency(float reward) const {
+    if (pImpl->changes.empty()) return 0.0f;
+    
+    float totalChange = 0.0f;
+    for (const auto& change : pImpl->changes) {
+        totalChange += std::abs(change.getWeightChange());
+    }
+    
+    return reward / (totalChange + 0.0001f);  // Add small epsilon to avoid division by zero
+}
+
+} // namespace nlm
