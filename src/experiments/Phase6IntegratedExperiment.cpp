@@ -4,6 +4,7 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -73,12 +74,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
+    // Apply action to world
+    ActionResult actionResult = world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+    
+    // Use the reward from the action result (computed by the world)
+    float reward = actionResult.reward;
+    totalReward += reward;
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);

@@ -42,6 +42,9 @@ public:
     
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
+
+    // Get reward system
+    Reward* getReward();
     
     // Get curiosity level
     float getCuriosityLevel() const;
@@ -51,7 +54,10 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
-    
+
+    // Get reward system
+    Reward* getReward();
+
     // Reset agent for new episode
     void reset();
     

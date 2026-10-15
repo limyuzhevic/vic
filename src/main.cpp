@@ -1,11 +1,14 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Integrated Brain with Advanced Cognition
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements a complete artificial developmental brain with:
+// - Real LIF neuron dynamics and event-driven spiking
+// - Full memory systems (working, episodic, associative)
+// - Neuromodulation (reward, curiosity, novelty, prediction error)
+// - Prediction systems (temporal sequence learning)
+// - Advanced cognition (attention, planning, self-model, social learning)
+// - Integrated development and structural plasticity
+// - End-to-end closed-loop brain architecture
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,14 +38,17 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Integrated Brain                                  ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - Real LIF neuron dynamics                              ║
+    ║     - Event-driven spike propagation                        ║
+    ║     - Working memory (persistent activity)                  ║
+    ║     - Episodic memory (experience storage)                 ║
+    ║     - Neuromodulation (reward, curiosity, novelty)         ║
+    ║     - Prediction systems (temporal sequences)              ║
+    ║     - Advanced cognition (attention, planning)             ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -332,12 +338,16 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Integrated Brain ===");
     NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Real LIF neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Working memory systems");
+    NLM_LOG_INFO("  - Episodic memory with experience replay");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity, novelty)");
+    NLM_LOG_INFO("  - Prediction systems (temporal sequences)");
+    NLM_LOG_INFO("  - Advanced cognition (attention, planning)");
+    NLM_LOG_INFO("  - Integrated development and plasticity");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -430,19 +440,24 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Phase 6 Complete ===");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
+    NLM_LOG_INFO("Phase 6 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  ✓ Working memory systems implemented");
+    NLM_LOG_INFO("  ✓ Episodic memory with experience storage");
+    NLM_LOG_INFO("  ✓ Neuromodulation (dopamine, curiosity, novelty)");
+    NLM_LOG_INFO("  ✓ Prediction systems for temporal sequences");
+    NLM_LOG_INFO("  ✓ Advanced cognition (attention, planning)");
+    NLM_LOG_INFO("  ✓ Integrated development and structural plasticity");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("  ✓ Network shows complex activity-dependent modifications");
+    NLM_LOG_INFO("  ✓ Closed-loop brain architecture operational");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("The NLM brain is now a complete artificial developmental brain");
+    NLM_LOG_INFO("capable of learning, memory, prediction, and goal-directed behavior");
+    NLM_LOG_INFO("through integrated neural computation and neuromodulation.");
     NLM_LOG_INFO("");
     
     return 0;

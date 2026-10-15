@@ -39,7 +39,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │                    └─────────────┘                              │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │              PHASE 6: INTEGRATED BRAIN                        ││
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
 │  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
 │  │  │         │  │         │  │         │  │Learning │       ││

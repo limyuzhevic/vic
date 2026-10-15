@@ -334,6 +334,14 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+// Get reward system
+Reward* AgentBrain::getReward() {
+    if (brain_) {
+        return brain_->getReward();
+    }
+    return nullptr;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

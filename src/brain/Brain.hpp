@@ -1,11 +1,6 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 
@@ -27,7 +22,7 @@ class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
-class PredictionError;
+class Reward;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -184,6 +179,9 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Reward signal for reinforcement learning
+    Reward* getReward();
+
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
