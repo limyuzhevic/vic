@@ -25,13 +25,70 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
+    
+    // Core neural parameters
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("random_seed", uint64_t(42));
+    cfg->set("simulation_timestep", 0.001);
+    
+    // ============================================================================
+    // PHASE 6 INTEGRATED SYSTEMS CONFIGURATION
+    // ============================================================================
+    
+    // ----- MEMORY SYSTEMS CONFIGURATION -----
+    cfg->set("working_memory_capacity", size_t(config.neuronCount / 10));  // Working memory capacity
+    cfg->set("episodic_memory_max_episodes", size_t(1000));  // Maximum number of episodes
+    cfg->set("associative_memory_pattern_count", size_t(500));  // Number of patterns to store
+    cfg->set("memory_replay_interval", size_t(100));  // Steps between replay events
+    cfg->set("memory_consolidation_interval", size_t(1000));  // Steps between consolidation
+    
+    // ----- PREDICTION SYSTEM CONFIGURATION -----
+    cfg->set("prediction_horizon", uint64_t(10));  // Look-ahead steps
+    cfg->set("prediction_error_threshold", 0.1f);  // Threshold for prediction error
+    cfg->set("prediction_confidence_threshold", 0.8f);  // Confidence threshold
+    
+    // ----- COGNITION SYSTEMS CONFIGURATION -----
+    cfg->set("planner_planning_depth", size_t(5));  // Planning horizon depth
+    cfg->set("concept_formation_threshold", 0.7f);  // Concept formation threshold
+    cfg->set("attention_inhibition_strength", 0.5f);  // Attention inhibition strength
+    cfg->set("attention_excitation_strength", 1.5f);  // Attention excitation strength
+    cfg->set("attention_selection_threshold", 0.6f);  // Attention selection threshold
+    
+    // ----- DEVELOPMENT SYSTEM CONFIGURATION -----
+    cfg->set("developmental_stage", static_cast<int64_t>(0));  // Initial developmental stage
+    cfg->set("plasticity_rate_initial", 1.0f);  // Initial plasticity rate
+    cfg->set("plasticity_rate_critical_period", 0.8f);  // Critical period plasticity rate
+    cfg->set("plasticity_rate_maturation", 0.5f);  // Maturation plasticity rate
+    cfg->set("plasticity_rate_adult", 0.2f);  // Adult plasticity rate
+    cfg->set("development_update_interval", uint64_t(1000));  // Development update frequency
+    
+    // ----- NEUROMODULATION SYSTEMS CONFIGURATION -----
+    cfg->set("dopamine_baseline_level", 0.1f);  // Baseline dopamine level
+    cfg->set("dopamine_plasticity_factor", 1.0f);  // Dopamine effect on plasticity
+    cfg->set("curiosity_exploration_rate", 0.3f);  // Curiosity-driven exploration
+    cfg->set("novelty_threshold", 0.5f);  // Novelty detection threshold
+    cfg->set("prediction_error_gain", 1.0f);  // Prediction error learning rate
+    
+    // ----- STDP AND PLASTICITY CONFIGURATION -----
+    cfg->set("stdp_ltp_weight", 0.01f);  // Long-term potentiation weight
+    cfg->set("stdp_ltd_weight", 0.012f);  // Long-term depression weight
+    cfg->set("stdp_tau", 20.0f);  // STDP time constant
+    cfg->set("hebbian_learning_rate", 0.005f);  // Hebbian learning rate
+    cfg->set("synaptogenesis_rate", config.enableDevelopment ? 0.0001f : 0.0f);  // Synapse formation
+    cfg->set("pruning_rate", config.enableDevelopment ? 0.00001f : 0.0f);  // Synapse pruning
+    
+    // ----- SENSORY AND MOTOR CONFIGURATION -----
+    cfg->set("sensory_input_scale", 10.0f);  // Sensory input scaling factor
+    cfg->set("motor_output_strength", 1.0f);  // Motor output strength
+    
+    // ----- ENVIRONMENT AND AGENT CONFIGURATION -----
+    cfg->set("environment_width", uint64_t(16));  // Environment width
+    cfg->set("environment_height", uint64_t(16));  // Environment height
+    cfg->set("agent_exploration_rate", 0.3f);  // Agent exploration rate
+    cfg->set("agent_curiosity_enabled", config.enableDevelopment);  // Enable curiosity
+    cfg->set("agent_reward_modulation_enabled", true);  // Enable reward modulation
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

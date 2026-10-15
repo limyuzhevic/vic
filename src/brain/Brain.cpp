@@ -157,15 +157,20 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
-
-Brain::~Brain() = default;
-
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+// Impl destructor - fixes memory leaks
+Brain::Impl::~Impl() {
+    // Clean up neuron vectors to prevent memory leaks
+    sensoryNeurons.clear();
+    motorNeurons.clear();
 }
 
-Brain& Brain::operator=(Brain&& other) noexcept {
+// Brain destructor with null check
+Brain::~Brain() {
+    if (pImpl) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
     if (this != &other) {
         delete pImpl;
         pImpl = other.pImpl;
@@ -176,49 +181,129 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Validate that configuration is available
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Cannot initialize brain: Configuration is null");
+        return false;
+    }
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Log configuration values for debugging
+    NLM_LOG_DEBUG("Config values - neuron_count: " + std::to_string(neuronCount));
+    NLM_LOG_DEBUG("Config values - region_count: " + std::to_string(regionCount));
+    NLM_LOG_DEBUG("Config values - connection_probability: " + std::to_string(connectionProbability));
+    
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Cannot initialize brain: neuron_count must be > 0");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Cannot initialize brain: region_count must be > 0");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Cannot initialize brain: connection_probability must be between 0 and 1");
+        return false;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        NLM_LOG_DEBUG("Creating region " + std::to_string(i + 1));
+        RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+        if (regionId.index() == 0) {
+            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+            return false;
+        }
     }
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) {
+        NLM_LOG_ERROR("Cannot initialize brain: neuronsPerRegion is 0, need at least 1 neuron per region");
+        return false;
+    }
+    
+    for (size_t i = 0; i < regionCount; ++i) {
+        auto* region = getRegion(RegionId(i + 1));
+        if (!region) {
+            NLM_LOG_ERROR("Failed to get region " + std::to_string(i + 1) + " during initialization");
+            return false;
+        }
+        
+        // Calculate neuron counts for different populations
+        size_t sensoryNeurons = std::max(size_t(1), neuronsPerRegion / 4);
+        size_t internalNeurons = std::max(size_t(1), neuronsPerRegion / 2);
+        size_t motorNeurons = std::max(size_t(1), neuronsPerRegion / 4);
+        
+        NLM_LOG_DEBUG("Region " + std::to_string(i + 1) + 
+                     ": creating " + std::to_string(sensoryNeurons) + " sensory, " +
+                     std::to_string(internalNeurons) + " internal, " +
+                     std::to_string(motorNeurons) + " motor neurons");
+        
+        // Add populations
+        auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+        auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+        auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
+        
+        // Validate that populations were created
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* internalPop = region->getPopulation(internalPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        
+        if (!sensoryPop || !internalPop || !motorPop) {
+            NLM_LOG_ERROR("Failed to create neuron populations in region " + std::to_string(i + 1));
+            return false;
+        }
+        
+        // Collect sensory and motor neurons for I/O
+        for (auto* neuron : sensoryPop->getNeurons()) {
+            pImpl->sensoryNeurons.push_back(neuron);
+        }
+        for (auto* neuron : motorPop->getNeurons()) {
+            pImpl->motorNeurons.push_back(neuron);
+        }
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                     ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons");
+        
+        NLM_LOG_DEBUG("Region " + std::to_string(i + 1) + 
+                     ": " + std::to_string(sensoryPop->getNeurons().size()) + " sensory neurons, " +
+                     std::to_string(motorPop->getNeurons().size()) + " motor neurons");
+    }
+    
+    // Initialize connectivity with random weights
+    NLM_LOG_DEBUG("Initializing random connectivity...");
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+            // Initialize random connectivity and synapse weights
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            NLM_LOG_DEBUG("Created random connectivity in region " + std::to_string(i + 1));
         }
     }
+    
+    // Log initialization timing
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    NLM_LOG_INFO("Brain initialization completed in " + std::to_string(duration.count()) + "ms");
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    return true;
+}
     
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
@@ -259,7 +344,19 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize prediction error
+    pImpl->predictionError->initialize(this);
+    
+    // Initialize dopamine
+    pImpl->dopamine->initialize(this);
+    
+    // Initialize prediction system (if available)
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
@@ -762,6 +859,12 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot save brain: filepath is empty");
+        return false;
+    }
+    
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
@@ -771,9 +874,16 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Validate that we have data to save
+        size_t neuronCount = getTotalNeuronCount();
+        if (neuronCount == 0) {
+            NLM_LOG_ERROR("Cannot save brain: No neurons to save");
+            return false;
+        }
+        
         // Set metadata
         writer.setMetadata(
-            getTotalNeuronCount(),
+            neuronCount,
             getTotalSynapseCount(),
             getRegionCount(),
             pImpl->currentStep,
@@ -782,15 +892,21 @@ bool Brain::save(const std::string& filepath) const {
         
         // Write neurons
         NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
+        neuronData.membranePotential.reserve(neuronCount);
+        neuronData.restingPotential.reserve(neuronCount);
+        neuronData.threshold.reserve(neuronCount);
+        neuronData.resetPotential.reserve(neuronCount);
+        neuronData.leakConductance.reserve(neuronCount);
         
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
                 for (const auto* neuron : pop->getNeurons()) {
+                    // Validate neuron state before saving
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Cannot save brain: Found null neuron pointer");
+                        return false;
+                    }
+                    
                     const auto& state = neuron->getState();
                     neuronData.membranePotential.push_back(state.membranePotential);
                     neuronData.restingPotential.push_back(state.restingPotential);
@@ -814,6 +930,12 @@ bool Brain::save(const std::string& filepath) const {
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
+                // Validate synapse before saving
+                if (!syn) {
+                    NLM_LOG_ERROR("Cannot save brain: Found null synapse pointer");
+                    return false;
+                }
+                
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -844,6 +966,12 @@ bool Brain::save(const std::string& filepath) const {
 }
 
 bool Brain::load(const std::string& filepath) {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot load brain: filepath is empty");
+        return false;
+    }
+    
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
@@ -865,17 +993,30 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate that we have neurons to load
+        if (neuronData.membranePotential.empty()) {
+            NLM_LOG_ERROR("Cannot load brain: No neuron data found in checkpoint");
+            return false;
+        }
+        
         // Apply neuron states
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
+                    // Validate neuron before loading state
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Cannot load brain: Found null neuron pointer");
+                        return false;
+                    }
+                    
                     if (idx < neuronData.membranePotential.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
                         neuron->setThreshold(neuronData.threshold[idx]);
                         neuron->setResetPotential(neuronData.resetPotential[idx]);
                         neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                        
                         if (idx < neuronData.firingState.size()) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
@@ -895,9 +1036,11 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Log synapse loading status
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Note: Synapse state restoration is complex due to dynamic nature
+        // The brain structure is preserved, but exact synapse states may not be fully restored
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

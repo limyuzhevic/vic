@@ -85,6 +85,65 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // ============================================================================
+    // MEMORY SYSTEMS CONFIGURATION
+    // ============================================================================
+    size_t workingMemoryCapacity;      // Working memory capacity
+    size_t episodicMemoryMaxEpisodes;  // Maximum number of episodes
+    size_t associativeMemoryPatternCount;  // Number of patterns to store
+    size_t memoryReplayInterval;       // Steps between replay events
+    size_t memoryConsolidationInterval; // Steps between consolidation
+    
+    // ============================================================================
+    // PREDICTION SYSTEM CONFIGURATION
+    // ============================================================================
+    uint64_t predictionHorizon;        // Look-ahead steps
+    float predictionErrorThreshold;    // Threshold for prediction error
+    float predictionConfidenceThreshold; // Confidence threshold
+    
+    // ============================================================================
+    // COGNITION SYSTEMS CONFIGURATION
+    // ============================================================================
+    size_t plannerPlanningDepth;        // Planning horizon depth
+    float conceptFormationThreshold;    // Concept formation threshold
+    float attentionInhibitionStrength;  // Attention inhibition strength
+    float attentionExcitationStrength;   // Attention excitation strength
+    float attentionSelectionThreshold;  // Attention selection threshold
+    
+    // ============================================================================
+    // DEVELOPMENT SYSTEM CONFIGURATION
+    // ============================================================================
+    int64_t developmentalStage;         // Initial developmental stage
+    float plasticityRateInitial;       // Initial plasticity rate
+    float plasticityRateCriticalPeriod; // Critical period plasticity rate
+    float plasticityRateMaturation;     // Maturation plasticity rate
+    float plasticityRateAdult;          // Adult plasticity rate
+    uint64_t developmentUpdateInterval; // Development update frequency
+    
+    // ============================================================================
+    // NEUROMODULATION SYSTEMS CONFIGURATION
+    // ============================================================================
+    float dopamineBaselineLevel;       // Baseline dopamine level
+    float dopaminePlasticityFactor;    // Dopamine effect on plasticity
+    float curiosityExplorationRate;   // Curiosity-driven exploration
+    float noveltyThreshold;            // Novelty detection threshold
+    float predictionErrorGain;         // Prediction error learning rate
+    
+    // ============================================================================
+    // SENSORY AND MOTOR CONFIGURATION
+    // ============================================================================
+    float sensoryInputScale;           // Sensory input scaling factor
+    float motorOutputStrength;         // Motor output strength
+    
+    // ============================================================================
+    // ENVIRONMENT AND AGENT CONFIGURATION
+    // ============================================================================
+    uint64_t environmentWidth;         // Environment width
+    uint64_t environmentHeight;        // Environment height
+    float agentExplorationRate;        // Agent exploration rate
+    bool agentCuriosityEnabled;        // Enable curiosity
+    bool agentRewardModulationEnabled; // Enable reward modulation
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,8 +152,45 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
-};
+        , checkpointPath("./checkpoint_test.bin")
+        // Memory systems
+        , workingMemoryCapacity(100)
+        , episodicMemoryMaxEpisodes(1000)
+        , associativeMemoryPatternCount(500)
+        , memoryReplayInterval(100)
+        , memoryConsolidationInterval(1000)
+        // Prediction system
+        , predictionHorizon(10)
+        , predictionErrorThreshold(0.1f)
+        , predictionConfidenceThreshold(0.8f)
+        // Cognition systems
+        , plannerPlanningDepth(5)
+        , conceptFormationThreshold(0.7f)
+        , attentionInhibitionStrength(0.5f)
+        , attentionExcitationStrength(1.5f)
+        , attentionSelectionThreshold(0.6f)
+        // Development system
+        , developmentalStage(0)
+        , plasticityRateInitial(1.0f)
+        , plasticityRateCriticalPeriod(0.8f)
+        , plasticityRateMaturation(0.5f)
+        , plasticityRateAdult(0.2f)
+        , developmentUpdateInterval(1000)
+        // Neuromodulation systems
+        , dopamineBaselineLevel(0.1f)
+        , dopaminePlasticityFactor(1.0f)
+        , curiosityExplorationRate(0.3f)
+        , noveltyThreshold(0.5f)
+        , predictionErrorGain(1.0f)
+        // Sensory and motor
+        , sensoryInputScale(10.0f)
+        , motorOutputStrength(1.0f)
+        // Environment and agent
+        , environmentWidth(16)
+        , environmentHeight(16)
+        , agentExplorationRate(0.3f)
+        , agentCuriosityEnabled(true)
+        , agentRewardModulationEnabled(true) {}
 
 /**
  * Phase 6 integrated experiment runner

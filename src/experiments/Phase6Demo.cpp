@@ -60,6 +60,42 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
+    // Initialize additional Phase 6 configuration parameters
+    config.regionCount = 1;
+    config.connectionProbability = 0.1f;
+    config.workingMemoryCapacity = 50;
+    config.episodicMemoryMaxEpisodes = 100;
+    config.associativeMemoryPatternCount = 200;
+    config.memoryReplayInterval = 100;
+    config.memoryConsolidationInterval = 1000;
+    config.predictionHorizon = 5;
+    config.predictionErrorThreshold = 0.1f;
+    config.predictionConfidenceThreshold = 0.8f;
+    config.plannerPlanningDepth = 3;
+    config.conceptFormationThreshold = 0.7f;
+    config.attentionInhibitionStrength = 0.5f;
+    config.attentionExcitationStrength = 1.5f;
+    config.attentionSelectionThreshold = 0.6f;
+    config.developmentalStage = 0;
+    config.plasticityRateInitial = 1.0f;
+    config.plasticityRateCriticalPeriod = 0.8f;
+    config.plasticityRateMaturation = 0.5f;
+    config.plasticityRateAdult = 0.2f;
+    config.developmentUpdateInterval = 1000;
+    config.dopamineBaselineLevel = 0.1f;
+    config.dopaminePlasticityFactor = 1.0f;
+    config.curiosityExplorationRate = 0.3f;
+    config.noveltyThreshold = 0.5f;
+    config.predictionErrorGain = 1.0f;
+    config.sensoryInputScale = 10.0f;
+    config.motorOutputStrength = 1.0f;
+    config.environmentWidth = 16;
+    config.environmentHeight = 16;
+    config.agentExplorationRate = 0.3f;
+    config.agentCuriosityEnabled = true;
+    config.agentRewardModulationEnabled = true;
+    
+    // Apply Phase 6 integration experiment
     auto result = experiment.run(config);
     
     std::cout << std::endl;
