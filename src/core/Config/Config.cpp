@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,13 +52,20 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Loaded config from " + filepath + ": " + key + " = " + value + " (line " + std::to_string(lineNumber) + ")");
+        } else {
+            NLM_LOG_WARNING("Invalid config line in " + filepath + " (line " + std::to_string(lineNumber) + "): " + line);
         }
     }
     
+    NLM_LOG_INFO("Configuration loaded from " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_LOG_INFO("Loading configuration from command line arguments...");
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +76,10 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Loaded config from args: " + key + " = " + value);
+            } else {
+                NLM_LOG_WARNING("Invalid argument format (no '='): " + arg);
+                success = false;
             }
         }
         // Handle -key value format
@@ -73,22 +87,43 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Loaded config from args: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Unknown or invalid argument: " + arg);
+            success = false;
         }
     }
-    return true;
+    
+    NLM_LOG_INFO("Command line configuration loaded (" + std::to_string(pImpl->entries.size()) + " entries)");
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Write configuration with descriptive comments
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
+    file << "# Configuration saved from " << filepath << "\n";
+    
+    NLM_LOG_INFO("Configuration saved to " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
