@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <thread>
+#include <regex>
+#include <numeric>
 
 namespace nlm {
 

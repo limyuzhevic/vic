@@ -25,8 +25,41 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
+
+// Forward declarations for better organization
+namespace nlm_phase2 {
+    class LearningExperiment;
+    void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+    void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+    void runStdpVerification(std::shared_ptr<Brain> brain);
+}
+
+// Phase 2 namespace functions
+namespace nlm_phase2 {
+    void printDemoBanner();
+    
+    // Learning experiment demonstration
+    class LearningExperiment {
+    public:
+        std::shared_ptr<Brain> brain;
+        uint64_t seed;
+        size_t initialSynapseCount;
+        std::vector<float> initialWeights;
+        std::vector<float> finalWeights;
+        std::vector<NeuronId> mostActiveNeurons;
+        
+        LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
+            : brain(b), seed(s), initialSynapseCount(0) {}
+        
+        void recordInitialState();
+        void recordFinalState();
+        void computeStatistics();
+        void runExperiment();
+    };
+}
 
 void printBanner() {
     std::cout << R"(

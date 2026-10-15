@@ -21,11 +21,13 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Configuration library
+add_subdirectory(src/core/Config)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -92,13 +94,24 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(nlm_core PUBLIC nlm_config)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_agent PUBLIC nlm_core nlm_config nlm_config_validation)
+
+# World system (environment, objects, simple world)
+add_library(nlm_world STATIC
+    src/world/SimpleWorld.cpp
+)
+
+target_include_directories(nlm_world PUBLIC src)
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_config)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
