@@ -121,6 +121,131 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainPredictionSystem() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test prediction system integration
+    nlm::PredictionSystem* predictionSystem = brain.getPredictionSystem();
+    assert(predictionSystem != nullptr);
+    
+    // Test prediction system methods
+    float predictionError = predictionSystem->getPredictionError();
+    assert(predictionError >= 0.0f); // Should be non-negative
+    
+    float confidence = predictionSystem->getConfidence();
+    assert(confidence >= 0.0f && confidence <= 1.0f); // Should be between 0 and 1
+    
+    std::cout << "    testBrainPredictionSystem passed" << std::endl;
+}
+
+void testBrainAttentionSystem() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test attention system integration
+    nlm::AttentionalSelection* attention = brain.getAttention();
+    assert(attention != nullptr);
+    
+    // Run a few steps to let attention system work
+    for (nlm::SimulationStep step = 0; step < 5; ++step) {
+        brain.step(step);
+    }
+    
+    std::cout << "    testBrainAttentionSystem passed" << std::endl;
+}
+
+void testBrainConceptFormation() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test concept formation system integration
+    nlm::ConceptFormation* conceptFormation = brain.getConceptFormation();
+    assert(conceptFormation != nullptr);
+    
+    // Run a few steps to let concept formation work
+    for (nlm::SimulationStep step = 0; step < 5; ++step) {
+        brain.step(step);
+    }
+    
+    std::cout << "    testBrainConceptFormation passed" << std::endl;
+}
+
+void testBrainNeuralPlanner() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test neural planner system integration
+    nlm::NeuralPlanner* planner = brain.getPlanner();
+    assert(planner != nullptr);
+    
+    // Test planner methods
+    size_t planningDepth = planner->getPlanningDepth();
+    assert(planningDepth > 0); // Should have some planning depth
+    
+    float planningConfidence = planner->getPlanningConfidence();
+    assert(planningConfidence >= 0.0f && planningConfidence <= 1.0f); // Should be between 0 and 1
+    
+    // Test setting current goal
+    std::vector<float> testGoal = {0.5f, 0.5f, 0.5f};
+    planner->setCurrentGoal(testGoal);
+    auto currentGoal = planner->getCurrentGoal();
+    assert(currentGoal.size() == testGoal.size()); // Goal should be stored
+    
+    // Run a few steps to let planner work
+    for (nlm::SimulationStep step = 0; step < 5; ++step) {
+        brain.step(step);
+    }
+    
+    std::cout << "    testBrainNeuralPlanner passed" << std::endl;
+}
+
+void testBrainMemorySystemsIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test memory systems integration
+    nlm::NeuralWorkingMemory* workingMemory = brain.getWorkingMemory();
+    nlm::NeuralEpisodicMemory* episodicMemory = brain.getEpisodicMemory();
+    nlm::NeuralAssociativeMemory* associativeMemory = brain.getAssociativeMemory();
+    
+    assert(workingMemory != nullptr);
+    assert(episodicMemory != nullptr);
+    assert(associativeMemory != nullptr);
+    
+    // Run a few steps to let memory systems work
+    for (nlm::SimulationStep step = 0; step < 5; ++step) {
+        brain.step(step);
+    }
+    
+    std::cout << "    testBrainMemorySystemsIntegration passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +254,11 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainPredictionSystem();
+    testBrainAttentionSystem();
+    testBrainConceptFormation();
+    testBrainNeuralPlanner();
+    testBrainMemorySystemsIntegration();
 }
 
 } // namespace test_brain
