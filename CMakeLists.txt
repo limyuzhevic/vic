@@ -24,6 +24,10 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 # Core library
 add_library(nlm_core STATIC
     # Core
+    src/core/Constants/Constants.cpp
+    src/core/ErrorHandling/ErrorHandling.cpp
+    src/core/Constants.hpp
+    src/core/ErrorHandling.hpp
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
@@ -142,6 +146,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Improvements test executable
+add_executable(nlm_improvements_test
+    test_improvements/test_improvements.cpp
+)
+target_link_libraries(nlm_improvements_test PUBLIC nlm_core)
+add_test(NAME nlm_improvements_test COMMAND nlm_improvements_test)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
