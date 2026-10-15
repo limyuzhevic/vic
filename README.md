@@ -18,51 +18,69 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+# NLM — 熙然
+
+**An Experimental Artificial Developmental Brain**
+
+NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+
+NLM is NOT:
+- A transformer or LLM
+- A chatbot
+- A deep learning model
+- A pretrained AI system
+
+NLM IS intended to become:
+- A neural system that learns from experience
+- A brain-inspired architecture with neurons and synapses
+- A system that develops and adapts over time
+- A system where cognition emerges from neural dynamics
+
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION (IN PROGRESS)**
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Phase 6 Integration Achievements
+### Phase 6 Integration Achievements (Partial Integration)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+The NLM system contains sophisticated components that need full integration:
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Memory Systems (Needing Integration)
+- Working memory with persistent activity and competition - ✅ IMPLEMENTED
+- Episodic memory with experience encoding and replay - ✅ IMPLEMENTED  
+- Associative memory with Hebbian pattern associations - ✅ IMPLEMENTED
+- **ISSUE**: All memory systems are disconnected from main brain loop
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Neuromodulation Integration (Partially Working)
+- Dopamine affects neural excitability and plasticity - ⚠️ PARTIAL (Phase 2 TODOs)
+- Curiosity drives exploration behavior - ✅ WORKING
+- Novelty detection integrated with sensory processing - ✅ WORKING
+- All neuromodulators connected to plasticity rules - ⚠️ PARTIAL
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+#### Prediction System (Disconnected)
+- Prediction system integrated into brain loop - ✅ IMPLEMENTED BUT NOT USED
+- **ISSUE**: Returns nullptr in Brain class
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+#### Cognition Systems (Partially Connected)
+- Neural planner with action sequence evaluation - ✅ IMPLEMENTED BUT NOT USED
+- Concept formation from experience patterns - ✅ IMPLEMENTED BUT NOT USED
+- Attention with competitive selection dynamics - ✅ IMPLEMENTED BUT NOT FULLY USED
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+#### Development Integration (Basic)
+- Developmental stages affect plasticity rates - ✅ IMPLEMENTED
+- Structural plasticity modulated by age - ⚠️ PARTIAL
+- Neural excitability changes with development - ✅ IMPLEMENTED
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### Persistence (Implemented)
+- Checkpoint save/load implemented - ✅ WORKING
+- Brain state serialization working - ✅ WORKING
+- Can resume from saved checkpoints - ✅ WORKING
+
+#### Replay and Consolidation (Implemented)
+- Episodic memory replay during simulation - ✅ WORKING
+- Memory consolidation for important episodes - ✅ WORKING
+- Integration with sleep/rest cycle - ✅ IMPLEMENTED
 
 ## Building
 
@@ -75,44 +93,33 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Demo (Integration Test - **NEEDS IMPROVEMENT**)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+**CURRENT STATUS**: The Phase 6 demo exists but integration is incomplete. Many cognitive systems are disconnected from the main brain loop.
 
-## Project Structure
+### Improved Phase 6 Demo (New Implementation)
+The main.cpp file has been updated to show a more comprehensive Phase 6 integration demo with test suites for:
+1. Memory systems integration
+2. Neuromodulation integration
+3. Development integration
+4. Checkpoint and persistence
+5. Replay and consolidation
 
+```bash
+./nlm_phase6_demo_improved
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+*(Note: This demo is available as main.cpp but renamed for clarity)*
+
+### Phase 2 Demo (Basic Neural Computation)
+```bash
+./nlm_phase2_demo
 ```
+
+This runs the basic neural computation demo with working memory, episodic memory, and integrated neuromodulation.
 
 ## Phase Summary
 

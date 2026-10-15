@@ -32,6 +32,10 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    // TODO PHASE 2: Implement more sophisticated curiosity computation
+    // Current implementation: Linear combination of novelty and prediction error
+    // TODO: Add reference to expected novelty, meta-curiosity, and reward-seeking components
+    
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
