@@ -510,9 +510,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        // Get current sensory state for prediction
+        // For now, use dopamine level as a proxy for sensory state
+        // In a full implementation, this would get actual sensory input
+        
+        // Create a simple sensory input for prediction based on current brain state
+        SensoryInput currentState;
+        
+        // Use active neuron activities as prediction input
+        float predictionInput = 0.0f;
+        int activeNeurons = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        predictionInput += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activeNeurons++;
+                    }
+                }
+            }
+        }
+        
+        if (activeNeurons > 0) {
+            predictionInput /= activeNeurons;  // Normalize
+        }
+        
+        // Add some noise and variation for realistic prediction
+        float noise = (pImpl->rng ? pImpl->rng->getFloat() - 0.5f : 0.0f) * 2.0f;
+        currentState.addValue(predictionInput + noise);
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentState);
+        
+        if (predictedState) {
+            // Update prediction system with actual state
+            pImpl->predictionSystem->updatePredictions(*predictedState, currentState);
+            
+            // Train prediction system on current experience
+            pImpl->predictionSystem->train(currentState);
+            
+            // Prediction error affects learning (dopamine modulation)
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                // High prediction error increases exploration (curiosity)
+                float curiosityBoost = (predictionError - 0.1f) * 2.0f;
+                curiosityBoost = std::min(curiosityBoost, 1.0f);
+                
+                // Apply curiosity modulation to neural excitability
+                if (pImpl->curiosity) {
+                    float currentCuriosity = pImpl->curiosity->getLevel();
+                    pImpl->curiosity->setLevel(currentCuriosity + curiosityBoost * 0.1f);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +581,73 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity patterns for concept formation
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        // Gather neural activity patterns from active neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        // Add normalized neural activation to pattern
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        currentPattern.push_back(activation);
+                        
+                        // Add features based on neuron type
+                        switch (pop->getNeuronType()) {
+                            case NeuronType::Sensory:
+                                currentFeatures.push_back(1.0f);  // Feature: sensory processing
+                                break;
+                            case NeuronType::Motor:
+                                currentFeatures.push_back(-1.0f); // Feature: motor output
+                                break;
+                            case NeuronType::Internal:
+                                currentFeatures.push_back(0.0f);   // Feature: internal processing
+                                break;
+                            case NeuronType::Excitory:
+                                currentFeatures.push_back(0.5f);   // Feature: excitatory
+                                break;
+                            case NeuronType::Inhibitory:
+                                currentFeatures.push_back(-0.5f);  // Feature: inhibitory
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If we have enough data, present experience to concept formation
+        if (!currentPattern.empty()) {
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, currentFeatures, reward, currentStep);
+            
+            // If a concept was discovered or updated, influence attention
+            if (conceptId > 0 && pImpl->conceptFormation->getConceptStability(conceptId) > 0.5f) {
+                const auto& concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (!concept.categoryHint.empty()) {
+                    // Concept influences attention - focus on relevant features
+                    if (pImpl->attention) {
+                        // In a full implementation, this would set attentional focus
+                        // For now, we just log that concept formation influenced attention
+                        static int conceptInfluenceCount = 0;
+                        conceptInfluenceCount++;
+                        if (conceptInfluenceCount % 100 == 0) {
+                            NLM_LOG_INFO("Concept formation influenced attention: discovered concept with category " + concept.categoryHint);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with accumulated experience
+        pImpl->conceptFormation->updateConcept(
+            pImpl->conceptFormation->getConceptCount() > 0 ? 
+                pImpl->conceptFormation->getConceptCount() - 1 : 0,
+            currentPattern, currentFeatures, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -708,6 +826,49 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Return a simple action
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
+        type = ActionType::MoveForward;
+    }
+    
+    // Try to use NeuralPlanner for intelligent action planning
+    if (pImpl->planner) {
+        // Extract current neural state for planning
+        std::vector<float> currentState;
+        
+        // Use working memory activity as part of state
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                // Find this neuron and get its activity
+                float activity = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                                break;
+                            }
+                        }
+                    }
+                }
+                currentState.push_back(activity);
+            }
+        }
+        
+        // Add current dopamine level as reward signal
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        // Use NeuralPlanner to select action
+        ActionType plannedAction = pImpl->planner->planAction(currentState, reward);
+        
+        // Use the planned action if it makes sense (not Wait and not conflicting with current motor activity)
+        if (plannedAction != ActionType::Wait && plannedAction != ActionType::Stop) {
+            type = plannedAction;
+            NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(type)));
+        }
+    }
+    
+    // If no planning or planning failed, fall back to simple selection
+    if (type == ActionType::Wait && firingMotor > 0) {
         type = ActionType::MoveForward;
     }
     
