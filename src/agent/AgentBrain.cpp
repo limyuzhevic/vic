@@ -3,7 +3,40 @@
 #include <algorithm>
 #include <cmath>
 
+// Safety macro for null checks
+#define SAFE_RETURN(condition) if (!(condition)) return
+
 namespace nlm {
+
+// Helper function for safe vector access
+static Neuron* getNeuronFromIndex(const std::vector<Neuron*>& neurons, size_t idx) {
+    if (idx < neurons.size() && neurons[idx] != nullptr) {
+        return neurons[idx];
+    }
+    return nullptr;
+}
+
+// Helper function for null brain check
+static bool isBrainValid(const std::shared_ptr<Brain>& brain) {
+    return brain != nullptr;
+}
+
+// Helper function for safe neuron activity calculation
+static float calculateNeuronActivity(const std::vector<Neuron*>& neurons) {
+    if (neurons.empty()) return 0.0f;
+    
+    float sum = 0.0f;
+    size_t validCount = 0;
+    
+    for (const Neuron* n : neurons) {
+        if (n != nullptr) {
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            validCount++;
+        }
+    }
+    
+    return validCount > 0 ? sum / validCount : 0.0f;
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)

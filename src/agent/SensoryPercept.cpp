@@ -17,20 +17,26 @@ SensoryPercept::SensoryPercept()
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
     
-    // Vision (flattened)
-    all.insert(all.end(), vision_.begin(), vision_.end());
-    
-    // Touch
-    all.insert(all.end(), touch_.begin(), touch_.end());
-    
-    // Internal
-    all.insert(all.end(), internal_.begin(), internal_.end());
-    
-    // Proprioception
-    all.insert(all.end(), proprioception_.begin(), proprioception_.end());
-    
-    // Audio
-    all.insert(all.end(), audio_.begin(), audio_.end());
+    try {
+        // Vision (flattened) - safely copy all elements
+        all.insert(all.end(), vision_.begin(), vision_.end());
+        
+        // Touch - safely copy all elements  
+        all.insert(all.end(), touch_.begin(), touch_.end());
+        
+        // Internal - safely copy all elements
+        all.insert(all.end(), internal_.begin(), internal_.end());
+        
+        // Proprioception - safely copy all elements
+        all.insert(all.end(), proprioception_.begin(), proprioception_.end());
+        
+        // Audio - safely copy all elements
+        all.insert(all.end(), audio_.begin(), audio_.end());
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error copying sensory signals: " + std::string(e.what()));
+        all.clear();
+    }
     
     return all;
 }
