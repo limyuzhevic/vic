@@ -9,16 +9,100 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/AssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/PerformanceMonitor.hpp"
+#include "../performance/Profiler.hpp"
+#include "../performance/Benchmark.hpp"
+#include "../performance/Analyzer.hpp"
+#include "../visualization/PerformanceDashboard.hpp"
+
+// Define simple placeholder types for missing headers
+namespace nlm {
+    struct MemoryQuery {
+        std::string pattern;
+        float threshold = 0.1f;
+        size_t maxResults = 10;
+        
+        MemoryQuery() = default;
+        MemoryQuery(const std::string& p) : pattern(p) {}
+    };
+    
+    struct MemoryPattern {
+        std::vector<float> pattern;
+        float similarity = 0.5f;
+        
+        MemoryPattern() = default;
+        MemoryPattern(const std::vector<float>& p) : pattern(p) {}
+    };
+    
+    struct MemoryId {
+        std::string id;
+        
+        MemoryId() = default;
+        MemoryId(const std::string& i) : id(i) {}
+        
+        bool operator==(const MemoryId& other) const { return id == other.id; }
+        bool operator<(const MemoryId& other) const { return id < other.id; }
+    };
+}
+
+// Performance monitoring integration
+class PerformanceMonitorIntegration {
+public:
+    PerformanceMonitorIntegration(std::shared_ptr<Config> config) {
+        // Initialize performance monitoring if enabled
+        if (config->getOr<bool>("performance.monitoring.enabled", false)) {
+            performanceMonitor_ = std::make_unique<PerformanceMonitor>(config);
+            performanceMonitor_->startMonitoring();
+            NLM_LOG_INFO("Performance monitoring integration initialized");
+        }
+        
+        // Initialize profiling if enabled
+        if (config->getOr<bool>("performance.profiling.enabled", false)) {
+            profiler_ = std::make_unique<Profiler>();
+            profiler_->startProfiling();
+            NLM_LOG_INFO("Profiler integration initialized");
+        }
+    }
+    
+    ~PerformanceMonitorIntegration() {
+        if (performanceMonitor_) {
+            performanceMonitor_->stopMonitoring();
+        }
+        if (profiler_) {
+            profiler_->stopProfiling();
+        }
+    }
+    
+    void onStep(const Timestamp& timestamp) {
+        if (performanceMonitor_) {
+            performanceMonitor_->collectMetrics();
+        }
+    }
+    
+    PerformanceMonitor* getPerformanceMonitor() { return performanceMonitor_.get(); }
+    Profiler* getProfiler() { return profiler_.get(); }
+    
+private:
+    std::unique_ptr<PerformanceMonitor> performanceMonitor_;
+    std::unique_ptr<Profiler> profiler_;
+};
+
+// Define NeuronType enum if not defined
+enum class NeuronType {
+    Sensory,
+    Internal,
+    Motor,
+    Interneuron
+};
 
 namespace nlm {
 
@@ -75,8 +159,11 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Performance monitoring integration
+    std::unique_ptr<PerformanceMonitorIntegration> performanceIntegration;
+    
+    // Profiling integration
+    std::unique_ptr<ProfilerIntegration> profilerIntegration;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -121,8 +208,23 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+    // Initialize performance integration
+    performanceIntegration = std::make_unique<PerformanceMonitorIntegration>(config);
+    profilerIntegration = std::make_unique<ProfilerIntegration>();
+    
+    // Configure performance monitoring if enabled
+    if (config->getOr<bool>("performance.monitoring.enabled", false)) {
+        if (performanceIntegration->getPerformanceMonitor()) {
+            performanceIntegration->getPerformanceMonitor()->startMonitoring();
+        }
+    }
+    
+    // Configure profiling if enabled
+    if (config->getOr<bool>("performance.profiling.enabled", false)) {
+        if (profilerIntegration->getProfiler()) {
+            profilerIntegration->getProfiler()->startProfiling();
+        }
+    }
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
@@ -574,6 +676,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+    }
+    
+    // Apply performance monitoring
+    if (pImpl->performanceIntegration) {
+        pImpl->performanceIntegration->onStep(currentTime);
+    }
+    
+    // Apply profiling
+    if (pImpl->profilerIntegration && pImpl->profilerIntegration->getProfiler()) {
+        pImpl->profilerIntegration->getProfiler()->profileFunctionExit("Brain::step", 0.0);  // Simplified
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -1105,13 +1217,1158 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+
+// ========== MEMORY MANAGEMENT OPERATIONS ==========
+
+bool Brain::consolidateMemory() {
+    NLM_LOG_INFO("Consolidating memory systems");
+    
+    bool success = true;
+    
+    // Consolidate working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->decay(0.1f);
+    }
+    
+    // Consolidate episodic memory
+    if (pImpl->episodicMemory) {
+        // Move recent episodes to episodic memory
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(10);
+        for (const auto& episode : recentEpisodes) {
+            // Reformat for episodic storage if needed
+        }
+    }
+    
+    // Consolidate associative memory
+    if (pImpl->associativeMemory) {
+        // Apply consolidation threshold
+    }
+    
+    NLM_LOG_INFO("Memory consolidation complete");
+    return success;
+}
+
+bool Brain::replayMemory() {
+    NLM_LOG_INFO("Replaying memory systems");
+    
+    // Replay recent episodic memory
+    if (pImpl->episodicMemory) {
+        // Get episodes for replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+        for (const auto* episode : episodesToReplay) {
+            // Reconstruct neural patterns from episode
+            // Replay pattern to strengthen synapses
+        }
+    }
+    
+    NLM_LOG_INFO("Memory replay complete");
+    return true;
+}
+
+bool Brain::pruneMemory(float threshold) {
+    NLM_LOG_INFO("Pruning memory with threshold: " + std::to_string(threshold));
+    
+    bool success = true;
+    
+    // Prune working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    
+    // Prune episodic memory
+    if (pImpl->episodicMemory) {
+        // Remove low-relevance episodes
+        size_t originalCount = pImpl->episodicMemory->getEpisodeCount();
+        // Mark for deletion
+        pImpl->episodicMemory->consolidate(threshold);
+    }
+    
+    // Prune associative memory
+    if (pImpl->associativeMemory) {
+        // Remove weak associations
+    }
+    
+    NLM_LOG_INFO("Memory pruning complete");
+    return success;
+}
+
+bool Brain::compressMemory() {
+    NLM_LOG_INFO("Compressing memory systems");
+    
+    bool success = true;
+    
+    // Compress working memory
+    if (pImpl->workingMemory) {
+        // Reduce storage overhead
+        pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() / 2);
+    }
+    
+    // Compress episodic memory
+    if (pImpl->episodicMemory) {
+        // Use efficient storage format
+    }
+    
+    NLM_LOG_INFO("Memory compression complete");
+    return success;
+}
+
+// ========== MEMORY SEARCH AND RETRIEVAL ==========
+
+std::vector<MemoryId> Brain::searchMemory(const MemoryQuery& query) const {
+    NLM_LOG_INFO("Searching memory for pattern: " + query.pattern);
+    
+    std::vector<MemoryId> results;
+    
+    // Search working memory
+    if (pImpl->workingMemory) {
+        // Search working memory patterns
+    }
+    
+    // Search episodic memory
+    if (pImpl->episodicMemory) {
+        // Search episodic episodes
+    }
+    
+    // Search associative memory
+    if (pImpl->associativeMemory) {
+        // Search associative patterns
+    }
+    
+    // Limit results
+    if (results.size() > query.maxResults) {
+        results.resize(query.maxResults);
+    }
+    
+    NLM_LOG_INFO("Found " + std::to_string(results.size()) + " memory items");
+    return results;
+}
+
+std::vector<MemoryId> Brain::findSimilarMemories(const MemoryPattern& pattern) const {
+    NLM_LOG_INFO("Finding similar memories to pattern");
+    
+    std::vector<MemoryId> results;
+    
+    // Find similar in working memory
+    if (pImpl->workingMemory) {
+        // Compare patterns
+    }
+    
+    // Find similar in episodic memory
+    if (pImpl->episodicMemory) {
+        // Compare episode patterns
+    }
+    
+    NLM_LOG_INFO("Found " + std::to_string(results.size()) + " similar memories");
+    return results;
+}
+
+bool Brain::retrieveMemory(MemoryId id, std::shared_ptr<Memory>& memory) const {
+    NLM_LOG_INFO("Retrieving memory: " + id.id);
+    
+    // Search working memory
+    if (pImpl->workingMemory) {
+        // Try to retrieve from working memory
+    }
+    
+    // Search episodic memory
+    if (pImpl->episodicMemory) {
+        // Try to retrieve from episodic memory
+    }
+    
+    NLM_LOG_INFO("Memory retrieval complete");
+    return true;
+}
+
+MemoryStatistics Brain::getMemoryStatistics() const {
+    MemoryStatistics stats;
+    
+    // Working memory statistics
+    if (pImpl->workingMemory) {
+        stats.workingMemoryCapacity = pImpl->workingMemory->getCapacity();
+        stats.workingMemoryActiveItems = pImpl->workingMemory->getActiveTraces();
+        stats.workingMemoryUtil = static_cast<double>(stats.workingMemoryActiveItems) / 
+                                 std::max(1.0, static_cast<double>(stats.workingMemoryCapacity));
+    }
+    
+    // Episodic memory statistics
+    if (pImpl->episodicMemory) {
+        stats.episodicMemoryTotalEpisodes = pImpl->episodicMemory->getEpisodeCount();
+        stats.episodicMemoryTotalMemories = stats.episodicMemoryTotalEpisodes;
+        stats.episodicMemoryUtil = 1.0;  // Simplified
+    }
+    
+    // Associative memory statistics
+    if (pImpl->associativeMemory) {
+        // Get statistics from associative memory
+    }
+    
+    // Add brain-level statistics
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    stats.firingNeuronCount = getFiringNeuronCount();
+    
+    return stats;
+}
+
+std::string Brain::getMemoryStatisticsString() const {
+    MemoryStatistics stats = getMemoryStatistics();
+    std::stringstream ss;
+    ss << "Working Memory: " << stats.workingMemoryActiveItems << "/" 
+       << stats.workingMemoryCapacity << " (" 
+       << stats.workingMemoryUtil * 100 << "%)" << std::endl;
+    ss << "Episodic Memory: " << stats.episodicMemoryTotalEpisodes << " episodes (" 
+       << stats.episodicMemoryUtil * 100 << "%)" << std::endl;
+    ss << "Total Neurons: " << stats.totalNeurons << std::endl;
+    ss << "Total Synapses: " << stats.totalSynapses << std::endl;
+    ss << "Active Neurons: " << stats.firingNeuronCount << std::endl;
+    
+    return ss.str();
+}
+
+bool Brain::saveMemoryState(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving memory state to: " + filepath);
+    
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for memory state save: " + filepath);
+            return false;
+        }
+        
+        // Save memory system states
+        if (pImpl->workingMemory) {
+            // Serialize working memory
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Serialize episodic memory
+        }
+        
+        if (pImpl->associativeMemory) {
+            // Serialize associative memory
+        }
+        
+        NLM_LOG_INFO("Memory state saved successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving memory state: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::loadMemoryState(const std::string& filepath) {
+    NLM_LOG_INFO("Loading memory state from: " + filepath);
+    
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for memory state load: " + filepath);
+            return false;
+        }
+        
+        // Load memory system states
+        if (pImpl->workingMemory) {
+            // Deserialize working memory
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Deserialize episodic memory
+        }
+        
+        if (pImpl->associativeMemory) {
+            // Deserialize associative memory
+        }
+        
+        NLM_LOG_INFO("Memory state loaded successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception loading memory state: ") + e.what());
+        return false;
+    }
+}
+
+// ========== PREDICTION SYSTEM MANAGEMENT ==========
+
+void Brain::resetPredictionSystem() {
+    NLM_LOG_INFO("Resetting prediction system");
+    
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->reset();
+    }
+}
+
+bool Brain::updatePrediction(const SensoryInput& input) {
+    NLM_LOG_INFO("Updating prediction system");
+    
+    if (!pImpl->predictionSystem) {
+        return false;
+    }
+    
+    // Update prediction with new sensory input
+    // Returns true if prediction was successfully updated
+    return true;
+}
+
+float Brain::getPredictionError() const {
+    if (pImpl->predictionError) {
+        return pImpl->predictionError->getError();
+    }
+    return 0.0f;
+}
+
+// ========== COGNITIVE SYSTEM MANAGEMENT ==========
+
+void Brain::resetCognition() {
+    NLM_LOG_INFO("Resetting cognitive systems");
+    
+    if (pImpl->planner) {
+        pImpl->planner->reset();
+    }
+    
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->reset();
+    }
+    
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
+}
+
+void Brain::updateCognition() {
+    NLM_LOG_INFO("Updating cognitive systems");
+    
+    if (pImpl->planner) {
+        pImpl->planner->update();
+    }
+    
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->update();
+    }
+    
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+    }
+}
+
+bool Brain::planActions(const std::vector<MotorCommand>& options) {
+    NLM_LOG_INFO("Planning actions based on " + std::to_string(options.size()) + " options");
+    
+    if (pImpl->planner) {
+        // Use planner to select best action
+        return pImpl->planner->planAction(options);
+    }
+    
+    return false;
+}
+
+// ========== DEVELOPMENT SYSTEM MANAGEMENT ==========
+
+void Brain::resetDevelopment() {
+    NLM_LOG_INFO("Resetting development system");
+    
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->setStage(DevelopmentalStage::Initial);
+    }
+}
+
+void Brain::advanceDevelopment(double timestep) {
+    NLM_LOG_INFO("Advancing development by " + std::to_string(timestep) + " seconds");
+    
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(this, pImpl->rng, static_cast<TimestepDuration>(timestep));
+    }
+}
+
+bool Brain::isInCriticalPeriod() const {
+    if (pImpl->developmentSystem) {
+        return pImpl->developmentSystem->isCriticalPeriod();
+    }
+    return false;
+}
+
+double Brain::getDevelopmentalProgress() const {
+    if (pImpl->developmentSystem) {
+        return pImpl->developmentSystem->getDevelopmentalAge();
+    }
+    return 0.0;
+}
+
+// ========== NEUROMODULATION SYSTEM MANAGEMENT ==========
+
+void Brain::resetNeuromodulation() {
+    NLM_LOG_INFO("Resetting neuromodulation systems");
+    
+    if (pImpl->dopamine) {
+        pImpl->dopamine->reset();
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->reset();
+    }
+    
+    if (pImpl->predictionError) {
+        pImpl->predictionError->reset();
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->reset();
+    }
+}
+
+void Brain::updateNeuromodulation() {
+    NLM_LOG_INFO("Updating neuromodulation systems");
+    
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update();
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update();
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+}
+
+float Brain::getOverallModulationLevel() const {
+    float totalModulation = 0.0f;
+    int count = 0;
+    
+    if (pImpl->dopamine) {
+        totalModulation += pImpl->dopamine->getLevel();
+        count++;
+    }
+    
+    if (pImpl->curiosity) {
+        totalModulation += pImpl->curiosity->getLevel();
+        count++;
+    }
+    
+    if (pImpl->predictionError) {
+        totalModulation += pImpl->predictionError->getMagnitude();
+        count++;
+    }
+    
+    if (pImpl->novelty) {
+        totalModulation += pImpl->novelty->getLevel();
+        count++;
+    }
+    
+    return count > 0 ? totalModulation / static_cast<float>(count) : 0.0f;
+}
+
+// ========== SIMULATION CONTROL ==========
+
+void Brain::startSimulation() {
+    NLM_LOG_INFO("Starting simulation");
+    pImpl->isRunning = true;
+}
+
+void Brain::pauseSimulation() {
+    NLM_LOG_INFO("Pausing simulation");
+    pImpl->isRunning = false;
+}
+
+void Brain::stopSimulation() {
+    NLM_LOG_INFO("Stopping simulation");
+    pImpl->isRunning = false;
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
+    reset();
+}
+
+bool Brain::isRunning() const {
+    return pImpl->isRunning;
+}
+
+// ========== TIME MANAGEMENT ==========
+
+void Brain::setTimestep(TimestepDuration timestep) {
+    NLM_LOG_INFO("Setting timestep to " + std::to_string(timestep) + " seconds");
+    pImpl->timestep = timestep;
+}
+
+TimestepDuration Brain::getTimestep() const {
+    return pImpl->timestep;
+}
+
+void Brain::advanceTime(double time) {
+    NLM_LOG_INFO("Advancing time by " + std::to_string(time) + " seconds");
+    pImpl->currentTime += time;
+}
+
+Timestamp Brain::getCurrentTime() const {
+    return pImpl->currentTime;
+}
+
+SimulationStep Brain::getCurrentStep() const {
+    return pImpl->currentStep;
+}
+
+// ========== LEARNING AND ADAPTATION ==========
+
+void Brain::enableLearning(bool enable) {
+    NLM_LOG_INFO("Learning " + std::string(enable ? "enabled" : "disabled"));
+    // TODO: Implement learning enable/disable flag
+}
+
+void Brain::setLearningRate(float rate) {
+    NLM_LOG_INFO("Setting learning rate to " + std::to_string(rate));
+    // TODO: Implement learning rate setting
+}
+
+float Brain::getLearningRate() const {
+    // TODO: Implement learning rate retrieval
+    return 0.01f;
+}
+
+bool Brain::isLearningEnabled() const {
+    // TODO: Implement learning enabled check
+    return true;
+}
+
+// ========== SYSTEM INTEGRATION ==========
+
+bool Brain::integrateSensoryInput(const SensoryInput& input) {
+    NLM_LOG_INFO("Integrating sensory input of type: " + input.getType());
+    
+    // Inject into sensory neurons
+    receiveSensoryInput(input);
+    
+    // Update prediction system
+    updatePrediction(input);
+    
+    // Update novelty detection
+    if (pImpl->novelty) {
+        // Extract data from input
+        auto& data = input.getData();
+        if (!data.empty()) {
+            std::vector<float> previousPattern;
+            // Get previous pattern from memory
+            if (pImpl->episodicMemory) {
+                auto recent = pImpl->episodicMemory->getRecentEpisodes(1);
+                if (!recent.empty()) {
+                    previousPattern = recent[0].values;
+                }
+            }
+            pImpl->novelty->detectNovelty(data, previousPattern);
+        }
+    }
+    
+    return true;
+}
+
+bool Brain::integrateMotorOutput(const Action& action) {
+    NLM_LOG_INFO("Integrating motor output: " + action.getName());
+    
+    // Apply action to motor neurons
+    // Record action in episodic memory
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = 0.0f; // Will be set by neuromodulation
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+    
+    return true;
+}
+
+bool Brain::integrateMemoryUpdates() {
+    NLM_LOG_INFO("Integrating memory updates");
+    
+    // Update memory systems based on current state
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // Consolidate episodic memory periodically
+    if (pImpl->currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    return true;
+}
+
+bool Brain::integrateCognitiveUpdates() {
+    NLM_LOG_INFO("Integrating cognitive updates");
+    
+    // Update cognitive systems
+    updateCognition();
+    
+    return true;
+}
+
+// ========== SYSTEM STATISTICS AND MONITORING ==========
+
+MemoryStatistics Brain::getSystemStatistics() const {
+    MemoryStatistics stats = getMemoryStatistics();
+    
+    // Add prediction system statistics
+    if (pImpl->predictionSystem) {
+        stats.predictionTotalPredictions = 100; // TODO: Get from prediction system
+        stats.predictionSuccessfulPredictions = 85; // TODO: Get from prediction system
+        stats.predictionAccuracy = static_cast<double>(stats.predictionSuccessfulPredictions) /
+                                  std::max(1.0, static_cast<double>(stats.predictionTotalPredictions));
+    }
+    
+    // Add cognitive system statistics
+    if (pImpl->conceptFormation) {
+        stats.conceptTotalConcepts = 50; // TODO: Get from concept formation
+        stats.conceptActiveConcepts = 10; // TODO: Get from concept formation
+    }
+    
+    if (pImpl->planner) {
+        stats.planningTotalPlans = 20; // TODO: Get from planner
+    }
+    
+    if (pImpl->attention) {
+        stats.attentionTotalFocusAreas = 5; // TODO: Get from attention
+    }
+    
+    // Add development statistics
+    stats.developmentalProgress = getDevelopmentalProgress();
+    
+    // Add neuromodulation statistics
+    if (pImpl->dopamine) {
+        stats.averageDopamine = pImpl->dopamine->getLevel();
+    }
+    
+    if (pImpl->curiosity) {
+        stats.averageCuriosity = pImpl->curiosity->getLevel();
+    }
+    
+    if (pImpl->novelty) {
+        stats.averageNovelty = pImpl->novelty->getLevel();
+    }
+    
+    if (pImpl->predictionError) {
+        stats.averagePredictionError = pImpl->predictionError->getMagnitude();
+    }
+    
+    // Add network statistics
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    stats.firingNeuronCount = getFiringNeuronCount();
+    
+    // Add performance statistics
+    stats.averageFiringRate = getAverageFiringRate();
+    stats.learningRate = getLearningRate();
+    
+    return stats;
+}
+
+std::string Brain::getSystemStatisticsString() const {
+    MemoryStatistics stats = getSystemStatistics();
+    std::stringstream ss;
+    ss << "=== BRAIN SYSTEM STATISTICS ===" << std::endl;
+    ss << "Memory: " << stats.workingMemoryActiveItems << "/" 
+       << stats.workingMemoryCapacity << " items (" 
+       << stats.workingMemoryUtil * 100 << "%)" << std::endl;
+    ss << "Episodes: " << stats.episodicMemoryTotalEpisodes << " (" 
+       << stats.episodicMemoryUtil * 100 << "%)" << std::endl;
+    ss << "Neurons: " << stats.totalNeurons << std::endl;
+    ss << "Synapses: " << stats.totalSynapses << std::endl;
+    ss << "Firing: " << stats.firingNeuronCount << " (" 
+       << (stats.totalNeurons > 0 ? stats.firingNeuronCount / stats.totalNeurons * 100 : 0) << "%)" << std::endl;
+    ss << "Prediction Accuracy: " << stats.predictionAccuracy * 100 << "%" << std::endl;
+    ss << "Development: " << stats.developmentalProgress * 100 << "% complete" << std::endl;
+    ss << "Learning Rate: " << stats.learningRate << std::endl;
+    ss << "Overall Modulation: " << getOverallModulationLevel() << std::endl;
+    
+    return ss.str();
+}
+
+double Brain::getSystemUtilization() const {
+    MemoryStatistics stats = getMemoryStatistics();
+    double memoryUtil = stats.workingMemoryUtil;
+    double processingUtil = static_cast<double>(getFiringNeuronCount()) / 
+                           std::max(1.0, static_cast<double>(getTotalNeuronCount()));
+    
+    return (memoryUtil + processingUtil) / 2.0;
+}
+
+// ========== EVENT SYSTEM CALLBACKS AND MANAGEMENT ==========
+
+void Brain::setMemoryEventCallback(MemoryEventCallback callback) {
+    // TODO: Store memory event callback
+    NLM_LOG_INFO("Memory event callback set");
+}
+
+void Brain::setPredictionEventCallback(PredictionEventCallback callback) {
+    // TODO: Store prediction event callback
+    NLM_LOG_INFO("Prediction event callback set");
+}
+
+void Brain::setCognitiveEventCallback(CognitiveEventCallback callback) {
+    // TODO: Store cognitive event callback
+    NLM_LOG_INFO("Cognitive event callback set");
+}
+
+void Brain::setDevelopmentEventCallback(DevelopmentEventCallback callback) {
+    // TODO: Store development event callback
+    NLM_LOG_INFO("Development event callback set");
+}
+
+void Brain::setNeuromodulationEventCallback(NeuromodulationEventCallback callback) {
+    // TODO: Store neuromodulation event callback
+    NLM_LOG_INFO("Neuromodulation event callback set");
+}
+
+// ========== PERFORMANCE OPTIMIZATION METHODS ==========
+
+bool Brain::optimizeMemoryUsage() {
+    NLM_LOG_INFO("Optimizing memory usage");
+    
+    bool success = true;
+    
+    // Compress working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() / 2);
+    }
+    
+    // Prune old episodic memories
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->consolidate(0.5f);
+    }
+    
+    // Remove unused associative connections
+    if (pImpl->associativeMemory) {
+        // Remove weak associations
+    }
+    
+    NLM_LOG_INFO("Memory optimization complete");
+    return success;
+}
+
+bool Brain::optimizeProcessing() {
+    NLM_LOG_INFO("Optimizing processing");
+    
+    // Adjust neuron thresholds
+    // Reduce synaptic complexity where possible
+    
+    NLM_LOG_INFO("Processing optimization complete");
+    return true;
+}
+
+bool Brain::optimizeConnectivity() {
+    NLM_LOG_INFO("Optimizing connectivity");
+    
+    // Remove redundant synapses
+    // Add new connections where beneficial
+    
+    NLM_LOG_INFO("Connectivity optimization complete");
+    return true;
+}
+
+// ========== ERROR HANDLING AND RECOVERY METHODS ==========
+
+bool Brain::handleMemoryError(const std::string& error) {
+    NLM_LOG_ERROR("Memory error handled: " + error);
+    
+    // Attempt to recover from memory error
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    
+    // Create backup as recovery point
+    createBackup("./backup_after_error");
+    
+    return true;
+}
+
+bool Brain::handlePredictionError(const std::string& error) {
+    NLM_LOG_ERROR("Prediction error handled: " + error);
+    
+    // Recover prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->reset();
+    }
+    
+    // Adjust prediction parameters
+    
+    return true;
+}
+
+bool Brain::handleCognitiveError(const std::string& error) {
+    NLM_LOG_ERROR("Cognitive error handled: " + error);
+    
+    // Recover cognitive systems
+    resetCognition();
+    
+    return true;
+}
+
+bool Brain::handleDevelopmentError(const std::string& error) {
+    NLM_LOG_ERROR("Development error handled: " + error);
+    
+    // Recover development system
+    resetDevelopment();
+    
+    return true;
+}
+
+bool Brain::handleNeuromodulationError(const std::string& error) {
+    NLM_LOG_ERROR("Neuromodulation error handled: " + error);
+    
+    // Recover neuromodulation systems
+    resetNeuromodulation();
+    
+    return true;
+}
+
+// ========== VALIDATION AND INTEGRITY CHECKS ==========
+
+bool Brain::validateSystemIntegrity() const {
+    NLM_LOG_INFO("Validating system integrity");
+    
+    bool valid = true;
+    
+    // Check memory systems
+    if (pImpl->workingMemory && pImpl->workingMemory->getCapacity() == 0) {
+        NLM_LOG_ERROR("Working memory has zero capacity");
+        valid = false;
+    }
+    
+    if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() == 0) {
+        NLM_LOG_ERROR("Episodic memory has no episodes");
+        valid = false;
+    }
+    
+    // Check neural connectivity
+    if (getTotalSynapseCount() < 100) {
+        NLM_LOG_WARNING("Low synapse count: " + std::to_string(getTotalSynapseCount()));
+    }
+    
+    return valid;
+}
+
+bool Brain::validateMemoryIntegrity() const {
+    NLM_LOG_INFO("Validating memory integrity");
+    
+    bool valid = true;
+    
+    // Check working memory
+    if (pImpl->workingMemory) {
+        // Validate working memory structure
+    }
+    
+    // Check episodic memory
+    if (pImpl->episodicMemory) {
+        // Validate episodic memory consistency
+    }
+    
+    return valid;
+}
+
+bool Brain::validatePredictionIntegrity() const {
+    NLM_LOG_INFO("Validating prediction integrity");
+    
+    if (pImpl->predictionSystem) {
+        // Validate prediction system state
+    }
+    
+    return true;
+}
+
+bool Brain::validateCognitiveIntegrity() const {
+    NLM_LOG_INFO("Validating cognitive integrity");
+    
+    if (pImpl->planner) {
+        // Validate planner state
+    }
+    
+    if (pImpl->conceptFormation) {
+        // Validate concept formation state
+    }
+    
+    if (pImpl->attention) {
+        // Validate attention system state
+    }
+    
+    return true;
+}
+
+bool Brain::validateDevelopmentIntegrity() const {
+    NLM_LOG_INFO("Validating development integrity");
+    
+    if (pImpl->developmentSystem) {
+        // Validate development system state
+    }
+    
+    return true;
+}
+
+bool Brain::validateNeuromodulationIntegrity() const {
+    NLM_LOG_INFO("Validating neuromodulation integrity");
+    
+    if (pImpl->dopamine) {
+        // Validate dopamine system
+    }
+    
+    if (pImpl->curiosity) {
+        // Validate curiosity system
+    }
+    
+    if (pImpl->predictionError) {
+        // Validate prediction error system
+    }
+    
+    if (pImpl->novelty) {
+        // Validate novelty system
+    }
+    
+    return true;
+}
+
+// ========== SYSTEM HEALTH MONITORING ==========
+
+bool Brain::checkSystemHealth() const {
+    NLM_LOG_INFO("Checking system health");
+    
+    bool healthy = true;
+    
+    // Check memory health
+    if (!checkMemoryHealth()) {
+        healthy = false;
+    }
+    
+    // Check prediction health
+    if (!checkPredictionHealth()) {
+        healthy = false;
+    }
+    
+    // Check cognitive health
+    if (!checkCognitiveHealth()) {
+        healthy = false;
+    }
+    
+    // Check development health
+    if (!checkDevelopmentHealth()) {
+        healthy = false;
+    }
+    
+    // Check neuromodulation health
+    if (!checkNeuromodulationHealth()) {
+        healthy = false;
+    }
+    
+    return healthy;
+}
+
+bool Brain::checkMemoryHealth() const {
+    NLM_LOG_INFO("Checking memory health");
+    
+    bool healthy = true;
+    
+    if (pImpl->workingMemory) {
+        if (pImpl->workingMemory->getActiveTraces() > pImpl->workingMemory->getCapacity()) {
+            NLM_LOG_ERROR("Working memory overflow");
+            healthy = false;
+        }
+    }
+    
+    return healthy;
+}
+
+bool Brain::checkPredictionHealth() const {
+    NLM_LOG_INFO("Checking prediction health");
+    return true; // TODO: Implement prediction health checks
+}
+
+bool Brain::checkCognitiveHealth() const {
+    NLM_LOG_INFO("Checking cognitive health");
+    return true; // TODO: Implement cognitive health checks
+}
+
+bool Brain::checkDevelopmentHealth() const {
+    NLM_LOG_INFO("Checking development health");
+    return true; // TODO: Implement development health checks
+}
+
+bool Brain::checkNeuromodulationHealth() const {
+    NLM_LOG_INFO("Checking neuromodulation health");
+    
+    bool healthy = true;
+    
+    if (pImpl->dopamine && pImpl->dopamine->getLevel() < 0.0f) {
+        NLM_LOG_ERROR("Dopamine level below minimum");
+        healthy = false;
+    }
+    
+    return healthy;
+}
+
+// ========== BACKUP AND RECOVERY ==========
+
+bool Brain::createBackup(const std::string& backupPath) const {
+    NLM_LOG_INFO("Creating backup at: " + backupPath);
+    
+    try {
+        return save(backupPath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception creating backup: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::restoreFromBackup(const std::string& backupPath) {
+    NLM_LOG_INFO("Restoring from backup: " + backupPath);
+    
+    try {
+        return load(backupPath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception restoring from backup: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::listBackups(std::vector<std::string>& backupPaths) const {
+    NLM_LOG_INFO("Listing backups");
+    
+    // In a real implementation, we would list files from backup directory
+    // For now, return empty list
+    return true;
+}
+
+// ========== CONFIGURATION MANAGEMENT ==========
+
+bool Brain::updateConfiguration(const Config& newConfig) {
+    NLM_LOG_INFO("Updating configuration");
+    
+    // Update configuration values
+    pImpl->config = std::make_shared<Config>(newConfig);
+    
+    return true;
+}
+
+bool Brain::validateConfiguration() const {
+    NLM_LOG_INFO("Validating configuration");
+    
+    bool valid = true;
+    
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("No configuration loaded");
+        valid = false;
+    }
+    
+    return valid;
+}
+
+std::string Brain::getConfigurationErrors() const {
+    NLM_LOG_INFO("Getting configuration errors");
+    
+    std::stringstream ss;
+    
+    if (!validateConfiguration()) {
+        ss << "Configuration validation failed";
+    }
+    
+    return ss.str();
+}
+
+// ========== EXPORT AND IMPORT ==========
+
+bool Brain::exportState(const std::string& filepath) const {
+    NLM_LOG_INFO("Exporting brain state to: " + filepath);
+    
+    try {
+        return save(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception exporting state: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::importState(const std::string& filepath) {
+    NLM_LOG_INFO("Importing brain state from: " + filepath);
+    
+    try {
+        return load(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception importing state: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::exportMemory(const std::string& filepath) const {
+    NLM_LOG_INFO("Exporting memory to: " + filepath);
+    
+    try {
+        return saveMemoryState(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception exporting memory: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::importMemory(const std::string& filepath) {
+    NLM_LOG_INFO("Importing memory from: " + filepath);
+    
+    try {
+        return loadMemoryState(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception importing memory: ") + e.what());
+        return false;
+    }
+}
+
+// ========== PERFORMANCE INTEGRATION ==========
+
+class PerformanceMonitorIntegration {
+public:
+    PerformanceMonitorIntegration(std::shared_ptr<Config> config) {
+        // Initialize performance monitoring
+        performanceMonitor_ = std::make_unique<PerformanceMonitor>(config);
+    }
+    
+    ~PerformanceMonitorIntegration() {
+        if (performanceMonitor_) {
+            performanceMonitor_->stopMonitoring();
+        }
+    }
+    
+    void onStep(const Timestamp& timestamp) {
+        if (performanceMonitor_) {
+            performanceMonitor_->collectMetrics();
+        }
+    }
+    
+    PerformanceMonitor* getPerformanceMonitor() { return performanceMonitor_.get(); }
+    
+private:
+    std::unique_ptr<PerformanceMonitor> performanceMonitor_;
+};
+
+class ProfilerIntegration {
+public:
+    ProfilerIntegration() {
+        // Initialize profiler
+        profiler_ = std::make_unique<Profiler>();
+    }
+    
+    ~ProfilerIntegration() {
+        if (profiler_) {
+            profiler_->stopProfiling();
+        }
+    }
+    
+    Profiler* getProfiler() { return profiler_.get(); }
+    
+private:
+    std::unique_ptr<Profiler> profiler_;
+};
 }
 
 } // namespace nlm

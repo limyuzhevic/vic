@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -29,6 +29,11 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Configuration Management
+    config/ConfigValidator.cpp
+    config/ConfigManager.cpp
+    config/ConfigTemplate.cpp
+    config/ConfigHistory.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -42,6 +47,8 @@ add_library(nlm_core STATIC
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/TripletSTDP.cpp
     src/plasticity/StructuralPlasticity.cpp
     # Development
     src/development/DevelopmentSystem.cpp
@@ -89,6 +96,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/config>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -142,10 +150,3 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)

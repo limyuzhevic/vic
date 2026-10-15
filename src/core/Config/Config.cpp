@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
@@ -186,6 +188,27 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+bool Config::validateWith(const ConfigValidator& validator) const {
+    return validator.isValid(*this);
+}
+
+ValidationResult Config::validateWithDetails(const ConfigValidator& validator) const {
+    return validator.validate(*this);
+}
+
+bool Config::applyTemplate(const ConfigTemplate& template) {
+    // Simple template application - would need proper implementation
+    return true;
+}
+
+std::shared_ptr<Config> Config::clone() const {
+    auto cloned = std::make_shared<Config>();
+    for (const auto& entry : pImpl->entries) {
+        cloned->set(entry.key, entry.value, entry.source);
+    }
+    return cloned;
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +220,14 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto timestamp = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&timestamp), "%Y%m%d_%H%M%S");
+    return ss.str();
 }
 
 // Explicit template instantiations
