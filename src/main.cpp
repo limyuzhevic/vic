@@ -7,17 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "core/Config/Validator.hpp"
 
 #include <iostream>
 #include <memory>
@@ -390,6 +380,21 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Validate configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Validating configuration...");
+    if (config->validate()) {
+        NLM_LOG_INFO("✓ Configuration validation passed.");
+    } else {
+        NLM_LOG_ERROR("✗ Configuration validation failed: " + config->getValidationErrors());
+        NLM_LOG_INFO("Continuing with default configuration due to validation errors...");
+    }
+    
+    // Check for configuration errors
+    if (config->hasErrors()) {
+        NLM_LOG_WARNING("Configuration contains errors. Some functionality may be affected.");
+    }
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

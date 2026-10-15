@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "Validator.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -10,7 +12,7 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()), validator_(ConfigValidator::getDefaultValidator()) {}
 
 Config::~Config() = default;
 
@@ -86,7 +88,19 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else {
+                file << value;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -210,6 +224,34 @@ template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Validator access for external registration
+std::shared_ptr<ConfigValidator> Config::getDefaultValidator() {
+    static std::shared_ptr<ConfigValidator> validator = std::make_shared<ConfigValidator>();
+    return validator;
+}
+
+bool Config::validate() const {
+    if (!validator_) return true;
+    
+    auto result = validator_->validate(*this);
+    if (!result.valid) {
+        std::cerr << "Configuration validation failed: " << result.errorMessage << std::endl;
+    }
+    return result.valid;
+}
+
+std::string Config::getValidationErrors() const {
+    if (!validator_) return "";
+    
+    auto result = validator_->validate(*this);
+    if (result.valid) return "";
+    return result.errorMessage;
+}
+
+bool Config::hasErrors() const {
+    return !validate();
+}
+
+// Explicit template instantiations
 
 } // namespace nlm
