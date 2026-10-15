@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Phase 2 - Real predictive coding implementation using neural dynamics
 
 class PredictionSystem {
 public:

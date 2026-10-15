@@ -279,7 +279,12 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;
     if (query.size() != episode.sensoryState.size()) return 0.0f;
     
-    // Cosine similarity
+    // Enhanced similarity calculation using multiple components
+    float sensorySimilarity = 0.0f;
+    float temporalSimilarity = 0.0f;
+    float neuralSimilarity = 0.0f;
+    
+    // Cosine similarity for sensory patterns
     float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
     for (size_t i = 0; i < query.size(); ++i) {
         dot += query[i] * episode.sensoryState[i];
@@ -287,9 +292,31 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
         normE += episode.sensoryState[i] * episode.sensoryState[i];
     }
     
-    if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
+    if (normQ > 0.0001f && normE > 0.0001f) {
+        sensorySimilarity = dot / (std::sqrt(normQ) * std::sqrt(normE));
+    }
     
-    return dot / (std::sqrt(normQ) * std::sqrt(normE));
+    // Temporal similarity based on age
+    float ageNorm = std::min(episode.age / 100.0f, 1.0f);
+    temporalSimilarity = 1.0f - ageNorm;  // More recent = more similar
+    
+    // Neural similarity based on active neuron patterns
+    if (!episode.activeNeurons.empty() && !episode.neuronActivations.empty()) {
+        // Simple overlap check on neural activation patterns
+        for (size_t i = 0; i < episode.activeNeurons.size() && i < episode.neuronActivations.size(); ++i) {
+            // Check if similar neuron IDs or overlapping activation patterns
+            // For now, just use average activation as similarity
+            neuralSimilarity += episode.neuronActivations[i];
+        }
+        neuralSimilarity /= episode.activeNeurons.size();
+    }
+    
+    // Combined similarity with weights
+    float combinedSimilarity = sensorySimilarity * 0.6f + 
+                               temporalSimilarity * 0.2f + 
+                               neuralSimilarity * 0.2f;
+    
+    return combinedSimilarity;
 }
 
 bool NeuralEpisodicMemory::matchesCriteria(

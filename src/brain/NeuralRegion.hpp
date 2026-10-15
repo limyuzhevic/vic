@@ -1,11 +1,13 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <string>
 
 namespace nlm {
 
@@ -70,7 +72,7 @@ public:
     void reset();
     
     // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
+    void initializeRandomConnectivity(RandomGenerator& rng, 
                                       float connectionProbability,
                                       float meanWeight,
                                       float weightVariance);

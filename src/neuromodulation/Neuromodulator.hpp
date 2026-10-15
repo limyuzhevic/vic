@@ -48,6 +48,12 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced dopamine effects
+    void enhanceMemoryConsolidation();
+    void enhanceAttention();
+    void enhanceWorkingMemoryRetrieval();
+    void enhanceEpisodicMemoryStorage();
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -62,6 +68,15 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhanced acetylcholine effects
+    void enhanceSelectiveAttention();
+    void enhanceMemoryEncoding();
+    void enhanceWorkingMemoryIntegration();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +88,16 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhanced norepinephrine effects
+    void enhanceArousal();
+    void enhanceLearningRate();
+    void enhanceSignalDetection();
+    void enhanceWorkingMemory();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +109,16 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhanced serotonin effects
+    void enhanceMood();
+    void enhanceBehavioralFlexibility();
+    void enhanceExploration();
+    void enhanceDevelopment();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

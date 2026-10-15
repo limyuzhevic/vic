@@ -28,6 +28,13 @@ struct SynapseId {
     constexpr SynapseId() : value(0) {}
     explicit constexpr SynapseId(uint64_t v) : value(v) {}
     
+    // Postfix increment for generating unique synapse IDs
+    SynapseId operator++(int) {
+        SynapseId result(value);
+        value++;
+        return result;
+    }
+    
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }

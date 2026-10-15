@@ -190,6 +190,9 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get current simulation step
+    SimulationStep getCurrentStep() const;
+    
     // Logging
     void logStatus() const;
     
