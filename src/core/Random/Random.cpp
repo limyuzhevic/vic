@@ -10,21 +10,17 @@ struct RandomGenerator::Impl {
     Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
 };
 
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
+RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(std::make_unique<Impl>(seed)) {}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator() : pImpl(std::make_unique<Impl>(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -40,9 +36,11 @@ uint64_t RandomGenerator::getSeed() const {
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
+        NLM_LOG_ERROR("Invalid argument: min (" + std::to_string(min) + ") > max (" + std::to_string(max) + ")");
         throw std::invalid_argument("min must be <= max");
     }
     if (min == max) {
+        NLM_LOG_DEBUG("Uniform int returning constant value: " + std::to_string(min));
         return min;
     }
     std::uniform_int_distribution<uint32_t> dist(min, max);
@@ -51,9 +49,11 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
+        NLM_LOG_ERROR("Invalid argument: min (" + std::to_string(min) + ") > max (" + std::to_string(max) + ")");
         throw std::invalid_argument("min must be <= max");
     }
     if (min == max) {
+        NLM_LOG_DEBUG("Uniform int returning constant value: " + std::to_string(min));
         return min;
     }
     std::uniform_int_distribution<uint64_t> dist(min, max);
@@ -62,7 +62,12 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
+        NLM_LOG_ERROR("Invalid argument: min (" + std::to_string(min) + ") >= max (" + std::to_string(max) + ")");
         throw std::invalid_argument("min must be < max");
+    }
+    if (min == max) {
+        NLM_LOG_DEBUG("Uniform real returning constant value: " + std::to_string(min));
+        return min;
     }
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
@@ -70,7 +75,12 @@ double RandomGenerator::uniformReal(double min, double max) {
 
 float RandomGenerator::uniformReal(float min, float max) {
     if (min >= max) {
+        NLM_LOG_ERROR("Invalid argument: min (" + std::to_string(min) + ") >= max (" + std::to_string(max) + ")");
         throw std::invalid_argument("min must be < max");
+    }
+    if (min == max) {
+        NLM_LOG_DEBUG("Uniform real returning constant value: " + std::to_string(min));
+        return min;
     }
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
@@ -92,11 +102,19 @@ bool RandomGenerator::bernoulli(double p) {
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    if (lambda < 0.0) {
+        NLM_LOG_ERROR("Invalid argument for Poisson distribution: lambda (" + std::to_string(lambda) + ") must be >= 0");
+        throw std::invalid_argument("lambda must be >= 0");
+    }
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    if (lambda <= 0.0) {
+        NLM_LOG_ERROR("Invalid argument for exponential distribution: lambda (" + std::to_string(lambda) + ") must be > 0");
+        throw std::invalid_argument("lambda must be > 0");
+    }
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }
@@ -111,12 +129,17 @@ uint32_t RandomGenerator::randomBit() {
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
+        NLM_LOG_ERROR("Cannot pick from zero items");
         throw std::invalid_argument("Cannot pick from zero items");
     }
     return uniformInt(0, n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
+    if (data == nullptr) {
+        NLM_LOG_ERROR("Cannot fill null pointer with random bytes");
+        return;
+    }
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
         bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));

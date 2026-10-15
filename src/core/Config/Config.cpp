@@ -24,10 +24,12 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    bool loadedSomething = false;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -41,6 +43,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Skipping config entry with empty key: " + line);
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,13 +57,28 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            loadedSomething = true;
+        } else {
+            NLM_LOG_WARNING("Skipping malformed config line (no '='): " + line);
         }
     }
     
+    if (!loadedSomething) {
+        NLM_LOG_WARNING("No valid configuration entries loaded from file: " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + 
+                 " configuration entries from file: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 0 || argv == nullptr) {
+        return false;
+    }
+    
+    int argsProcessed = 0;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,30 +88,113 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Skipping command line argument with empty key: " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                argsProcessed++;
+            } else {
+                NLM_LOG_WARNING("Skipping malformed command line argument (no '='): " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Skipping command line argument with empty key: -" + value);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            argsProcessed++;
+        }
+        else {
+            NLM_LOG_WARNING("Skipping unrecognized command line argument: " + arg);
         }
     }
-    return true;
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(argsProcessed) + 
+                 " configuration entries from command line arguments");
+    return !argsProcessed; // Return true if any args were processed, false otherwise
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Sort entries by source (Priority: CommandLine > File > Runtime > Default)
+    std::vector<ConfigEntry> sortedEntries = pImpl->entries;
+    std::sort(sortedEntries.begin(), sortedEntries.end(),
+              [](const ConfigEntry& a, const ConfigEntry& b) {
+                  // Higher source priority first
+                  int priorityA = static_cast<int>(a.source);
+                  int priorityB = static_cast<int>(b.source);
+                  if (priorityA != priorityB) {
+                      return priorityA > priorityB;
+                  }
+                  // Same priority, compare by key
+                  return a.key < b.key;
+              });
+    
+    for (const auto& entry : sortedEntries) {
+        file << "# " << entry.description << " (source: " << static_cast<int>(entry.source) << ")\n";
+        file << entry.key << " = ";
+        
+        // Convert value to string based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Default case for int, int64_t, double
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    file.flush();
+    if (file.bad()) {
+        NLM_LOG_ERROR("Failed to write config to file: " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Saved " + std::to_string(sortedEntries.size()) + 
+                 " configuration entries to file: " + filepath);
     return true;
 }
 
@@ -115,14 +221,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        NLM_LOG_WARNING("Attempted to set configuration with empty key");
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_DEBUG("Updated configuration key: " + key + " (source: " + std::to_string(static_cast<int>(source)) + ")");
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_DEBUG("Added new configuration key: " + key + " (source: " + std::to_string(static_cast<int>(source)) + ")");
     }
 }
 
@@ -172,16 +286,40 @@ std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        oss << "  " << entry.key << " = ";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
+                // Default case for int, int64_t, double
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << " (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }

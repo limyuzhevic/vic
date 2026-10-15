@@ -32,9 +32,16 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with error handling
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_time;
+    std::tm* local_time = std::localtime(&time);
+    if (local_time) {
+        oss << std::put_time(local_time, "%Y-%m-%d %H:%M:%S");
+    } else {
+        oss << "[invalid-time]";
+        NLM_LOG_WARNING("Failed to get local time for log entry");
+    }
     
     oss << " " << entry.message;
     
@@ -50,7 +57,9 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        if (!pImpl->fileOut.flush()) {
+            NLM_LOG_ERROR("Failed to flush log to file");
+        }
     }
 }
 
@@ -71,12 +80,23 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot set output file with empty path");
+        return;
+    }
+    
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        NLM_LOG_ERROR("Could not open log file for writing: " + filepath);
+    } else {
+        NLM_LOG_INFO("Set log file output: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        NLM_LOG_INFO("Closed log file output");
     }
 }
 
@@ -182,8 +202,13 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    if (!logger) {
+        NLM_LOG_ERROR("Cannot set global logger to null pointer");
+        return;
+    }
+    // Store the global logger for advanced management
+    // For now, we just validate that it can be set
+    NLM_LOG_DEBUG("Global logger set (pointer: " + std::to_string(reinterpret_cast<uintptr_t>(logger.get())) + ")");
 }
 
 // LogStream implementation
@@ -191,7 +216,14 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    std::string message = oss_.str();
+    if (!message.empty()) {
+        Logger::getGlobal().log(level_, message, file_, line_, function_);
+    } else {
+        NLM_LOG_WARNING("LogStream destructor called with empty message (level: " + 
+                       std::to_string(static_cast<int>(level_)) + ", file: " + 
+                       file_ + ", line: " + std::to_string(line_) + ")");
+    }
 }
 
 } // namespace nlm

@@ -88,23 +88,28 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations
-template<typename Container>
-void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
-}
-
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+    template<typename Container>
+    void RandomGenerator::shuffle(Container& container) {
+        if (container.empty()) {
+            NLM_LOG_WARNING("Attempted to shuffle empty container");
+            return;
+        }
+        std::shuffle(container.begin(), container.end(), engine());
     }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
+    
+    template<typename Container>
+    auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
+        if (container.empty()) {
+            NLM_LOG_ERROR("Cannot pick from empty container");
+            throw std::runtime_error("Cannot pick from empty container");
+        }
+        auto it = container.begin();
+        std::advance(it, pickRandomIndex(container.size()));
+        return *it;
+    }
 
 } // namespace nlm
