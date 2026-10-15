@@ -23,10 +23,16 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
     src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
+    src/core/Config/Config.hpp
+    src/core/CLIParser.cpp
+    src/core/CLIParser.hpp
+    src/core/ConfigValidation.hpp
+    src/core/ConfigManager.hpp
+    src/core/NLMCoreUtilities.hpp
+    src/core/NLMCoreUtilities.cpp
+    src/core/NLMExtensionSystem.hpp
+    src/core/NLMExtensionSystem.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
@@ -90,6 +96,7 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
 
 # Agent system (body, sensory percept, agent-brain interface)

@@ -97,9 +97,23 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+        // Parse JSON content (private helper)
+    bool parseJSON(const std::string& jsonStr, ConfigSource source);
+    
+    // Parse JSON values (private helper)
+    bool parseJSONValue(const std::string& jsonStr, size_t& pos, ConfigValue& value);
+    
+    // Parse numbers from JSON (private helper)
+    bool parseNumber(const std::string& jsonStr, size_t& pos, double& value);
+    
+    // Skip whitespace in JSON (private helper)
+    static void skipWhitespace(const std::string& jsonStr, size_t& pos);
+    
+    // Flatten JSON object keys (private helper)
+    std::vector<std::string> flattenJSON(const std::string& jsonStr, const std::string& prefix);
+    
+    // Escape string for JSON output (private helper)
+    static std::string escapeString(const std::string& str);
 };
 
 } // namespace nlm
