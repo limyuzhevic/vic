@@ -98,13 +98,16 @@ public:
 
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
-
+    
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
-
+    
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
-
+    
+    // Get recent features extracted from episodes (for concept formation)
+    std::vector<float> getRecentFeatures(size_t count) const;
+    
     // Get average reward from episodes
     float getAverageReward() const;
 

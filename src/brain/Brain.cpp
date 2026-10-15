@@ -49,6 +49,7 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +130,7 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -527,9 +529,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->episodicMemory) {
+        // Get current neural activity patterns from working memory
+        std::vector<float> pattern = pImpl->workingMemory->retrieve();
+        
+        // Get episodic memory features (sensory statistics, recent experiences)
+        std::vector<float> features = pImpl->episodicMemory->getRecentFeatures(10);
+        
+        // Get current reward signal from dopamine
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        // Present current experience to concept formation system
+        pImpl->conceptFormation->presentExperience(pattern, features, reward, currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -540,9 +551,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+        
+        // Replay multiple cycles of each episode for consolidation
+        // In biological systems, replay occurs in multiple cycles during rest/sleep
         for (const auto* episode : episodesToReplay) {
+            // During replay, reactivate the neural patterns associated with the episode
+            // This strengthens the memory traces and integrates them with current knowledge
+            
+            // Reactivate episodic memory pattern
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Update concept formation with replayed patterns
+            if (pImpl->conceptFormation) {
+                // Extract pattern from episode for concept formation
+                std::vector<float> pattern = episode->sensoryState;
+                if (!pattern.empty()) {
+                    // Present replayed pattern to concept formation system
+                    // This allows concepts to be refined and integrated with current knowledge
+                    std::vector<float> features = pImpl->episodicMemory->getRecentFeatures(5);
+                    float reward = episode->reward;
+                    pImpl->conceptFormation->presentExperience(pattern, features, reward, currentStep);
+                }
+            }
+            
+            // Update working memory with replayed patterns
+            if (pImpl->workingMemory) {
+                // Working memory can briefly hold replayed patterns for rehearsal
+                // This helps consolidate the memory into long-term storage
+                std::vector<float> pattern = episode->sensoryState;
+                if (!pattern.empty()) {
+                    // Store a portion of the pattern in working memory for rehearsal
+                    size_t storeSize = std::min(pattern.size(), size_t(10));
+                    std::vector<float> rehearsalPattern(pattern.begin(), pattern.begin() + storeSize);
+                    pImpl->workingMemory->store(rehearsalPattern, 0.5f);  // Lower strength for rehearsal
+                }
+            }
+        }
+        
+        // During replay, boost cholinergic signaling for memory consolidation
+        if (pImpl->acetylcholine) {
+            float currentACh = pImpl->acetylcholine->getLevel();
+            if (currentACh < 0.7f) {
+                pImpl->acetylcholine->setLevel(currentACh + 0.3f);  // Boost ACh for consolidation
+            }
+        }
+        
+        // Also boost dopaminergic signaling for reward-based learning during replay
+        if (pImpl->dopamine) {
+            float currentDA = pImpl->dopamine->getLevel();
+            if (currentDA < 0.5f) {
+                pImpl->dopamine->setLevel(currentDA + 0.2f);  // Boost DA for reward learning
+            }
         }
     }
     
@@ -582,10 +642,84 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 15: Sleep/rest cycle with memory consolidation ==========
+    // Determine if brain should rest (every 10000 steps or when energy is low)
+    if (pImpl->stepsSinceLastEpisode >= 10000) {
+        pImpl->isResting = true;
+        NLM_LOG_INFO("Brain entering rest/sleep cycle at step " + std::to_string(currentStep));
+        
+        // During rest, consolidate memories and replay important episodes
+        if (pImpl->episodicMemory) {
+            // Replay important memories for consolidation
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            
+            // Consolidate memories (weaker ones are removed, stronger ones are strengthened)
+            pImpl->episodicMemory->consolidate(0.5f);
+        }
+        
+        // Reduce plasticity during rest to protect memories
+        if (pImpl->stdp) {
+            pImpl->stdp->setLearningRate(0.001f);  // Reduce STDP learning rate
+        }
+        
+        if (pImpl->hebbian) {
+            pImpl->hebbian->setLearningRate(0.001f);  // Reduce Hebbian learning rate
+        }
+        
+        // Boost cholinergic signaling for memory consolidation
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->setLevel(0.8f);  // High ACh during rest
+        }
+        
+        // Reset rest counter
+        pImpl->stepsSinceLastEpisode = 0;
     }
+    
+    // If resting, reduce metabolic activity and stabilize neural states
+    if (pImpl->isResting) {
+        // During rest, neurons stabilize near resting potential
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    auto& state = neuron->getState();
+                    // Gradually return to resting potential
+                    if (state.membranePotential > state.restingPotential + 5.0f) {
+                        state.membranePotential -= 0.1f;
+                    } else if (state.membranePotential < state.restingPotential - 5.0f) {
+                        state.membranePotential += 0.1f;
+                    }
+                }
+            }
+        }
+        
+        // Gradually reduce high ACh levels during rest
+        if (pImpl->acetylcholine) {
+            float currentACh = pImpl->acetylcholine->getLevel();
+            if (currentACh > 0.1f) {
+                pImpl->acetylcholine->setLevel(currentACh * 0.95f);
+            }
+        }
+        
+        // Gradually restore normal plasticity rates
+        if (pImpl->stdp) {
+            float currentRate = pImpl->stdp->getLearningRate();
+            if (currentRate < 0.01f) {
+                pImpl->stdp->setLearningRate(currentRate * 1.05f);
+            }
+        }
+        
+        // Check if rest should end (after 500 steps or if memory consolidation is sufficient)
+        if (currentStep - pImpl->replayInterval >= 500) {
+            pImpl->isResting = false;
+            NLM_LOG_INFO("Brain rest cycle completed at step " + std::to_string(currentStep));
+        }
+    }
+    
+    // Update rest counter
+    pImpl->stepsSinceLastEpisode++;
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1063,6 +1197,10 @@ Curiosity* Brain::getCuriosity() {
 
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {

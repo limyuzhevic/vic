@@ -20,6 +20,13 @@ std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryIn
     return currentState.clone();
 }
 
+void PredictionSystem::train(const SensoryInput& observation) {
+    // TODO PHASE 2: Train prediction model
+    // For now, store the observation for training
+    // This would be implemented in Phase 2 with real neural learning
+    (void)observation; // Avoid unused parameter warning
+}
+
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
     // TODO PHASE 2: Implement real prediction error computation
     // PLACEHOLDER: Calculate simple error

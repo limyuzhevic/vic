@@ -60,6 +60,13 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
         ep.age++;
     }
 }
+    }
+    
+    // Age all episodes
+    for (auto& ep : episodes_) {
+        ep.age++;
+    }
+}
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     const std::vector<float>& sensoryPattern,
@@ -206,6 +213,53 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(s
     }
     
     return results;
+}
+
+// Get recent features extracted from episodes (for concept formation)
+std::vector<float> NeuralEpisodicMemory::getRecentFeatures(size_t count) const {
+    std::vector<float> features;
+    features.reserve(100);  // Reserve reasonable size
+    
+    // Get most recent episodes
+    auto recentEpisodes = getRecentEpisodes(count);
+    
+    if (recentEpisodes.empty()) {
+        return features;
+    }
+    
+    // Compute average features from recent episodes
+    // This provides a summary of recent sensory statistics for concept formation
+    float totalX = 0.0f, totalY = 0.0f, totalOrientation = 0.0f;
+    float totalReward = 0.0f;
+    
+    for (const auto* ep : recentEpisodes) {
+        totalX += ep->positionX;
+        totalY += ep->positionY;
+        totalOrientation += ep->orientation;
+        totalReward += ep->reward;
+    }
+    
+    size_t numEpisodes = recentEpisodes.size();
+    
+    features.push_back(totalX / numEpisodes);     // Average X position
+    features.push_back(totalY / numEpisodes);     // Average Y position
+    features.push_back(totalOrientation / numEpisodes); // Average orientation
+    features.push_back(totalReward / numEpisodes);      // Average reward
+    
+    // Add recent reward variance if we have enough episodes
+    if (numEpisodes >= 3) {
+        float variance = 0.0f;
+        float meanReward = totalReward / numEpisodes;
+        for (const auto* ep : recentEpisodes) {
+            variance += (ep->reward - meanReward) * (ep->reward - meanReward);
+        }
+        variance /= numEpisodes;
+        features.push_back(std::sqrt(variance)); // Reward volatility
+    } else {
+        features.push_back(0.0f); // No variance if insufficient data
+    }
+    
+    return features;
 }
 
 float NeuralEpisodicMemory::getAverageReward() const {

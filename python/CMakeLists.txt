@@ -36,6 +36,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/development/Pruning.cpp
     ${NLM_SOURCE_DIR}/development/Maturation.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Acetylcholine.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp

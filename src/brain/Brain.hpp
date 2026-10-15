@@ -25,6 +25,7 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -170,15 +171,18 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+// ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Dopamine: Reward and reinforcement learning
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
+    // Acetylcholine: Attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Curiosity: Exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
+    // Novelty: Novelty detection
     Novelty* getNovelty();
     
     // Prediction error signal
