@@ -95,6 +95,16 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Test target for Python bindings
+test(BUILD_TESTING)
+add_custom_target(pynlm_test ALL
+    COMMAND ${Python_EXECUTABLE} -m pip install -e .
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_enhanced_bindings.py
+    DEPENDS pynlm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Running enhanced Python bindings tests"
+)
+
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
