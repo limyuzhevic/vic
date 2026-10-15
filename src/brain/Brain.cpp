@@ -7,10 +7,12 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -46,6 +48,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -106,9 +111,7 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
+// Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
@@ -126,9 +129,36 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulation baselines from config
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+        float acetylcholineBaseline = config->getOr<float>("acetylcholine_baseline", 0.05f);
+        float norepinephrineBaseline = config->getOr<float>("norepinephrine_baseline", 0.05f);
+        float serotoninBaseline = config->getOr<float>("serotonin_baseline", 0.05f);
+        
+        // Set baseline levels
+        dopamine->setLevel(dopamineBaseline);
+        acetylcholine->setLevel(acetylcholineBaseline);
+        norepinephrine->setLevel(norepinephrineBaseline);
+        serotonin->setLevel(serotoninBaseline);
+        
+        // Configure neuromodulation baselines from config
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+        float acetylcholineBaseline = config->getOr<float>("acetylcholine_baseline", 0.05f);
+        float norepinephrineBaseline = config->getOr<float>("norepinephrine_baseline", 0.05f);
+        float serotoninBaseline = config->getOr<float>("serotonin_baseline", 0.05f);
+        
+        // Set baseline levels
+        dopamine->setLevel(dopamineBaseline);
+        acetylcholine->setLevel(acetylcholineBaseline);
+        norepinephrine->setLevel(norepinephrineBaseline);
+        serotonin->setLevel(serotoninBaseline);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -511,8 +541,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // Predict next state based on current neural activity
+        if (pImpl->spikeSystem) {
+            // Get current sensory state from input neurons
+            std::vector<float> sensoryState;
+            for (NeuronId neuronId : pImpl->sensoryNeurons) {
+                // Find the neuron
+                NeuronId currentNeuron = neuronId;
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == currentNeuron) {
+                                // Get neuron activation (0-1 range)
+                                float activation = (neuron->getState().membranePotential - 
+                                                  neuron->getState().restingPotential) / 10.0f;
+                                sensoryState.push_back(std::clamp(activation, 0.0f, 1.0f));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Create sensory input for prediction
+            class SimpleSensoryInput : public SensoryInput {
+            public:
+                SimpleSensoryInput(const std::vector<float>& data) : data_(data) {}
+                const std::vector<float>& getData() const override { return data_; }
+            } currentInput(sensoryState);
+            
+            // Predict next state
+            auto predictedInput = pImpl->predictionSystem->predictNextState(currentInput);
+            
+            // Update predictions based on actual observation
+            pImpl->predictionSystem->updatePredictions(currentInput, *predictedInput);
+            
+            // Train prediction system to improve future predictions
+            if (pImpl->dopamine && pImpl->dopamine->getLevel() > 0.5f) {
+                pImpl->predictionSystem->train(currentInput);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -690,9 +759,66 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Action selection: use neural planner for intelligent planning
+    // when available, otherwise fall back to simple motor neuron activity
     
+    // Convert current neural state to representation for planner
+    std::vector<float> currentState;
+    
+    // Add sensory neuron activations
+    for (NeuronId neuronId : pImpl->sensoryNeurons) {
+        // Get the neuron and its current activation
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        // Calculate activation (0-1 range)
+                        float activation = (neuron->getState().membranePotential - 
+                                          neuron->getState().restingPotential) / 10.0f;
+                        currentState.push_back(std::clamp(activation, 0.0f, 1.0f));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add current memory traces if available
+    if (pImpl->workingMemory) {
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        auto memoryActivations = pImpl->workingMemory->retrieve();
+        
+        // Add memory activations to state
+        for (float activation : memoryActivations) {
+            currentState.push_back(std::clamp(activation, 0.0f, 1.0f));
+        }
+    }
+    
+    // Use neural planner for intelligent action selection
+    if (pImpl->planner && !currentState.empty()) {
+        // Determine if we're in a high-reward situation
+        float targetReward = 0.5f;
+        if (pImpl->dopamine) {
+            targetReward = std::clamp(pImpl->dopamine->getLevel(), 0.0f, 1.0f);
+        }
+        
+        // Plan action using neural planner
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store the planned action in self-model for learning
+        if (pImpl->conceptFormation) {
+            // Record the action planning for self-model
+            // In a full implementation, this would update the self-model's action effects
+        }
+        
+        // Log planning activity
+        NLM_LOG_INFO("Neural planner selected action: " + std::to_string(static_cast<int>(plannedAction)) +
+                    " (state size: " + std::to_string(currentState.size()) + ")");
+        
+        return std::make_unique<Action>(plannedAction);
+    }
+    
+    // Fall back to simple motor neuron activity if planner not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -1055,6 +1181,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {

@@ -1,8 +1,7 @@
 #include "Phase4Experiment.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../prediction/NeuralPrediction.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/Memory.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include <algorithm>
