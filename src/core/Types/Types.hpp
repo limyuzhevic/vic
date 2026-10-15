@@ -11,11 +11,13 @@ namespace nlm {
 struct NeuronId {
     uint64_t value;
     
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
+    // Replace the constexpr operator== and operator!= with explicit implementations
+    constexpr bool operator==(const NeuronId& other) const {
+        return value == other.value;
+    }
+    constexpr bool operator!=(const NeuronId& other) const {
+        return value != other.value;
+    }
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
@@ -28,8 +30,12 @@ struct SynapseId {
     constexpr SynapseId() : value(0) {}
     explicit constexpr SynapseId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
+    constexpr bool operator==(const SynapseId& other) const {
+        return value == other.value;
+    }
+    constexpr bool operator!=(const SynapseId& other) const {
+        return value != other.value;
+    }
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
@@ -42,8 +48,12 @@ struct RegionId {
     constexpr RegionId() : value(0) {}
     explicit constexpr RegionId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
+    constexpr bool operator==(const RegionId& other) const {
+        return value == other.value;
+    }
+    constexpr bool operator!=(const RegionId& other) const {
+        return value != other.value;
+    }
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
@@ -56,8 +66,12 @@ struct PopulationId {
     constexpr PopulationId() : value(0) {}
     explicit constexpr PopulationId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
+    constexpr bool operator==(const PopulationId& other) const {
+        return value == other.value;
+    }
+    constexpr bool operator!=(const PopulationId& other) const {
+        return value != other.value;
+    }
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }

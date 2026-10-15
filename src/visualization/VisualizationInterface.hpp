@@ -3,50 +3,68 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
+#include <mutex>
+#include <atomic>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Visualization formats
+enum class VisualizationFormat {
+    TEXT,
+    ASCII,
+    JSON,
+    CSV,
+    HTML,
+    SVG
+};
+
+// Visualization export options
+struct ExportOptions {
+    VisualizationFormat format = VisualizationFormat::TEXT;
+    std::string filename;
+    bool includeMetadata = true;
+    std::string customTemplate;
+};
+
+// Base visualization interface
 class VisualizationInterface {
 public:
-    VisualizationInterface();
-    ~VisualizationInterface();
+    virtual ~VisualizationInterface() = default;
     
     // Initialize visualization
-    bool initialize();
+    virtual bool initialize() = 0;
     
     // Update visualization data
-    void update();
+    virtual void update(double deltaTime) = 0;
     
     // Render current state
-    void render();
+    virtual void render() = 0;
     
     // Close visualization
-    void close();
+    virtual void close() = 0;
     
     // Check if visualization is active
-    bool isActive() const;
+    virtual bool isActive() const = 0;
     
     // Set update rate
-    void setUpdateRate(double hz);
-    double getUpdateRate() const;
+    virtual void setUpdateRate(double hz) = 0;
+    virtual double getUpdateRate() const = 0;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Export visualization data
+    virtual bool exportData(const ExportOptions& options) = 0;
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    // Import visualization data
+    virtual bool importData(const std::string& filepath) = 0;
     
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    // Get current frame as string (for text-based formats)
+    virtual std::string getCurrentFrame() const = 0;
     
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get performance statistics
+    virtual std::string getPerformanceStats() const = 0;
 };
 
 } // namespace nlm

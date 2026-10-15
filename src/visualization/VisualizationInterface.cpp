@@ -1,12 +1,24 @@
 #include "VisualizationInterface.hpp"
+#include <iostream>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 
 namespace nlm {
 
 struct VisualizationInterface::Impl {
-    bool active;
-    double updateRate;
+    bool active = false;
+    double updateRate = 30.0;
+    std::chrono::steady_clock::time_point lastUpdate;
+    double accumulatedTime = 0.0;
     
-    Impl() : active(false), updateRate(30.0) {}
+    // Performance tracking
+    double totalUpdateTime = 0.0;
+    int updateCount = 0;
+    
+    Impl() {
+        lastUpdate = std::chrono::steady_clock::now();
+    }
 };
 
 VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
@@ -14,18 +26,24 @@ VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
-    pImpl->active = false;
+    pImpl->active = true;
+    pImpl->lastUpdate = std::chrono::steady_clock::now();
     return true;
 }
 
-void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+void VisualizationInterface::update(double deltaTime) {
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - pImpl->lastUpdate;
+    pImpl->lastUpdate = now;
+    
+    // Track performance
+    pImpl->accumulatedTime += elapsed.count();
+    pImpl->totalUpdateTime += deltaTime;
+    pImpl->updateCount++;
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Default implementation - nothing to render
 }
 
 void VisualizationInterface::close() {
@@ -44,20 +62,46 @@ double VisualizationInterface::getUpdateRate() const {
     return pImpl->updateRate;
 }
 
-void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+bool VisualizationInterface::exportData(const ExportOptions& options) {
+    std::ofstream file(options.filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << getCurrentFrame();
+    file.close();
+    return true;
 }
 
-void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+bool VisualizationInterface::importData(const std::string& filepath) {
+    // Default implementation - nothing to import
+    return false;
 }
 
-void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+std::string VisualizationInterface::getCurrentFrame() const {
+    std::stringstream ss;
+    ss << "=== Visualization Frame ===" << std::endl;
+    ss << "Active: " << (isActive() ? "true" : "false") << std::endl;
+    ss << "Update Rate: " << std::fixed << std::setprecision(2) << getUpdateRate() << " Hz" << std::endl;
+    
+    if (pImpl->updateCount > 0) {
+        double avgDeltaTime = pImpl->totalUpdateTime / pImpl->updateCount;
+        ss << "Average update time: " << std::scientific << avgDeltaTime << "s" << std::endl;
+        ss << "Actual update rate: " << std::fixed << (1.0 / avgDeltaTime) << " Hz" << std::endl;
+    }
+    
+    ss << getPerformanceStats() << std::endl;
+    return ss.str();
 }
 
-void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+std::string VisualizationInterface::getPerformanceStats() const {
+    std::stringstream ss;
+    ss << "Performance Statistics:" << std::endl;
+    ss << "  Updates processed: " << pImpl->updateCount << std::endl;
+    if (pImpl->updateCount > 0) {
+        ss << "  Average delta time: " << (pImpl->totalUpdateTime / pImpl->updateCount) << "s" << std::endl;
+    }
+    return ss.str();
 }
 
 } // namespace nlm

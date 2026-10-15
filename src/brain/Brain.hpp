@@ -187,11 +187,26 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Helper method to validate essential configuration
+    void validateEssentialConfig(std::shared_ptr<Config> config);
     
-    // Logging
-    void logStatus() const;
+    // Helper method to initialize all components
+    void initializeComponents(size_t neuronCount, size_t regionCount, float connectionProbability);
+    
+    // Helper method to validate sensory input
+    ValidationResult validateSensoryInput(const class SensoryInput& input) const;
+    
+    // Helper method to validate neuromodulator signal
+    ValidationResult validateNeuromodulatorSignal(const class Neuromodulator& signal) const;
+    
+    // Helper method to validate region parameters
+    ValidationResult validateRegionParameters(const std::string& name) const;
+    
+    // Helper method to handle error recovery
+    bool attemptRecovery(const std::string& operation, const std::string& error);
+    
+    // Helper method to log operation with error context
+    void logOperation(const std::string& operation, const std::string& details = "") const;
     
 private:
     struct Impl;

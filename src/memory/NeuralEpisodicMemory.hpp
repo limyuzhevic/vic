@@ -1,7 +1,6 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <memory>
 #include <deque>

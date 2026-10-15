@@ -3,16 +3,66 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
 struct NeuralEpisodicMemory::Impl {
     Brain* brain;
     
-    // Pattern neurons for episodic recall
-    std::vector<NeuronId> episodeNeurons;
+    // Enhanced episode storage with neural representations
+    std::deque<EpisodicMemoryItem> episodes_;
     
-    Impl() : brain(nullptr) {}
+    // Hippocampal pattern storage (CA3)
+    std::vector<NeuronId> hippocampalPatternNeurons_;
+    
+    // Neocortical trace storage
+    std::vector<NeuronId> neocorticalPatternNeurons_;
+    
+    // Synaptic tagging system for consolidation
+    std::vector<std::pair<NeuronId, SimulationStep>> taggedSynapses_;
+    std::unordered_map<uint64_t, float> synapticTags_;
+    
+    // Replay queue for consolidation
+    std::priority_queue<size_t> replayQueue_;
+    SimulationStep nextReplayStep_;
+    
+    // Neuromodulation integration
+    class Dopamine;
+    Dopamine* dopamine_;
+    
+    // Working memory integration
+    class NeuralWorkingMemory;
+    NeuralWorkingMemory* workingMemory_;
+    
+    // Consolidation tracking
+    std::vector<float> episodeRelevance_;
+    std::vector<size_t> episodeReplayCount_;
+    
+    // Stats
+    size_t totalEpisodesEncoded_;
+    size_t totalReplaysPerformed_;
+    float averageRelevanceScore_;
+    
+    Impl() 
+        : brain(nullptr)
+        , dopamine_(nullptr)
+        , workingMemory_(nullptr)
+        , totalEpisodesEncoded_(0)
+        , totalReplaysPerformed_(0)
+        , averageRelevanceScore_(0.0f)
+        , nextReplayStep_(0) {
+        
+        // Initialize containers
+        episodes_.reserve(5000);
+        hippocampalPatternNeurons_.reserve(5000);
+        neocorticalPatternNeurons_.reserve(20000);
+        taggedSynapses_.reserve(1000);
+        synapticTags_.reserve(1000);
+        episodeRelevance_.reserve(5000);
+        episodeReplayCount_.reserve(5000);
+    }
 };
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
@@ -21,6 +71,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    std::ostringstream oss;
+    oss << "NeuralEpisodicMemory initialized with enhanced episodic memory system";
+    NLM_LOG_INFO(oss.str());
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
@@ -28,7 +81,16 @@ NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralEpisodicMemory initialized");
+    
+    // Get neuromodulators
+    if (brain) {
+        pImpl->dopamine_ = brain->getDopamine();
+        pImpl->workingMemory_ = brain->getWorkingMemory();
+    }
+    
+    std::ostringstream oss;
+    oss << "NeuralEpisodicMemory initialized with neural episodic memory system";
+    NLM_LOG_INFO(oss.str());
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
@@ -36,50 +98,176 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
-    
-    // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
+    // Create hippocampal pattern (CA3 encoding)
+    if (!episode.sensoryState.empty() && brain_) {
+        std::vector<float> pattern = episode.sensoryState;
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Add positional and contextual encoding
+        size_t pos_idx = pattern.size() + 1;
+        if (pos_idx < pattern.size() + 10) {
+            pattern.resize(pattern.size() + 10, 0.0f);
+        }
+        
+        pattern[0] = episode.positionX;
+        pattern[1] = episode.positionY;
+        pattern[2] = episode.orientation;
+        pattern[3] = static_cast<float>(episode.action) / 10.0f;
+        pattern[4] = std::tanh(episode.reward);
+        
+        NeuronId hipNeuron(30000 + pImpl->hippocampalPatternNeurons_.size());
+        pImpl->hippocampalPatternNeurons_.push_back(hipNeuron);
+        
+        stored.activeNeurons.push_back(hipNeuron);
+        stored.neuronActivations.push_back(1.0f);
     }
     
-    // Remove old episodes if over capacity
+    // Create neocortical trace (slow consolidation)
+    if (!episode.sensoryState.empty() && brain_) {
+        std::vector<float> trace = episode.sensoryState;
+        
+        size_t base_idx = trace.size();
+        trace.resize(base_idx + 5, 0.0f);
+        
+        trace[0] = episode.novelty;
+        trace[1] = episode.energy;
+        trace[2] = episode.resultingReward - episode.reward;
+        trace[3] = std::sqrt(episode.positionX * episode.positionX + episode.positionY * episode.positionY);
+        trace[4] = std::cos(episode.orientation);
+        
+        NeuronId neoNeuron(50000 + pImpl->neocorticalPatternNeurons_.size());
+        pImpl->neocorticalPatternNeurons_.push_back(neoNeuron);
+        
+        stored.activeNeurons.push_back(neoNeuron);
+        stored.neuronActivations.push_back(1.0f);
+    }
+    
+    // Store in episode buffer
+    episodes_.push_back(stored);
+    pImpl->totalEpisodesEncoded_++;
+    
+    // Initialize relevance tracking
+    pImpl->episodeRelevance_.push_back(0.0f);
+    pImpl->episodeReplayCount_.push_back(0);
+    
+    // Create synaptic tag for consolidation eligibility
+    createSynapticTagForEpisode(stored);
+    
+    // Update working memory with episode context
+    if (pImpl->workingMemory_) {
+        updateWorkingMemoryWithEpisode(stored);
+    }
+    
+    // Enforce capacity limits
     while (episodes_.size() > maxEpisodes_) {
+        size_t erased_index = 0;
         episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        erased_index = 0;
+        
+        if (!pImpl->hippocampalPatternNeurons_.empty()) {
+            pImpl->hippocampalPatternNeurons_.erase(pImpl->hippocampalPatternNeurons_.begin());
+        }
+        
+        if (!pImpl->neocorticalPatternNeurons_.empty()) {
+            pImpl->neocorticalPatternNeurons_.erase(pImpl->neocorticalPatternNeurons_.begin());
+        }
+        
+        if (!pImpl->episodeRelevance_.empty()) {
+            pImpl->episodeRelevance_.erase(pImpl->episodeRelevance_.begin());
+        }
+        
+        if (!pImpl->episodeReplayCount_.empty()) {
+            pImpl->episodeReplayCount_.erase(pImpl->episodeReplayCount_.begin());
         }
     }
     
-    // Age all episodes
+    // Age all episodes and update relevance
     for (auto& ep : episodes_) {
         ep.age++;
+        updateEpisodeRelevance(ep);
     }
+    
+    std::ostringstream oss;
+    oss << "Stored episode: timestamp=" << stored.timestamp << ", reward=" << std::fixed << std::setprecision(3) << stored.reward << ", sensory_dim=" << stored.sensoryState.size();
+    NLM_LOG_DEBUG(oss.str());
+}
+
+void NeuralEpisodicMemory::createSynapticTagForEpisode(const EpisodicMemoryItem& episode) {
+    if (!brain_ || episode.activeNeurons.empty()) return;
+    
+    // Calculate tag strength based on episode properties
+    float tagStrength = episode.reward * 0.5f + episode.novelty * 0.3f + episode.energy * 0.2f;
+    
+    // Create tags for episode-related neurons
+    for (const NeuronId& neuronId : episode.activeNeurons) {
+        uint64_t synapseId = neuronId.value * 1000 + episode.timestamp;
+        
+        pImpl->synapticTags_[synapseId] = tagStrength;
+        pImpl->taggedSynapses_.push_back({INVALID_SYNAPSE_ID, episode.timestamp});
+    }
+    
+    // Apply neuromodulatory effects during encoding
+    if (pImpl->dopamine_ && episode.reward > 0) {
+        pImpl->dopamine_->setLevel(std::min(1.0f, pImpl->dopamine_->getLevel() + 0.1f * episode.reward));
+    }
+}
+
+void NeuralEpisodicMemory::updateWorkingMemoryWithEpisode(const EpisodicMemoryItem& episode) {
+    if (!pImpl->workingMemory_) return;
+    
+    float integrationWeight = episode.novelty * 0.5f + episode.reward * 0.5f;
+    
+    if (integrationWeight > 0.3f && !episode.sensoryState.empty()) {
+        pImpl->workingMemory_->store(episode.sensoryState, integrationWeight);
+        
+        if (episode.novelty > 0.7f || episode.reward > 0.5f) {
+            std::ostringstream oss;
+            oss << "Episode triggered attentional focus: reward=" << std::fixed << std::setprecision(3) << episode.reward << ", novelty=" << std::fixed << std::setprecision(3) << episode.novelty;
+            NLM_LOG_DEBUG(oss.str());
+        }
+    }
+}
+
+void NeuralEpisodicMemory::updateEpisodeRelevance(const EpisodicMemoryItem& episode) {
+    float relevance = 1.0f;
+    
+    // Recency factor - older episodes decay in relevance
+    relevance *= std::exp(-0.01f * episode.age);
+    
+    // Replay count factor - more replay increases relevance
+    size_t replayIndex = episode.timestamp % pImpl->episodeReplayCount_.size();
+    if (replayIndex < pImpl->episodeReplayCount_.size()) {
+        relevance *= std::min(2.0f, 1.0f + 0.1f * pImpl->episodeReplayCount_[replayIndex]);
+    }
+    
+    // Neuromodulatory influence
+    if (pImpl->dopamine_) {
+        float rewardFactor = pImpl->dopamine_->getLevel();
+        relevance *= (1.0f + rewardFactor * 0.5f);
+    }
+    
+    // Clamp relevance
+    relevance = std::min(1.0f, std::max(0.0f, relevance));
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     const std::vector<float>& sensoryPattern,
     size_t maxResults) const {
     
-    std::vector<std::pair<float, size_t>> scores;  // (similarity, index)
+    std::vector<std::pair<float, size_t>> scores;
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
         float sim = computeSimilarity(sensoryPattern, episodes_[i]);
-        scores.emplace_back(sim, i);
+        if (sim > 0.1f) {
+            scores.emplace_back(sim, i);
+        }
     }
     
-    // Sort by similarity (descending)
     std::sort(scores.begin(), scores.end(),
         [](const auto& a, const auto& b) { return a.first > b.first; });
     
-    // Return top results
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(maxResults, scores.size()); ++i) {
-        if (scores[i].first > 0.3f) {  // Threshold
+        if (scores[i].first > 0.3f) {
             results.push_back(&episodes_[scores[i].second]);
         }
     }
@@ -100,10 +288,9 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveTemporal(
         }
     }
     
-    // Return most recent first
     std::sort(results.begin(), results.end(),
-        [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
-            return a->timestamp > b->timestamp;
+        [this](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            return getEpisodeRelevance(a) > getEpisodeRelevance(b);
         });
     
     if (results.size() > maxResults) {
@@ -116,7 +303,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveTemporal(
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
     float x, float y, float radius, size_t maxResults) const {
     
-    std::vector<std::pair<float, size_t>> distances;  // (distance, index)
+    std::vector<std::pair<float, size_t>> distances;
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
         float dx = episodes_[i].positionX - x;
@@ -128,7 +315,6 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
         }
     }
     
-    // Sort by distance
     std::sort(distances.begin(), distances.end(),
         [](const auto& a, const auto& b) { return a.first < b.first; });
     
@@ -151,10 +337,9 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
         }
     }
     
-    // Most recent first
     std::sort(results.begin(), results.end(),
-        [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
-            return a->timestamp > b->timestamp;
+        [this](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            return getEpisodeRelevance(a) > getEpisodeRelevance(b);
         });
     
     if (results.size() > maxResults) {
@@ -165,28 +350,36 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 }
 
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
-    if (!episode || !brain_) return;
+    if (!episode || !brain_ || !replayEnabled_) return;
     
-    // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
         float activation = i < episode->neuronActivations.size() ? 
                           episode->neuronActivations[i] : 0.5f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        float replayStrength = activation * 2.0f;
+        
+        brain_->injectCurrent(neuron, replayStrength);
     }
     
-    // Also inject sensory pattern if available
-    if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+    size_t episodeIndex = getEpisodeIndex(episode);
+    if (episodeIndex < pImpl->episodeReplayCount_.size()) {
+        pImpl->episodeReplayCount_[episodeIndex]++;
+        pImpl->totalReplaysPerformed_++;
     }
+    
+    std::ostringstream oss;
+    oss << "Replaying episode: timestamp=" << episode->timestamp << ", neurons_activated=" << episode->activeNeurons.size();
+    NLM_LOG_DEBUG(oss.str());
 }
 
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
     if (episodeId < episodes_.size()) {
-        // In a full implementation, episodes would have a relevance field
-        // For now, this would age the episode differently
+        size_t index = episodeId % pImpl->episodeRelevance_.size();
+        if (index < pImpl->episodeRelevance_.size()) {
+            pImpl->episodeRelevance_[index] = 
+                std::min(1.0f, pImpl->episodeRelevance_[index] + relevanceDelta);
+        }
     }
 }
 
@@ -205,6 +398,11 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(s
         results.push_back(&episodes_[i]);
     }
     
+    std::sort(results.begin(), results.end(),
+        [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            return a->timestamp > b->timestamp;
+        });
+    
     return results;
 }
 
@@ -219,37 +417,114 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    consolidateSynapticTags(relevanceThreshold);
+    
+    std::deque<EpisodicMemoryItem> newEpisodes;
+    std::vector<float> newRelevance;
+    std::vector<size_t> newReplayCounts;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float relevance = getEpisodeRelevance(&episodes_[i]);
+        
+        if (relevance >= relevanceThreshold || 
+            episodes_[i].age < 100 || 
+            episodes_[i].reward > 0.5f) {
+            
+            newEpisodes.push_back(episodes_[i]);
+            newRelevance.push_back(pImpl->episodeRelevance_[i]);
+            newReplayCounts.push_back(pImpl->episodeReplayCount_[i]);
+        } else {
+            removeHippocampalTrace(i);
+        }
+    }
+    
+    episodes_ = std::move(newEpisodes);
+    pImpl->episodeRelevance_ = std::move(newRelevance);
+    pImpl->episodeReplayCount_ = std::move(newReplayCounts);
+    
+    pImpl->hippocampalPatternNeurons_.resize(episodes_.size());
+    pImpl->neocorticalPatternNeurons_.resize(episodes_.size());
+    
+    std::ostringstream oss;
+    oss << "Consolidated episodic memory: " << episodes_.size() << " episodes remain (threshold=" << std::fixed << std::setprecision(3) << relevanceThreshold << ")";
+    NLM_LOG_INFO(oss.str());
+}
+
+void NeuralEpisodicMemory::consolidateSynapticTags(float relevanceThreshold) {
+    std::vector<std::pair<NeuronId, SimulationStep>> activeTags;
+    
+    for (const auto& tag : pImpl->taggedSynapses_) {
+        SimulationStep age = tag.second;
+        
+        if (age < 1000) {
+            activeTags.push_back(tag);
+            
+            auto it = pImpl->synapticTags_.find(tag.first.value);
+            if (it != pImpl->synapticTags_.end()) {
+                float tagStrength = it->second;
+                
+                if (tagStrength > relevanceThreshold) {
+                    markForConsolidation(tag.first.value, tagStrength);
+                }
+            }
+        }
+    }
+    
+    pImpl->taggedSynapses_ = std::move(activeTags);
+}
+
+void NeuralEpisodicMemory::markForConsolidation(uint64_t synapseId, float strength) {
+    if (pImpl->brain_) {
+        STDP* stdp = pImpl->brain_->getSTDP();
+        if (stdp) {
+            SynapticWeight ltpWeight = stdp->getLTPWeight();
+            stdp->applyWeightChange(nullptr, ltpWeight * strength);
+        }
+    }
+    
+    pImpl->synapticTags_.erase(synapseId);
+}
+
+void NeuralEpisodicMemory::removeHippocampalTrace(size_t episodeIndex) {
+    if (episodeIndex < pImpl->hippocampalPatternNeurons_.size()) {
+        pImpl->hippocampalPatternNeurons_.erase(
+            pImpl->hippocampalPatternNeurons_.begin() + episodeIndex);
     }
 }
 
 void NeuralEpisodicMemory::clear() {
     episodes_.clear();
-    pImpl->episodeNeurons.clear();
+    pImpl->hippocampalPatternNeurons_.clear();
+    pImpl->neocorticalPatternNeurons_.clear();
+    pImpl->taggedSynapses_.clear();
+    pImpl->synapticTags_.clear();
+    pImpl->episodeRelevance_.clear();
+    pImpl->episodeReplayCount_.clear();
+    
+    std::ostringstream oss;
+    oss << "NeuralEpisodicMemory: Cleared all episodic memory";
+    NLM_LOG_INFO(oss.str());
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     
-    // Select episodes for replay based on:
-    // 1. Recency (more recent episodes)
-    // 2. Reward (higher reward episodes)
-    // 3. Unpredictability (higher prediction error episodes)
-    
-    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    std::vector<std::tuple<float, float, size_t>> scored;
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
         float recencyScore = 1.0f / (episodes_[i].age + 1);
         float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
+        float noveltyScore = episodes_[i].novelty;
+        float relevance = getEpisodeRelevance(&episodes_[i]);
+        
+        float score = recencyScore * 0.3f + 
+                      rewardScore * 0.3f + 
+                      noveltyScore * 0.2f + 
+                      relevance * 0.2f;
+        
         scored.emplace_back(score, rewardScore, i);
     }
     
-    // Sort by score
     std::sort(scored.begin(), scored.end(),
         [](const auto& a, const auto& b) {
             return std::get<0>(a) > std::get<0>(b);
@@ -264,14 +539,17 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForRepla
 }
 
 void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+    if (!replayEnabled_) return;
+    
     for (size_t id : episodeIds) {
         if (id < episodes_.size()) {
             replayEpisode(&episodes_[id]);
-            
-            // Small delay between replays
-            // (In simulation, this would be steps)
         }
     }
+    
+    std::ostringstream oss;
+    oss << "Performed replay sequence of " << episodeIds.size() << " episodes";
+    NLM_LOG_INFO(oss.str());
 }
 
 float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
@@ -279,12 +557,18 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;
     if (query.size() != episode.sensoryState.size()) return 0.0f;
     
-    // Cosine similarity
     float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
+    
     for (size_t i = 0; i < query.size(); ++i) {
-        dot += query[i] * episode.sensoryState[i];
-        normQ += query[i] * query[i];
-        normE += episode.sensoryState[i] * episode.sensoryState[i];
+        float weight = 1.0f;
+        
+        if (i < 3) {
+            weight = 2.0f;
+        }
+        
+        dot += query[i] * episode.sensoryState[i] * weight;
+        normQ += query[i] * query[i] * weight;
+        normE += episode.sensoryState[i] * episode.sensoryState[i] * weight;
     }
     
     if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
@@ -318,260 +602,28 @@ bool NeuralEpisodicMemory::matchesCriteria(
     return true;
 }
 
-// NeuralAssociativeMemory Implementation
-struct NeuralAssociativeMemory::Impl {
-    Brain* brain;
+size_t NeuralEpisodicMemory::getEpisodeIndex(const EpisodicMemoryItem* episode) const {
+    if (!episode) return 0;
     
-    Impl() : brain(nullptr) {}
-};
-
-NeuralAssociativeMemory::NeuralAssociativeMemory()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-{
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        if (&episodes_[i] == episode) {
+            return i;
+        }
+    }
+    
+    return 0;
 }
 
-NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;
-
-void NeuralAssociativeMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("NeuralAssociativeMemory initialized");
-}
-
-void NeuralAssociativeMemory::associate(const std::vector<float>& patternA,
-                                        const std::vector<float>& patternB,
-                                        float strength) {
-    NeuronId neuronA = findPatternNeuron(patternA);
-    NeuronId neuronB = findPatternNeuron(patternB);
+float NeuralEpisodicMemory::getEpisodeRelevance(const EpisodicMemoryItem* episode) const {
+    if (!episode) return 0.0f;
     
-    if (neuronA != INVALID_NEURON_ID && neuronB != INVALID_NEURON_ID) {
-        // Check if association exists
-        for (auto& assoc : associations_) {
-            if ((std::get<0>(assoc) == neuronA && std::get<1>(assoc) == neuronB) ||
-                (std::get<0>(assoc) == neuronB && std::get<1>(assoc) == neuronA)) {
-                // Update strength
-                std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + strength * 0.1f, 0.0f, 1.0f);
-                return;
-            }
-        }
-        
-        // Create new association
-        associations_.emplace_back(neuronA, neuronB, strength);
-    }
-}
-
-void NeuralAssociativeMemory::associateFromExperience(const EpisodicMemoryItem& episode) {
-    if (!episode.sensoryState.empty() && !episode.resultingSensoryState.empty()) {
-        associate(episode.sensoryState, episode.resultingSensoryState, 0.8f);
-    }
-    
-    // Associate action with resulting state
-    if (!episode.sensoryState.empty()) {
-        // Create action-specific pattern
-        std::vector<float> actionPattern(episode.sensoryState.size(), 0.0f);
-        actionPattern[0] = static_cast<float>(episode.action) / 10.0f;
-        
-        associate(actionPattern, episode.resultingSensoryState, 0.7f);
-    }
-}
-
-std::vector<std::vector<float>> NeuralAssociativeMemory::retrieve(
-    const std::vector<float>& queryPattern,
-    size_t maxResults) const {
-    
-    NeuronId queryNeuron;
-    float bestSim = 0.0f;
-    
-    // Find best matching pattern neuron
-    for (size_t i = 0; i < patternNeurons_.size(); ++i) {
-        float sim = computeSimilarity(queryPattern, patternNeurons_[i].second);
-        if (sim > bestSim) {
-            bestSim = sim;
-            queryNeuron = patternNeurons_[i].first;
-        }
-    }
-    
-    if (bestSim < 0.3f) {
-        return {};
-    }
-    
-    // Find associated patterns
-    std::vector<std::vector<float>> results;
-    std::vector<std::pair<float, std::vector<float>>> scored;
-    
-    for (const auto& assoc : associations_) {
-        NeuronId otherNeuron;
-        
-        if (std::get<0>(assoc) == queryNeuron) {
-            otherNeuron = std::get<1>(assoc);
-        } else if (std::get<1>(assoc) == queryNeuron) {
-            otherNeuron = std::get<0>(assoc);
-        }
-        
-        if (otherNeuron != INVALID_NEURON_ID) {
-            for (const auto& pn : patternNeurons_) {
-                if (pn.first == otherNeuron) {
-                    float strength = std::get<2>(assoc);
-                    scored.emplace_back(strength, pn.second);
-                    break;
-                }
-            }
-        }
-    }
-    
-    // Sort by strength
-    std::sort(scored.begin(), scored.end(),
-        [](const auto& a, const auto& b) { return a.first > b.first; });
-    
-    for (size_t i = 0; i < std::min(maxResults, scored.size()); ++i) {
-        results.push_back(scored[i].second);
-    }
-    
-    return results;
-}
-
-float NeuralAssociativeMemory::getAssociationStrength(
-    const std::vector<float>& patternA,
-    const std::vector<float>& patternB) const {
-    
-    NeuronId neuronA, neuronB;
-    float bestSimA = 0.0f, bestSimB = 0.0f;
-    
-    for (const auto& pn : patternNeurons_) {
-        float simA = computeSimilarity(patternA, pn.second);
-        float simB = computeSimilarity(patternB, pn.second);
-        
-        if (simA > bestSimA) {
-            bestSimA = simA;
-            neuronA = pn.first;
-        }
-        if (simB > bestSimB) {
-            bestSimB = simB;
-            neuronB = pn.first;
-        }
-    }
-    
-    if (bestSimA < 0.3f || bestSimB < 0.3f) {
-        return 0.0f;
-    }
-    
-    for (const auto& assoc : associations_) {
-        if ((std::get<0>(assoc) == neuronA && std::get<1>(assoc) == neuronB) ||
-            (std::get<0>(assoc) == neuronB && std::get<1>(assoc) == neuronA)) {
-            return std::get<2>(assoc);
-        }
+    size_t index = getEpisodeIndex(episode);
+    if (index < pImpl->episodeRelevance_.size()) {
+        return pImpl->episodeRelevance_[index];
     }
     
     return 0.0f;
 }
 
-void NeuralAssociativeMemory::updateAssociation(const std::vector<float>& patternA,
-                                                const std::vector<float>& patternB,
-                                                float delta) {
-    NeuronId neuronA = findPatternNeuron(patternA);
-    NeuronId neuronB = findPatternNeuron(patternB);
-    
-    for (auto& assoc : associations_) {
-        if ((std::get<0>(assoc) == neuronA && std::get<1>(assoc) == neuronB) ||
-            (std::get<0>(assoc) == neuronB && std::get<1>(assoc) == neuronA)) {
-            std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + delta, 0.0f, 1.0f);
-            return;
-        }
-    }
-}
-
-std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
-    const std::vector<float>& cuePattern,
-    size_t steps) const {
-    
-    std::vector<std::vector<float>> activated;
-    std::set<NeuronId> visited;
-    
-    // Find initial pattern neuron
-    NeuronId currentNeuron;
-    for (const auto& pn : patternNeurons_) {
-        if (computeSimilarity(cuePattern, pn.second) > 0.5f) {
-            currentNeuron = pn.first;
-            activated.push_back(pn.second);
-            visited.insert(currentNeuron);
-            break;
-        }
-    }
-    
-    if (currentNeuron == INVALID_NEURON_ID) {
-        return activated;
-    }
-    
-    // Spread through association network
-    for (size_t step = 0; step < steps; ++step) {
-        std::vector<NeuronId> nextNeurons;
-        
-        for (const auto& assoc : associations_) {
-            NeuronId otherNeuron = INVALID_NEURON_ID;
-            
-            if (std::get<0>(assoc) == currentNeuron && visited.find(std::get<1>(assoc)) == visited.end()) {
-                otherNeuron = std::get<1>(assoc);
-            } else if (std::get<1>(assoc) == currentNeuron && visited.find(std::get<0>(assoc)) == visited.end()) {
-                otherNeuron = std::get<0>(assoc);
-            }
-            
-            if (otherNeuron != INVALID_NEURON_ID && std::get<2>(assoc) > 0.3f) {
-                nextNeurons.push_back(otherNeuron);
-                visited.insert(otherNeuron);
-                
-                // Find pattern for this neuron
-                for (const auto& pn : patternNeurons_) {
-                    if (pn.first == otherNeuron) {
-                        activated.push_back(pn.second);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (nextNeurons.empty()) break;
-        
-        // Pick highest associated next neuron
-        currentNeuron = nextNeurons[0];
-    }
-    
-    return activated;
-}
-
-void NeuralAssociativeMemory::clear() {
-    patternNeurons_.clear();
-    associations_.clear();
-}
-
-NeuronId NeuralAssociativeMemory::findPatternNeuron(const std::vector<float>& pattern) {
-    // Check if we already have a similar pattern
-    for (const auto& pn : patternNeurons_) {
-        if (computeSimilarity(pattern, pn.second) > 0.8f) {
-            return pn.first;
-        }
-    }
-    
-    // Create new pattern neuron
-    NeuronId newId(patternNeurons_.size() + 30000);
-    patternNeurons_.push_back({newId, pattern});
-    return newId;
-}
-
-float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
-                                                 const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-    }
-    
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
-}
-
 } // namespace nlm
+
