@@ -127,6 +127,12 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Enhanced CLI executable
+add_executable(nlm_enhanced
+    src/enhanced_cli.cpp
+)
+target_link_libraries(nlm_enhanced PUBLIC nlm_core)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
