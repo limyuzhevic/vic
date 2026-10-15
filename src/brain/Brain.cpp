@@ -40,6 +40,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +122,8 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -401,9 +405,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // ========== STEP 4: Update working memory and apply attentional selection ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attentional selection to working memory winners
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to selected neurons
+            const std::vector<NeuronId>& winners = pImpl->attention->getWinners();
+            for (NeuronId winner : winners) {
+                // Strengthen winners in working memory
+                if (pImpl->workingMemory->contains(winner)) {
+                    pImpl->workingMemory->strengthenMemory(1.1f);
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +530,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Use working memory as the input representation for prediction
+        auto* workingMemory = getWorkingMemory();
+        if (workingMemory && workingMemory->getMemoryNeurons().size() > 0) {
+            std::vector<float> sensoryPattern = workingMemory->retrieve();
+            
+            // Create a dummy SensoryInput for prediction
+            class DummySensoryInput {
+            public:
+                std::vector<float> getData() const { return sensoryPattern; }
+                size_t getSize() const { return sensoryPattern.size(); }
+            };
+            
+            DummySensoryInput currentState;
+            pImpl->predictionSystem->train(currentState);
+            
+            // Track prediction error for novelty signal
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.5f) {
+                // High prediction error triggers neuromodulation
+                if (pImpl->novelty) {
+                    float noveltySignal = error * 2.0f;  // Scale error to novelty
+                    pImpl->novelty->setLevel(noveltySignal);
+                }
+                if (pImpl->curiosity) {
+                    // Novelty increases curiosity-driven exploration
+                    float curiositySignal = error * pImpl->curiosity->getLevel();
+                    pImpl->curiosity->setLevel(std::min(curiositySignal, 1.0f));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +576,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation operates on patterns extracted from working memory
+        // It discovers recurring patterns that could form stable concepts
+        auto* workingMemory = getWorkingMemory();
+        if (workingMemory) {
+            std::vector<NeuronId> memoryNeurons = workingMemory->getMemoryNeurons();
+            
+            // Convert neuron activity to a pattern for concept formation
+            std::vector<float> conceptPattern;
+            conceptPattern.reserve(memoryNeurons.size());
+            
+            for (NeuronId neuronId : memoryNeurons) {
+                float activation = workingMemory->getNeuronActivation(neuronId);
+                conceptPattern.push_back(activation);
+            }
+            
+            // Present this pattern for concept formation
+            if (!conceptPattern.empty()) {
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                SimulationStep currentTime = pImpl->currentTime;
+                
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    conceptPattern, conceptPattern, reward, currentTime);
+                
+                // If concept is formed/stable, it influences planning
+                if (conceptId > 0) {
+                    // Store concept in working memory as goal
+                    pImpl->conceptFormation->setCurrentGoal(conceptPattern);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -723,6 +799,29 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Neuromodulation affects concept formation and planning confidence
+    if (pImpl->conceptFormation) {
+        // Higher dopamine increases exploration in concept space
+        float conceptStability = 0.5f + modulation * 0.4f;
+        pImpl->conceptFormation->setFormationThreshold(0.5f + modulation * 0.3f);
+    }
+    
+    if (pImpl->planner) {
+        // Dopamine affects planning confidence
+        pImpl->planner->setPlanningConfidence(modulation);
+    }
+}
+  if (pImpl->conceptFormation) {
+      // Higher dopamine increases exploration in concept space
+      float conceptStability = 0.5f + modulation * 0.4f;
+      pImpl->conceptFormation->setFormationThreshold(0.5f + modulation * 0.3f);
+  }
+  
+  if (pImpl->planner) {
+      // Dopamine affects planning confidence
+      pImpl->planner->setPlanningConfidence(modulation);
+  }
 }
 
 void Brain::updatePlasticity() {
@@ -1073,10 +1172,17 @@ std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+// =================== SOCIAL COGNITION SYSTEM ACCESSORS ======================
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
 }
 
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
+// Logging
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));

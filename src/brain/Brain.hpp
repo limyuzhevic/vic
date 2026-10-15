@@ -1,13 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../cognition/SocialCognition.hpp"
 
 namespace nlm {
 
@@ -27,7 +18,8 @@ class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
-class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,11 +156,11 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Self-model: represents the agent's internal model of itself
+    SelfModel* getSelfModel();
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Social learning: enables learning from other agents
+    SocialLearning* getSocialLearning();
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
