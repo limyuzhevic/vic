@@ -14,6 +14,9 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -34,9 +37,17 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Set prediction parameters from config
+    void configure(float learningRate, float predictionHorizon, float confidenceDecay);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    float learningRate_;
+    float predictionHorizon_;
+    float confidenceDecay_;
 };
 
 } // namespace nlm

@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -10,9 +11,31 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem()
+    : pImpl(new Impl)
+    , brain_(nullptr)
+    , learningRate_(0.01f)
+    , predictionHorizon_(1.0f)
+    , confidenceDecay_(0.99f)
+{
+}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    brain_ = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
+
+void PredictionSystem::configure(float learningRate, float predictionHorizon, float confidenceDecay) {
+    learningRate_ = learningRate;
+    predictionHorizon_ = predictionHorizon;
+    confidenceDecay_ = confidenceDecay;
+    NLM_LOG_INFO("PredictionSystem configured with learning rate: " + std::to_string(learningRate_) +
+                 ", prediction horizon: " + std::to_string(predictionHorizon_) +
+                 ", confidence decay: " + std::to_string(confidenceDecay_));
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate

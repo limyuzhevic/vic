@@ -196,6 +196,34 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Initialization helper methods for Impl
+    static void initializeRandomGenerator(Impl& impl);
+    static void initializePlasticitySystems(Impl& impl);
+    static void initializeMemorySystems(Impl& impl);
+    static void initializePredictionSystem(Impl& impl);
+    static void initializeCognitionSystems(Impl& impl);
+    static void initializeDevelopmentSystem(Impl& impl);
+    static void initializeNeuromodulationSystems(Impl& impl);
+    static void initializeConfigurationParameters(Impl& impl);
+    static void initializeCheckpointManager(Impl& impl);
+    
+    // Step update helper methods for Impl
+    static void updateSpiking(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void updateNeurons(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void updateWorkingMemory(Impl& impl);
+    static void updateNeuromodulation(Impl& impl);
+    static void updatePlasticity(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void updateEpisodicMemory(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void updatePrediction(Impl& impl);
+    static void updateAttention(Impl& impl);
+    static void updateConceptFormation(Impl& impl);
+    static void updateStructuralPlasticity(Impl& impl, SimulationStep currentStep);
+    static void updateReplayMemories(Impl& impl, SimulationStep currentStep);
+    static void updateDevelopment(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void updateConsolidation(Impl& impl, SimulationStep currentStep);
+    static void updateCheckpoints(Impl& impl, SimulationStep currentStep, Timestamp currentTime);
+    static void collectStatistics(Impl& impl);
 };
 
 } // namespace nlm
