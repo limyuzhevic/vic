@@ -35,6 +35,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
+    stored.lastAccess = 0;
     
     episodes_.push_back(stored);
     

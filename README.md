@@ -162,6 +162,181 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
+## Documentation
+
+NLM documentation is organized by experience level and use case:
+
+### Getting Started
+
+**Beginner Level**
+- `easy_usage.md` - Simple examples for beginners
+- `HOW_TO_USE.md` - Quick reference and common patterns
+
+**Intermediate Level**
+- `HOW_TO_USE.md` - Advanced integration examples
+- `docs/PHASE6_FINAL_AUDIT.md` - Phase 6 integration details
+- `docs/EXPERIMENTS.md` - Experiment framework documentation
+
+**Advanced Level**
+- `docs/ARCHITECTURE.md` - System architecture
+- `docs/SCIENCE.md` - Scientific methods and principles
+- `docs/SCALING.md` - Performance optimization and scaling
+- `docs/PERFORMANCE.md` - Performance benchmarks and metrics
+
+**Research Level**
+- `docs/RESEARCH_METHODS.md` - Research methodology
+- `docs/BIOLOGICAL_FIDELITY.md` - Biological plausibility discussions
+- `docs/LIMITATIONS.md` - Current limitations and future directions
+- `docs/FINAL_LIMITATIONS.md` - Phase 6 specific limitations
+- `docs/FAILURES.md` - What didn't work and why
+
+### Documentation Structure
+
+| Documentation Type | Purpose | Key Topics |
+|-------------------|---------|------------|
+| **Integration Examples** | How to use and connect systems | `HOW_TO_USE.md` |
+| **System Architecture** | How the brain is designed | `docs/ARCHITECTURE.md` |
+| **Scientific Background** | Why it works the way it does | `docs/SCIENCE.md` |
+| **Phase 6 Results** | What Phase 6 achieved | `docs/PHASE6_FINAL_AUDIT.md` |
+| **Experiments** | How to run and interpret experiments | `docs/EXPERIMENTS.md` |
+| **Performance** | Speed and scalability | `docs/PERFORMANCE.md` |
+| **Scaling** | Optimization techniques | `docs/SCALING.md` |
+| **Limitations** | Current boundaries | `docs/LIMITATIONS.md` |
+| **Research Methods** | How to study it | `docs/RESEARCH_METHODS.md` |
+
+### Additional Resources
+
+#### Advanced Usage
+- **Working with Memory Systems**: `HOW_TO_USE.md` - Memory storage, retrieval, replay
+- **Neuromodulation Control**: `HOW_TO_USE.md` - Dopamine, curiosity, novelty control
+- **Prediction and Planning**: `HOW_TO_USE.md` - Using prediction for intelligent behavior
+- **Development and Maturation**: `HOW_TO_USE.md` - Understanding developmental stages
+- **Sleep and Memory Consolidation**: `HOW_TO_USE.md` - Replay mechanisms
+- **Performance Optimization**: `HOW_TO_USE.md` - Speed and scalability
+- **Multi-Agent Systems**: `HOW_TO_USE.md` - Creating competing agents
+
+#### Configuration Files
+- `configs/default.cfg` - Default NLM configuration
+- `configs/large_brain.cfg` - Configuration for larger simulations
+- `configs/learning.cfg` - Configuration optimized for learning
+- `configs/fast.cfg` - Configuration for faster simulation
+
+#### Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+#### Running Experiments
+
+```bash
+# Run the basic integration demo
+./nlm_phase6_demo
+
+# Run a learning experiment  
+./nlm_learning_demo
+
+# Run a sleep experiment
+./nlm_sleep_demo
+
+# Run a neuromodulation experiment
+./nlm_neuromodulation_demo
+
+# Run a prediction experiment
+./nlm_prediction_demo
+```
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── easy_usage.md              # Simple examples for beginners
+├── HOW_TO_USE.md              # Integration examples
+├── docs/                     # Detailed documentation
+│   ├── ARCHITECTURE.md       # System architecture
+│   ├── SCIENCE.md            # Scientific background
+│   ├── ROADMAP.md            # Development roadmap
+│   ├── EXPERIMENTS.md        # Experiment framework
+│   ├── PERFORMANCE.md        # Performance benchmarks
+│   ├── SCALING.md            # Performance optimization
+│   ├── LIMITATIONS.md        # Current limitations
+│   ├── BIOLOGICAL_FIDELITY.md # Biological plausibility
+│   ├── RESEARCH_METHODS.md   # Research methodology
+│   ├── FAILURES.md           # What didn't work
+│   ├── FINAL_LIMITATIONS.md  # Phase 6 limitations
+│   └── PHASE6_FINAL_AUDIT.md  # Phase 6 integration results
+├── src/                     # Source code
+│   ├── core/               # Core utilities
+│   ├── brain/              # Neural components
+│   ├── dynamics/           # Neural dynamics
+│   ├── plasticity/         # Plasticity rules
+│   ├── development/        # Developmental system
+│   ├── neuromodulation/     # Neuromodulators
+│   ├── memory/             # Memory systems
+│   ├── prediction/          # Prediction systems
+│   ├── cognition/          # Cognitive mechanisms
+│   ├── sensory/            # Sensory processing
+│   ├── motor/              # Motor system
+│   ├── environment/        # Environment interface
+│   ├── experiments/        # Experiment framework
+│   └── visualization/       # Visualization
+├── tests/                   # Unit tests
+└── configs/                 # Configuration files
+```
+
+## Phase Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Complete)
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
+
+### Phase 3 (Complete)
+- World interaction loop
+- Sensory input and motor output
+- Reward prediction error
+- Developmental stages
+- Novelty and curiosity
+
+### Phase 4 (Complete)
+- Neural prediction system
+- Working memory
+- Episodic-like memory
+- Concept formation
+- Neural attention (NOT Transformer)
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Checkpoint system
+
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working
+- Replay and consolidation functional
+- Phase 6 integration experiment created
+
 ## Scientific Limitations
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:

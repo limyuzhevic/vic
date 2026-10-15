@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "performance/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -48,7 +49,6 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -148,7 +148,7 @@ struct LearningExperiment {
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+                                 (strengthened > 0 || weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {

@@ -232,6 +232,70 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         }
     }
     
+    // Check if brain has a neural planner and try to integrate curiosity with planning
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Use curiosity to influence planning - higher curiosity might lead to more exploratory plans
+        float curiosityFactor = std::min(1.0f, curiosityLevel_ * 2.0f);  // Scale to 0-2 range
+        
+        // Check if curiosity is driving exploration
+        if (curiosityLevel_ > 0.3f && curiosityFactor < 1.5f) {
+            // For moderate curiosity, try to find alternative/novel actions
+            // This is a simplified approach - real implementation would use the planner's capabilities
+            
+            // Check current motor activity
+            float maxMotorActivity = 0.0f;
+            MotorCommand mostActive = MotorCommand::Wait;
+            
+            struct { MotorCommand cmd; float activity; } commands[] = {
+                {MotorCommand::MoveForward, 0.0f},
+                {MotorCommand::MoveBackward, 0.0f},
+                {MotorCommand::TurnLeft, 0.0f},
+                {MotorCommand::TurnRight, 0.0f},
+                {MotorCommand::Interact, 0.0f},
+                {MotorCommand::Wait, 0.0f}
+            };
+            
+            // Calculate activity based on motor neuron groups
+            auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+                if (neurons.empty()) return 0.0f;
+                float sum = 0.0f;
+                for (Neuron* n : neurons) {
+                    sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                }
+                return sum / neurons.size();
+            };
+            
+            commands[0].activity = calcActivity(motorForward_);
+            commands[1].activity = calcActivity(motorBackward_);
+            commands[2].activity = calcActivity(motorTurnLeft_);
+            commands[3].activity = calcActivity(motorTurnRight_);
+            commands[4].activity = calcActivity(motorInteract_);
+            commands[5].activity = calcActivity(motorWait_);
+            
+            // Find most active command
+            for (const auto& c : commands) {
+                if (c.activity > maxMotorActivity) {
+                    maxMotorActivity = c.activity;
+                    mostActive = c.cmd;
+                }
+            }
+            
+            // If current activity is low but curiosity is high, try exploration
+            if (maxMotorActivity < 0.3f && curiosityLevel_ > 0.7f) {
+                // Use curiosity to drive exploratory action selection
+                int explorationChoice = brain_->getRandomGenerator()->uniformInt(0, 4);
+                switch (explorationChoice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::TurnLeft;
+                    case 2: return MotorCommand::TurnRight;
+                    case 3: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            }
+        }
+    }
+    
     return defaultCmd;
 }
 

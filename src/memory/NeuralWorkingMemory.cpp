@@ -44,13 +44,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        if (brain_ && neuron.value > 0) {
+            // Inject current to activate the neuron
+            brain_->injectCurrent(neuron, activation * 5.0f);
         }
         
         // Update stored activation
@@ -125,12 +121,13 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
-            // Age the trace
+            // Age the trace and decay
             memoryTimestamps_[i]++;
+            activation *= std::pow(1.0f - decayRate_, static_cast<float>(dt));
             
-            // Check if trace is too old
+            // Check if trace is too old (age-based decay)
             if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+                activation = 0.0f; // Remove old traces
             }
             
             memoryActivations_[i] = activation;
