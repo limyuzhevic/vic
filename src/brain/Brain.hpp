@@ -8,10 +8,11 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for different brain systems
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -29,6 +30,14 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declarations for modular systems
+class NeuralProcessor;
+class MemoryManager;
+class PredictionModule;
+class CognitiveModule;
+class DevelopmentModule;
+class NeuromodulationModule;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -44,10 +53,132 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// NeuralProcessor: Core spiking neural computation
+class NeuralProcessor {
+public:
+    NeuralProcessor(std::shared_ptr<SpikeSystem> spikeSystem,
+                   std::shared_ptr<STDP> stdp,
+                   std::shared_ptr<Hebbian> hebbian,
+                   std::shared_ptr<StructuralPlasticity> structuralPlasticity);
+    
+    void step(SimulationStep currentStep, Timestamp currentTime);
+    void injectCurrent(NeuronId neuron, MembranePotential current);
+    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    void updatePlasticity();
+    void develop();
+    size_t getTotalSpikeCount() const;
+    size_t getTotalNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
+    
+    NeuralRegion* getRegion(RegionId id);
+    const NeuralRegion* getRegion(RegionId id) const;
+    RegionId addRegion(const std::string& name = "");
+    void addInterRegionConnection(RegionId source, RegionId target, 
+                                  float weight = 0.0f, Delay delay = 1);
+    void removeInterRegionConnection(RegionId source, RegionId target);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
 
+// MemoryManager: Manages all memory systems
+class MemoryManager {
+public:
+    MemoryManager(std::shared_ptr<NeuralWorkingMemory> workingMemory,
+                 std::shared_ptr<NeuralEpisodicMemory> episodicMemory,
+                 std::shared_ptr<NeuralAssociativeMemory> associativeMemory);
+    
+    NeuralWorkingMemory* getWorkingMemory();
+    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralAssociativeMemory* getAssociativeMemory();
+    
+    void update(SimulationStep currentStep, Timestamp currentTime);
+    float getEpisodicMemoryLoad() const;
+    bool hasConsolidationWork() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// PredictionModule: Handles prediction and prediction error computation
+class PredictionModule {
+public:
+    PredictionModule(std::shared_ptr<PredictionSystem> predictionSystem,
+                    std::shared_ptr<PredictionError> predictionError);
+    
+    PredictionSystem* getPredictionSystem();
+    PredictionError* getPredictionErrorSignal();
+    
+    void update(SimulationStep currentStep, Timestamp currentTime, 
+                const std::vector<float>& sensoryInput);
+    void computePredictionError();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// CognitiveModule: Manages all cognitive systems
+class CognitiveModule {
+public:
+    CognitiveModule(std::shared_ptr<NeuralPlanner> planner,
+                   std::shared_ptr<ConceptFormation> conceptFormation,
+                   std::shared_ptr<AttentionalSelection> attention);
+    
+    NeuralPlanner* getPlanner();
+    ConceptFormation* getConceptFormation();
+    AttentionalSelection* getAttention();
+    
+    void update(SimulationStep currentStep, Timestamp currentTime);
+    void selectActions(const std::vector<float>& sensoryInput);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// DevelopmentModule: Manages developmental processes
+class DevelopmentModule {
+public:
+    DevelopmentModule(std::shared_ptr<DevelopmentSystem> developmentSystem);
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    
+    void update(double dt);
+    void stageChanged(DevelopmentalStage oldStage, DevelopmentalStage newStage);
+    bool isInSensitivePeriod() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// NeuromodulationModule: Manages all neuromodulators
+class NeuromodulationModule {
+public:
+    NeuromodulationModule(std::shared_ptr<Dopamine> dopamine,
+                         std::shared_ptr<Curiosity> curiosity,
+                         std::shared_ptr<Novelty> novelty);
+    
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
+    
+    void update(SimulationStep currentStep, Timestamp currentTime,
+                const std::vector<float>& rewardSignals,
+                float noveltyLevel);
+    void applyToNeurons(NeuralProcessor* neuralProcessor);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Brain: The central coordinator of the neural system
+// Now uses a modular architecture with separate components for different functions
 class Brain {
 public:
     // Create brain with configuration
@@ -137,52 +268,53 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== MODULAR SYSTEMS ACCESS ==========
     
-    // Working memory - transient active information
+    // Neural processor (core computation)
+    NeuralProcessor* getNeuralProcessor();
+    const NeuralProcessor* getNeuralProcessor() const;
+    
+    // Memory manager (all memory systems)
+    MemoryManager* getMemoryManager();
+    const MemoryManager* getMemoryManager() const;
+    
+    // Prediction module
+    PredictionModule* getPredictionModule();
+    const PredictionModule* getPredictionModule() const;
+    
+    // Cognitive module (all cognitive systems)
+    CognitiveModule* getCognitiveModule();
+    const CognitiveModule* getCognitiveModule() const;
+    
+    // Development module
+    DevelopmentModule* getDevelopmentModule();
+    const DevelopmentModule* getDevelopmentModule() const;
+    
+    // Neuromodulation module (all neuromodulators)
+    NeuromodulationModule* getNeuromodulationModule();
+    const NeuromodulationModule* getNeuromodulationModule() const;
+    
+    // Individual memory systems (for backward compatibility)
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
+    // Individual prediction systems
     PredictionSystem* getPredictionSystem();
+    PredictionError* getPredictionErrorSignal();
     
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
+    // Individual cognition systems
     NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+    // Individual neuromodulators
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Development system
+    DevelopmentSystem* getDevelopmentSystem();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
@@ -195,7 +327,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
