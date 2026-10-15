@@ -25,10 +25,41 @@ using ConfigValue = std::variant<
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default = 0,
+    File = 1,
+    CommandLine = 2,
+    Runtime = 3
+};
+
+// Type for type-safe configuration validation
+using ConfigValidator = std::function<bool(const ConfigValue&)>;
+// Validation results with error messages
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    
+    ValidationResult(bool v = true, const std::string& error = "") 
+        : valid(v), errorMessage(error) {}
+};
+// Default configuration schema definitions
+struct ConfigSchema {
+    std::string name;
+    std::string description;
+    ConfigSource defaultSource;
+    std::string defaultValue;
+    std::string type; // "int", "int64", "double", "bool", "string", "vector<int>", "vector<double>"
+    std::string units;
+    double minValue;
+    double maxValue;
+    ConfigValidator validator;
+    
+    ConfigSchema() : defaultSource(ConfigSource::Default), minValue(-1e100), maxValue(1e100) {}
+    
+    ConfigSchema(const std::string& name, const std::string& desc, ConfigSource src, 
+                const std::string& def, const std::string& type, const std::string& units = "",
+                double min = -1e100, double max = 1e100)
+        : name(name), description(desc), defaultSource(src), defaultValue(def), 
+          type(type), units(units), minValue(min), maxValue(max) {}
 };
 
 // Configuration entry
@@ -93,13 +124,32 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced configuration management
+    std::string getDescription(const std::string& key) const;
+    ConfigSource getDefaultSource(const std::string& key) const;
+    ValidationResult validate(const std::string& key, const ConfigValue& value) const;
+    bool hasDescription(const std::string& key) const;
+    std::string getType(const std::string& key) const;
+    std::string getUnits(const std::string& key) const;
+    
+    // Schema management
+    void addSchema(const ConfigSchema& schema);
+    std::vector<std::string> getAllSchemaKeys() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Initialize default schema
+    void initializeDefaultSchema();
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // String to value conversions (friend functions)
+    static ConfigValue stringToValue(const std::string& valueStr, const std::string& type);
+    static ValidationResult validateValue(const ConfigSchema& schema, const ConfigValue& value);
 };
 
 } // namespace nlm

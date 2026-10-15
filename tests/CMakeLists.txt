@@ -14,6 +14,12 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    # Enhanced tests with improved error handling and validation
+    test_neuron_enhanced.cpp
+    test_synapse_enhanced.cpp
+    test_stdp_enhanced.cpp
+    test_config_enhanced.cpp
+    test_comprehensive.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
