@@ -29,6 +29,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Validation (Phase 6)
+    src/core/Validation/Validation.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
