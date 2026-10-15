@@ -104,7 +104,11 @@ VectorizedSTDP: Batch plasticity updates
 
 ## Benchmarking
 
-### Standard Benchmarks
+### Enhanced Benchmarking Framework
+
+Phase 5 introduced comprehensive performance optimizations, and this enhancement (Phase 5.5) provides a complete benchmarking and monitoring system for the NLM.
+
+#### Standard Benchmarks (Backward Compatible)
 
 | Scale | Neurons | Synapses | Target Steps/sec |
 |-------|---------|----------|-----------------|
@@ -113,31 +117,284 @@ VectorizedSTDP: Batch plasticity updates
 | Medium | 100,000 | ~1,000,000 | 1,000+ |
 | Large | 1,000,000 | ~10,000,000 | 100+ |
 
-### Performance Metrics
+#### Enhanced Benchmark Suites
 
-**Simulation Performance**:
+The enhanced benchmarking system now provides multiple specialized benchmark suites:
+
+**Performance Benchmarks**
+- Measures simulation speed and scalability
+- CPU, memory, and I/O efficiency analysis
+- Multi-threaded performance evaluation
+
+**Memory Benchmarks**
+- Detailed memory usage tracking
+- Memory pool statistics and fragmentation analysis
+- Memory leak detection
+- Allocation/deallocation overhead measurement
+
+**Accuracy Benchmarks**
+- Neural stability and convergence analysis
+- Spike timing accuracy
+- Plasticity rule verification
+- Reproducibility testing
+
+**Scalability Benchmarks**
+- Scaling with neuron count (1K to 1M)
+- Memory scaling analysis
+- Parallel efficiency measurement
+- Resource utilization optimization
+
+**System Integration Benchmarks**
+- Complete system loop integration testing
+- Memory system integration validation
+- Neuromodulation integration verification
+- Checkpoint performance measurement
+
+**Regression Detection Benchmarks**
+- Automated performance regression detection
+- Baseline comparison and drift analysis
+- Statistical significance testing
+- Trend analysis and prediction
+
+**Configuration Comparison Benchmarks**
+- Multiple configuration optimization
+- Parameter sweep analysis
+- Trade-off analysis (speed vs. accuracy vs. memory)
+- Configuration ranking and recommendations
+
+**Custom Benchmarks**
+- User-defined benchmark scenarios
+- Custom metrics and analysis
+- Domain-specific testing
+- Experimental validation
+
+### Enhanced Performance Metrics
+
+**Original Metrics (Maintained for backward compatibility)**:
 - Neurons per second: Total neurons / wall-clock time
-- Spikes per second: Total spikes / wall-clock time
+- Steps per second: Total steps / wall-clock time
 - Real-time factor: simulated_time / wall_clock_time
+- Spikes per step: Total spikes / total steps
+- Synapses per neuron: Total synapses / total neurons
 
-**Memory Usage**:
-- Neuron memory: sizeof(NeuronState) × neuron_count
-- Synapse memory: sizeof(SynapseRecord) × synapse_count
-- Event queue memory: Queue capacity × event_size
+**Enhanced Metrics**:
+- **CPU Metrics**: CPU time, CPU usage percentage, parallel efficiency
+- **Memory Metrics**: Peak memory usage (MB), memory fragmentation, allocation/deallocation rates
+- **Event Metrics**: Spike event throughput, queue occupancy, latency analysis
+- **System Metrics**: Resource utilization, cache efficiency, bandwidth usage
+- **Temporal Metrics**: Step time statistics, coefficient of variation, steady-state analysis
+- **Integration Metrics**: System component interaction, data flow analysis, synchronization overhead
 
 ### Measurement Commands
 
+**Basic Enhanced Benchmarking**:
 ```bash
-# Build with performance flags
-cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
-make -j$(nproc)
+# Run quick benchmark (demonstration)
+./nlm_benchmark_demonstration --quick
 
-# Run benchmark
-./build/nlm --benchmark --neurons=10000 --steps=10000
+# Run comprehensive benchmark
+./nlm_benchmark_demonstration --comprehensive
 
-# Run scaling experiment
-./build/nlm --scaling-benchmark
+# Run with custom configuration
+./nlm_benchmark_demonstration --config my_benchmark.cfg
+
+# Compare configurations
+./nlm_benchmark_demonstration --mode config
 ```
+
+**Advanced Benchmarking**:
+```bash
+# Run system integration demonstration
+./nlm_benchmark_demonstration --mode integration
+
+# Show help for all options
+./nlm_benchmark_demonstration --help
+
+# Show benchmark examples
+./nlm_benchmark_demonstration --examples
+```
+
+**Configuration File Example**:
+```ini
+# configs/benchmark.cfg
+benchmark_type = 0
+target_steps_per_second = 10000.0
+target_memory_mb = 512.0
+warmup_steps = 100
+measurement_steps = 1000
+num_threads = 0
+monitor_memory = true
+monitor_cpu = true
+monitor_events = true
+monitor_fragmentation = true
+export_results = false
+export_path = results
+export_format = csv
+compute_statistics = true
+compute_regression = true
+```
+
+### Configuration System
+
+The enhanced benchmarking system includes:
+- **File-based configuration** with schema validation
+- **Command-line argument** overrides
+- **Runtime configuration** changes
+- **Configuration factories** for common scenarios
+- **Help system** with examples
+
+### Monitoring and Analysis
+
+**Real-time Monitoring**:
+- System resource monitoring (CPU, memory, I/O)
+- Brain state monitoring (neurons, spikes, plasticity)
+- Memory pool tracking and analysis
+- Event queue statistics
+
+**Statistical Analysis**:
+- Descriptive statistics (mean, median, std dev, percentiles)
+- Distribution fitting and outlier detection
+- Confidence intervals and hypothesis testing
+- Performance regression detection
+- Correlation and trend analysis
+
+**Export Capabilities**:
+- CSV export for spreadsheet analysis
+- JSON export for visualization tools
+- Statistical summaries
+- Raw measurement data
+- Configuration files
+
+### Integration with Existing NLM Systems
+
+**Memory Infrastructure Integration**:
+- MemoryPool allocation/deallocation tracking
+- Memory fragmentation analysis
+- Memory leak detection
+- Cache performance analysis
+
+**Event Queue Integration**:
+- Spike event monitoring
+- Queue size and overflow tracking
+- Event timing analysis
+- Throughput measurement
+
+**Performance Infrastructure Integration**:
+- SIMD vectorization efficiency measurement
+- Parallel processing analysis
+- Multithreading optimization
+- Cache utilization analysis
+
+**Checkpoint System Integration**:
+- Checkpoint save/load performance
+- State serialization analysis
+- Backup/restore timing
+- Checkpoint size optimization
+
+### Backward Compatibility
+
+The enhanced benchmarking system maintains full backward compatibility:
+
+**Original benchmark.cpp** (src/benchmark.cpp):
+- Same interface and command-line arguments
+- Same output format (ASCII table display)
+- Same benchmark scenarios (4 configurations)
+- Same measurement methodology
+
+**Enhanced features**:
+- **Optional**: All new features are opt-in via command-line arguments
+- **Configurable**: Fine-grained control over monitoring and analysis
+- **Extensible**: Plugin architecture for custom benchmarks
+- **Documented**: Comprehensive help and examples
+
+### Example Usage
+
+**Basic Usage**:
+```bash
+# Run enhanced benchmark (default)
+./nlm_benchmark_demonstration
+
+# Run comprehensive benchmark with monitoring
+./nlm_benchmark_demonstration --comprehensive
+
+# Show help
+./nlm_benchmark_demonstration --help
+```
+
+**Configuration-based Benchmarking**:
+```bash
+# Run with custom configuration
+./nlm_benchmark_demonstration --config my_benchmark.cfg
+
+# Export results to CSV
+./nlm_benchmark_demonstration --config my_benchmark.cfg --output results.csv
+```
+
+**System Integration Testing**:
+```bash
+# Demonstrate system integration
+./nlm_benchmark_demonstration --mode integration
+```
+
+### Future Enhancements
+
+**Planned Features**:
+1. **GPU Integration**: CUDA acceleration for large-scale benchmarks
+2. **Distributed Benchmarking**: Multi-machine scaling analysis
+3. **Automated Optimization**: Machine learning for parameter tuning
+4. **Cloud Benchmarking**: Remote resource allocation and monitoring
+5. **Container Benchmarking**: Docker container performance analysis
+6. **Real-time Visualization**: Live monitoring dashboards
+
+**Research Integration**:
+1. **Scientific Validation**: Integration with experimental validation frameworks
+2. **Cross-platform Comparison**: Benchmarking across different hardware platforms
+3. **Production Performance**: Real-world workload simulation
+4. **Edge Computing**: Benchmarks for embedded and edge devices
+
+### Files Modified
+
+- `src/benchmark.cpp`: Enhanced with new framework while maintaining backward compatibility
+- `src/main.cpp`: Added comprehensive demonstration capabilities
+- New directories created:
+  - `src/benchmark/`: Enhanced benchmark framework
+  - `src/benchmark/config/`: Configuration system
+  - `src/benchmark/stats/`: Statistical analysis utilities
+  - `src/benchmark/monitor/`: Performance monitoring system
+  - `src/benchmark/memory/`: Memory tracking system
+  - `src/benchmark/export/`: Data export system
+
+### Quick Start Guide
+
+1. **Build the project**:
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run quick demonstration**:
+   ```bash
+   ./nlm_benchmark_demonstration --quick
+   ```
+
+3. **Run comprehensive benchmark**:
+   ```bash
+   ./nlm_benchmark_demonstration --comprehensive
+   ```
+
+4. **View configuration options**:
+   ```bash
+   ./nlm_benchmark_demonstration --help
+   ```
+
+5. **Explore examples**:
+   ```bash
+   ./nlm_benchmark_demonstration --examples
+   ```
+
+The enhanced benchmarking system provides comprehensive performance analysis while maintaining full backward compatibility. It enables detailed understanding of NLM performance characteristics and supports optimization for scientific research and production deployment.
 
 ## Scaling Results
 
