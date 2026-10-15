@@ -71,7 +71,7 @@ void STDP::update(Synapse* synapse,
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, exp is < 1
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)

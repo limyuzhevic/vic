@@ -234,7 +234,6 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
@@ -250,7 +249,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is depolarized but not firing - determine if active or resting
+        if (V > V_rest - 5.0f) {  // Threshold for active state (5mV above resting)
+            pImpl->state.firingState = FiringState::Active;
+        } else {
+            pImpl->state.firingState = FiringState::Resting;
+        }
     }
     
     // Clear synaptic input for next step

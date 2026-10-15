@@ -133,15 +133,37 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+// Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+// New command-line tools
+
+// NLM Brain Inspector - provides debugging and visualization tools
+add_executable(nlm_inspect
+    src/tools/BrainInspector.cpp
+)
+target_link_libraries(nlm_inspect PUBLIC nlm_core nlm_agent nlm_world)
+
+// NLM Config Tool - configuration utilities
+add_executable(nlm_config
+    src/tools/ConfigTool.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+// NLM Profiler - performance profiling tools
+add_executable(nlm_profile
+    src/tools/Profiler.cpp
+)
+target_link_libraries(nlm_profile PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
+
+// NLM Benchmark - performance benchmarks
+add_executable(nlm_benchmark
+    src/tools/Benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
