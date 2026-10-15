@@ -1,13 +1,11 @@
-#pragma once
+// Brain: The central coordinator of the neural system
+// Implements real spiking neural computation with event-driven dynamics
+// and integrated memory, prediction, cognition, and neuromodulation systems
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/Profiler.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -189,6 +187,12 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Performance profiling
+    void enableProfiling(bool enabled = true);
+    bool isProfilingEnabled() const;
+    std::string generatePerformanceReport() const;
+    void savePerformanceReport(const std::string& filename) const;
     
     // Logging
     void logStatus() const;
