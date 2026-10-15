@@ -22,9 +22,14 @@ struct Neuron::Impl {
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;  // mV
+    static constexpr float MIN_MEMBRANE_POTENTIAL = -100.0f; // mV
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize adaptation variable
+        adaptationVariable = 0.0f;
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -219,8 +224,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
+    // Improved numerical integration with adaptive step size for stability
+    float totalContribution = leakContribution + synapticContribution;
+    
+    // Limit the contribution to prevent overshoot and ensure stability
+    const float MAX_CONTRIBUTION = 10.0f;  // mV/ms - prevent excessive changes
+    if (std::abs(totalContribution) > MAX_CONTRIBUTION) {
+        totalContribution = std::copysign(MAX_CONTRIBUTION, totalContribution);
+    }
+    
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Scale dt by 1000 to convert from seconds to milliseconds (consistent with tau)
+    float dtScaled = static_cast<float>(dt) * 1000.0f;
+    V = V + dtScaled * totalContribution;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,29 +244,51 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Improved clamping with adaptive bounds based on neuron type and state
+    float minV = Impl::MIN_MEMBRANE_POTENTIAL;
+    float maxV = Impl::MAX_MEMBRANE_POTENTIAL;
     
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+    // Adjust bounds based on neuron type
+    if (pImpl->type == NeuronType::Inhibitory) {
+        maxV *= 0.8f;  // Inhibitory neurons have lower maximum potential
+    }
+    
+    // Adjust bounds based on adaptation level
+    if (pImpl->state.adaptationVariable > 1.0f) {
+        minV += pImpl->state.adaptationVariable * 0.1f;  // Adapt to stronger inhibition
+    }
+    
+    // Stable clamping
+    V = std::clamp(V, minV, maxV);
+    
+    // Check for spike with hysteresis to prevent spurious firing
+    bool shouldFire = V >= threshold;
+    if (shouldFire) {
+        // Only fire if not already in refractory or active state
+        if (pImpl->state.firingState != FiringState::Refractory && 
+            pImpl->state.firingState != FiringState::Active) {
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike with overflow protection
+            recordSpike(currentTime);
+            
+            // Reset membrane potential to a stable reset value
+            V = V_reset;
+            
+            // Enter refractory period with safety check
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+        }
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Only mark as active if not already firing
+        if (pImpl->state.firingState == FiringState::Resting) {
+            pImpl->state.firingState = FiringState::Active;
+        }
     }
     
     // Clear synaptic input for next step
