@@ -15,6 +15,16 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -351,7 +361,46 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

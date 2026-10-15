@@ -98,6 +98,10 @@ bool Experiment::hasMetric(const std::string& name) const {
     return false;
 }
 
+void Experiment::clearMetrics() {
+    pImpl->metrics.clear();
+}
+
 void Experiment::recordStep(SimulationStep step, size_t neuronCount, size_t synapseCount,
                            size_t firingCount, float avgFiringRate) {
     StepData data;
@@ -135,6 +139,10 @@ void Experiment::addNote(const std::string& note) {
 
 const std::vector<std::string>& Experiment::getNotes() const {
     return pImpl->notes;
+}
+
+void Experiment::clearMetrics() {
+    pImpl->metrics.clear();
 }
 
 } // namespace nlm

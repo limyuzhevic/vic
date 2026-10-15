@@ -1,7 +1,15 @@
 #include "SimpleWorld.hpp"
+#include "../core/Errors/Errors.hpp"
+#include "../core/Errors/ErrorHandling.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../agent/SensoryPercept.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <memory>
+#include <vector>
+#include <stdexcept>
+#include <limits>
 
 namespace nlm {
 
@@ -29,7 +37,38 @@ SimpleWorld::SimpleWorld()
     , rngSeed_(42)
     , rngState_(42)
 {
-    agent_.reset();
+    try {
+        agent_.reset();
+        // Validate world dimensions
+        if (width_ <= 0.0f || height_ <= 0.0f) {
+            throw ValidationError("World dimensions must be positive", ValidationError::ErrorType::InvalidFormat);
+        }
+        
+        // Validate vision dimensions
+        if (visionWidth_ == 0 || visionHeight_ == 0) {
+            throw ValidationError("Vision dimensions must be positive", ValidationError::ErrorType::InvalidFormat);
+        }
+        
+        // Validate energy parameters
+        if (maxEnergy_ <= 0.0f || energyDecayRate_ < 0.0f || resourceEnergyGain_ <= 0.0f) {
+            throw ValidationError("Energy parameters must be valid", ValidationError::ErrorType::InvalidFormat);
+        }
+        
+    } catch (const ValidationError& e) {
+        logError(ConfigError("Error initializing SimpleWorld: " + e.getMessage(),
+                           ConfigError::ErrorType::ValidationFailed));
+        // Reset to default values
+        width_ = 20.0f;
+        height_ = 20.0f;
+        visionWidth_ = 16;
+        visionHeight_ = 16;
+        maxEnergy_ = 100.0f;
+        energyDecayRate_ = 0.01f;
+        resourceEnergyGain_ = 30.0f;
+        simTime_ = 0.0;
+        rngSeed_ = 42;
+        rngState_ = 42;
+    }
 }
 
 SimpleWorld::~SimpleWorld() = default;

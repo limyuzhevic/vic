@@ -40,6 +40,9 @@ public:
     // Check if metric exists
     bool hasMetric(const std::string& name) const;
     
+    // Clear all metrics
+    void clearMetrics();
+    
     // Recording step data
     void recordStep(SimulationStep step, size_t neuronCount, size_t synapseCount,
                    size_t firingCount, float avgFiringRate);

@@ -1,0 +1,170 @@
+# Enhanced Neural Network Framework - CMake Configuration
+
+cmake_minimum_required(VERSION 3.10)
+project(NLM_EnhancedNeuralNetwork VERSION 1.0.0 LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build options
+option(NLM_ENABLE_ADVANCED_NEURONS "Enable advanced neuron models" ON)
+option(NLM_ENABLE_ADVANCED_PLASTICITY "Enable advanced plasticity rules" ON)
+option(NLM_ENABLE_NEURAL_CIRCUIT_ARCHITECTURE "Enable neural circuit architecture" ON)
+option(NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS "Enable performance optimizations" ON)
+option(NLM_ENABLE_RESEARCH_EXTENSIONS "Enable research extensions" ON)
+
+# Enhanced neural network source files
+if(NLM_ENABLE_ADVANCED_NEURONS)
+    file(GLOB ENHANCED_NEURON_SOURCES
+        "src/neural_network/neurons/lif_neuron.cpp"
+        "src/neural_network/neurons/adaptive_neuron.cpp"
+        "src/neural_network/neurons/stochastic_neuron.cpp"
+        "src/neural_network/neurons/dendrite.cpp"
+    )
+endif()
+
+if(NLM_ENABLE_ADVANCED_PLASTICITY)
+    file(GLOB ENHANCED_SYNAPSE_SOURCES
+        "src/neural_network/synapses/stdp.cpp"
+        "src/neural_network/synapses/hebbian.cpp"
+        "src/neural_network/synapses/neuromodulated_synapse.cpp"
+        "src/neural_network/synapses/structural_plasticity.cpp"
+    )
+endif()
+
+if(NLM_ENABLE_NEURAL_CIRCUIT_ARCHITECTURE)
+    file(GLOB ENHANCED_CIRCUIT_SOURCES
+        "src/neural_network/circuits/network_topology.cpp"
+        "src/neural_network/circuits/connection_patterns.cpp"
+        "src/neural_network/circuits/network_initializer.cpp"
+    )
+endif()
+
+if(NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS)
+    file(GLOB ENHANCED_PERFORMANCE_SOURCES
+        "src/neural_network/performance/simd_optimization.cpp"
+        "src/neural_network/performance/memory_pool.cpp"
+        "src/neural_network/performance/event_queue.cpp"
+    )
+endif()
+
+if(NLM_ENABLE_RESEARCH_EXTENSIONS)
+    file(GLOB ENHANCED_RESEARCH_SOURCES
+        "src/neural_network/research/meta_plasticity.cpp"
+        "src/neural_network/research/homeostatic_plasticity.cpp"
+        "src/neural_network/research/specialized_populations.cpp"
+    )
+endif()
+
+# Enhanced brain source file
+file(GLOB ENHANCED_BRAIN_SOURCES
+    "src/neural_network/enhanced_brain.cpp"
+)
+
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/brain)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network/neurons)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network/synapses)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network/circuits)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network/performance)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/neural_network/research)
+
+# Create enhanced neural network library
+add_library(nlm_neural_network STATIC
+    ${ENHANCED_NEURON_SOURCES}
+    ${ENHANCED_SYNAPSE_SOURCES}
+    ${ENHANCED_CIRCUIT_SOURCES}
+    ${ENHANCED_PERFORMANCE_SOURCES}
+    ${ENHANCED_RESEARCH_SOURCES}
+    ${ENHANCED_BRAIN_SOURCES}
+)
+
+# Link with existing NLM libraries
+target_link_libraries(nlm_neural_network
+    PUBLIC
+        nlm_core
+        nlm_agent
+        nlm_world
+        nlm_neuromodulation
+        nlm_plasticity
+        nlm_development
+        nlm_memory
+        nlm_prediction
+        nlm_cognition
+        nlm_performance
+)
+
+# Compiler options
+target_compile_options(nlm_neural_network PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror
+    -O3
+    -march=native
+    -ffast-math
+    -funroll-loops
+    -fomit-frame-pointer
+    -flto
+)
+
+# Linker options
+target_link_options(nlm_neural_network PRIVATE
+    -flto
+    -Wl,--gc-sections
+)
+
+# Enhanced brain executable
+add_executable(test_enhanced_neural_network
+    test_enhanced_neural_network.cpp
+)
+
+target_link_libraries(test_enhanced_neural_network
+    PRIVATE
+        nlm_neural_network
+        nlm_performance
+)
+
+# Installation
+install(TARGETS nlm_neural_network
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/enhanced_brain.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/neurons/neuron_base.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/neurons/lif_neuron.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/neurons/adaptive_neuron.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/neurons/stochastic_neuron.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/neurons/dendrite.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/synapses/synapse_base.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/synapses/stdp.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/synapses/hebbian.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/synapses/neuromodulated_synapse.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/synapses/structural_plasticity.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/circuits/network_topology.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/circuits/connection_patterns.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/circuits/network_initializer.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/performance/simd_optimization.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/performance/memory_pool.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/performance/event_queue.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/research/meta_plasticity.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/research/homeostatic_plasticity.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neural_network/research/specialized_populations.hpp
+    DESTINATION include/nlm_neural_network
+)
+
+# Summary
+message(STATUS "Enhanced Neural Network Framework Configuration")
+message(STATUS "  - Advanced Neuron Models: ${NLM_ENABLE_ADVANCED_NEURONS}")
+message(STATUS "  - Advanced Plasticity: ${NLM_ENABLE_ADVANCED_PLASTICITY}")
+message(STATUS "  - Neural Circuit Architecture: ${NLM_ENABLE_NEURAL_CIRCUIT_ARCHITECTURE}")
+message(STATUS "  - Performance Optimizations: ${NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS}")
+message(STATUS "  - Research Extensions: ${NLM_ENABLE_RESEARCH_EXTENSIONS}")

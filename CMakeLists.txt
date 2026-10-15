@@ -107,44 +107,79 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Experiment management system (NEW FRAMEWORK)
+add_library(nlm_experiments STATIC
+    # Enhanced experiment framework
+    src/experiments/experiments/base_experiment.cpp
+    src/experiments/experiments/enhanced_experiments.cpp
+    src/experiments/experiments/plasticity_experiment.cpp
+    
+    # Management system
+    src/experiments/management/experiment_factory.cpp
+    src/experiments/management/parameter_sweep.cpp
+    src/experiments/management/result_analyzer.cpp
+    src/experiments/management/experiment_scheduler.cpp
+    src/experiments/management/reproducibility_manager.cpp
+    
+    # Experiment manager (core)
+    src/experiments/experiments/experiment_manager.cpp
+    
+    # Utilities
+    src/experiments/utils/experiment_utils.cpp
+    src/experiments/utils/parameter_parser.cpp
+    src/experiments/utils/result_exporter.cpp
+    
+    # Legacy compatibility
+    src/experiments/legacy/legacy_experiment.cpp
+    src/experiments/legacy/legacy_runner.cpp
+    
+    # Enhanced CLI integration
+    src/cli/enhanced_experiment_runner.cpp
+)
+target_include_directories(nlm_experiments PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_experiments PUBLIC nlm_core)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_experiments)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_experiments)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_experiments)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_experiments)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_experiments)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_experiments
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
