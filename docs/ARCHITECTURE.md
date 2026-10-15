@@ -1,8 +1,17 @@
 # NLM Architecture
 
 ## Overview
+NLM is an experimental computational brain project that implements an artificial developmental brain with integrated memory, prediction, cognition, and neuromodulation systems.
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+## System Components
+- Core neural computation engine
+- Integrated memory systems (working memory, episodic memory, etc.)
+- Neuromodulation systems (dopamine, curiosity, novelty detection)
+- Prediction and cognition systems
+- Developmental system
+- Experiment framework
+- Plugin architecture
+- Configuration management
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -102,6 +111,147 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 
 ### 9. Cognitive Layer (Phase 4)
 - **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
+- **NeuralPlanner**: Predictive action selection
+- **SelfModel**: Sensorimotor self-awareness
+- **SocialLearning**: Observation and imitation
+
+### 10. Sensory Layer
+- **SensoryInput**: Base class for sensory data
+- **Vision**: Visual input processing
+- **Audio**: Audio input processing
+- **InternalSignals**: Internal state signals
+
+### 11. Motor Layer
+- **Action**: Action representation
+- **MotorSystem**: Neural-to-action conversion
+
+### 12. Environment Layer
+- **Environment**: Abstract environment interface
+- **Observation**: Sensory observation wrapper
+- **Action**: Action wrapper
+
+### 13. Experiments Layer
+- **Experiment**: Single experiment recording
+- **ExperimentRunner**: Experiment execution
+- **Metrics**: Data analysis
+- **Phase4Experiment**: Phase 4 cognitive experiments
+
+## System Components
+- Core neural computation engine
+- Integrated memory systems (working memory, episodic memory, etc.)
+- Neuromodulation systems (dopamine, curiosity, novelty detection)
+- Prediction and cognition systems
+- Developmental system
+- Experiment framework
+- Plugin architecture
+- Configuration management
+
+## Data Flow
+1. Sensory input -> Neural processing -> Memory integration
+2. Neural dynamics -> Plasticity -> Learning
+3. Prediction -> Error signals -> Neuromodulation
+4. Action selection -> Motor output -> World interaction
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         NLM Brain                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
+│  │   Input    │    │   Core      │    │    Output   │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│         │                  │                  │                 │
+│         ▼                  ▼                  ▼                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │  Sensory    │    │  Memory     │    │   Action    │          │
+│  │  Processing │    │  Systems   │    │  Selection  │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │  Prediction │                              │
+│                    │   System    │                              │
+│                    └─────────────┘                              │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │Neuromodul. │                              │
+│                    │  Signals    │                              │
+│                    └─────────────┘                              │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │ Development │                              │
+│                    │   System    │                              │
+│                    └─────────────┘                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
+│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
+│  │  │         │  │         │  │         │  │Learning │       ││
+│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Core Components
+
+### 1. Core Layer
+- **Types**: Strongly-typed identifiers (NeuronId, SynapseId, etc.)
+- **Config**: Configuration management system
+- **Random**: Deterministic random number generator
+- **Logger**: Structured logging system
+- **SimulationClock**: Time management for simulation
+
+### 2. Brain Layer
+- **Neuron**: Individual neuron representation (LIF dynamics)
+- **Synapse**: Synaptic connection representation
+- **NeuralPopulation**: Group of neurons with shared properties
+- **NeuralRegion**: Brain region with multiple populations
+- **Brain**: Central coordinator
+
+### 3. Dynamics Layer
+- **NeuralDynamics**: Abstract base for neuron dynamics
+- **SpikeSystem**: Event-driven spike processing
+
+### 4. Plasticity Layer
+- **PlasticityRule**: Abstract base for plasticity rules
+- **Hebbian**: Hebbian learning rule
+- **STDP**: Spike-Timing-Dependent Plasticity
+- **StructuralPlasticity**: Synapse formation/removal
+
+### 5. Development Layer
+- **DevelopmentSystem**: Orchestrates development
+- **Synaptogenesis**: New synapse formation
+- **Pruning**: Weak synapse removal
+- **Maturation**: Adult property development
+
+### 6. Neuromodulation Layer
+- **Neuromodulator**: Abstract base for neuromodulators
+- **Dopamine**: Reward and reinforcement
+- **Novelty**: Novelty detection
+- **Curiosity**: Exploration motivation
+- **PredictionError**: Error signals
+
+### 7. Memory Layer (Phase 4)
+- **NeuralWorkingMemory**: Persistent activity for temporary storage
+- **NeuralEpisodicMemory**: Experience encoding in neural patterns
+- **NeuralAssociativeMemory**: Experience-based associations
+- **ConceptFormation**: Pattern discovery without labels
+- **SpatialRepresentation**: Learned spatial relationships
+- **TemporalRelation**: Before/after/sequence encoding
+
+### 8. Prediction Layer (Phase 4)
+- **NeuralPrediction**: Temporal sequence learning
+- **ActionConsequencePredictor**: Action effect prediction
+- **PredictionErrorSignal**: Error computation for learning
+
+### 9. Cognitive Layer (Phase 4)
+- **AttentionalSelection**: Competition-based attention
 - **NeuralPlanner**: Predictive action selection
 - **SelfModel**: Sensorimotor self-awareness
 - **SocialLearning**: Observation and imitation
