@@ -28,24 +28,71 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "==============================" << std::endl;
+    std::cout << "Usage: ./nlm_phase2 [--help] [--config <file>] [--log-level <level>] [--neurons <count>] [--timestep <ms>] [--steps <count>] [--help-plasticity] [--help-stdp]" << std::endl;
+    std::cout << "\nGeneral Options:" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --log-level <level>       Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  --neurons <count>         Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --timestep <ms>           Set simulation timestep in milliseconds (default: 1.0)" << std::endl;
+    std::cout << "  --steps <count>           Set number of simulation steps (default: 1000)" << std::endl;
+    std::cout << "\nTesting Modes:" << std::endl;
+    std::cout << "  --test-plasticity         Run only plasticity learning test" << std::endl;
+    std::cout << "  --test-stdp               Run only STDP verification test" << std::endl;
+    std::cout << "  --test-connectivity       Run only basic connectivity test" << std::endl;
+    std::cout << "  --help-tests              Show detailed information about all tests" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --help-plasticity         Show detailed STDP and Hebbian parameters" << std::endl;
+    std::cout << "  --help-stdp               Show detailed STDP learning rule parameters" << std::endl;
+    std::cout << "  --stdp-weights <ltp> <ltd>  Set STDP LTP/LTD weights (default: 0.02 0.015)" << std::endl;
+    std::cout << "  --synaptogenesis <rate>   Set synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning <rate>          Set pruning rate" << std::endl;
+}
+
+void printPlasticityHelp() {
+    std::cout << "NLM Phase 2 Plasticity Parameters" << std::endl;
+    std::cout << "===============================" << std::endl;
+    std::cout << "Hebbian Plasticity:" << std::endl;
+    std::cout << "  - Rules: Synapses strengthen when pre- and post-synaptic neurons fire together" << std::endl;
+    std::cout << "  - Time window: ~10-20ms" << std::endl;
+    std::cout << "  - Effect: Permanent strengthening of synaptic connections" << std::endl;
+    std::cout << "\nSTDP (Spike-Timing-Dependent Plasticity):" << std::endl;
+    std::cout << "  - LTP (Long-Term Potentiation): Pre fires before post" << std::endl;
+    std::cout << "    - Weight increases by ~0.02 per correlated pair" << std::endl;
+    std::cout << "  - LTD (Long-Term Depression): Post fires before pre" << std::endl;
+    std::cout << "    - Weight decreases by ~0.015 per correlated pair" << std::endl;
+    std::cout << "  - Time window: ~20-40ms (depends on parameters)" << std::endl;
+    std::cout << "  - Asymmetry: LTP > LTD by design" << std::endl;
+    std::cout << "\nStructural Plasticity:" << std::std::endl;
+    std::cout << "  - Synaptogenesis: New synapses form at rate (~0.0001/step)" << std::endl;
+    std::cout << "  - Pruning: Weak synapses eliminate at rate (~0.00001/step)" << std::endl;
+    std::cout << "\nDevelopment:" << std::endl;
+    std::cout << "  - Plasticity decreases with age (higher plasticity in young brains)" << std::endl;
+    std::cout << "  - Different developmental stages: Initial, Critical Period, Maturation, Adult" << std::endl;
+}
+
+void printSTDPHelp() {
+    std::cout << "NLM Phase 2 STDP Learning Rule Parameters" << std::endl;
+    std::cout << "====================================" << std::endl;
+    std::cout << "LTP Weight (pre before post):" << std::endl;
+    std::cout << "  - Default: 0.02 per correlated pair" << std::endl;
+    std::cout << "  - Effect: Permanent synaptic strengthening" << std::endl;
+    std::cout << "  - Biological analogy: Long-Term Potentiation" << std::endl;
+    std::cout << "\nLTD Weight (post before pre):" << std::endl;
+    std::cout << "  - Default: 0.015 per correlated pair" << std::endl;
+    std::cout << "  - Effect: Permanent synaptic weakening" << std::endl;
+    std::cout << "  - Biological analogy: Long-Term Depression" << std::endl;
+    std::cout << "\nSTDP Time Constant (τ):" << std::endl;
+    std::cout << "  - Default: 20.0ms" << std::endl;
+    std::cout << "  - Controls the width of the STDP window" << std::endl;
+    std::cout << "  - Longer τ = broader temporal window" << std::endl;
+    std::cout << "\nLearning Rate Modifiers:" << std::endl;
+    std::cout << "  - Dopamine modulates STDP strength" << std::endl;
+    std::cout << "  - Higher dopamine = stronger plasticity" << std::endl;
+    std::cout << "  - Negative dopamine = reduced learning" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -90,7 +137,7 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons = brain->getSpikeSystem() ? brain->getSpikeSystem()->getMostActiveNeurons(10) : std::vector<NeuronId>();
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));

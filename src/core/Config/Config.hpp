@@ -100,6 +100,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    static std::string escapeString(const std::string& str);
+    static std::string toHex(unsigned char value);
+}
 
 } // namespace nlm

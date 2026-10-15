@@ -7,13 +7,6 @@
 
 namespace nlm {
 
-struct ConsoleLogger::Impl {
-    LogLevel level = LogLevel::Info;
-    bool useColors = true;
-    std::ofstream fileOut;
-    std::mutex mutex;
-};
-
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {

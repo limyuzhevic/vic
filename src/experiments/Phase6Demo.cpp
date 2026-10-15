@@ -9,14 +9,14 @@
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
-using namespace nlm;
+namespace nlm {
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    nlm::Logger::getGlobal().setLevel(nlm::LogLevel::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
@@ -83,3 +83,5 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
+
+} // namespace nlm
