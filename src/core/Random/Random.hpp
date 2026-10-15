@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -19,15 +20,15 @@ public:
     // Create with time-based seed (not deterministic)
     RandomGenerator();
     
-    ~RandomGenerator();
+    ~RandomGenerator() = default;
     
     // Disable copying
     RandomGenerator(const RandomGenerator&) = delete;
     RandomGenerator& operator=(const RandomGenerator&) = delete;
     
     // Enable moving
-    RandomGenerator(RandomGenerator&&) noexcept;
-    RandomGenerator& operator=(RandomGenerator&&) noexcept;
+    RandomGenerator(RandomGenerator&&) noexcept = default;
+    RandomGenerator& operator=(RandomGenerator&&) noexcept = default;
     
     // Seed operations
     void seed(uint64_t seed);
@@ -88,7 +89,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;  // FIXED: Now uses smart pointer
 };
 
 // Template implementations

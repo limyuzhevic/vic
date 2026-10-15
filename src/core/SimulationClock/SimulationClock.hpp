@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include <memory>
 
 namespace nlm {
 
@@ -12,13 +13,13 @@ public:
     // Create with specific timestep
     explicit SimulationClock(TimestepDuration timestep = 0.001); // 1ms default
     
-    ~SimulationClock();
+    ~SimulationClock() = default;
     
     // Disable copying, enable moving
     SimulationClock(const SimulationClock&) = delete;
     SimulationClock& operator=(const SimulationClock&) = delete;
-    SimulationClock(SimulationClock&&) noexcept;
-    SimulationClock& operator=(SimulationClock&&) noexcept;
+    SimulationClock(SimulationClock&&) noexcept = default;
+    SimulationClock& operator=(SimulationClock&&) noexcept = default;
     
     // Time operations
     void reset();
@@ -56,7 +57,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;  // FIXED: Now uses smart pointer
 };
 
 } // namespace nlm

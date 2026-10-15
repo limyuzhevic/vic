@@ -3,6 +3,12 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // For JSON parsing
+#include <ryml.hpp>             // For YAML parsing
+#include <ryml_std.hpp>         // For YAML standard types
+
+using json = nlohmann::json;
+namespace ryml = ryml;
 
 namespace nlm {
 
@@ -18,15 +24,69 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Enhanced loadFromFile with JSON/YAML support
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Determine file format based on extension
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    bool success = false;
+    
+    if (extension == "json" || extension == "JSON") {
+        success = loadFromJSON(file);
+    } else if (extension == "yaml" || extension == "yml" || extension == "YAML" || extension == "YML") {
+        // Read entire file for YAML parsing
+        file.clear();
+        file.seekg(0, std::ios::beg);
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        success = loadFromYAML(content);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        file.clear();
+        file.seekg(0, std::ios::beg);
+        success = loadFromSimple(file);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(std::ifstream& file) {
+    try {
+        json data = json::parse(file);
+        pImpl->entries.clear();
+        
+        // Convert JSON to Config entries
+        convertJSONToConfig(data, ConfigSource::File);
+        return true;
+    } catch (const json::parse_error& e) {
+        NLM_LOG_ERROR("JSON parse error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& content) {
+    try {
+        auto tree = ryml::parse_in_place(content);
+        pImpl->entries.clear();
+        
+        // Convert YAML to Config entries
+        convertYAMLToConfig(tree, ConfigSource::File);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parse error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromSimple(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -51,8 +111,105 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
+}
+
+void Config::convertJSONToConfig(const json& data, ConfigSource source) {
+    if (data.is_object()) {
+        for (auto it = data.begin(); it != data.end(); ++it) {
+            std::string key = it.key();
+            const json& value = it.value();
+            setFromJSONValue(key, value, source);
+        }
+    } else {
+        NLM_LOG_WARNING("JSON root is not an object, skipping");
+    }
+}
+
+void Config::convertYAMLToConfig(ryml::Tree& tree, ConfigSource source) {
+    if (tree.rootref().is_map()) {
+        auto node = tree.rootref();
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::string key = ryml::to_cstr(it->key());
+            setFromYAMLValue(key, *it, source);
+        }
+    } else {
+        NLM_LOG_WARNING("YAML root is not a map, skipping");
+    }
+}
+
+void Config::setFromJSONValue(const std::string& key, const json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // Handle arrays
+        std::vector<double> doubleArray;
+        for (const auto& item : value) {
+            if (item.is_number()) {
+                doubleArray.push_back(item.get<double>());
+            }
+        }
+        // For now, store arrays as strings. Could enhance later.
+        set(key, "ARRAY_NOT_FULLY_SUPPORTED", source);
+    } else {
+        // null or other types
+        set(key, "NULL_OR_UNSUPPORTED", source);
+    }
+}
+
+void Config::setFromYAMLValue(const std::string& key, const ryml::ConstNodeRef& node, ConfigSource source) {
+    if (ryml::is_scalar(node)) {
+        std::string value = ryml::to_cstr(node);
+        // Try to determine type
+        if (value == "true" || value == "false") {
+            set(key, value == "true", source);
+        } else {
+            try {
+                // Try to parse as integer
+                size_t pos;
+                int64_t intVal = std::stoll(value, &pos);
+                if (pos == value.size()) {
+                    set(key, intVal, source);
+                    return;
+                }
+            } catch (...) {}
+            
+            try {
+                // Try to parse as float
+                size_t pos;
+                double floatVal = std::stod(value, &pos);
+                if (pos == value.size()) {
+                    set(key, floatVal, source);
+                    return;
+                }
+            } catch (...) {}
+            
+            // Default to string
+            set(key, value, source);
+        }
+    } else if (ryml::is_seq(node)) {
+        // Handle sequences (arrays)
+        std::vector<double> doubleArray;
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            if (ryml::is_scalar(*it)) {
+                std::string value = ryml::to_cstr(*it);
+                try {
+                    double val = std::stod(value);
+                    doubleArray.push_back(val);
+                } catch (...) {}
+            }
+        }
+        // For now, store arrays as strings. Could enhance later.
+        set(key, "ARRAY_NOT_FULLY_SUPPORTED", source);
+    } else {
+        NLM_LOG_WARNING("Unsupported YAML node type for key: " + key);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

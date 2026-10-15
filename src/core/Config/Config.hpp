@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>  // For JSON parsing
+#include <ryml.hpp>             // For YAML parsing
+
+using json = nlohmann::json;
+namespace ryml = ryml;
 
 namespace nlm {
 
@@ -55,8 +60,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON, YAML, or simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from specific formats
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimple(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -100,6 +110,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format-specific loading helpers
+    bool loadFromJSON(std::ifstream& file);
+    bool loadFromYAML(const std::string& content);
+    bool loadFromSimple(std::ifstream& file);
+    
+    // Conversion helpers
+    void convertJSONToConfig(const json& data, ConfigSource source);
+    void convertYAMLToConfig(ryml::Tree& tree, ConfigSource source);
+    void setFromJSONValue(const std::string& key, const json& value, ConfigSource source);
+    void setFromYAMLValue(const std::string& key, const ryml::ConstNodeRef& node, ConfigSource source);
 };
 
 } // namespace nlm
