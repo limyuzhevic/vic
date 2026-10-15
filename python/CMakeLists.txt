@@ -87,9 +87,31 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Add Python package data files
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../easy_usage.md
+    ${CMAKE_CURRENT_BINARY_DIR}/easy_usage.md
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../HOW_TO_USE.md
+    ${CMAKE_CURRENT_BINARY_DIR}/HOW_TO_USE.md
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
+    ${CMAKE_CURRENT_BINARY_DIR}/README.md
+)
+
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Add include directory for headers
+target_include_directories(pynlm PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
+    $<INSTALL_INTERFACE:include>
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
