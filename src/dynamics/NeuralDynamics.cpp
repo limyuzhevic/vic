@@ -1,6 +1,3 @@
-#include "NeuralDynamics.hpp"
-#include <cmath>
-
 namespace nlm {
 
 struct IntegrateAndFireDynamics::Impl {

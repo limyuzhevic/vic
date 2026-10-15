@@ -1,7 +1,3 @@
-#include "SpikeSystem.hpp"
-#include <algorithm>
-#include <limits>
-
 namespace nlm {
 
 struct SpikeSystem::Impl {
@@ -22,15 +18,11 @@ SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
 SpikeSystem::~SpikeSystem() = default;
 
-SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -69,6 +61,11 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Trim history if needed
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
             pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Also remove oldest spike count to keep map manageable
+            auto it = pImpl->spikeCountPerNeuron.begin();
+            if (it != pImpl->spikeCountPerNeuron.end()) {
+                pImpl->spikeCountPerNeuron.erase(it);
+            }
         }
         
         // Call handlers
