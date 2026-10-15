@@ -1,0 +1,227 @@
+# CMake configuration for NLM Advanced Debugging and Profiling Tools
+
+# This CMakeLists.txt adds the debugging and profiling components to the NLM build system.
+# It conditionally includes debugging features based on build options.
+
+cmake_minimum_required(VERSION 3.16)
+project(NLM_Debugging_Profiling Tools LANGUAGES CXX)
+
+# Debug and profiling build options
+option(NLM_DEBUGGING_ENABLED "Enable advanced debugging tools" ON)
+option(NLM_PROFILING_ENABLED "Enable performance profiling tools" ON)
+option(NLM_MONITORING_ENABLED "Enable system monitoring tools" ON)
+option(NLM_OPTIMIZATION_ENABLED "Enable optimization analysis tools" ON)
+option(NLM_VISUALIZATION_ENABLED "Enable visualization tools" ON)
+option(NLM_REPORT_GENERATION_ENABLED "Enable report generation tools" ON)
+
+# Debug libraries
+if(NLM_DEBUGGING_ENABLED)
+    add_library(debug_core STATIC
+        src/debug/DebugManager.cpp
+        src/debug/BreakpointDebugger.cpp
+        src/debug/MemoryDebugger.cpp
+    )
+    
+    target_include_directories(debug_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/debug
+    )
+    
+    target_compile_definitions(debug_core PUBLIC
+        NLM_DEBUGGING_ENABLED
+    )
+    
+    # Link dependencies
+    target_link_libraries(debug_core PUBLIC
+        core
+        ${NLM_LIBRARIES}
+    )
+endif()
+
+# Profiling libraries
+if(NLM_PROFILING_ENABLED)
+    add_library(profiling_core STATIC
+        src/profiling/PerformanceProfiler.cpp
+    )
+    
+    target_include_directories(profiling_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/profiling
+    )
+    
+    target_compile_definitions(profiling_core PUBLIC
+        NLM_PROFILING_ENABLED
+    )
+    
+    # Link dependencies
+    target_link_libraries(profiling_core PUBLIC
+        debug_core
+        experiments
+        ${NLM_LIBRARIES}
+    )
+endif()
+
+# Monitoring libraries
+if(NLM_MONITORING_ENABLED)
+    add_library(monitoring_core STATIC
+        src/monitoring/SystemMonitor.cpp
+        src/monitoring/PerformanceDashboard.cpp
+        src/monitoring/AlertSystem.cpp
+        src/monitoring/HealthChecker.cpp
+    )
+    
+    target_include_directories(monitoring_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/monitoring
+    )
+    
+    target_compile_definitions(monitoring_core PUBLIC
+        NLM_MONITORING_ENABLED
+    )
+    
+    # Link dependencies
+    target_link_libraries(monitoring_core PUBLIC
+        profiling_core
+        ${NLM_LIBRARIES}
+    )
+endif()
+
+# Optimization libraries
+if(NLM_OPTIMIZATION_ENABLED)
+    add_library(optimization_core STATIC
+        src/optimization/BottleneckAnalyzer.cpp
+        src/optimization/MemoryOptimizer.cpp
+        src/optimization/CPUMOptimizer.cpp
+        src/optimization/AlgorithmAnalyzer.cpp
+    )
+    
+    target_include_directories(optimization_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/optimization
+    )
+    
+    target_compile_definitions(optimization_core PUBLIC
+        NLM_OPTIMIZATION_ENABLED
+    )
+    
+    # Link dependencies
+    target_link_libraries(optimization_core PUBLIC
+        monitoring_core
+        ${NLM_LIBRARIES}
+    )
+endif()
+
+# Visualization libraries
+if(NLM_VISUALIZATION_ENABLED)
+    add_library(visualization_core STATIC
+        src/visualization/PerformanceVisualizer.cpp
+        src/visualization/DebugVisualizer.cpp
+        src/visualization/ArchitectureVisualizer.cpp
+        src/visualization/ReportGenerator.cpp
+    )
+    
+    target_include_directories(visualization_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/visualization
+    )
+    
+    target_compile_definitions(visualization_core PUBLIC
+        NLM_VISUALIZATION_ENABLED
+    )
+    
+    # Link dependencies
+    target_link_libraries(visualization_core PUBLIC
+        optimization_core
+        ${NLM_LIBRARIES}
+    )
+endif()
+
+# Integration libraries
+add_library(debug_integration STATIC
+    src/core/DebugConfig.cpp
+    src/core/DebugCommandLine.cpp
+    src/experiments/DebugExperiment.cpp
+)
+
+target_include_directories(debug_integration PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/experiments
+)
+
+target_compile_definitions(debug_integration PUBLIC
+    NLM_DEBUGGING_ENABLED
+)
+
+# Link dependencies
+target_link_libraries(debug_integration PUBLIC
+    visualization_core
+    ${NLM_LIBRARIES}
+)
+
+# Main executable for testing the debugging and profiling tools
+if(NLM_DEBUGGING_ENABLED OR NLM_PROFILING_ENABLED)
+    add_executable(nlm_debug_test
+        examples/test_debug_profiling.cpp
+    )
+    
+    target_link_libraries(nlm_debug_test
+        debug_integration
+        ${NLM_LIBRARIES}
+    )
+    
+    # Add test target
+    add_test(NAME nlm_debug_test
+        COMMAND nlm_debug_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+endif()
+
+# Python bindings
+if(PYTHON_EXECUTABLE)
+    # This section would be handled by the main pyproject.toml
+    # Include Python bindings build script
+    # add_subdirectory(python)
+endif()
+
+# Installation
+install(TARGETS debug_core profiling_core monitoring_core optimization_core
+        visualization_core debug_integration
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
+
+install(DIRECTORY src/debug/ DESTINATION include/nlm/debug
+        FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY src/profiling/ DESTINATION include/nlm/profiling
+        FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY src/monitoring/ DESTINATION include/nlm/monitoring
+        FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY src/optimization/ DESTINATION include/nlm/optimization
+        FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY src/visualization/ DESTINATION include/nlm/visualization
+        FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY src/core/ DESTINATION include/nlm/core
+        FILES_MATCHING PATTERN "*.hpp")
+
+# Summary
+if(NLM_DEBUGGING_ENABLED)
+    message(STATUS "NLM Advanced Debugging Tools: Enabled")
+endif()
+
+if(NLM_PROFILING_ENABLED)
+    message(STATUS "NLM Advanced Profiling Tools: Enabled")
+endif()
+
+if(NLM_MONITORING_ENABLED)
+    message(STATUS "NLM Advanced Monitoring Tools: Enabled")
+endif()
+
+if(NLM_OPTIMIZATION_ENABLED)
+    message(STATUS "NLM Advanced Optimization Tools: Enabled")
+endif()
+
+if(NLM_VISUALIZATION_ENABLED)
+    message(STATUS "NLM Advanced Visualization Tools: Enabled")
+endif()
+
+message(STATUS "NLM Debugging and Profiling Tools: Complete")

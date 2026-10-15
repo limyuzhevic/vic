@@ -6,10 +6,13 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <json/json.h> // For structured logging
+#include "../Error/ErrorBase.hpp"
+#include "../Error/ErrorManager.hpp"
 
 namespace nlm {
 
-// Log severity levels
+// Enhanced Log severity levels with error severity integration
 enum class LogLevel {
     Debug = 0,
     Info = 1,
@@ -18,7 +21,32 @@ enum class LogLevel {
     Critical = 4
 };
 
-// Log entry structure
+// Structured log entry for enhanced logging
+struct StructuredLogEntry {
+    std::chrono::system_clock::time_point timestamp;
+    LogLevel level;
+    std::string message;
+    std::string component;
+    std::string operation;
+    Json::Value data;
+    std::chrono::milliseconds executionTime;
+    size_t memoryUsage;
+    std::string correlationId;
+    std::string parentLogId;
+    std::string errorId;
+};
+
+// Performance log structure
+struct PerformanceLogEntry {
+    std::chrono::system_clock::time_point timestamp;
+    std::string metricName;
+    double value;
+    std::string unit;
+    std::string component;
+    std::map<std::string, std::string> tags;
+};
+
+// Enhanced Log entry structure with metadata
 struct LogEntry {
     LogLevel level;
     std::string message;
@@ -26,42 +54,31 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    std::string component;
+    std::string operation;
+    Json::Value data;
+    std::chrono::milliseconds executionTime;
+    size_t memoryUsage;
+    std::string correlationId;
+    std::string errorId;
 };
 
-// Logger interface
-class ILogger {
-public:
-    virtual ~ILogger() = default;
-    virtual void log(const LogEntry& entry) = 0;
-    virtual void setLevel(LogLevel level) = 0;
-    virtual LogLevel getLevel() const = 0;
-};
-
-// Console logger implementation
-class ConsoleLogger : public ILogger {
-public:
-    ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
-    
-    void log(const LogEntry& entry) override;
-    void setLevel(LogLevel level) override;
-    LogLevel getLevel() const override;
-    
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
-    
-    // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
+// Event types for system events
+enum class EventType {
+    StateChange,
+    ConfigurationUpdate,
+    SystemStartup,
+    SystemShutdown,
+    ErrorOccurred,
+    RecoveryCompleted,
+    PerformanceMetric,
+    MemoryAllocation,
+    MemoryDeallocation,
+    PluginLoaded,
+    PluginUnloaded,
+    UserAction,
+    SecurityEvent,
+    Custom
 };
 
 // Main Logger class
@@ -108,34 +125,3 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
-
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
-
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
-    }
-    
-private:
-    LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
-};
-
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
-
-} // namespace nlm
