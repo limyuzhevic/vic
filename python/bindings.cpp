@@ -73,39 +73,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+    // NeuronType - basic types
+    py::enum_<NeuronType>(m, "NeuronType")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
         .value("Modulatory", NeuronType::Modulatory)
         .value("Sensory", NeuronType::Sensory)
         .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
+        .value("Internal", NeuronType::Internal);
 
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+    // SynapseType - basic types  
+    py::enum_<SynapseType>(m, "SynapseType")
         .value("Excitatory", SynapseType::Excitatory)
         .value("Inhibitory", SynapseType::Inhibitory)
         .value("Modulatory", SynapseType::Modulatory)
         .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+        .value("GapJunction", SynapseType::GapJunction);
 
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+    // DevelopmentalStage - simplified
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage")
         .value("Initial", DevelopmentalStage::Initial)
         .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
         .value("Maturation", DevelopmentalStage::Maturation)
         .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+        .value("Aging", DevelopmentalStage::Aging);
 
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+    // FiringState - simplified
+    py::enum_<FiringState>(m, "FiringState")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
         .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+        .value("Inhibited", FiringState::Inhibited);
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+    // ActionType - simplified
+    py::enum_<ActionType>(m, "ActionType")
         .value("MoveForward", ActionType::MoveForward)
         .value("MoveBackward", ActionType::MoveBackward)
         .value("MoveLeft", ActionType::MoveLeft)
@@ -120,10 +121,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Drink", ActionType::Drink)
         .value("Rest", ActionType::Rest)
         .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+        .value("Custom", ActionType::Custom);
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+    // MotorCommand - simplified
+    py::enum_<MotorCommand>(m, "MotorCommand")
         .value("MoveForward", MotorCommand::MoveForward)
         .value("MoveBackward", MotorCommand::MoveBackward)
         .value("TurnLeft", MotorCommand::TurnLeft)
@@ -131,16 +132,28 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookLeft", MotorCommand::LookLeft)
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+        .value("Wait", MotorCommand::Wait);
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+    // WorldObjectType - simplified
+    py::enum_<WorldObjectType>(m, "WorldObjectType")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
         .value("Hazard", WorldObjectType::Hazard)
         .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+        .value("Marker", WorldObjectType::Marker);
+
+    py::enum_<LogLevel>(m, "LogLevel")
+        .value("Debug", LogLevel::Debug)
+        .value("Info", LogLevel::Info)
+        .value("Warning", LogLevel::Warning)
+        .value("Error", LogLevel::Error)
+        .value("Critical", LogLevel::Critical);
+
+    py::enum_<ConfigSource>(m, "ConfigSource")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime);
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
