@@ -69,26 +69,20 @@ set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
-    $<INSTALL_INTERFACE:include>
-)
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-)
+# Performance-optimized modules are header-only or inline implementation
+# No separate .cpp files needed for these headers
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+# Replace the nlm_performance section with interface library approach
+add_library(nlm_performance INTERFACE)
+target_include_directories(nlm_performance INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_performance INTERFACE nlm_core)
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_compile_definitions(nlm_performance INTERFACE
+    NLM_PERFORMANCE_ENABLED
+)
 
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlm_performance)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)

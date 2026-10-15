@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <algorithm>
 #include <random>
+#include <stdexcept>
 #include <functional>
 
 namespace nlm {
