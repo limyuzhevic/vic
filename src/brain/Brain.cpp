@@ -235,6 +235,18 @@ bool Brain::initialize() {
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
+    // Populate working memory with sensory and motor neurons
+    // This provides the neural substrate for working memory storage
+    for (size_t i = 0; i < std::min(size_t(50), neuronCount); ++i) {
+        // Use first available neurons (sensory and motor)
+        // This gives working memory access to sensory input and motor output neurons
+        if (i < pImpl->sensoryNeurons.size()) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), 0.0f);
+        } else if (i < pImpl->motorNeurons.size()) {
+            pImpl->workingMemory->storeToNeuron(pImpl->motorNeurons[i]->getId(), 0.0f);
+        }
+    }
+    
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
@@ -895,7 +907,22 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
+        // Apply synapse states
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Apply checkpoint data to this synapse
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                }
+                synapseIdx++;
+            }
+        }
+        
+        // Also apply to inter-region connections (simplified)
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         

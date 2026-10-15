@@ -37,6 +37,14 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_phase6 {
+    void runAllPhase6IntegrationTests();
+}
+
+namespace test_python_bindings {
+    void runAllPythonBindingTests();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +121,24 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Phase 6 Integration tests..." << std::endl;
+    try {
+        test_phase6::runAllPhase6IntegrationTests();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Binding tests..." << std::endl;
+    try {
+        test_python_bindings::runAllPythonBindingTests();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
