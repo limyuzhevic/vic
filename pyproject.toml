@@ -49,8 +49,27 @@ cmake.args = [
     "-DPYTHON_EXECUTABLE={python}",
 ]
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+# Additional C++ standard library includes and dependencies
+[build-system.cmake.define]
+pybind11_SOURCE_DIR = "${PYBIND11_SOURCE_DIR}"
+enable_pandas = true
+enable_numpy = true
+
+# Advanced Python binding configuration
+pybind11_OPTIONAL_DEPENDENCIES = ["pandas", "numpy"]
+pybind11_MODULE_TYPE = "python_extension"
+pybind11_PYTHON_VERSION = ">=3.8"
+pybind11_GLOBAL_COMPILATION_OPTIONS = ["-O2", "-march=native", "-fopenmp"]
+
+# Python API configuration
+pybind11_MODULE = "pynlm._pynlm"
+pybind11_PYTHON_VERSION = ">=3.8"
+pybind11_INCLUDE_DIRS = ["/usr/include/python3.8", "/usr/local/include/python3.8"]
+
+[build-system.cmake.define.pybind11_extra_args]
+"-O2"
+"-march=native"
+"-fopenmp"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
