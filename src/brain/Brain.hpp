@@ -97,6 +97,9 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
+    // Process neuron activity: detect spikes and schedule events
+    void processNeuronActivity(SimulationStep currentStep, Timestamp currentTime);
+    
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     

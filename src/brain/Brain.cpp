@@ -341,7 +341,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+void Brain::processNeuronActivity(SimulationStep currentStep, Timestamp currentTime) {
+    // Process neuron activity: detect spikes and schedule events
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -349,7 +350,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f +
+                                 1e-6f);  // Add epsilon for floating-point precision
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -387,7 +389,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
                     }
-                    
+
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
@@ -397,14 +399,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
+}
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
