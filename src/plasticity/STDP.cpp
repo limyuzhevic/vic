@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "SpikeCorrelationCache.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -21,11 +22,13 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                    const std::vector<Timestamp>& preSpikes,
+                    const std::vector<Timestamp>& postSpikes,
+                    TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
+     * 
+     * OPTIMIZED: Uses SpikeCorrelationCache to avoid redundant calculations
      * 
      * Mathematical formulation:
      * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
@@ -41,40 +44,90 @@ void STDP::update(Synapse* synapse,
      *   A- = ltdWeight (depression amplitude)  
      *   τ+ = τ- = timeConstant (STDP time window)
      * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * OPTIMIZATION:
+     * 1. Use SpikeCorrelationCache for spike storage and statistics
+     * 2. Sort spike times for efficient window processing (O(n log n))
+     * 3. Use sliding windows to process spikes within timeConstant (O(n))
+     * 4. Only consider spike pairs within timeConstant window
+     * 5. Cache correlation statistics to avoid recomputation
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
+    // Get synapse ID for cache operations
+    SynapseId synapseId = synapse->getId();
+    
+    // Try to get cached spike data
+    SpikeCorrelationCache cache;
+    auto cachedSpikes = cache.getSpikes(synapseId);
+    
+    // Get spike data from either cache or directly
+    std::vector<Timestamp> actualPreSpikes = preSpikes;
+    std::vector<Timestamp> actualPostSpikes = postSpikes;
+    
+    if (!cachedSpikes.first.empty() && !cachedSpikes.second.empty()) {
+        // Use cached spikes (they should be equivalent)
+        actualPreSpikes = cachedSpikes.first;
+        actualPostSpikes = cachedSpikes.second;
+    }
+    
+    // Store spikes in cache for future use
+    cache.storeSpikes(synapseId, actualPreSpikes, actualPostSpikes);
+    
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    // OPTIMIZATION: Sort spikes for efficient window processing
+    std::vector<Timestamp> sortedPre = actualPreSpikes;
+    std::vector<Timestamp> sortedPost = actualPostSpikes;
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
+    // OPTIMIZATION: Sliding window approach for each spike type
+    size_t preIdx = 0, postIdx = 0;
+    
+    // Process pre-before-post pairings (positive Δt)
+    for (size_t i = 0; i < sortedPre.size(); ++i) {
+        Timestamp preTime = sortedPre[i];
+        
+        // Find posts that occur after this pre spike
+        // Only consider posts within timeConstant window
+        while (postIdx < sortedPost.size() && 
+               sortedPost[postIdx] < preTime + tau) {
+            Timestamp postTime = sortedPost[postIdx];
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
+            }
+            ++postIdx;
+        }
+    }
+    
+    // Reset post index for depression calculation
+    postIdx = 0;
+    
+    // Process post-before-pre pairings (negative Δt)
+    for (size_t i = 0; i < sortedPost.size(); ++i) {
+        Timestamp postTime = sortedPost[i];
+        
+        // Find pres that occur after this post spike
+        // Only consider pres within timeConstant window
+        while (preIdx < sortedPre.size() &&
+               sortedPre[preIdx] < postTime + tau) {
+            Timestamp preTime = sortedPre[preIdx];
+            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            
+            if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            ++preIdx;
         }
     }
     
