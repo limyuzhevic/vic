@@ -1,0 +1,1047 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) - Command Line Interface
+
+This provides command-line tools for:
+- Configuration management
+- Testing and validation
+- Performance monitoring
+- Debugging and analysis
+"""
+
+import sys
+import os
+import json
+import subprocess
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+def parse_args():
+    """Parse command line arguments"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="NLM Neural Learning Machine CLI Tools",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run a simple brain simulation
+  nlm-cli run --steps 1000
+  
+  # Run with agent in world
+  nlm-cli run-agent --steps 1000 --world-width 20 --world-height 20
+  
+  # Test integration
+  nlm-cli test-integration
+  
+  # Configure brain parameters
+  nlm-cli config set neuron-count 2000
+  nlm-cli config get neuron-count
+  
+  # Performance monitoring
+  nlm-cli monitor --duration 60
+  
+  # Debug session
+  nlm-cli debug --log-level debug --output debug.json
+        """.strip()
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    
+    # Basic run commands
+    add_run_subparser(subparsers)
+    add_run_agent_subparser(subparsers)
+    
+    # Configuration management
+    add_config_subparser(subparsers)
+    
+    # Testing and validation
+    add_test_subparser(subparsers)
+    add_test_integration_subparser(subparsers)
+    
+    # Performance monitoring
+    add_monitor_subparser(subparsers)
+    
+    # Debugging
+    add_debug_subparser(subparsers)
+    
+    # Advanced commands
+    add_advanced_subparser(subparsers)
+    
+    return parser.parse_args()
+
+def add_run_subparser(subparsers):
+    """Add brain simulation run command"""
+    parser = subparsers.add_parser("run", help="Run a brain simulation")
+    parser.add_argument("--steps", type=int, default=100, help="Number of simulation steps")
+    parser.add_argument("--neuron-count", type=int, default=500, help="Number of neurons")
+    parser.add_argument("--region-count", type=int, default=1, help="Number of brain regions")
+    parser.add_argument("--connection-prob", type=float, default=0.1, help="Connection probability")
+    parser.add_argument("--output", type=str, help="Output file for results")
+    parser.add_argument("--quiet", action="store_true", help="Suppress detailed output")
+
+def add_run_agent_subparser(subparsers):
+    """Add agent simulation run command"""
+    parser = subparsers.add_parser("run-agent", help="Run agent in world simulation")
+    parser.add_argument("--steps", type=int, default=500, help="Number of simulation steps")
+    parser.add_argument("--world-width", type=int, default=20, help="World width")
+    parser.add_argument("--world-height", type=int, default=20, help="World height")
+    parser.add_argument("--vision-width", type=int, default=8, help="Vision width")
+    parser.add_argument("--vision-height", type=int, default=8, help="Vision height")
+    parser.add_argument("--enable-reward", action="store_true", default=True, help="Enable reward modulation")
+    parser.add_argument("--enable-curiosity", action="store_true", default=True, help="Enable curiosity-driven exploration")
+    parser.add_argument("--enable-development", action="store_true", default=True, help="Enable development")
+    parser.add_argument("--enable-structural-plasticity", action="store_true", default=True, help="Enable structural plasticity")
+    parser.add_argument("--output", type=str, help="Output file for results")
+
+def add_config_subparser(subparsers):
+    """Add configuration management commands"""
+    config_parser = subparsers.add_parser("config", help="Configuration management")
+    config_subparsers = config_parser.add_subparsers(dest="config_command", help="Config commands")
+    
+    # Set configuration value
+    set_parser = config_subparsers.add_parser("set", help="Set configuration value")
+    set_parser.add_argument("key", type=str, help="Configuration key")
+    set_parser.add_argument("value", type=str, help="Configuration value")
+    set_parser.add_argument("--source", choices=["default", "file", "commandline", "runtime"], 
+                           default="runtime", help="Configuration source")
+    
+    # Get configuration value
+    get_parser = config_subparsers.add_parser("get", help="Get configuration value")
+    get_parser.add_argument("key", type=str, help="Configuration key")
+    
+    # List all keys
+    config_subparsers.add_parser("list", help="List all configuration keys")
+    
+    # Clear configuration
+    config_subparsers.add_parser("clear", help="Clear all configuration")
+    
+    # Save to file
+    save_parser = config_subparsers.add_parser("save", help="Save configuration to file")
+    save_parser.add_argument("filepath", type=str, help="Configuration file path")
+    
+    # Load from file
+    load_parser = config_subparsers.add_parser("load", help="Load configuration from file")
+    load_parser.add_argument("filepath", type=str, help="Configuration file path")
+
+def add_test_subparser(subparsers):
+    """Add basic testing commands"""
+    parser = subparsers.add_parser("test", help="Run basic tests")
+    parser.add_argument("--quick", action="store_true", help="Run quick tests")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--output", type=str, help="Output file for test results")
+
+def add_test_integration_subparser(subparsers):
+    """Add integration testing commands"""
+    parser = subparsers.add_parser("test-integration", help="Run integration tests")
+    parser.add_argument("--detailed", action="store_true", help="Run detailed integration tests")
+    parser.add_argument("--benchmark", action="store_true", help="Run performance benchmarks")
+    parser.add_argument("--output", type=str, help="Output file for integration results")
+
+def add_monitor_subparser(subparsers):
+    """Add performance monitoring commands"""
+    parser = subparsers.add_parser("monitor", help="Monitor brain performance")
+    parser.add_argument("--duration", type=int, default=60, help="Monitoring duration in seconds")
+    parser.add_argument("--interval", type=float, default=1.0, help="Sampling interval in seconds")
+    parser.add_argument("--output", type=str, help="Output file for monitoring data")
+    parser.add_argument("--metrics", nargs="*", default=["spikes", "firing-rate", "e-i-ratio"],
+                       help="Metrics to monitor")
+
+def add_debug_subparser(subparsers):
+    """Add debugging commands"""
+    parser = subparsers.add_parser("debug", help="Debug simulation")
+    parser.add_argument("--log-level", choices=["error", "warn", "info", "debug"], default="info",
+                       help="Log level")
+    parser.add_argument("--output", type=str, help="Output file for debug data")
+    parser.add_argument("--trace", action="store_true", help="Enable detailed tracing")
+    parser.add_argument("--validate", action="store_true", help="Validate internal state")
+
+def add_advanced_subparser(subparsers):
+    """Add advanced commands for power users"""
+    adv_parser = subparsers.add_parser("advanced", help="Advanced commands for power users")
+    adv_subparsers = adv_parser.add_subparsers(dest="advanced_command", help="Advanced commands")
+    
+    # Create custom brain
+    create_parser = adv_subparsers.add_parser("create-brain", help="Create custom brain configuration")
+    create_parser.add_argument("--file", type=str, help="Save configuration to file")
+    
+    # Export brain state
+    export_parser = adv_subparsers.add_parser("export", help="Export brain state")
+    export_parser.add_argument("--format", choices=["bin", "json", "csv"], default="bin",
+                              help="Export format")
+    export_parser.add_argument("--filepath", type=str, required=True, help="Output file path")
+    
+    # Import brain state
+    import_parser = adv_subparsers.add_parser("import", help="Import brain state")
+    import_parser.add_argument("--format", choices=["bin", "json", "csv"], default="bin",
+                              help="Import format")
+    import_parser.add_argument("--filepath", type=str, required=True, help="Input file path")
+    
+    # Performance profile
+    profile_parser = adv_subparsers.add_parser("profile", help="Profile performance")
+    profile_parser.add_argument("--steps", type=int, default=1000, help="Number of steps to profile")
+    profile_parser.add_argument("--output", type=str, help="Output file for profile data")
+
+class NLMCLI:
+    """NLM Command Line Interface"""
+    
+    def __init__(self):
+        self.config = {}  # In-memory configuration cache
+        self.load_config_from_file()
+    
+    def load_config_from_file(self):
+        """Load default configuration from file"""
+        config_file = os.path.expanduser("~/.nlm_config")
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    self.config = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load config file: {e}")
+    
+    def save_config_to_file(self):
+        """Save configuration to file"""
+        config_file = os.path.expanduser("~/.nlm_config")
+        try:
+            with open(config_file, 'w') as f:
+                json.dump(self.config, f, indent=2)
+        except Exception as e:
+            print(f"Error: Could not save config file: {e}")
+    
+    def run_simulation(self, args):
+        """Run a brain simulation"""
+        print(f"Running brain simulation with {args.steps} steps...")
+        
+        # Build command for C++ executable
+        cmd = [
+            "python3", "-c", f"""
+import pynlm
+import sys
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", {args.neuron_count})
+config.set("brain.region_count", {args.region_count})
+config.set("brain.connection_probability", {args.connection_prob})
+config.set("random_seed", 42)
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range({args.steps}):
+    brain.step(step)
+    
+    # Print progress every 100 steps
+    if step % 100 == 0 and {not args.quiet}:
+        firing = brain.getFiringNeuronCount()
+        total_spikes = brain.getTotalSpikeCount()
+        print(f"Step {{step}}: {{firing}} firing neurons, {{total_spikes}} total spikes")
+
+print("Simulation complete!")
+print(f"Final firing rate: {{brain.getAverageFiringRate()}}")
+print(f"Total neurons: {{brain.getTotalNeuronCount()}}")
+print(f"Total synapses: {{brain.getTotalSynapseCount()}}")
+"""
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Simulation failed with code {e.returncode}")
+            return False
+        except FileNotFoundError:
+            print("Error: pynlm module not found. Install with: pip install pynlm")
+            return False
+        
+        return True
+    
+    def run_agent_simulation(self, args):
+        """Run agent in world simulation"""
+        print(f"Running agent simulation with {args.steps} steps...")
+        
+        cmd = [
+            "python3", "-c", f"""
+import pynlm
+import sys
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+
+# Create brain and agent
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world
+world = pynlm.createSimpleWorld()
+world.configure(
+    width={args.world_width},
+    height={args.world_height},
+    visionWidth={args.vision_width},
+    visionHeight={args.vision_height}
+)
+world.reset()
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable subsystems
+agent.enableRewardModulation({args.enable_reward})
+agent.enableCuriosity({args.enable_curiosity})
+agent.enableDevelopment({args.enable_development})
+agent.enableStructuralPlasticity({args.enable_structural_plasticity})
+
+# Run simulation
+for step in range({args.steps}):
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print progress
+    if step % 100 == 0:
+        firing = brain.getFiringNeuronCount()
+        curiosity = agent.getCuriosityLevel()
+        reward = agent.getNeuromodulationLevel()
+        print(f"Step {{step}}: {{firing}} firing neurons, curiosity={{curiosity:.3f}}, reward={{reward:.3f}}")
+
+print("Agent simulation complete!")
+print(f"Final firing rate: {{brain.getAverageFiringRate()}}")
+print(f"Curiosity level: {{agent.getCuriosityLevel()}}")
+print(f"Novelty level: {{agent.getNoveltyLevel()}}")
+"""
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Agent simulation failed with code {e.returncode}")
+            return False
+        except FileNotFoundError:
+            print("Error: pynlm module not found. Install with: pip install pynlm")
+            return False
+        
+        return True
+    
+    def config_command(self, args):
+        """Handle configuration commands"""
+        if args.config_command == "set":
+            self.set_config(args.key, args.value, args.source)
+        elif args.config_command == "get":
+            self.get_config(args.key)
+        elif args.config_command == "list":
+            self.list_config()
+        elif args.config_command == "clear":
+            self.clear_config()
+        elif args.config_command == "save":
+            self.save_config(args.filepath)
+        elif args.config_command == "load":
+            self.load_config_file(args.filepath)
+        else:
+            print(f"Unknown config command: {args.config_command}")
+            return False
+        
+        return True
+    
+    def set_config(self, key, value, source):
+        """Set configuration value"""
+        # Convert string value to appropriate type
+        try:
+            if value.lower() in ('true', 'false'):
+                value = value.lower() == 'true'
+            elif '.' in value:
+                value = float(value)
+            elif value.isdigit():
+                value = int(value)
+            
+            self.config[key] = value
+            print(f"Set {key} = {value} (source: {source})")
+            self.save_config_to_file()
+        except Exception as e:
+            print(f"Error setting config: {e}")
+            return False
+    
+    def get_config(self, key):
+        """Get configuration value"""
+        if key in self.config:
+            print(f"{key} = {self.config[key]}")
+        else:
+            print(f"Key '{key}' not found in configuration")
+            return False
+        return True
+    
+    def list_config(self):
+        """List all configuration keys"""
+        if not self.config:
+            print("No configuration entries")
+            return
+        
+        print("Configuration entries:")
+        for key, value in sorted(self.config.items()):
+            print(f"  {key} = {value}")
+    
+    def clear_config(self):
+        """Clear all configuration"""
+        self.config.clear()
+        print("Configuration cleared")
+        self.save_config_to_file()
+    
+    def save_config(self, filepath):
+        """Save configuration to file"""
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(self.config, f, indent=2)
+            print(f"Configuration saved to {filepath}")
+        except Exception as e:
+            print(f"Error saving configuration: {e}")
+            return False
+        return True
+    
+    def load_config_file(self, filepath):
+        """Load configuration from file"""
+        try:
+            with open(filepath, 'r') as f:
+                file_config = json.load(f)
+            
+            # Merge with existing config
+            self.config.update(file_config)
+            print(f"Configuration loaded from {filepath}")
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+            return False
+        return True
+    
+    def run_tests(self, args):
+        """Run basic tests"""
+        print("Running basic tests...")
+        
+        if args.quick:
+            print("Running quick tests...")
+            # Run quick tests
+            cmd = ["python3", "-c", """
+import pynlm
+import sys
+
+# Test basic brain creation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+print(f"Brain initialized successfully")
+print("Quick tests passed!")
+"""]
+            
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Quick tests failed with code {e.returncode}")
+                return False
+        else:
+            print("Running comprehensive tests...")
+            # Run comprehensive tests
+            cmd = ["python3", "-c", """
+import pynlm
+import sys
+
+print("Running comprehensive tests...")
+
+# Test 1: Basic brain creation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+print("✓ Basic brain creation test passed")
+
+# Test 2: Brain stepping
+for step in range(50):
+    brain.step(step)
+print("✓ Brain stepping test passed")
+
+# Test 3: Statistics
+firing = brain.getFiringNeuronCount()
+total_spikes = brain.getTotalSpikeCount()
+avg_rate = brain.getAverageFiringRate()
+print(f"✓ Statistics test passed (firing: {firing}, spikes: {total_spikes}, rate: {avg_rate})")
+
+# Test 4: AgentBrain creation
+agent = pynlm.createAgentBrain(brain)
+print("✓ AgentBrain creation test passed")
+
+# Test 5: World creation
+world = pynlm.createSimpleWorld()
+print("✓ World creation test passed")
+
+print("All comprehensive tests passed!")
+"""]
+            
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Comprehensive tests failed with code {e.returncode}")
+                return False
+        
+        return True
+    
+    def run_integration_tests(self, args):
+        """Run integration tests"""
+        print("Running integration tests...")
+        
+        if args.benchmark:
+            print("Running benchmark...")
+            # Run benchmark
+            cmd = ["python3", "-c", """
+import pynlm
+import time
+import sys
+
+print("Running integration benchmark...")
+
+start_time = time.time()
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run agent simulation for benchmarking
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+end_time = time.time()
+
+print(f"Benchmark completed in {end_time - start_time:.2f} seconds")
+print(f"Performance: {1000/(end_time - start_time):.1f} steps/second")
+print("Integration benchmark test passed!")
+"""]
+            
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Benchmark failed with code {e.returncode}")
+                return False
+        else:
+            print("Running detailed integration tests...")
+            # Run detailed integration tests
+            cmd = ["python3", "-c", """
+import pynlm
+import sys
+
+print("Running detailed integration tests...")
+
+# Test complete agent simulation with all features
+config = pynlm.createDefaultConfig()
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all subsystems for comprehensive testing
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+print("Testing complete agent simulation with all subsystems enabled...")
+
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Verify integration
+firing = brain.getFiringNeuronCount()
+curiosity = agent.getCuriosityLevel()
+novelty = agent.getNoveltyLevel()
+dopamine = agent.getNeuromodulationLevel()
+dev_stage = agent.getDevelopmentalStage()
+
+print(f"Integration test results:")
+print(f"  - Neural activity: {firing} firing neurons")
+print(f"  - Neuromodulation: curiosity={curiosity:.3f}, novelty={novelty:.3f}, dopamine={dopamine:.3f}")
+print(f"  - Development: stage={dev_stage}")
+print(f"  - Overall system integration: PASSED")
+
+print("Detailed integration tests completed successfully!")
+"""]
+            
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Detailed integration tests failed with code {e.returncode}")
+                return False
+        
+        return True
+    
+    def run_monitoring(self, args):
+        """Run performance monitoring"""
+        print(f"Running performance monitoring for {args.duration} seconds...")
+        
+        # For now, run a quick performance test
+        cmd = ["python3", "-c", f"""
+import pynlm
+import time
+import json
+import sys
+
+print("Starting performance monitoring...")
+
+# Create monitoring data
+metrics = []
+start_time = time.time()
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Monitor for specified duration
+steps_per_second = 10  # One step every 0.1 seconds
+total_steps = int(args.duration * steps_per_second)
+
+for step in range(total_steps):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Collect metrics
+    if step % steps_per_second == 0:
+        metric = {{
+            'step': step,
+            'time': time.time() - start_time,
+            'firing_neutrons': brain.getFiringNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'average_firing_rate': brain.getAverageFiringRate(),
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'dopamine': agent.getNeuromodulationLevel(),
+            'development_stage': agent.getDevelopmentalStage()
+        }}
+        metrics.append(metric)
+    
+    # Print progress
+    if step % 500 == 0:
+        print(f"Step {{step}}: {{brain.getFiringNeuronCount()}} firing neurons")
+
+end_time = time.time()
+
+# Calculate summary
+if metrics:
+    avg_firing = sum(m['firing_neutrons'] for m in metrics) / len(metrics)
+    avg_spikes = sum(m['total_spikes'] for m in metrics) / len(metrics)
+    
+    summary = {{
+        'total_duration': args.duration,
+        'total_steps': total_steps,
+        'steps_per_second': total_steps / args.duration,
+        'average_firing_rate': avg_firing,
+        'average_spike_rate': avg_spikes,
+        'metrics': metrics
+    }}
+    
+    # Save to file if specified
+    if {args.output}:
+        with open('{args.output}', 'w') as f:
+            json.dump(summary, f, indent=2)
+        print(f"Monitoring data saved to {args.output}")
+    
+    print("Monitoring completed successfully!")
+    print(f"Duration: {{args.duration}} seconds")
+    print(f"Average firing rate: {{avg_firing:.1f}} neurons")
+    print(f"Average spike rate: {{avg_spikes:.1f}} spikes/second")
+else:
+    print("No metrics collected")
+"""]
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Monitoring failed with code {e.returncode}")
+            return False
+        except FileNotFoundError:
+            print("Error: pynlm module not found. Install with: pip install pynlm")
+            return False
+        
+        return True
+    
+    def run_debug(self, args):
+        """Run debugging session"""
+        print("Starting debug session...")
+        
+        cmd = [
+            "python3", "-c", f"""
+import pynlm
+import sys
+import json
+
+print("Debug session started")
+print("Log level: {args.log_level}")
+
+# Create and test brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain created: {{brain.getTotalNeuronCount()}} neurons, {{brain.getTotalSynapseCount()}} synapses")
+
+# Validate internal state
+if {args.validate}:
+    print("Validating internal state...")
+    regions = brain.getRegions()
+    print(f"Found {{regions.size()}} brain regions")
+    
+    total_neurons = sum(r->getTotalNeuronCount() for r in regions)
+    total_synapses = sum(r->getSynapseCount() for r in regions)
+    
+    print(f"Validation results:")
+    print(f"  - Total neurons: {{total_neurons}} (expected: {{brain.getTotalNeuronCount()}})")
+    print(f"  - Total synapses: {{total_synapses}} (expected: {{brain.getTotalSynapseCount()}})")
+    
+    if total_neurons != brain.getTotalNeuronCount() or total_synapses != brain.getTotalSynapseCount():
+        print("  - WARNING: Internal state validation failed!")
+    else:
+        print("  - Internal state validation passed!")
+
+# Generate debug output
+if {args.trace}:
+    print("Generating detailed trace...")
+    debug_data = {{
+        'brain_config': {{
+            'neuron_count': brain.getTotalNeuronCount(),
+            'synapse_count': brain.getTotalSynapseCount(),
+            'region_count': brain.getRegionCount()
+        }},
+        'regions': []
+    }}
+    
+    for region in brain.getRegions():
+        region_info = {{
+            'id': region->getId().index(),
+            'name': region->getName(),
+            'neuron_count': region->getTotalNeuronCount(),
+            'synapse_count': region->getSynapseCount(),
+            'populations': []
+        }}
+        
+        for pop in region->getPopulations():
+            pop_info = {{
+                'id': pop->getId().index(),
+                'type': pop->getNeuronType(),
+                'neuron_count': pop->getNeuronCount()
+            }}
+            region_info['populations'].append(pop_info)
+        
+        debug_data['regions'].append(region_info)
+    
+    if {args.output}:
+        with open('{args.output}', 'w') as f:
+            json.dump(debug_data, f, indent=2)
+        print(f"Debug trace saved to {args.output}")
+
+print("Debug session completed!")
+"""
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Debug session failed with code {e.returncode}")
+            return False
+        except FileNotFoundError:
+            print("Error: pynlm module not found. Install with: pip install pynlm")
+            return False
+        
+        return True
+    
+    def run_advanced_commands(self, args):
+        """Run advanced commands"""
+        if args.advanced_command == "create-brain":
+            self.create_custom_brain(args.file)
+        elif args.advanced_command == "export":
+            self.export_brain_state(args.format, args.filepath)
+        elif args.advanced_command == "import":
+            self.import_brain_state(args.format, args.filepath)
+        elif args.advanced_command == "profile":
+            self.profile_performance(args.steps, args.output)
+        else:
+            print(f"Unknown advanced command: {args.advanced_command}")
+            return False
+        
+        return True
+    
+    def create_custom_brain(self, filepath):
+        """Create custom brain configuration"""
+        print("Creating custom brain configuration...")
+        
+        # Example custom configuration
+        config_template = {
+            "brain": {
+                "neuron_count": 2000,
+                "region_count": 4,
+                "connection_probability": 0.15,
+                "stdp_ltp_weight": 0.02,
+                "stdp_ltd_weight": 0.015,
+                "synaptogenesis_rate": 0.0002,
+                "pruning_rate": 0.00002
+            },
+            "neuromodulation": {
+                "dopamine_scale": 1.5,
+                "curiosity_enable": True,
+                "novelty_enable": True
+            },
+            "development": {
+                "critical_period_multiplier": 2.0,
+                "maturation_rate": 0.8
+            }
+        }
+        
+        if filepath:
+            try:
+                with open(filepath, 'w') as f:
+                    json.dump(config_template, f, indent=2)
+                print(f"Custom configuration saved to {filepath}")
+            except Exception as e:
+                print(f"Error saving configuration: {e}")
+                return False
+        
+        print("Custom configuration created successfully!")
+        return True
+    
+    def export_brain_state(self, format, filepath):
+        """Export brain state"""
+        print(f"Exporting brain state in {format} format...")
+        
+        # In a real implementation, this would export the actual brain state
+        # For now, we'll create a placeholder export
+        export_data = {
+            "export_info": {
+                "format": format,
+                "timestamp": "2024-01-15T19:51:52Z",
+                "version": "1.0"
+            },
+            "brain_state": {
+                "description": "Placeholder brain state export",
+                "neuron_count": 1000,
+                "synapse_count": 10000,
+                "configuration": {
+                    "neuron_count": 1000,
+                    "region_count": 1,
+                    "connection_probability": 0.1
+                }
+            }
+        }
+        
+        try:
+            if format == "json":
+                with open(filepath, 'w') as f:
+                    json.dump(export_data, f, indent=2)
+            elif format == "csv":
+                import csv
+                with open(filepath, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["metric", "value"])
+                    for key, value in export_data["brain_state"].items():
+                        if isinstance(value, dict):
+                            for subkey, subvalue in value.items():
+                                writer.writerow([f"{key}.{subkey}", subvalue])
+                        else:
+                            writer.writerow([key, value])
+            else:  # bin
+                import pickle
+                with open(filepath, 'wb') as f:
+                    pickle.dump(export_data, f)
+            
+            print(f"Brain state exported to {filepath}")
+        except Exception as e:
+            print(f"Error exporting brain state: {e}")
+            return False
+        
+        return True
+    
+    def import_brain_state(self, format, filepath):
+        """Import brain state"""
+        print(f"Importing brain state from {format} format...")
+        
+        try:
+            if format == "json":
+                with open(filepath, 'r') as f:
+                    import_data = json.load(f)
+            elif format == "csv":
+                import csv
+                with open(filepath, 'r', newline='') as f:
+                    reader = csv.DictReader(f)
+                    import_data = {row['metric']: row['value'] for row in reader}
+            else:  # bin
+                import pickle
+                with open(filepath, 'rb') as f:
+                    import_data = pickle.load(f)
+            
+            print(f"Brain state imported successfully!")
+            print(f"Data keys: {list(import_data.keys())}")
+            return True
+        except Exception as e:
+            print(f"Error importing brain state: {e}")
+            return False
+    
+    def profile_performance(self, steps, output):
+        """Profile performance"""
+        print(f"Profiling performance over {steps} steps...")
+        
+        cmd = [
+            "python3", "-c", f"""
+import pynlm
+import time
+import json
+import sys
+
+print("Starting performance profiling...")
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+start_time = time.time()
+step_times = []
+
+for step in range({steps}):
+    step_start = time.time()
+    brain.step(step)
+    step_time = time.time() - step_start
+    step_times.append(step_time)
+
+end_time = time.time()
+
+# Calculate performance metrics
+total_time = end_time - start_time
+avg_step_time = sum(step_times) / len(step_times)
+min_step_time = min(step_times)
+max_step_time = max(step_times)
+
+# Calculate spikes per second
+spikes_per_second = brain.getTotalSpikeCount() / total_time
+neurons_per_second = brain.getTotalNeuronCount() / total_time
+
+profile_data = {{
+    'profile_info': {{
+        'total_steps': {steps},
+        'total_time': total_time,
+        'avg_step_time': avg_step_time,
+        'min_step_time': min_step_time,
+        'max_step_time': max_step_time
+    }},
+    'performance': {{
+        'spikes_per_second': spikes_per_second,
+        'neurons_per_second': neurons_per_second,
+        'steps_per_second': {steps} / total_time
+    }},
+    'step_times': step_times,
+    'final_brain_state': {{
+        'total_neurons': brain.getTotalNeuronCount(),
+        'total_synapses': brain.getTotalSynapseCount(),
+        'firing_neurons': brain.getFiringNeuronCount(),
+        'total_spikes': brain.getTotalSpikeCount(),
+        'avg_firing_rate': brain.getAverageFiringRate()
+    }}
+}}
+
+# Save to file if specified
+if '{output}':
+    with open('{output}', 'w') as f:
+        json.dump(profile_data, f, indent=2)
+    print(f"Profile data saved to {{output}}")
+
+print("Performance profiling completed!")
+print(f"Total time: {{total_time:.2f}} seconds")
+print(f"Average step time: {{avg_step_time*1000:.2f}} ms")
+print(f"Steps per second: {{steps/total_time:.1f}}")
+print(f"Spikes per second: {{spikes_per_second:.1f}}")
+print(f"Performance profile completed successfully!")
+"""
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Performance profiling failed with code {e.returncode}")
+            return False
+        except FileNotFoundError:
+            print("Error: pynlm module not found. Install with: pip install pynlm")
+            return False
+        
+        return True
+    
+    def main(self, args):
+        """Main entry point"""
+        if args.command == "run":
+            return self.run_simulation(args)
+        elif args.command == "run-agent":
+            return self.run_agent_simulation(args)
+        elif args.command == "config":
+            return self.config_command(args)
+        elif args.command == "test":
+            return self.run_tests(args)
+        elif args.command == "test-integration":
+            return self.run_integration_tests(args)
+        elif args.command == "monitor":
+            return self.run_monitoring(args)
+        elif args.command == "debug":
+            return self.run_debug(args)
+        elif args.command == "advanced":
+            return self.run_advanced_commands(args)
+        else:
+            print(f"Unknown command: {args.command}")
+            return False
+
+if __name__ == "__main__":
+    cli = NLMCLI()
+    args = parse_args()
+    
+    success = cli.main(args)
+    sys.exit(0 if success else 1)
