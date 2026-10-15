@@ -25,27 +25,195 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <map>
+#include <optional>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command-line argument parsing helper
+struct CommandLineOptions {
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool debug = false;
+    bool help = false;
+    bool version = false;
+    bool benchmark = false;
+    bool validate = false;
+    uint64_t neuronCount = 500;
+    uint64_t maxSteps = 1000;
+    double timeStep = 0.001;
+    float connectionProbability = 0.15f;
+    std::string outputFile;
+    std::string checkpointFile;
+    uint64_t checkpointInterval = 0;
+    bool enableCheckpointing = false;
+    bool enableReplay = false;
+    bool enableDevelopment = false;
+    std::string performanceProfile;
+    std::map<std::string, std::string> customSettings;
+    bool quiet = false;
+    uint32_t logLevel = 2; // 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+};
+
+CommandLineOptions parseCommandLine(int argc, char** argv) {
+    CommandLineOptions options;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-?") {
+            options.help = true;
+        } else if (arg == "--version") {
+            options.version = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            options.debug = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            options.benchmark = true;
+        } else if (arg == "--validate") {
+            options.validate = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            options.quiet = true;
+        } else if (arg == "--neuron-count") {
+            if (i + 1 < argc) options.neuronCount = std::stoull(argv[++i]);
+        } else if (arg == "--max-steps") {
+            if (i + 1 < argc) options.maxSteps = std::stoull(argv[++i]);
+        } else if (arg == "--time-step") {
+            if (i + 1 < argc) options.timeStep = std::stod(argv[++i]);
+        } else if (arg == "--connection-prob") {
+            if (i + 1 < argc) options.connectionProbability = std::stof(argv[++i]);
+        } else if (arg == "--config") {
+            if (i + 1 < argc) options.configFile = argv[++i];
+        } else if (arg == "--output") {
+            if (i + 1 < argc) options.outputFile = argv[++i];
+        } else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                options.checkpointFile = argv[++i];
+                options.enableCheckpointing = true;
+            }
+        } else if (arg == "--checkpoint-interval") {
+            if (i + 1 < argc) options.checkpointInterval = std::stoull(argv[++i]);
+        } else if (arg == "--performance-profile") {
+            if (i + 1 < argc) options.performanceProfile = argv[++i];
+        } else if (arg.substr(0, 7) == "--set=") {
+            std::string setting = arg.substr(7);
+            size_t pos = setting.find('=');
+            if (pos != std::string::npos) {
+                std::string key = setting.substr(0, pos);
+                std::string value = setting.substr(pos + 1);
+                options.customSettings[key] = value;
+            }
+        } else if (arg.substr(0, 2) == "--") {
+            std::string key = arg.substr(2);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                options.customSettings[key] = value;
+            }
+        } else {
+            // Unknown argument
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
+    }
+
+    return options;
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << "\nUsage: nlm [OPTIONS]\n";
+    std::cout << "\nBasic Options:\n";
+    std::cout << "  --help, -?              Show this help message and exit\n";
+    std::cout << "  --version               Print version information and exit\n";
+    std::cout << "  --config FILE           Load configuration from file\n";
+    std::cout << "  --neuron-count N        Set number of neurons (default: 500)\n";
+    std::cout << "  --max-steps N           Set maximum simulation steps (default: 1000)\n";
+    std::cout << "  --time-step T           Set simulation time step (default: 0.001)\n";
+    std::cout << "  --connection-prob P     Set connection probability (default: 0.15)\n";
+    std::cout << "\nOutput Options:\n";
+    std::cout << "  --output FILE           Save results to output file\n";
+    std::cout << "  --checkpoint FILE       Enable checkpointing with specified file\n";
+    std::cout << "  --checkpoint-interval N Save checkpoint every N steps (0 = disable)\n";
+    std::cout << "\nAdvanced Options:\n";
+    std::cout << "  --performance-profile NAME   Apply performance profile (fast, balanced, deep)\n";
+    std::cout << "  --set KEY=VALUE             Set custom configuration key-value pair\n";
+    std::cout << "  --enable-checkpointing      Enable checkpointing (legacy)\n";
+    std::cout << "  --enable-replay             Enable replay functionality\n";
+    std::cout << "  --enable-development        Enable developmental processes\n";
+    std::cout << "\nLogging Options:\n";
+    std::cout << "  --verbose, -v              Enable verbose logging\n";
+    std::cout << "  --debug, -d                Enable debug logging (very verbose)\n";
+    std::cout << "  --quiet, -q                Quiet mode (minimal output)\n";
+    std::cout << "  --log-level LEVEL          Set log level (0=ERROR, 1=WARN, 2=INFO, 3=DEBUG)\n";
+    std::cout << "\nExperiment Options:\n";
+    std::cout << "  --benchmark, -b            Run benchmark mode\n";
+    std::cout << "  --validate                Validate configuration and exit\n";
+    std::cout << "\nPhase 2 Experiments:\n";
+    std::cout << "  Phase 2 implements:\n";
+    std::cout << "    - Real Leaky Integrate-and-Fire (LIF) neuron dynamics\n";
+    std::cout << "    - Event-driven spike propagation with synaptic delays\n";
+    std::cout << "    - STDP (Spike-Timing-Dependent Plasticity) learning\n";
+    std::cout << "    - Hebbian plasticity\n";
+    std::cout << "    - Structural plasticity (synaptogenesis/pruning)\n";
+    std::cout << "\nExamples:\n";
+    std::cout << "  nlm --neuron-count 1000 --max-steps 5000\n";
+    std::cout << "  nlm --config my_config.cfg --checkpoint checkpoint.bin\n";
+    std::cout << "  nlm --performance-profile deep --output results.txt\n";
+    std::cout << "  nlm --benchmark --validate\n";
+}
+
+void printVersion() {
+    std::cout << "NLM (Neural Learning Machine) - Phase 2\n";
+    std::cout << "Version: 0.1.0\n";
+    std::cout << "Phase: Real Neural Computation\n";
+    std::cout << "Built with C++20\n";
+    std::cout << "License: MIT\n";
+}
+
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    
+    // Inject current into a few neurons and see if spikes propagate
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_INFO("  No neurons found!");
+        return;
+    }
+    
+    // Get initial spike count
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    
+    // Inject strong current into first 10 neurons
+    NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    }
+    
+    // Run a few steps
+    for (SimulationStep step = 0; step < 50; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+    
+    if (spikes > 0) {
+        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+    } else {
+        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+        }
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

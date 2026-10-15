@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <spdlog/spdlog.h>
 
 namespace nlm {
 
@@ -10,7 +12,9 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    SPDLOG_DEBUG("Configuration initialized");
+}
 
 Config::~Config() = default;
 
@@ -19,16 +23,52 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    SPDLOG_INFO("Loading configuration from file: {}", filepath);
+    
+    // Validate filepath
+    if (filepath.empty()) {
+        SPDLOG_ERROR("Empty filepath provided for configuration loading");
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        SPDLOG_WARN("Configuration file does not exist: {}", filepath);
+        return false; // File not found is not necessarily an error
+    }
+    
+    if (!std::filesystem::is_regular_file(filepath)) {
+        SPDLOG_ERROR("Path is not a regular file: {}", filepath);
+        return false;
+    }
+    
+    if (!std::filesystem::is_readable(filepath)) {
+        SPDLOG_ERROR("Configuration file is not readable: {}", filepath);
+        return false;
+    }
+    
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        SPDLOG_ERROR("Failed to open configuration file: {}", filepath);
         return false;
     }
     
+    // Validate file size before reading
+    auto fileSize = std::filesystem::file_size(filepath);
+    if (fileSize > 10 * 1024 * 1024) { // 10MB limit
+        SPDLOG_WARN("Large configuration file ({} bytes), parsing may be slow", fileSize);
+    }
+    
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +81,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                SPDLOG_WARN("Empty key found at line {}", lineNumber);
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,8 +94,29 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate value length to prevent buffer overflow
+            if (value.length() > 1024) {
+                SPDLOG_WARN("Very long value for key '{}' at line {}, truncating", key, lineNumber);
+                value = value.substr(0, 1024);
+            }
+            
+            try {
+                set(key, value, ConfigSource::File);
+                ++validEntries;
+            } catch (const std::exception& e) {
+                SPDLOG_ERROR("Failed to set configuration key '{}' at line {}: {}", 
+                           key, lineNumber, e.what());
+                // Continue parsing other entries instead of failing completely
+            }
+        } else {
+            SPDLOG_WARN("Invalid configuration format at line {}: missing '='", lineNumber);
         }
+    }
+    
+    if (validEntries > 0) {
+        SPDLOG_INFO("Successfully loaded {} configuration entries from {}", validEntries, filepath);
+    } else {
+        SPDLOG_WARN("No valid configuration entries found in {}", filepath);
     }
     
     return true;

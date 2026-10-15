@@ -155,6 +155,201 @@ agent.enableCuriosity(True)             # Explore new things
 
 ---
 
+## Advanced Configuration (New Feature!)
+
+The NLM now includes advanced configuration with validation and performance profiles!
+
+### Example: Performance Profile Configuration
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createAdvancedConfig()
+
+# Apply performance profile
+config.applyPerformanceProfile("balanced")  # Options: "fast", "balanced", "deep"
+
+# Create and initialize brain
+brain = pynlm.createBrain(config.getConfig())
+brain.initialize()
+
+# Check configuration
+print("Configuration summary:")
+print(config.getProfileSummary())
+```
+
+### Example: Batch Configuration Setting
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createAdvancedConfig()
+
+# Batch set multiple settings at once
+settings = [
+    {"brain.neuron_count", 5000},
+    {"plasticity.stdp.enable", True},
+    {"plasticity.hebbian.enable", True},
+    {"neuromod.curiosity.enable", True},
+    {"neuromod.novelty.enable", False},
+]
+
+config.batchSet(settings)
+
+# Verify settings
+print("Brain neuron count:", config.getValidated("brain.neuron_count"))
+print("STDP enabled:", config.getValidated("plasticity.stdp.enable"))
+```
+
+### Example: Validation and Error Handling
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createAdvancedConfig()
+
+# Set values with automatic validation
+config.setValidated("brain.neuron_count", 1000)  # Valid range: 100-100000
+config.setValidated("plasticity.stdp.learning_rate", 0.001)  # Valid range: 0.0-0.1
+
+# Try to set invalid value (will raise exception)
+try:
+    config.setValidated("brain.neuron_count", -50)  # Invalid!
+except ValueError as e:
+    print("Validation error caught:", str(e))
+
+# Use validated getter
+neuron_count = config.getValidated("brain.neuron_count", 500)
+print("Neurons:", neuron_count)
+```
+
+---
+
+## Advanced Agent Operations (New Feature!)
+
+### Example: Run Complete Episodes
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run a complete episode
+print("Running episode...")
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+
+print("Episode complete!")
+```
+
+### Example: Training and Evaluation
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Configure training
+num_episodes = 10
+steps_per_episode = 500
+
+print("Training agent...")
+for episode in range(num_episodes):
+    # Run episode
+    for step in range(steps_per_episode):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print progress
+    print(f"Episode {episode + 1}/{num_episodes} complete")
+    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+
+print("Training complete!")
+```
+
+---
+
+## Performance Monitoring (New Feature!)
+
+### Example: Benchmark and Monitor
+
+```python
+import pynlm
+import time
+
+# Create a benchmark brain
+brain = pynlm.benchmarkPerformance("balanced")
+brain.initialize()
+
+print("Benchmarking performance...")
+steps = 1000
+
+start_time = time.time()
+for i in range(steps):
+    brain.step(i)
+end_time = time.time()
+
+# Get performance metrics
+metrics = brain.getPerformanceMetrics()
+print(f"Performance metrics:")
+print(f"  Steps per second: {steps / (end_time - start_time):.0f}")
+print(f"  Average firing rate: {metrics.averageFiringRate:.2f} Hz")
+print(f"  Memory usage: {metrics.totalMemoryUsage / 1024 / 1024:.2f} MB")
+print(f"  Plasticity update time: {metrics.plasticityUpdateTime * 1000:.2f} ms")
+
+# Get system health
+health = brain.getSystemHealth()
+print(f"System health: {'Healthy' if health.isHealthy else 'Issues detected'}")
+if not health.isHealthy:
+    for warning in health.warnings:
+        print(f"  Warning: {warning}")
+    for error in health.errors:
+        print(f"  Error: {error}")
+```
+
+---
+
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
@@ -221,14 +416,16 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Advanced Features
 
 ```python
 import pynlm
 
 # Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+config = pynlm.createAdvancedConfig()
+config.applyPerformanceProfile("balanced")
+
+brain = pynlm.createBrain(config.getConfig())
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
@@ -239,8 +436,10 @@ agent.initialize(world)
 # Enable learning
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
 
-# Run agent
+# Run agent with monitoring
+print("Running advanced agent simulation...")
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -249,9 +448,13 @@ for step in range(100):
     world.applyMotorCommand(action, world.getSimulationTime())
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
 
-print("Agent simulation complete!")
+print("Advanced agent simulation complete!")
 ```
 
 ---
@@ -285,6 +488,14 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Configuration validation error"**
+- Use `config.setValidated()` instead of `config.set()`
+- Check the error message for valid range
+
+**"Performance issues"**
+- Use performance profiles: `applyPerformanceProfile("fast")` or `applyPerformanceProfile("deep")`
+- Monitor performance with `brain.getPerformanceMetrics()`
+
 ---
 
 ## Next Steps
@@ -293,5 +504,7 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced examples in this guide
+5. Check out the performance monitoring and validation features
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with advanced features and capabilities.

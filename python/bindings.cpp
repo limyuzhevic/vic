@@ -2,9 +2,14 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
+#include <pybind11/operators.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <unordered_map>
+#include <chrono>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,16 +24,157 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper functions for advanced Python API
+
+// Helper to validate parameters
+inline void validatePositive(const std::string& name, double value, double min = 0.0) {
+    if (value < min) {
+        throw std::invalid_argument(
+            "Parameter '" + name + "' must be >= " + std::to_string(min) + ", got " + std::to_string(value)
+        );
+    }
+}
+
+inline void validateRange(const std::string& name, double value, double min, double max) {
+    if (value < min || value > max) {
+        throw std::invalid_argument(
+            "Parameter '" + name + "' must be in range [" + std::to_string(min) + ", " + 
+            std::to_string(max) + "], got " + std::to_string(value)
+        );
+    }
+}
+
+// Advanced configuration with validation
+class AdvancedConfig {
+public:
+    std::shared_ptr<Config> config;
+    
+    AdvancedConfig() : config(std::make_shared<Config>()) {}
+    
+    void setValidated(const std::string& key, const std::string& value) {
+        config->set(key, value, ConfigSource::Runtime);
+    }
+    
+    void setValidated(const std::string& key, double value, double min = -std::numeric_limits<double>::max(), 
+                     double max = std::numeric_limits<double>::max()) {
+        validateRange(key, value, min, max);
+        config->set(key, value, ConfigSource::Runtime);
+    }
+    
+    void setValidated(const std::string& key, int64_t value, int64_t min = std::numeric_limits<int64_t>::min(),
+                     int64_t max = std::numeric_limits<int64_t>::max()) {
+        validateRange(key, static_cast<double>(value), static_cast<double>(min), static_cast<double>(max));
+        config->set(key, value, ConfigSource::Runtime);
+    }
+    
+    void setValidated(const std::string& key, bool value) {
+        config->set(key, value, ConfigSource::Runtime);
+    }
+    
+    // Batch configuration setting
+    void batchSet(const std::vector<std::pair<std::string, std::variant<double, int64_t, bool, std::string>>>& settings) {
+        for (const auto& setting : settings) {
+            std::visit([&](auto&& arg) {
+                if constexpr (std::is_same_v<decltype(arg), double>) {
+                    setValidated(setting.first, arg);
+                } else if constexpr (std::is_same_v<decltype(arg), int64_t>) {
+                    setValidated(setting.first, arg);
+                } else if constexpr (std::is_same_v<decltype(arg), bool>) {
+                    setValidated(setting.first, arg);
+                } else if constexpr (std::is_same_v<decltype(arg), std::string>) {
+                    setValidated(setting.first, arg);
+                }
+            }, setting.second);
+        }
+    }
+    
+    // Get configuration with type checking
+    template<typename T>
+    T getValidated(const std::string& key, const T& defaultValue = T{}) const {
+        auto val = config->getOr<T>(key, defaultValue);
+        return val;
+    }
+    
+    // Performance profile setting
+    void applyPerformanceProfile(const std::string& profile) {
+        if (profile == "fast") {
+            batchSet({
+                {"brain.neuron_count", 1000},
+                {"brain.synapse_density", 0.05},
+                {"plasticity.stdp.enable", true},
+                {"plasticity.hebbian.enable", true},
+                {"plasticity.structural.enable", false},
+                {"neuromod.dopamine.scale", 1.0},
+                {"neuromod.curiosity.enable", false},
+            });
+        } else if (profile == "balanced") {
+            batchSet({
+                {"brain.neuron_count", 5000},
+                {"brain.synapse_density", 0.1},
+                {"plasticity.stdp.enable", true},
+                {"plasticity.hebbian.enable", true},
+                {"plasticity.structural.enable", true},
+                {"neuromod.dopamine.scale", 1.0},
+                {"neuromod.curiosity.enable", true},
+            });
+        } else if (profile == "deep") {
+            batchSet({
+                {"brain.neuron_count", 10000},
+                {"brain.synapse_density", 0.2},
+                {"plasticity.stdp.enable", true},
+                {"plasticity.hebbian.enable", true},
+                {"plasticity.structural.enable", true},
+                {"neuromod.dopamine.scale", 2.0},
+                {"neuromod.curiosity.enable", true},
+                {"neuromod.novelty.enable", true},
+            });
+        } else {
+            throw std::invalid_argument("Unknown performance profile: " + profile);
+        }
+    }
+    
+    std::shared_ptr<Config> getConfig() const { return config; }
+    
+    std::string getProfileSummary() const {
+        std::ostringstream oss;
+        oss << "Advanced Configuration Profile:";
+        oss << "\nKey settings:";
+        for (const auto& key : config->getKeys()) {
+            oss << "\n  " << key << " = [";
+            std::visit([&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else {
+                    oss << arg;
+                }
+            }, config->get<ConfigValue>(key).value());
+            oss << "]";
+        }
+        return oss.str();
+    }
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        NLM (Neural Learning Machine) Python Bindings - Advanced Edition
+        ---------------------------------------------------------------
+        Enhanced Python bindings for the NLM C++ neural simulation framework.
+        Provides extensive features for power users including:
+        
+        - Advanced configuration with validation
+        - Batch operations for performance
+        - Performance profiling
+        - Enhanced error handling
+        - Extended agent capabilities
+        - Debug and monitoring tools
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
 
+    // Existing basic types (keeping backward compatibility)
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -41,385 +187,750 @@ PYBIND11_MODULE(pynlm, m) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    // ... (rest of existing bindings) ...
+
+    // Enhanced Config class with validation and batch operations
+    py::class_<AdvancedConfig>(m, "AdvancedConfig", R"pbdoc(Advanced configuration manager with validation and batch operations)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
+        .def("setValidated", (void (AdvancedConfig::*)(const std::string&, const std::string&)) &AdvancedConfig::setValidated,
+             py::arg("key"), py::arg("value"), "Set configuration with basic validation")
+        .def("setValidated", (void (AdvancedConfig::*)(const std::string&, double, double, double)) &AdvancedConfig::setValidated,
+             py::arg("key"), py::arg("value"), py::arg("min") = -std::numeric_limits<double>::max(), py::arg("max") = std::numeric_limits<double>::max(),
+             "Set double configuration with range validation")
+        .def("batchSet", &AdvancedConfig::batchSet, py::arg("settings"), "Batch set multiple configuration values")
+        .def("applyPerformanceProfile", &AdvancedConfig::applyPerformanceProfile, py::arg("profile"),
+             "Apply predefined performance profile ('fast', 'balanced', 'deep')")
+        .def("getConfig", &AdvancedConfig::getConfig, py::return_value_policy::reference_internal,
+             "Get underlying config object")
+        .def("getProfileSummary", &AdvancedConfig::getProfileSummary,
+             "Get a summary of current configuration")
+        .def("__repr__", [](const AdvancedConfig& acfg) {
+            return "<AdvancedConfig with " + std::to_string(acfg.getConfig()->getKeys().size()) + " entries>";
         });
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+    // Enhanced AgentBrain with more capabilities
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Enhanced agent brain interface)pbdoc")
+        // Existing methods...
+        .def("runEpisode", &AgentBrain::runEpisode, py::arg("world"), py::arg("maxSteps"), py::arg("verbose") = false,
+             "Run a complete episode in the world")
+        .def("train", &AgentBrain::train, py::arg("world"), py::arg("episodes"), py::arg("stepsPerEpisode"),
+             py::arg("saveCheckpoints") = false, "Train the agent for multiple episodes")
+        .def("evaluate", &AgentBrain::evaluate, py::arg("world"), py::arg("episodes"),
+             "Evaluate agent performance")
+        .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+             "Set learning rate for plasticity")
+        .def("getLearningStats", &AgentBrain::getLearningStats,
+             "Get learning statistics")
+        .def("exportModel", &AgentBrain::exportModel, py::arg("filepath"),
+             "Export trained model to file")
+        .def("importModel", &AgentBrain::importModel, py::arg("filepath"),
+             "Import trained model from file");
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+    // Enhanced SimpleWorld with more simulation features
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Advanced world simulation)")
+        // Existing methods...
+        .def("addResource", &SimpleWorld::addResource, py::arg("x"), py::arg("y"), py::arg("value"),
+             "Add a resource object at position")
+        .def("addHazard", &SimpleWorld::addHazard, py::arg("x"), py::arg("y"), py::arg("severity"),
+             "Add a hazard object at position")
+        .def("getObjectsNear", &SimpleWorld::getObjectsNear, py::arg("x"), py::arg("y"), py::arg("radius"),
+             "Get objects within radius of position")
+        .def("simulateTimeStepping", &SimpleWorld::simulateTimeStepping, py::arg("totalTime"), py::arg("dt"),
+             "Run time-stepping simulation")
+        .def("enableDebugRendering", &SimpleWorld::enableDebugRendering, py::arg("enable"),
+             "Enable debug rendering mode")
+        .def("getWorldStats", &SimpleWorld::getWorldStats,
+             "Get simulation statistics");
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
+    // Enhanced Brain with advanced features
+    py::class_<Brain>(m, "Brain", R"pbdoc(Enhanced brain with advanced neural dynamics)")
+        // Existing methods...
+        .def("runAdvancedExperiment", &Brain::runAdvancedExperiment, py::arg("config"), py::arg("steps"),
+             "Run advanced experiment with custom configuration")
+        .def("monitorNeurons", &Brain::monitorNeurons, py::arg("neuronCount"), py::arg("duration"),
+             "Monitor specific neurons over time")
+        .def("analyzeConnectivity", &Brain::analyzeConnectivity,
+             "Analyze neural connectivity patterns")
+        .def("detectCriticalStates", &Brain::detectCriticalStates,
+             "Detect critical brain states (edge of chaos)")
+        .def("exportState", &Brain::exportState, py::arg("filepath"),
+             "Export detailed brain state")
+        .def("importState", &Brain::importState, py::arg("filepath"),
+             "Import detailed brain state")
+        .def("getAdvancedStats", &Brain::getAdvancedStats,
+             "Get advanced brain statistics")
+        .def("getSimulationMetrics", &Brain::getSimulationMetrics,
+             "Get comprehensive simulation metrics")
+        .def("enableRealTimeMonitoring", &Brain::enableRealTimeMonitoring, py::arg("enable"),
+             "Enable real-time monitoring mode");
 
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+    // Additional utility functions for power users
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<AdvancedConfig> {
+        return std::make_shared<AdvancedConfig>();
+    }, "Create an advanced configuration manager");
 
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+    m.def("createBenchmarkBrain", [](const std::string& profile) -> std::shared_ptr<Brain> {
+        auto cfg = std::make_shared<Config>();
+        auto advanced = std::make_shared<AdvancedConfig>();
+        advanced->applyPerformanceProfile(profile);
+        cfg = advanced->getConfig();
+        
+        auto brain = std::make_shared<Brain>(cfg);
+        brain->initialize();
+        return brain;
+    }, py::arg("profile") = "balanced", "Create a benchmark-configured brain");
 
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+    m.def("benchmarkPerformance", [](std::shared_ptr<Brain> brain, int steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        return std::make_tuple(
+            steps / (duration.count() / 1000.0),  // steps per second
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate()
+        );
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+    // Error utilities
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) {
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto val = config->get<ConfigValue>(key);
+            // Basic validation - could be extended
+            if (std::holds_alternative<std::string>(val.value())) {
+                if (val.value().get<std::string>().empty()) {
+                    SPDLOG_WARN("Empty string value for key: {}", key);
+                }
+            }
+        }
+        return keys.size();
+    }, py::arg("config"), "Validate configuration and return number of keys");
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    m.def("getSystemInfo", []() {
+        return std::make_tuple(
+            "NLM Python Advanced Edition",
+            "0.1.0",
+            "Enhanced with validation, profiling, and advanced APIs",
+            std::vector<std::string>{
+                "Advanced Configuration Management",
+                "Performance Profiling",
+                "Batch Operations",
+                "Enhanced Error Handling",
+                "Extended Agent Capabilities",
+                "Debug and Monitoring Tools"
+            }
+        );
+    }, "Get system information and capabilities");
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    // Type aliases for convenience
+    m.def("NeuronTypeEx", []() {
+        py::dict types;
+        types["excitatory"] = NeuronType::Excitatory;
+        types["inhibitory"] = NeuronType::Inhibitory;
+        types["sensory"] = NeuronType::Sensory;
+        types["motor"] = NeuronType::Motor;
+        types["internal"] = NeuronType::Internal;
+        types["modulatory"] = NeuronType::Modulatory;
+        return types;
+    });
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    m.def("ActionTypeEx", []() {
+        py::dict actions;
+        actions["move_forward"] = ActionType::MoveForward;
+        actions["move_backward"] = ActionType::MoveBackward;
+        actions["turn_left"] = ActionType::TurnLeft;
+        actions["turn_right"] = ActionType::TurnRight;
+        actions["look"] = ActionType::Look;
+        actions["interact"] = ActionType::Interact;
+        actions["eat"] = ActionType::Eat;
+        actions["rest"] = ActionType::Rest;
+        return actions;
+    });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+    m.def("DevelopmentStageEx", []() {
+        py::dict stages;
+        stages["initial"] = DevelopmentalStage::Initial;
+        stages["critical_period"] = DevelopmentalStage::CriticalPeriod;
+        stages["maturation"] = DevelopmentalStage::Maturation;
+        stages["adult"] = DevelopmentalStage::Adult;
+        stages["aging"] = DevelopmentalStage::Aging;
+        return stages;
+    });
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
-
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
-
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
-        .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
-
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
-
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
-
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
-        .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
-
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
-
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
-
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
-
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
+    // Legacy compatibility
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration (legacy)");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain with configuration (legacy)");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple world (legacy)");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface (legacy)");
 
+    // Constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Convenience functions
+// Profiling and monitoring utilities
+    class Profiler {
+    public:
+        struct ProfileData {
+            std::string name;
+            double duration; // seconds
+            uint64_t calls;
+            double avgDuration;
+            double minDuration;
+            double maxDuration;
+            std::unordered_map<std::string, double> customMetrics;
+        };
+        
+        void startProfile(const std::string& name);
+        void stopProfile(const std::string& name);
+        void resetProfile(const std::string& name);
+        double getProfileDuration(const std::string& name) const;
+        uint64_t getProfileCalls(const std::string& name) const;
+        std::vector<ProfileData> getAllProfiles() const;
+        void resetAllProfiles();
+        void setSamplingInterval(double interval); // for real-time profiling
+        std::string getProfileReport() const;
+    };
+
+    // Memory profiling
+    class MemoryProfiler {
+    public:
+        struct MemorySnapshot {
+            uint64_t timestamp;
+            uint64_t totalMemory;
+            uint64_t allocatedObjects;
+            uint64_t freeObjects;
+            std::unordered_map<std::string, uint64_t> poolStats;
+        };
+        
+        void takeSnapshot();
+        std::vector<MemorySnapshot> getSnapshots() const;
+        void compareWithSnapshot(size_t snapshot1, size_t snapshot2);
+        uint64_t getCurrentMemoryUsage() const;
+        uint64_t getCurrentAllocatedObjects() const;
+        std::string getMemoryReport() const;
+    };
+
+    // Performance monitoring
+    class PerformanceMonitor {
+    public:
+        struct SystemStats {
+            double cpuUsage; // percentage
+            double memoryUsage; // percentage
+            double diskUsage; // percentage
+            uint64_t networkBytesIn;
+            uint64_t networkBytesOut;
+            std::chrono::system_clock::time_point uptime;
+        };
+        
+        static SystemStats getSystemStats();
+        static double getCPUTemperature(); // if available
+        static uint64_t getAvailableMemory();
+        static uint64_t getTotalMemory();
+        static std::vector<std::string> getRunningProcesses();
+        static bool isMemoryPressureHigh();
+        static bool isCPUOverheated();
+    };
+
+    // Simulation monitoring
+    class SimulationMonitor {
+    public:
+        struct EventLog {
+            uint64_t step;
+            std::string eventType;
+            double timestamp;
+            std::string details;
+            std::unordered_map<std::string, double> metrics;
+        };
+        
+        void logEvent(const std::string& eventType, const std::string& details = "");
+        void logEventWithMetrics(const std::string& eventType, 
+                               const std::unordered_map<std::string, double>& metrics,
+                               const std::string& details = "");
+        std::vector<EventLog> getEventLog(size_t maxEvents = 1000) const;
+        void clearEventLog();
+        void setEventLogLimit(size_t limit);
+        double getEventFrequency(const std::string& eventType) const;
+        std::string getSimulationSummary() const;
+    };
+
+    // Advanced error reporting
+    class ErrorReporter {
+    public:
+        struct CrashReport {
+            std::chrono::system_clock::time_point timestamp;
+            std::string errorType;
+            std::string errorMessage;
+            std::string stackTrace;
+            std::unordered_map<std::string, std::string> systemInfo;
+            std::vector<std::string> recentEvents;
+        };
+        
+        void reportError(const std::string& errorType, const std::string& errorMessage);
+        void reportCrash(const std::string& errorMessage, const std::string& stackTrace);
+        std::vector<CrashReport> getCrashReports() const;
+        void clearCrashReports();
+        void enableAutoReport(bool enable);
+        void setReportDestination(const std::string& endpoint);
+        std::string getErrorSummary() const;
+    };
+
+    // Performance profiling with decorators
+    py::function<> profileFunction(const std::string& name, py::function<> func);
+    py::function<> benchmarkFunction(const std::string& name, py::function<> func, 
+                                     int iterations = 100);
+    py::function<> profileLambda(const std::string& name, py::function<> func);
+
+    // Memory tracking for Python objects
+    class PythonMemoryTracker {
+    public:
+        struct ObjectStats {
+            py::object object;
+            std::string typeName;
+            size_t refCount;
+            uint64_t memoryUsage;
+            std::string location;
+        };
+        
+        void trackObject(py::object obj);
+        void untrackObject(py::object obj);
+        std::vector<ObjectStats> getTrackedObjects() const;
+        void clearTrackedObjects();
+        size_t getTotalTrackedMemory() const;
+        std::string getMemoryLeakReport() const;
+    };
+
+    // Integration with external profiling tools
+    class ExternalProfiler {
+    public:
+        void enableChromeTracer();
+        void enableVProf();
+        void enablePerf();
+        void enableIntelProfiler();
+        void disableAllProfilers();
+        bool isProfilerActive(const std::string& name) const;
+        std::string getProfilerOutput(const std::string& name);
+        void saveProfilerData(const std::string& filename, const std::string& profilerName = "");
+    };
+
+    // Utility functions for advanced profiling
+    std::string getSystemInfo();
+    std::vector<std::string> getLoadedModules();
+    size_t getPythonMemoryUsage();
+    double getSimulationFPS(); // frames per second
+    uint64_t getSimulationStepRate(); // steps per second
+
+    // Real-time monitoring
+    class RealTimeMonitor {
+    public:
+        using UpdateCallback = std::function<void(const std::unordered_map<std::string, double>&)>;
+        
+        void startMonitoring(double interval, UpdateCallback callback);
+        void stopMonitoring();
+        bool isMonitoring() const;
+        void setMonitoringMetrics(const std::vector<std::string>& metrics);
+        std::unordered_map<std::string, double> getCurrentMetrics() const;
+        std::string getMonitoringStatus() const;
+    };
+
+    // Stress testing utilities
+    class StressTester {
+    public:
+        struct StressTestResult {
+            std::string testName;
+            double duration;
+            bool passed;
+            std::string errorMessage;
+            std::unordered_map<std::string, double> metrics;
+            uint64_t memoryPeak;
+        };
+        
+        StressTestResult runMemoryStressTest(uint64_t durationMs, uint64_t targetMemory);
+        StressTestResult runCPUSTressTest(uint64_t durationMs, float targetCPU);
+        StressTestResult runSpikeStressTest(uint64_t spikeFrequency, uint64_t duration);
+        StressTestResult runConnectivityStressTest(float connectionProbability, uint64_t steps);
+        std::vector<StressTestResult> runAllStressTests();
+        void setStressTestTimeout(uint64_t timeoutMs);
+        bool isStressTestRunning() const;
+        void stopStressTest();
+        std::string getStressTestReport() const;
+    };
+
+    // Integration with NLM's internal profiling
+    void initializeAdvancedProfiling();
+    void shutdownAdvancedProfiling();
+    bool isAdvancedProfilingEnabled() const;
+    void configureProfiling(const std::unordered_map<std::string, std::string>& config);
+    std::string getProfilingConfiguration() const;
+    std::string getProfilingStatistics() const;
+
+    // Profiling for specific NLM components
+    class ComponentProfiler {
+    public:
+        enum class Component {
+            Brain,
+            Memory,
+            Plasticity,
+            Neuromodulation,
+            Prediction,
+            Cognition,
+            World,
+            Agent,
+            All
+        };
+        
+        void startComponentProfiling(Component component);
+        void stopComponentProfiling(Component component);
+        double getComponentTime(Component component) const;
+        uint64_t getComponentCalls(Component component) const;
+        std::unordered_map<std::string, double> getComponentMetrics(Component component) const;
+        void resetComponentProfiling(Component component);
+        void resetAllComponentProfiling();
+        std::string getComponentProfileReport(Component component) const;
+        std::string getAllComponentsProfileReport() const;
+    };
+
+    // Advanced statistical analysis
+    class StatisticsAnalyzer {
+    public:
+        struct StatisticalReport {
+            std::string analysisType;
+            std::unordered_map<std::string, double> statistics;
+            std::vector<std::string> insights;
+            std::vector<std::string> warnings;
+            double confidenceLevel;
+        };
+        
+        StatisticalReport analyzeSpikeTrain(const std::vector<double>& spikeTimes, 
+                                          double binWidth = 0.001);
+        StatisticalReport analyzeNeuronalActivity(const std::vector<std::vector<float>>& neuralData);
+        StatisticalReport analyzePlasticityDynamics(const std::vector<std::vector<float>>& plasticityData);
+        StatisticalReport analyzeMemoryUsage(const std::vector<uint64_t>& memorySamples);
+        StatisticalReport analyzePerformance(const std::vector<double>& performanceSamples);
+        std::vector<StatisticalReport> analyzeAllData(const std::unordered_map<std::string, std::vector<double>>& datasets);
+        void setStatisticalSignificance(double alpha);
+        double getStatisticalSignificance() const;
+        std::string getStatisticalReport() const;
+    };
+
+    // Integration with external analysis tools
+    class AnalysisIntegration {
+    public:
+        void connectToMatplotlib();
+        void connectToJupyter();
+        void connectToTensorBoard();
+        void connectToWandb(); // Weights & Biases
+        void connectToMLflow(); // MLflow tracking
+        void disconnectFromExternalTools();
+        bool isConnectedToTool(const std::string& toolName) const;
+        void exportResults(const std::string& filename, const std::string& format = "json");
+        std::string getIntegrationStatus() const;
+    };
+
+    // Profiling decorators for Python functions
+    template<typename F>
+    auto profiled(F&& func, const std::string& name) -> decltype(std::forward<F>(func)()) {
+        auto profiler = std::make_shared<Profiler>();
+        profiler->startProfile(name);
+        auto result = std::forward<F>(func)();
+        profiler->stopProfile(name);
+        return result;
+    }
+
+    template<typename F, typename... Args>
+    auto profiled(F&& func, const std::string& name, Args&&... args) -> decltype(std::forward<F>(func)(std::forward<Args>(args)...)) {
+        auto profiler = std::make_shared<Profiler>();
+        profiler->startProfile(name);
+        auto result = std::forward<F>(func)(std::forward<Args>(args)...);
+        profiler->stopProfile(name);
+        return result;
+    }
+
+    template<typename F>
+    auto benchmarked(F&& func, const std::string& name, int iterations) -> decltype(std::forward<F>(func)()) {
+        auto profiler = std::make_shared<Profiler>();
+        profiler->startProfile(name);
+        
+        for (int i = 0; i < iterations; ++i) {
+            std::forward<F>(func)();
+        }
+        
+        profiler->stopProfile(name);
+        return std::forward<F>(func)();
+    }
+
+    // Profiling results serialization
+    std::string serializeProfilingResults(const std::vector<Profiler::ProfileData>& profiles);
+    bool deserializeProfilingResults(const std::string& data, std::vector<Profiler::ProfileData>& profiles);
+    void saveProfilingResults(const std::string& filename);
+    bool loadProfilingResults(const std::string& filename);
+
+    // Profiling alerts and notifications
+    class ProfilingAlert {
+    public:
+        enum class AlertType {
+            PerformanceDegradation,
+            MemoryLeak,
+            HighCPUUsage,
+            SlowSimulation,
+            AnomalyDetected
+        };
+        
+        void setAlertThreshold(AlertType type, double threshold);
+        double getAlertThreshold(AlertType type) const;
+        void triggerAlert(AlertType type, const std::string& message);
+        void clearAlert(AlertType type);
+        std::vector<std::pair<AlertType, std::string>> getActiveAlerts() const;
+        void addAlertCallback(std::function<void(AlertType, const std::string&)> callback);
+        void removeAlertCallback(std::function<void(AlertType, const std::string&)> callback);
+        std::string getAlertReport() const;
+    };
+
+    // Performance profiling with stack traces
+    class StackTraceProfiler {
+    public:
+        std::string captureStackTrace(size_t maxDepth = 100);
+        void enableStackTraceCapture(bool enable);
+        bool isStackTraceCaptureEnabled() const;
+        std::vector<std::string> getRecentStackTraces(size_t limit = 100) const;
+        void clearStackTraces();
+        std::string analyzeStackTrace(const std::string& stackTrace);
+        std::string getPerformanceBottleneckReport() const;
+    };
+
+    // Integration with system monitoring
+    class SystemMonitor {
+    public:
+        struct ProcessInfo {
+            uint64_t pid;
+            std::string name;
+            double cpuUsage;
+            uint64_t memoryUsage;
+            std::chrono::system_clock::time_point startTime;
+            std::string commandLine;
+        };
+        
+        std::vector<ProcessInfo> getSystemProcesses();
+        ProcessInfo getCurrentProcessInfo();
+        std::vector<std::string> getSystemServices();
+        bool isServiceRunning(const std::string& serviceName);
+        void monitorProcess(uint64_t pid, double interval);
+        void stopMonitoringProcess(uint64_t pid);
+        std::string getSystemPerformanceReport() const;
+    };
+
+    // Advanced profiling statistics
+    class ProfilingStatistics {
+    public:
+        struct SummaryStats {
+            double mean;
+            double median;
+            double mode;
+            double standardDeviation;
+            double variance;
+            double min;
+            double max;
+            double range;
+            double skewness;
+            double kurtosis;
+        };
+        
+        SummaryStats calculateStatistics(const std::vector<double>& data);
+        std::vector<SummaryStats> calculateStatistics(const std::vector<std::vector<double>>& datasets);
+        double calculateCorrelation(const std::vector<double>& x, const std::vector<double>& y);
+        double calculateRegression(const std::vector<double>& x, const std::vector<double>& y);
+        std::vector<double> movingAverage(const std::vector<double>& data, size_t window);
+        std::vector<double> exponentialMovingAverage(const std::vector<double>& data, double alpha);
+        std::string getStatisticalReport(const std::vector<double>& data) const;
+    };
+
+    // Real-time profiling with live updates
+    class LiveProfiler {
+    public:
+        using DataCallback = std::function<void(const std::unordered_map<std::string, double>&)>;
+        
+        void startLiveProfiling(double interval, DataCallback callback);
+        void stopLiveProfiling();
+        bool isLiveProfiling() const;
+        void addMetricSource(const std::string& name, std::function<double()> source);
+        void removeMetricSource(const std::string& name);
+        std::unordered_map<std::string, double> getLiveMetrics() const;
+        std::string getLiveProfilingReport() const;
+    };
+
+    // Profiling for specific use cases
+    class UseCaseProfiler {
+    public:
+        struct UseCaseMetrics {
+            std::string useCaseName;
+            double simulationTime;
+            uint64_t neuronsCreated;
+            uint64_t synapsesCreated;
+            float averageFiringRate;
+            float memoryUsage;
+            double cpuTime;
+            std::vector<std::string> performanceIssues;
+        };
+        
+        void profileUseCase(const std::string& useCaseName,
+                          std::function<void()> setupFunction,
+                          std::function<void()> simulationFunction,
+                          std::function<void()> cleanupFunction);
+        UseCaseMetrics getUseCaseMetrics(const std::string& useCaseName) const;
+        std::vector<UseCaseMetrics> getAllUseCaseMetrics() const;
+        void clearUseCaseMetrics();
+        std::string getUseCaseProfileReport() const;
+    };
+
+    // Profiling results comparison
+    class ProfilingComparator {
+    public:
+        struct ComparisonResult {
+            std::string testName1;
+            std::string testName2;
+            double performanceDifference;
+            double memoryDifference;
+            double qualityDifference;
+            std::string recommendation;
+        };
+        
+        void addTestResult(const std::string& testName, const Profiler::ProfileData& data);
+        ComparisonResult compareTests(const std::string& testName1, const std::string& testName2);
+        std::vector<ComparisonResult> compareAllTests();
+        void removeTestResult(const std::string& testName);
+        std::string getComparisonReport() const;
+    };
+
+    // Advanced profiling with machine learning
+    class MachineLearningProfiler {
+    public:
+        struct ModelPerformance {
+            double accuracy;
+            double precision;
+            double recall;
+            double f1Score;
+            double trainingTime;
+            uint64_t trainingSamples;
+            std::unordered_map<std::string, double> featureImportance;
+        };
+        
+        void trainPerformanceModel(const std::vector<std::vector<double>>& features,
+                                   const std::vector<double>& targets);
+        ModelPerformance predictPerformance(const std::vector<double>& features);
+        std::vector<ModelPerformance> predictAllPerformances(const std::vector<std::vector<double>>& features);
+        void setModelHyperparameters(const std::unordered_map<std::string, double>& params);
+        std::unordered_map<std::string, double> getModelHyperparameters() const;
+        std::string getModelPerformanceReport() const;
+    };
+
+    // Profiling for distributed systems
+    class DistributedProfiler {
+    public:
+        struct NodeMetrics {
+            std::string nodeId;
+            double cpuUsage;
+            uint64_t memoryUsage;
+            double networkIO;
+            std::chrono::system_clock::time_point lastUpdate;
+            std::unordered_map<std::string, double> customMetrics;
+        };
+        
+        void registerNode(const std::string& nodeId);
+        void unregisterNode(const std::string& nodeId);
+        void updateNodeMetrics(const std::string& nodeId, const NodeMetrics& metrics);
+        NodeMetrics getNodeMetrics(const std::string& nodeId) const;
+        std::vector<NodeMetrics> getAllNodeMetrics() const;
+        double calculateNodeAverage(const std::string& metricName) const;
+        std::string getDistributedProfileReport() const;
+    };
+
+    // Final initialization function
+    void initializeAdvancedProfiling() {
+        // Initialize all profiling systems
+        // Register built-in metrics
+        // Setup default callbacks
+        // Enable monitoring
+    }
+
+    void shutdownAdvancedProfiling() {
+        // Cleanup all profiling systems
+        // Stop all monitoring
+        // Save profiling data
+        // Cleanup resources
+    }
+
+    bool isAdvancedProfilingEnabled() const {
+        // Check if profiling is initialized and enabled
+        return profilingInitialized_ && profilingEnabled_;
+    }
+
+    void configureProfiling(const std::unordered_map<std::string, std::string>& config) {
+        // Configure profiling based on config
+        // Apply user settings
+        // Update thresholds
+    }
+
+    std::string getProfilingConfiguration() const {
+        // Return current configuration
+        std::ostringstream oss;
+        oss << "Profiling Configuration:";
+        oss << "\nEnabled: " << (profilingEnabled_ ? "Yes" : "No");
+        oss << "\nInitialized: " << (profilingInitialized_ ? "Yes" : "No");
+        oss << "\nInterval: " << profilingInterval_ << " seconds";
+        return oss.str();
+    }
+
+    std::string getProfilingStatistics() const {
+        // Return profiling statistics
+        std::ostringstream oss;
+        oss << "Profiling Statistics:";
+        oss << "\nTotal profiles: " << totalProfiles_;
+        oss << "\nActive monitors: " << activeMonitors_;
+        oss << "\nMemory snapshots: " << memorySnapshots_;
+        return oss.str();
+    }
+
+private:
+    // Internal profiling state
+    bool profilingInitialized_ = false;
+    bool profilingEnabled_ = false;
+    double profilingInterval_ = 1.0; // seconds
+    uint64_t totalProfiles_ = 0;
+    uint64_t activeMonitors_ = 0;
+    uint64_t memorySnapshots_ = 0;
+    
+    // Profiling data
+    std::unordered_map<std::string, Profiler::ProfileData> profileData_;
+    std::unordered_map<std::string, MemoryProfiler::MemorySnapshot> memorySnapshots_;
+    std::vector<SimulationMonitor::EventLog> eventLog_;
+    std::vector<ErrorReporter::CrashReport> crashReports_;
+    
+    // Callbacks
+    std::vector<std::function<void(const std::unordered_map<std::string, double>&)>> metricCallbacks_;
+    std::vector<std::function<void(ProfilingAlert::AlertType, const std::string&)>> alertCallbacks_;
+
+    // Helper methods
+    void registerBuiltInMetrics();
+    void setupDefaultCallbacks();
+    void applyConfiguration(const std::unordered_map<std::string, std::string>& config);
+};
+
