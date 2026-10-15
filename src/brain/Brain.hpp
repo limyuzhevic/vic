@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
+#include "BrainImpl.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
