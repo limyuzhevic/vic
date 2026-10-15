@@ -29,6 +29,63 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declarations for system coordinators and state tracking
+class NeuralComputationSystem;
+class MemorySystem;
+class DevelopmentSystemCoordinator;
+class SystemStateTracker;
+class BrainInitializer;
+
+// Brain system state structure for debugging and monitoring
+struct BrainSystemState {
+    // Performance metrics
+    struct {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        size_t totalSpikes;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+    } neural;
+    
+    // Memory system state
+    struct {
+        size_t workingMemoryTraces;
+        size_t episodicMemoryEpisodes;
+        float memoryConsolidationLevel;
+    } memory;
+    
+    // Neuromodulation state
+    struct {
+        float dopamineLevel;
+        float curiosityLevel;
+        float noveltyLevel;
+        float predictionError;
+    } neuromodulation;
+    
+    // Development state
+    struct {
+        DevelopmentalStage stage;
+        float plasticityModulation;
+    } development;
+    
+    // Timing information
+    struct {
+        SimulationStep currentStep;
+        Timestamp currentTime;
+        double wallClockTime;
+    } timing;
+    
+    BrainSystemState();
+};
+
+// System coordinators for better separation of concerns
+class NeuralComputationSystem;
+class MemorySystem;
+class DevelopmentSystemCoordinator;
+class SystemStateTracker;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -192,6 +249,15 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== SYSTEM STATE TRACKING ==========
+    
+    // Get current system state for debugging and monitoring
+    const BrainSystemState& getSystemState() const;
+    
+    // Access to system state tracker for advanced debugging
+    SystemStateTracker* getStateTracker();
+    const SystemStateTracker* getStateTracker() const;
     
 private:
     struct Impl;
