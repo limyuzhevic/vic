@@ -68,6 +68,39 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize higher cognition systems if available
+    if (brain_) {
+        // NeuralPlanner for action planning
+        if (brain_->getPlanner()) {
+            NLM_LOG_INFO("AgentBrain: Integrating NeuralPlanner for action planning");
+        }
+        
+        // ConceptFormation for concept-based behavior
+        if (brain_->getConceptFormation()) {
+            NLM_LOG_INFO("AgentBrain: Integrating ConceptFormation for concept learning");
+        }
+        
+        // SelfModel for self-aware behavior
+        if (brain_->getSelfModel()) {
+            NLM_LOG_INFO("AgentBrain: Integrating SelfModel for self-awareness");
+        }
+        
+        // SocialLearning for social behavior
+        if (brain_->getSocialLearning()) {
+            NLM_LOG_INFO("AgentBrain: Integrating SocialLearning for social behavior");
+        }
+        
+        // NeuralWorkingMemory for working memory integration
+        if (brain_->getWorkingMemory()) {
+            NLM_LOG_INFO("AgentBrain: Integrating NeuralWorkingMemory");
+        }
+        
+        // PredictionSystem for predictive behavior
+        if (brain_->getPredictionSystem()) {
+            NLM_LOG_INFO("AgentBrain: Integrating PredictionSystem for predictive behavior");
+        }
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -157,6 +190,22 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Consider planned actions from NeuralPlanner
+    if (currentGoalAction_ != ActionType::Wait) {
+        // If we have a planned action, consider it
+        MotorCommand plannedMotor = actionToMotorCommand(currentGoalAction_);
+        
+        // Choose between planned and immediate action based on confidence
+        if (shouldFollowPlannedAction()) {
+            decoded = plannedMotor;
+        }
+    }
+    
+    // Consider concept-based behavior
+    if (conceptInfluenced_) {
+        decoded = applyConceptBasedAction(decoded);
     }
     
     return decoded;

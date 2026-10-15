@@ -9,11 +9,15 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -124,8 +128,9 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
+// Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        novelty = std::make_unique<Novelty>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -242,8 +247,8 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+// Initialize prediction system
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -256,8 +261,10 @@ bool Brain::initialize() {
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->novelty->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +518,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        if (sensoryInputBuffer_) {
+            // Generate prediction based on current state
+            auto prediction = pImpl->predictionSystem->predictNextState(*sensoryInputBuffer_);
+            
+            // Update with actual sensory input if available
+            if (currentSensoryInput_) {
+                pImpl->predictionSystem->updatePredictions(*prediction, *currentSensoryInput_);
+                
+                // Store prediction error for neuromodulation
+                float predError = pImpl->predictionSystem->getPredictionError();
+                if (pImpl->predictionError) {
+                    // Use prediction error to modulate dopamine
+                    // Positive prediction error (unexpected) increases dopamine
+                    // Negative error (expected) decreases dopamine
+                    float dopamineMod = 0.5f + predError * 0.5f;
+                    pImpl->dopamine->setLevel(dopamineMod);
+                }
+            }
+            
+            // Train prediction system with current observation
+            if (currentSensoryInput_) {
+                pImpl->predictionSystem->train(*currentSensoryInput_);
+            }
+        }
+        
+        // Update prediction confidence for curiosity
+        if (pImpl->curiosity && pImpl->novelty) {
+            float confidence = pImpl->predictionSystem->getConfidence();
+            // Low confidence = high curiosity
+            float curiosityLevel = 1.0f - confidence;
+            pImpl->curiosity->setLevel(curiosityLevel);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

@@ -11,6 +11,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Enhanced with integration to higher cognition systems
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -36,6 +37,9 @@ public:
     
     // Update development system
     void updateDevelopment(double timestep);
+    
+    // Update higher cognition systems (NeuralPlanner, ConceptFormation, etc.)
+    void updateCognition(double timestep);
     
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
@@ -75,7 +79,7 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +116,30 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Higher cognition integration
+    ActionType currentGoalAction_;  // Planned action from NeuralPlanner
+    bool conceptInfluenced_;        // Whether concept formation is influencing behavior
+    
+    // Helper methods for higher cognition integration
+    std::vector<float> getSensoryState() const;
+    
+    MotorCommand decodeMotorCommandEnhanced();
+    MotorCommand applyConceptBasedAction(MotorCommand originalAction);
+    bool shouldFollowPlannedAction() const;
+    MotorCommand actionToMotorCommand(ActionType action) const;
+    
+    void applyConceptBasedBehavior(size_t conceptId, const std::vector<float>& conceptProto);
+    void considerImitationAction();
 };
+
+// Include headers for higher cognition systems
+// These includes are needed for the enhanced AgentBrain implementation
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
 
 } // namespace nlm
