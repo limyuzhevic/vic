@@ -78,12 +78,73 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Set valid values
+    config.set("int_field", 42, nlm::ConfigSource::Runtime);
+    config.set("double_field", 3.14, nlm::ConfigSource::Runtime);
+    config.set("string_field", "hello", nlm::ConfigSource::Runtime);
+    config.set("bool_field", true, nlm::ConfigSource::Runtime);
+    
+    // Create schema for validation
+    std::vector<nlm::ConfigSchemaField> schema {
+        nlm::ConfigSchemaField("int_field", 0, true, "Integer field"),
+        nlm::ConfigSchemaField("double_field", 0.0, true, "Double field"),
+        nlm::ConfigSchemaField("string_field", std::string(""), true, "String field"),
+        nlm::ConfigSchemaField("bool_field", false, true, "Bool field")
+    };
+    
+    // Validate - should pass
+    assert(config.validate(schema));
+    std::string errors = config.validateAndGetErrors(schema);
+    assert(errors.empty());
+    
+    // Test validation error detection
+    std::vector<nlm::ConfigSchemaField> invalidSchema {
+        nlm::ConfigSchemaField("missing_field", "", true, "Missing required field"),
+        nlm::ConfigSchemaField("int_field", 0, true, "Integer field with wrong type")
+    };
+    
+    std::string validationErrors = config.validateAndGetErrors(invalidSchema);
+    assert(!validationErrors.empty());
+    std::cout << "    Validation correctly detected errors: " << validationErrors << std::endl;
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigTypeConversion() {
+    // Test type conversion utilities
+    assert(nlm::Config::convertTo<int>("42").has_value());
+    assert(nlm::Config::convertTo<int>("42").value() == 42);
+    
+    assert(nlm::Config::convertTo<double>("3.14").has_value());
+    assert(nlm::Config::convertTo<double>("3.14").value() > 3.13);
+    
+    assert(nlm::Config::convertTo<bool>("true").has_value());
+    assert(nlm::Config::convertTo<bool>("true").value() == true);
+    
+    assert(nlm::Config::convertTo<bool>("false").has_value());
+    assert(nlm::Config::convertTo<bool>("false").value() == false);
+    
+    assert(nlm::Config::convertTo<std::string>("hello").has_value());
+    assert(nlm::Config::convertTo<std::string>("hello").value() == "hello");
+    
+    // Test invalid conversions
+    assert(!nlm::Config::convertTo<int>("not_a_number").has_value());
+    assert(!nlm::Config::convertTo<bool>("maybe").has_value());
+    
+    std::cout << "    testConfigTypeConversion passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigTypeConversion();
 }
 
 } // namespace test_config

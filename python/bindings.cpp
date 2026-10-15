@@ -145,21 +145,21 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file. Supports JSON, YAML, and key=value formats based on file extension. Returns True on success, False on failure.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments (--key=value or -key value format)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file. Supports JSON format for .json files, key=value format for .cfg and other extensions. Returns True on success, False on failure.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys as a list of strings")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a human-readable summary string of the configuration including all entries and their sources")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -292,113 +292,121 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             "Initialize the brain with configuration. Must be called before simulation.")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             "Perform a simulation step using the default timestep. Updates neural activity.")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with explicit timestamp. Updates neural activity.")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
-             "Inject sensory input into the brain")
+             "Inject sensory input into the brain for processing.")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
+             "Inject direct current into a specific neuron.")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+             "Inject current into all neurons of a specific type (Excitatory, Inhibitory, etc.).")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+             "Produce motor action based on neural activity. Returns a MotorCommand.")
         .def("reset", &Brain::reset,
-             "Reset brain state")
+             "Reset brain state to initial conditions.")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to a file. Returns True on success, False on failure.")
         .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+             "Load brain state from a file. Returns True on success, False on failure.")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+             "Add a new neural region to the brain. Returns the new region's ID.")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
-             "Get a region by ID")
+             "Get a region by its ID. Returns the region object.")
         .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
+             "Get the number of neural regions in the brain.")
         .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
+             "Get all region IDs as a list.")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
-             "Get all regions")
+             "Get all regions as a list of Region objects.")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
+             "Get total neuron count across all regions.")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
+             "Get total synapse count across all regions.")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
+             "Get count of neurons that are currently active (membrane potential > threshold).")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
+             "Get count of neurons that are currently firing (in refractory period).")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
+             "Get average firing rate across all neurons in Hz.")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
+             "Get the ratio of excitation to inhibition in the network.")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+             "Get total spike count since brain initialization.")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get the current developmental stage of the brain.")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
-             "Set developmental stage")
+             "Set the developmental stage of the brain.")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
+             "Get the configuration object used by this brain.")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log current brain status and statistics to the logger.");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+             "Initialize agent brain with a world. Must be called before simulation.")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
+             "Get expected sensory input size. Returns the number of sensory input values.")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
+             "Get expected motor output size. Returns the number of motor output values.")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             "Process sensory percept (list of floats) and inject into the brain.")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
+             "Decode brain motor activity into a MotorCommand object.")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+             "Apply reward-based neuromodulation using reward prediction error.")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
-             "Update development system")
+             "Update development system for the given timestep.")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get the current developmental stage of the agent brain.")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+             "Get current neuromodulation level (0.0 to 1.0).")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+             "Get curiosity level (0.0 to 1.0). Higher values indicate more exploration.")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+             "Get novelty level (0.0 to 1.0). Higher values indicate more novel stimuli.")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+             "Get prediction error (reward prediction error). Negative = worse than expected, positive = better than expected.")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+             "Reset agent brain for a new episode. Clears state and history.")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             "Get the underlying Brain object that this AgentBrain wraps.")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable or disable reward modulation.")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable or disable structural plasticity (synapse creation/removal).")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable or disable development processes.")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"),
+             "Enable or disable curiosity-driven exploration.")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is currently enabled.")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is currently enabled.")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is currently enabled.")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity-driven exploration is currently enabled.");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
