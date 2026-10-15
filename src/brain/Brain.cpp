@@ -165,69 +165,166 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
 
-Brain& Brain::operator=(Brain&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+bool validateConfiguration() const {
+    // Basic configuration validation
+    // Check for required configuration keys
+    
+    // Neuron count should be reasonable
+    if (auto neuronCountOpt = pImpl->config->get<size_t>("neuron_count")) {
+        if (*neuronCountOpt == 0) {
+            return false;
+        }
     }
-    return *this;
+    
+    // Region count should be reasonable
+    if (auto regionCountOpt = pImpl->config->get<size_t>("region_count")) {
+        if (*regionCountOpt == 0) {
+            return false;
+        }
+    }
+    
+    // Connection probability should be valid
+    if (auto connectionProbabilityOpt = pImpl->config->get<float>("connection_probability")) {
+        if (*connectionProbabilityOpt < 0.0f || *connectionProbabilityOpt > 1.0f) {
+            return false;
+        }
+    }
+    
+    // Check timestep
+    if (pImpl->timestep <= 0.0) {
+        return false;
+    }
+    
+    // Check for required keys
+    std::vector<std::string> requiredKeys = {
+        "random_seed", "simulation_timestep", "neuron_count", "region_count",
+        "connection_probability", "stdp_ltp_weight", "stdp_ltd_weight", "stdp_tau"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!pImpl->config->has(key)) {
+            NLM_LOG_WARN("Missing configuration key: " + key);
+        }
+    }
+    
+    return true;
 }
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
-    
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
-    
-    // Create regions
-    for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+    // Validate configuration before proceeding
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return false;
     }
     
-    // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+    try {
+        // Get configuration values
+        size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        
+        // Validate derived values
+        if (neuronCount == 0) {
+            NLM_LOG_ERROR("Invalid neuron count: 0");
+            return false;
+        }
+        
+        if (regionCount == 0) {
+            NLM_LOG_ERROR("Invalid region count: 0");
+            return false;
+        }
+        
+        if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+            return false;
+        }
+        
+        // Validate timestep
+        if (pImpl->timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid timestep: " + std::to_string(pImpl->timestep));
+            return false;
+        }
+        
+NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                     std::to_string(regionCount) + " regions");
+        
+        // Create regions with error checking
+        for (size_t i = 0; i < regionCount; ++i) {
+            RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+            if (regionId == INVALID_REGION_ID) {
+                NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+                return false;
+            }
+        }
+        
+        // Create neurons across regions with error checking
+        size_t neuronsPerRegion = neuronCount / regionCount;
+        if (neuronsPerRegion < 4) {
+            NLM_LOG_ERROR("Not enough neurons for proper population distribution");
+            return false;
+        }
+        
+        for (size_t i = 0; i < regionCount; ++i) {
+            auto* region = getRegion(RegionId(i + 1));
+            if (!region) {
+                NLM_LOG_ERROR("Failed to get region " + std::to_string(i + 1));
+                return false;
+            }
             
-            // Collect sensory and motor neurons for I/O
+            // Add populations
+            auto sensoryPopId = region->addPopulation(std::max<size_t>(neuronsPerRegion / 4, 1), NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(std::max<size_t>(neuronsPerRegion / 2, 1), NeuronType::Internal);
+            auto motorPopId = region->addPopulation(std::max<size_t>(neuronsPerRegion / 4, 1), NeuronType::Motor);
+            
+            if (sensoryPopId == INVALID_POPULATION_ID || internalPopId == INVALID_POPULATION_ID || motorPopId == INVALID_POPULATION_ID) {
+                NLM_LOG_ERROR("Failed to create populations in region " + std::to_string(i + 1));
+                return false;
+            }
+            
+            // Collect sensory and motor neurons for I/O with error checking
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
+            
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
+                auto neurons = sensoryPop->getNeurons();
+                if (neurons.empty()) {
+                    NLM_LOG_ERROR("No neurons in sensory population in region " + std::to_string(i + 1));
+                }
+                for (auto* neuron : neurons) {
                     pImpl->sensoryNeurons.push_back(neuron);
                 }
             }
+            
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
+                auto neurons = motorPop->getNeurons();
+                if (neurons.empty()) {
+                    NLM_LOG_ERROR("No neurons in motor population in region " + std::to_string(i + 1));
+                }
+                for (auto* neuron : neurons) {
                     pImpl->motorNeurons.push_back(neuron);
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
-    }
-    
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        
+        // Initialize connectivity with error checking
+        for (size_t i = 0; i < regionCount; ++i) {
+            auto* region = getRegion(RegionId(i + 1));
+            if (!region) {
+                NLM_LOG_ERROR("Failed to get region for connectivity initialization: " + std::to_string(i + 1));
+                return false;
+            }
+            
+            if (!region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f)) {
+                NLM_LOG_ERROR("Failed to initialize connectivity in region " + std::to_string(i + 1));
+                return false;
+            }
         }
-    }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     

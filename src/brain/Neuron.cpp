@@ -23,8 +23,11 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Configuration
+    TimestepDuration defaultTimestep_;  // Default timestep for neuron updates
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), defaultTimestep_(0.001f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -35,27 +38,28 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
-
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+void Neuron::setType(NeuronType type) {
+    pImpl->type = type;
+}
+
+void Neuron::setDefaultTimestep(TimestepDuration dt) {
+    pImpl->defaultTimestep_ = dt;
+}
+
+TimestepDuration Neuron::getDefaultTimestep() const {
+    return pImpl->defaultTimestep_;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -170,6 +174,14 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+void Neuron::setDefaultTimestep(TimestepDuration dt) {
+    defaultTimestep_ = dt;
+}
+
+TimestepDuration Neuron::getDefaultTimestep() const {
+    return defaultTimestep_;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
@@ -260,8 +272,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Use configured default timestep for neuron updates
+    TimestepDuration dt = defaultTimestep_;
     stepLIF(currentTime, dt);
 }
 

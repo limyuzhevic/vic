@@ -62,6 +62,10 @@ public:
     NeuronType getType() const;
     void setType(NeuronType type);
     
+    // Configuration
+    void setDefaultTimestep(TimestepDuration dt);
+    TimestepDuration getDefaultTimestep() const;
+    
     // State access
     const NeuronState& getState() const;
     NeuronState& getState();

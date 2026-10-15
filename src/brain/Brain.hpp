@@ -190,6 +190,9 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Configuration validation
+    bool validateConfiguration() const;
+    
     // Logging
     void logStatus() const;
     

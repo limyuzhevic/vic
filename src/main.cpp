@@ -25,10 +25,75 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <unordered_map>
 
 using namespace nlm;
 
-void printBanner() {
+// Forward declarations for helper functions
+void printBanner();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+// Helper function for extracting initial weights from a brain
+std::vector<float> extractInitialWeights(std::shared_ptr<Brain> brain) {
+    std::vector<float> weights;
+    
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            weights.push_back(syn->getWeight());
+        }
+    }
+    
+    return weights;
+}
+
+// Helper function for extracting final weights from a brain
+std::vector<float> extractFinalWeights(std::shared_ptr<Brain> brain) {
+    std::vector<float> weights;
+    
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            weights.push_back(syn->getWeight());
+        }
+    }
+    
+    return weights;
+}
+
+// Helper function for getting most active neurons
+std::vector<NeuronId> getMostActiveNeurons(std::shared_ptr<Brain> brain, size_t count) {
+    return brain->getSpikeSystem()->getMostActiveNeurons(count);
+}
+
+// Helper function to apply input pattern to brain
+void applyInputPattern(std::shared_ptr<Brain> brain, NeuronType type, float current, size_t count) {
+    for (size_t i = 0; i < count && i < brain->getTotalNeuronCount() / 4; ++i) {
+        brain->injectCurrentToNeurons(type, current);
+    }
+}
+
+// Helper function to print command-line help
+void printHelp() {
+    std::cout << "NLM (Neural Learning Machine) - Command Line Options\n" << std::endl;
+    std::cout << "Usage: nlm [options]\n" << std::endl;
+    std::cout << "Options:\n" << std::endl;
+    std::cout << "  --help                    Display this help message\n" << std::endl;
+    std::cout << "\nStandard Configuration Keys:\n" << std::endl;
+    std::cout << "  random_seed              Random seed for reproducibility (int64_t)\n";
+    std::cout << "  simulation_timestep      Simulation time step in seconds (double)\n";
+    std::cout << "  neuron_count             Number of neurons to create (size_t)\n";
+    std::cout << "  region_count             Number of neural regions (size_t)\n";
+    std::cout << "  connection_probability   Probability of creating synapses (float)\n";
+    std::cout << "  stdp_ltp_weight          STDP long-term potentiation weight (float)\n";
+    std::cout << "  stdp_ltd_weight          STDP long-term depression weight (float)\n";
+    std::cout << "  stdp_tau                 STDP time constant (float)\n";
+    std::cout << "  synaptogenesis_rate       Rate of new synapse formation (float)\n";
+    std::cout << "  pruning_rate             Rate of synapse removal (float)\n";
+    std::cout << "\nExample:\n" << std::endl;
+    std::cout << "  ./nlm --config=./configs/neural.cfg\n" << std::endl;
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -340,11 +405,14 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Check for help request
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printHelp();
+            return 0;
+        }
+    }
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
