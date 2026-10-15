@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <cctype>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,13 +22,21 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first - simple JSON parser
+    if (parseSimpleJSON(content)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -49,6 +60,94 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseSimpleJSON(const std::string& content) {
+    std::string trimmed = trim(content);
+    if (trimmed.empty() || trimmed[0] != '{' || trimmed.back() != '}') {
+        return false;
+    }
+    
+    // Extract content between braces
+    std::string jsonContent = trimmed.substr(1, trimmed.size() - 2);
+    size_t pos = 0;
+    
+    while (pos < jsonContent.size()) {
+        // Find key (string in quotes)
+        size_t keyStart = jsonContent.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = jsonContent.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+        size_t colonPos = jsonContent.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value start
+        size_t valueStart = jsonContent.find_first_not_of(" \t",",", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find value end (next comma or closing brace)
+        size_t valueEnd = jsonContent.find_first_of(",}", valueStart);
+        if (valueEnd == std::string::npos) break;
+        
+        std::string valueStr = trim(jsonContent.substr(valueStart, valueEnd - valueStart));
+        
+        // Parse value based on type
+        ConfigValue value;
+        bool parsed = false;
+        
+        // Parse boolean
+        if (valueStr == "true" || valueStr == "false") {
+            value = (valueStr == "true");
+            parsed = true;
+        }
+        // Parse integer
+        else if (std::regex_match(valueStr, std::regex("^-?\d+$"))) {
+            value = std::stoll(valueStr);
+            parsed = true;
+        }
+        // Parse float/double
+        else if (std::regex_match(valueStr, std::regex("^-?\d+\.\d*$")) ||
+                 std::regex_match(valueStr, std::regex("^-?\d+$")) && valueStr.find('.') == std::string::npos) {
+            // Check if it's a float or int
+            if (valueStr.find('.') != std::string::npos) {
+                value = std::stod(valueStr);
+            } else {
+                value = std::stoll(valueStr);
+            }
+            parsed = true;
+        }
+        // Parse string
+        else if ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                 (valueStr.front() == '\'' && valueStr.back() == '\'')) {
+            value = valueStr.substr(1, valueStr.size() - 2);
+            parsed = true;
+        }
+        // Parse array (simple)
+        else if (valueStr.front() == '[' && valueStr.back() == ']') {
+            value = valueStr; // Store as string for now
+            parsed = true;
+        }
+        
+        if (parsed) {
+            set(key, value, ConfigSource::File);
+        }
+        
+        // Move to next key-value pair
+        pos = valueEnd;
+        // Skip comma if present
+        if (pos < jsonContent.size() && jsonContent[pos] == ',') {
+            pos++;
+        }
+        // Skip whitespace
+        while (pos < jsonContent.size() && std::isspace(jsonContent[pos])) {
+            pos++;
         }
     }
     
@@ -86,7 +185,48 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
