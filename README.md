@@ -64,15 +64,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
@@ -81,6 +72,154 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+## Python Bindings
+
+NLM provides Python bindings through the `pynlm` package that make it easy to use NLM in Python applications.
+
+### Installation
+
+```bash
+pip install scikit-build-core pybind11
+pip install -e .
+```
+
+### Quick Start
+
+#### Basic Brain Usage
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+#### Complete Agent Example
+
+```python
+import pynlm
+
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # Initialize agent with world
+    agent.initialize(world)
+    
+    # Enable subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_agent_simulation(1000)
+```
+
+### Enhanced Python Bindings
+
+In addition to the standard `pynlm` bindings, there is an enhanced version `pynlm_enhanced` that provides additional convenience methods and Pythonic APIs:
+
+#### Installation
+
+```bash
+pip install pynlm_enhanced
+```
+
+#### Enhanced Features
+
+The enhanced bindings provide:
+
+1. **Convenience Methods**: Helper functions for common operations
+2. **Context Managers**: Automatic resource management
+3. **Batch Operations**: Efficient processing of multiple operations
+4. **Enhanced Statistics**: Advanced brain analysis tools
+5. **Simplified Configuration**: Python-style configuration management
+6. **Examples**: Ready-to-use example scripts
+
+#### Quick Start with Enhanced Bindings
+
+```python
+import pynlm_enhanced as pynlm
+
+# Create enhanced configuration with all systems enabled
+config = pynlm.createEnhancedConfig()
+
+# Create brain with automatic initialization
+brain = pynlm.createBrain(config)
+
+# Get brain statistics
+data = pynlm.analyzeBrainActivity(brain, "basic_stats")
+print(data)
+
+# Run enhanced simulation
+agent = pynlm.PyAgentBrain(brain)
+world = pynlm.PySimpleWorld()
+world.configure(20, 20, 8, 8)
+world.reset()
+agent.initialize(world)
+
+# Enable all learning systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run enhanced simulation
+result = pynlm.runSimulation(agent, world, 1000)
+print(pynlm.formatResults(result))
+```
 
 ## Project Structure
 
@@ -104,12 +243,12 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```

@@ -1,0 +1,98 @@
+# NLM Configuration File Template
+# This is a template configuration file for the NLM (Neural Learning Machine) project.
+# Values can be overridden by command line arguments or environment variables.
+
+# Simulation Configuration
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 1
+connection_probability = 0.1
+
+# Neuron Configuration
+v_thresh = -50.0
+v_rest = -70.0
+v_reset = -75.0
+tau_mem = 20.0
+tau_ref = 2.0
+adaptation_enabled = true
+refractory_period_enabled = true
+
+# Synaptic Configuration
+initial_weight_mean = 0.5
+initial_weight_std = 0.1
+pre_synaptic_active = true
+post_synaptic_active = true
+modulatory_synaptic_active = true
+
+# Plasticity Configuration
+stdp_enable = true
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+hebbian_enable = true
+hebbian_learning_rate = 0.001
+structural_enable = true
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Development Configuration
+development_enable = true
+critical_period_duration = 1000.0
+plasticity_decay_rate = 0.01
+maturation_speed = 1.0
+
+# Neuromodulation Configuration
+neuromod_dopamine_scale = 1.0
+neuromod_curiosity_enable = true
+neuromod_novelty_enable = true
+neuromod_prediction_error_enable = true
+
+# Memory Configuration
+memory_working_memory_capacity = 100
+memory_episodic_memory_capacity = 1000
+memory_associative_memory_enabled = true
+memory_procedural_memory_enabled = true
+
+# Prediction Configuration
+prediction_enable = true
+prediction_confidence_threshold = 0.5
+prediction_horizon = 10
+
+# Cognition Configuration
+concept_formation_enabled = true
+neural_planner_enabled = true
+attentional_selection_enabled = true
+
+# World Configuration
+world_width = 20
+world_height = 20
+vision_width = 8
+vision_height = 8
+max_energy = 100.0
+energy_decay_rate = 0.1
+
+# Agent Configuration
+agent_enable_reward_modulation = true
+agent_enable_structural_plasticity = true
+agent_enable_development = true
+agent_enable_curiosity = true
+agent_enable_novelty = true
+
+# Performance Configuration
+optimize_for_performance = true
+enable_vectorization = true
+enable_parallel_processing = true
+enable_memory_pooling = true
+
+# Debugging Configuration
+log_level = info
+debug_mode = false
+performance_profiling = false
+
+# Export Configuration
+export_format = json
+export_path = ./exports
+backup_enabled = true
+backup_path = ./backups
+backup_frequency = 1000
