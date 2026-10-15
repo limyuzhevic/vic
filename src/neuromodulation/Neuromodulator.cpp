@@ -17,8 +17,9 @@ Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;
 
-const char* Dopamine::getName() const {
-    return "DA";
+void Dopamine::initialize(Brain* brain) {
+    // Dopamine doesn't currently need brain reference, but keeping interface consistent
+    NLM_LOG_INFO("Dopamine system initialized");
 }
 
 float Dopamine::getLevel() const {

@@ -367,10 +367,10 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("random_seed", 42, ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("neuron_count", 500, ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", 1, ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
@@ -392,10 +392,71 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // ========== CONFIGURATION VALIDATION ==========
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Validating Configuration ===");
+    
+    // Validate essential configuration parameters
+    bool configValid = true;
+    std::vector<std::string> warnings;
+    
+    // Check for required parameters
+    if (!config->has("random_seed")) {
+        warnings.push_back("Missing random_seed, using default (42)");
+        config->set("random_seed", 42, ConfigSource::Default);
+    }
+    
+    if (!config->has("simulation_timestep")) {
+        warnings.push_back("Missing simulation_timestep, using default (0.001)");
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    
+    if (!config->has("neuron_count")) {
+        warnings.push_back("Missing neuron_count, using default (500)");
+        config->set("neuron_count", 500, ConfigSource::Default);
+    }
+    
+    if (!config->has("region_count")) {
+        warnings.push_back("Missing region_count, using default (1)");
+        config->set("region_count", 1, ConfigSource::Default);
+    }
+    
+    // Validate parameter ranges
+    auto neuronCount = config->getOr<size_t>("neuron_count", 500);
+    if (neuronCount == 0) {
+        warnings.push_back("neuron_count cannot be 0, using default (500)");
+        config->set("neuron_count", 500, ConfigSource::Default);
+    } else if (neuronCount > 10000) {
+        warnings.push_back("neuron_count very high (" + std::to_string(neuronCount) + "), consider reducing for performance");
+    }
+    
+    auto timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        warnings.push_back("simulation_timestep out of range (0.001-1.0), using default (0.001)");
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    
+    auto connectionProb = config->getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        warnings.push_back("connection_probability out of range [0.0, 1.0], using default (0.15)");
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
+    
+    // Log warnings if any
+    for (const auto& warning : warnings) {
+        NLM_LOG_WARNING("Configuration warning: " + warning);
+    }
+    
+    if (warnings.empty()) {
+        NLM_LOG_INFO("Configuration validation passed");
+    } else {
+        NLM_LOG_INFO("Configuration validation completed with " + std::to_string(warnings.size()) + " warnings");
+    }
+    
     // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    double simTimestep = config->getOr<double>("simulation_timestep", 0.001);
+    SimulationClock clock(simTimestep);
+    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(simTimestep) + "s");
     
     // Initialize brain
     NLM_LOG_INFO("");

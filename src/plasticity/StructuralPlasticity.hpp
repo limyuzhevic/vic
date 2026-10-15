@@ -1,9 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
 
 namespace nlm {
+
+// Forward declaration
+class Brain;
+class RandomGenerator;
 
 // Structural plasticity: creation and removal of synapses and neurons
 // PLACEHOLDER - Phase 2 will implement real structural plasticity
@@ -39,7 +42,7 @@ public:
     void setPruningRate(float rate);
     
     // Update structural plasticity
-    void update(Brain* brain, class RandomGenerator& rng);
+    void update(Brain* brain, RandomGenerator& rng);
     
 private:
     struct Impl;
