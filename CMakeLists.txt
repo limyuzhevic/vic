@@ -29,6 +29,27 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Test Framework
+    src/core/TestFramework/TestBase.cpp
+    src/core/TestFramework/TestRegistry.cpp
+    src/core/TestFramework/CLIParser.cpp
+    src/core/TestFramework/TestConfig.cpp
+    src/core/TestFramework/TestRunner.cpp
+    src/core/TestFramework/ProgressTracker.cpp
+    src/core/TestFramework/Reporter.cpp
+    src/core/TestFramework/ReporterHelper.cpp
+    src/core/TestFramework/PlainTextReporter.cpp
+    src/core/TestFramework/JSONReporter.cpp
+    src/core/TestFramework/XMLReporter.cpp
+    src/core/TestFramework/CSVReporter.cpp
+    src/core/TestFramework/MarkdownReporter.cpp
+    src/core/TestFramework/ReportFactory.cpp
+    src/core/TestFramework/DefaultErrorHandler.cpp
+    src/core/TestFramework/ExceptionErrorHandler.cpp
+    src/core/TestFramework/ErrorHandlerFactory.cpp
+    src/core/TestFramework/DynamicPlugin.cpp
+    src/core/TestFramework/PluginManager.cpp
+    src/core/TestFramework/ScenarioManager.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
