@@ -1,0 +1,102 @@
+# pyproject.toml for NLM Python bindings
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "cmake>=3.16", "pybind11>=2.11"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynlm"
+version = "0.1.0"
+description = "Python bindings for NLM (Neural Learning Machine)"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "NLM Authors"}
+]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+python-bindings = [
+    "numpy>=1.20",
+]
+experimental = [
+    "matplotlib>=3.5",
+    "scipy>=1.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+packages = ["pynlm"]
+
+[tool.setuptools.package-data]
+pynlm = ["*.so", "*.dll", "*.dylib", "*.pyd"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["pynlm"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.cibuildwheel]
+build = "cp38-cp312"
+enable = ["*linux", "*macosx", "*win32"]
