@@ -58,8 +58,14 @@ struct DiscoveredConcept {
     // Average stability of instances
     float avgStability;
     
+    // Multi-dimensional category representation
+    std::vector<float> categoryVector;
+    
+    // Category entropy (measure of diversity within category)
+    float categoryEntropy;
+    
     DiscoveredConcept() 
-        : id(0), totalObservations(0), avgStability(0) {}
+        : id(0), totalObservations(0), avgStability(0), categoryEntropy(0) {}
 };
 
 // ConceptFormation: Discovers recurring patterns from experience
@@ -84,9 +90,9 @@ public:
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
-                            const std::vector<float>& features,
-                            float reward,
-                            SimulationStep currentTime);
+                             const std::vector<float>& features,
+                             float reward,
+                             SimulationStep currentTime);
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
@@ -115,11 +121,11 @@ public:
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+                       const std::vector<float>& features, float reward);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     // Check if pattern is novel (doesn't belong to any existing concept)
     bool isNovel(const std::vector<float>& pattern,
@@ -138,17 +144,99 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Enhanced novel concept formation
+    size_t createConceptEnhanced(const std::vector<float>& pattern,
+                                 const std::vector<float>& features,
+                                 float reward,
+                                 SimulationStep currentTime);
+
+    // Enhanced concept update with novelty awareness
+    void updateConceptEnhanced(size_t conceptId,
+                              const std::vector<float>& newPattern,
+                              const std::vector<float>& features,
+                              float reward,
+                              float temporalNovelty,
+                              SimulationStep currentTime);
+
+    // Multi-resolution matching
+    size_t findMatchingConceptMultiResolution(const std::vector<float>& pattern,
+                                              float temporalNovelty);
+
+    // Comprehensive novelty detection
+    bool isNovelComprehensive(const std::vector<float>& pattern,
+                             const std::vector<float>& features,
+                             float reward,
+                             SimulationStep currentTime) const;
+
+    // Instance consolidation
+    void consolidateInstances(size_t conceptId);
+
+    // Concept pruning
+    void pruneOutdatedConcepts();
+
+    // Instance lifecycle management
+    void ageInstances();
+
+    // Category evolution
+    void updateCategoryEvolution(size_t conceptId,
+                                const std::vector<float>& newPattern,
+                                const std::vector<float>& features,
+                                float reward);
+
+    // Category management
+    void mergeSimilarCategories(size_t conceptId);
+    void splitCategoryIfNeeded(size_t conceptId);
+    void performConceptClustering(const DiscoveredConcept& concept,
+                                  std::vector<std::vector<float>>& clusters) const;
+
+    // Category utilities
+    float calculateCategorySimilarity(const std::vector<float>& a,
+                                     const std::vector<float>& b) const;
+    std::string generateMultiDimensionalCategory(const std::vector<float>& pattern,
+                                                 const std::vector<float>& features,
+                                                 float reward) const;
+    std::vector<float> extractFeatureVector(const std::vector<float>& pattern,
+                                           const std::vector<float>& features) const;
+    float calculatePatternComplexity(const std::vector<float>& pattern) const;
+    float calculatePatternEnergy(const std::vector<float>& pattern) const;
+    float calculateFeatureDiversity(const std::vector<float>& features) const;
+    float calculateCategoryEntropy(const std::vector<float>& pattern,
+                                   const std::vector<float>& features) const;
+    float calculateFeatureInfluence(float featureValue, float categoryValue) const;
+    std::vector<float> downsamplePattern(const std::vector<float>& pattern,
+                                         size_t factor) const;
+    float calculateContextualNovelty(const std::vector<float>& pattern) const;
+    float calculatePredictionError(const std::vector<float>& pattern) const;
+    void updateNoveltyStatistics(const std::vector<float>& pattern,
+                                SimulationStep currentTime);
+    bool isPatternOutlier(float patternEnergy) const;
+    void updateBrainState(const std::vector<float>& newState);
+    void forgetOutdatedConcepts();
+
+    // Global state updates
+    void updateGlobalState(const std::vector<float>& brainState);
+
 private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
+    // Enhanced prototype update with adaptive learning
+    void updatePrototypeAdaptive(size_t conceptId,
+                                const std::vector<float>& newInstance,
+                                const std::vector<float>& features,
+                                float temporalNovelty);
 
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
+    // Enhanced stability calculations
+    float calculateEnhancedStability(const DiscoveredConcept& concept,
+                                     const std::vector<float>& newPattern,
+                                     float temporalNovelty) const;
+    float calculateConceptStability(const DiscoveredConcept& concept) const;
 
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
+    // Temporal novelty detection
+    float calculateTemporalNovelty(const std::vector<float>& pattern,
+                                   SimulationStep currentTime) const;
+
+    // Helper for dynamic threshold calculation
+    static float calculateAdaptiveThreshold(const std::vector<nlm::DiscoveredConcept>& concepts,
+                                            float baseThreshold,
+                                            float memoryDensity);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -157,10 +245,13 @@ private:
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
     
-    // Parameters
+    // Enhanced parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    size_t memoryCapacity_;    // Maximum number of concepts to store
+    size_t minObservationsForStability_; // Minimum observations before concept is stable
+    float conceptPruningThreshold_; // Stability threshold for concept pruning
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience

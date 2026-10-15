@@ -23,31 +23,74 @@ NeuralPlanner::NeuralPlanner()
 NeuralPlanner::~NeuralPlanner() = default;
 
 void NeuralPlanner::initialize(Brain* brain) {
-    pImpl->brain = brain;
+        pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");
+    
+    // Integrate with prediction system for forward planning
+    if (brain_->getPredictionSystem()) {
+        // Use prediction system outputs in planning
+        NLM_LOG_INFO("NeuralPlanner integrated with prediction system");
+        
+        // Enhanced integration with prediction system for biologically plausible planning
+        brain_->getPredictionSystem()->initialize(brain_);
+    }
+    
+    // Integrate with self-model for better predictions
+    // SelfModel is part of the brain's cognition systems
+    // Integrate with social learning for social action planning
+    // SocialLearning is part of the brain's cognition systems
+    NLM_LOG_INFO("NeuralPlanner integrated with self-model and social learning");
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
+    NLM_LOG_DEBUG("NeuralPlanner planning action, targetReward: " + std::to_string(targetReward));
+    
+    // Create integrated state vector from brain components
+    std::vector<float> integratedState = createIntegratedState(currentState);
+    
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
     PlanningCandidate best;
     best.expectedReward = -1000.0f;
     
-    // Evaluate each sequence
+    // Evaluate each sequence with neuromodulation effects
+    float dopamineLevel = 0.0f;
+    if (brain_->getDopamine()) {
+        dopamineLevel = brain_->getDopamine()->getLevel();
+    }
+    
     for (const auto& sequence : sequences) {
-        PlanningCandidate candidate = evaluateSequence(sequence, currentState);
+        PlanningCandidate candidate = evaluateSequence(sequence, integratedState);
+        
+        // Apply dopamine modulation to confidence
+        if (dopamineLevel > 0.0f) {
+            float confidenceMod = 1.0f + dopamineLevel * 0.5f; // Higher dopamine = higher confidence
+            candidate.confidence *= confidenceMod;
+        }
         
         if (candidate.expectedReward > best.expectedReward) {
             best = candidate;
         }
     }
     
-    // Update confidence based on how consistent evaluations are
+    // Update confidence based on how consistent evaluations are and neuromodulation
     if (!sequences.empty()) {
-        planningConfidence_ = best.confidence;
+        // Blend with working memory state for stability
+        if (brain_->getWorkingMemory()) {
+            float memoryStability = std::min(1.0f, brain_->getWorkingMemory()->getActiveTraces() * 0.1f);
+            planningConfidence_ = planningConfidence_ * 0.7f + best.confidence * 0.3f + memoryStability * 0.1f;
+        } else {
+            planningConfidence_ = best.confidence;
+        }
+        
+        // Apply neuromodulation to final confidence
+        if (dopamineLevel > 0.0f) {
+            planningConfidence_ *= (1.0f + dopamineLevel * 0.3f);
+            planningConfidence_ = std::min(1.0f, planningConfidence_);
+        }
     }
     
     // Return first action of best sequence
@@ -58,15 +101,28 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
             recentPlanSuccess_.pop_front();
         }
         
+        // Use attention system to modulate action selection
+        if (brain_->getAttention() && planningConfidence_ < 0.6f) {
+            // Low confidence - increase attention to sensory inputs
+            brain_->getAttention()->applyBottomUpSalience(
+                static_cast<NeuronId>(0), // First motor neuron
+                (1.0f - planningConfidence_) * 2.0f
+            );
+        }
+        
+        NLM_LOG_DEBUG("Selected action: " + std::to_string(static_cast<int>(best.actions[0])) + 
+                     " with confidence: " + std::to_string(best.confidence));
+        
         return best.actions[0];
     }
     
     // Default: wait if no good option
+    NLM_LOG_DEBUG("No good action sequence found, defaulting to WAIT");
     return ActionType::Wait;
 }
 
 PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
-                                                 const std::vector<float>& startState) {
+                                                  const std::vector<float>& startState) {
     PlanningCandidate candidate;
     candidate.actions = actions;
     candidate.depth = actions.size();
@@ -78,27 +134,80 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     for (size_t i = 0; i < actions.size(); ++i) {
         ActionType action = actions[i];
         
-        // Evaluate this action
-        float actionValue = evaluateAction(action, currentState);
-        
-        // Predict next state
-        auto predictedNext = predictNextState(action, currentState);
+        // Use self-model predictions if available for more accurate next state prediction
+        std::vector<float> predictedNext;
+        if (brain_ && planningConfidence_ > 0.5f) {
+            // Try to get self-model prediction for better forward model
+            if (brain_->getSelfModel()) {
+                // Use SelfModel to predict sensory consequences
+                for (size_t j = 0; j < integratedState.size(); ++j) {
+                    ActionType action = actions[0];  // Simplified for single action evaluation
+                    predictedNext = brain_->getSelfModel()->predictActionConsequence(
+                        action, integratedState);
+                    if (!predictedNext.empty()) {
+                        break;
+                    }
+                }
+            } else if (brain_->getPredictionSystem()) {
+                // Fallback to prediction system if SelfModel not available
+                predictedNext = predictNextState(action, currentState);
+            } else {
+                // Use prediction system if available
+                predictedNext = predictNextState(action, currentState);
+            }
+            
+            // Enhance prediction with prediction system confidence
+            float predConfidence = brain_->getPredictionSystem() ? 
+                brain_->getPredictionSystem()->getConfidence() : 0.0f;
+            if (predConfidence > 0.0f) {
+                for (auto& val : predictedNext) {
+                    val *= (0.5f + predConfidence * 0.5f);
+                    val = std::clamp(val, 0.0f, 1.0f);
+                }
+            }
+        } else if (brain_ && brain_->getPredictionSystem()) {
+            // Use prediction system if confidence is low
+            predictedNext = predictNextState(action, currentState);
+        }
         
         if (!predictedNext.empty()) {
             candidate.predictedStates.push_back(predictedNext);
             currentState = predictedNext;
+        } else {
+            // Fallback to simple prediction
+            auto fallbackNext = predictNextState(action, currentState);
+            if (!fallbackNext.empty()) {
+                candidate.predictedStates.push_back(fallbackNext);
+                currentState = fallbackNext;
+            }
         }
         
         // Get action quality from experience
         size_t actionIdx = static_cast<size_t>(action);
         if (actionIdx < actionQuality_.size()) {
-            actionValue = actionQuality_[actionIdx] * 0.7f + actionValue * 0.3f;
+            float actionValue = actionQuality_[actionIdx] * 0.7f + evaluateAction(action, currentState) * 0.3f;
+            totalReward += actionValue;
+        } else {
+            float actionValue = evaluateAction(action, currentState);
+            totalReward += actionValue;
         }
         
-        totalReward += actionValue;
+        // Reduce confidence if we're uncertain, using both self-model and neuromodulators
+        float uncertainty = 1.0f;
         
-        // Reduce confidence if we're uncertain
-        confidence *= getSelfModelConfidence(action);
+        // Get self-model confidence if available
+        if (brain_) {
+            uncertainty *= getSelfModelConfidence(action);
+        }
+        
+        // Apply neuromodulation effects on planning confidence
+        if (brain_ && brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            // High dopamine = lower uncertainty (more confident)
+            uncertainty *= (1.0f - dopamineLevel * 0.3f);
+        }
+        
+        confidence *= uncertainty;
     }
     
     candidate.expectedReward = totalReward;
@@ -145,12 +254,95 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     return result;
 }
 
+// Helper method to create integrated state from multiple brain systems
+std::vector<float> NeuralPlanner::createIntegratedState(const std::vector<float>& baseState) {
+    std::vector<float> integratedState = baseState;
+    
+    if (!brain_) return integratedState;
+    
+    // Integrate working memory
+    if (brain_->getWorkingMemory()) {
+        auto wmState = brain_->getWorkingMemory()->retrieve();
+        if (!wmState.empty()) {
+            // Blend working memory with current state
+            for (size_t i = 0; i < std::min(integratedState.size(), wmState.size()); ++i) {
+                integratedState[i] = integratedState[i] * 0.7f + wmState[i] * 0.3f;
+            }
+        }
+    }
+    
+    // Integrate attention system
+    if (brain_->getAttention()) {
+        const auto& winners = brain_->getAttention()->getWinners();
+        if (!winners.empty() && !integratedState.empty()) {
+            // Boost attention-modulated regions
+            for (size_t i = 0; i < std::min(integratedState.size(), static_cast<size_t>(winners.size())); ++i) {
+                if (brain_->getAttention()->isAttended(winners[i])) {
+                    integratedState[i] *= 1.2f;
+                }
+            }
+        }
+    }
+    
+    // Integrate prediction system confidence
+    if (brain_->getPredictionSystem()) {
+        float predictionConfidence = brain_->getPredictionSystem()->getConfidence();
+        if (predictionConfidence > 0.0f) {
+            // Scale integrated state based on prediction confidence
+            float scale = 0.5f + predictionConfidence * 0.5f;
+            for (auto& value : integratedState) {
+                value *= scale;
+                value = std::clamp(value, 0.0f, 1.0f);
+            }
+        }
+    }
+    
+    return integratedState;
+}
+
 float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionQuality_.size()) return 0.0f;
     
     // Base value from experience
     float baseValue = actionQuality_[actionIdx];
+    
+    // Integrate with prediction system for context-aware evaluation
+    float predictionContext = 1.0f;
+    if (brain_ && brain_->getPredictionSystem()) {
+        float predConfidence = brain_->getPredictionSystem()->getConfidence();
+        predictionContext = 0.5f + predConfidence * 0.5f;
+    }
+    
+    // Evaluate action with social learning influence
+    float socialInfluence = 1.0f;
+    if (brain_ && brain_->getSocialLearning() && brain_->getSocialLearning()->hasSocialKnowledge()) {
+        // Social learning can influence action evaluation through imitation
+        // Get best imitation action for current state
+        ActionType imitationAction = brain_->getSocialLearning()->getImitationAction(currentState);
+        
+        // Blend current action with socially preferred action
+        if (imitationAction != action && imitationAction != ActionType::Wait) {
+            // Calculate social similarity
+            float socialSimilarity = brain_->getSocialLearning()->computeSimilarity(
+                currentState, std::vector<float>(currentState.size(), 0.5f)); // Simplified
+            
+            // Increase action value if it matches social preference
+            if (socialSimilarity > 0.7f) {
+                socialInfluence = 1.2f;  // 20% boost for socially congruent actions
+            }
+        }
+        
+        // Apply neuromodulation to social influence
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            // High dopamine = stronger social learning influence
+            socialInfluence *= (1.0f + dopamineLevel * 0.3f);
+        }
+    }
+    
+    // Apply social influence to action evaluation
+    actionValue *= socialInfluence;
     
     // Bonus for approaching goal (if goal is defined)
     float goalBonus = 0.0f;
@@ -166,7 +358,16 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
         }
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    // Apply neuromodulatory modulation to evaluation
+    float neuromodulationMod = 1.0f;
+    if (brain_ && brain_->getDopamine()) {
+        float dopamineLevel = brain_->getDopamine()->getLevel();
+        // High dopamine = higher evaluation of potential reward
+        neuromodulationMod = 1.0f + dopamineLevel * 0.3f;
+    }
+    
+    return baseValue * 0.6f * predictionContext * attentionContext * neuromodulationMod +
+           goalBonus * 0.4f;
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,

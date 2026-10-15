@@ -29,6 +29,10 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// NEW: Integrated cognition systems
+class SelfModel;
+class SocialLearning;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -164,6 +168,16 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // ========== SELF-MODEL ==========
+    
+    // Self model for sensorimotor integration and forward prediction
+    SelfModel* getSelfModel();
+    
+    // ========== SOCIAL LEARNING ==========
+    
+    // Social learning for observation-based learning and imitation
+    SocialLearning* getSocialLearning();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -192,6 +206,24 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== INTEGRATION HELPERS ==========
+    
+    // Helper method for motor-based action selection (fallback)
+    std::unique_ptr<class Action> getMotorBasedAction();
+    
+    // Get current state as vector for planning
+    std::vector<float> getCurrentState() const;
+    
+    // Update self-model with new experience
+    void updateSelfModel(const std::vector<float>& beforeState,
+                       const std::vector<float>& afterState,
+                       ActionType action);
+    
+    // Update planning based on actual outcome
+    void updatePlanning(const std::vector<ActionType>& plannedActions,
+                       const std::vector<ActionType>& actualActions,
+                       float actualReward);
     
 private:
     struct Impl;

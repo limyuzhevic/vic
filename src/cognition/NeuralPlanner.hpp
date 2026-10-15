@@ -74,12 +74,14 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
-private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
-
+    
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
+    
+    // Helper method to create integrated state from multiple brain systems
+    std::vector<float> createIntegratedState(const std::vector<float>& baseState);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

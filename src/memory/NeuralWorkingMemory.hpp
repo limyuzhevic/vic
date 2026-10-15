@@ -74,6 +74,15 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Get attentional winners (for working memory selection)
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
+
+    // Check if attentional system is available
+    bool hasAttention() const { return attention_ != nullptr; }
+
+    // Set attentional selection system
+    void setAttention(AttentionalSelection* attention) { attention_ = attention; }
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -88,6 +97,7 @@ private:
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
+    AttentionalSelection* attention_;
     size_t capacity_;
     float decayRate_;
     
@@ -125,6 +135,7 @@ public:
 
     // Process competing sensory inputs and select winners
     // Returns IDs of winning neural populations
+    // Enhanced implementation with multi-phase biological competition
     std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
                                               float globalInhibition = 0.5f);
 
@@ -166,6 +177,31 @@ public:
     // Reset attention
     void reset();
 
+    // Neuromodulation integration methods
+    void integrateDopamine(float level);
+    void integrateNovelty(float level);
+    void integrateCuriosity(float level);
+    void updateBrainState(float attention, float arousal);
+
+    // Working memory integration
+    void integrateWorkingMemory(const std::vector<NeuronId>& memoryNeurons,
+                                const std::vector<float>& memoryActivations);
+
+    // Advanced selection strategies
+    void setSelectionMode(bool winnerTakeAll);
+    void addTopDownBias(NeuronId neuron, float biasStrength, float timeWindow);
+    void addBottomUpSalience(NeuronId neuron, float salienceStrength, float timeWindow);
+
+    // Biological realism features
+    void setAttentionalScope(float scope);
+    void enableAttentionBlink(bool enable, float duration);
+    void setFatigueParameters(float recoveryRate, float fatigueThreshold);
+
+    // Get neuromodulation levels
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getNoveltyLevel() const { return noveltyLevel_; }
+    float getCuriosityLevel() const { return curiosityLevel_; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -182,6 +218,35 @@ private:
     // Biases/salience stored by NeuronId for correct lookup in processCompetition
     std::unordered_map<uint64_t, float> topDownBias_;
     std::unordered_map<uint64_t, float> bottomUpSalience_;
+    
+    // Neuromodulation integration
+    float dopamineLevel_;
+    float noveltyLevel_;
+    float curiosityLevel_;
+    
+    // Working memory integration
+    std::vector<NeuronId> workingMemoryNeurons_;
+    std::vector<float> workingMemoryActivations_;
+    
+    // Advanced selection strategies
+    bool winnerTakeAllMode_;
+    float attentionalScope_;
+    
+    // Biological realism
+    bool attentionBlinkEnabled_;
+    float attentionBlinkDuration_;
+    float attentionalFatigue_;
+    float attentionalRecoveryRate_;
+    float attentionalFatigueThreshold_;
+    
+    // Selection timing and dynamics
+    float selectionTimeWindow_;
+    float temporalIntegrationDecay_;
+    
+    // Neural dynamics
+    std::vector<float> neuronHistory_;
+    std::vector<float> inhibitionHistory_;
+    std::vector<float> excitationHistory_;
 };
 
 } // namespace nlm
