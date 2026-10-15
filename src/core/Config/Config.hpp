@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -43,6 +45,19 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration template for advanced users
+struct ConfigTemplate {
+    std::string name;
+    std::string description;
+    nlohmann::json schema;        // JSON schema for validation
+    nlohmann::json defaultValues; // Default values for template
+    
+    ConfigTemplate() = default;
+    ConfigTemplate(const std::string& n, const std::string& desc, 
+                   const nlohmann::json& schema, const nlohmann::json& defaults)
+        : name(n), description(desc), schema(schema), defaultValues(defaults) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,13 +70,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or .cfg format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (automatic format detection)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -78,6 +93,11 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Batch operations for advanced users
+    bool setMultiple(const std::vector<std::pair<std::string, ConfigValue>>& keyValues, ConfigSource source = ConfigSource::Runtime);
+    bool setFromJson(const std::string& jsonString);
+    bool setFromYaml(const std::string& yamlString);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -93,6 +113,34 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Template management
+    bool addTemplate(const ConfigTemplate& template);
+    bool removeTemplate(const std::string& name);
+    bool applyTemplate(const std::string& name);
+    std::vector<std::string> getTemplateNames() const;
+    std::string getTemplateInfo(const std::string& name) const;
+    
+    // Configuration validation and schema checking
+    bool validate(const nlohmann::json& schema) const;
+    bool validateAgainstTemplate(const std::string& templateName) const;
+    std::string getLastError() const;
+    
+    // Auto-save functionality for advanced users
+    void enableAutoSave(const std::string& filepath, int intervalSeconds = 60);
+    void disableAutoSave();
+    bool isAutoSaveEnabled() const;
+    std::string getAutoSavePath() const;
+    
+    // Configuration comparison and diff
+    bool equals(const Config& other) const;
+    std::string diff(const Config& other) const;
+    
+    // Serialization for network transfer or storage
+    std::string toJsonString() const;
+    std::string toYamlString() const;
+    bool fromJsonString(const std::string& jsonString);
+    bool fromYamlString(const std::string& yamlString);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +148,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateValue(const std::string& key, const ConfigValue& value, const nlohmann::json& schema) const;
+    nlohmann::json configValueToJson(const ConfigValue& value) const;
+    ConfigValue jsonToConfigValue(const nlohmann::json& j) const;
 };
 
 } // namespace nlm

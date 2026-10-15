@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
+# C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -11,6 +12,30 @@ endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+
+# Find nlohmann/json dependency (same as main CMakeLists.txt)
+find_package(nlohmann_json 3.2.0 QUIET)
+if(NOT nlohmann_json_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+# Find yaml-cpp dependency (same as main CMakeLists.txt)
+find_package(yaml-cpp 0.7.0 QUIET)
+if(NOT yaml-cpp_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG yaml-cpp-0.7.0
+    )
+    FetchContent_MakeAvailable(yaml-cpp)
+endif()
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
@@ -54,6 +79,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    ${NLM_SOURCE_DIR}/environment/Action.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
@@ -78,6 +104,9 @@ target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
+
+# Link against JSON and YAML libraries
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json yaml-cpp)
 
 add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)

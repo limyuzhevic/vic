@@ -18,6 +18,36 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find nlohmann/json dependency (as a package)
+find_package(nlohmann_json 3.2.0 QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann/json not found as package, attempting to use FetchContent")
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+else()
+    message(STATUS "Found nlohmann/json as package: ${nlohmann_json_VERSION}")
+endif()
+
+# Find yaml-cpp dependency (as a package)
+find_package(yaml-cpp 0.7.0 QUIET)
+if(NOT yaml-cpp_FOUND)
+    message(STATUS "yaml-cpp not found as package, attempting to use FetchContent")
+    include(FetchContent)
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG yaml-cpp-0.7.0
+    )
+    FetchContent_MakeAvailable(yaml-cpp)
+else()
+    message(STATUS "Found yaml-cpp as package: ${yaml-cpp_VERSION}")
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -59,7 +89,6 @@ add_library(nlm_core STATIC
     src/memory/EpisodicMemory.cpp
     src/memory/SemanticMemory.cpp
     src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -91,6 +120,9 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link against JSON and YAML libraries
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
