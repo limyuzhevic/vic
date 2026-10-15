@@ -24,6 +24,24 @@ NLM IS intended to become:
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
+## Quick Demo
+
+Run the Phase 6 integration demo to see all systems working together:
+
+```bash
+./Phase6Demo
+```
+
+Alternatively, run it from the build directory:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+./Phase6Demo
+```
+
 ### Phase 6 Integration Achievements
 
 #### Memory Systems
@@ -77,10 +95,17 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./Phase6Demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Demo (Legacy - For Reference Only)
+```bash
+./nlm_phase2_demo
+```
+
+Note: The Phase 2 demo is still available for reference but the main focus is Phase 6 integration.
 
 ## Project Structure
 
@@ -104,7 +129,7 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
@@ -155,12 +180,54 @@ NLM/
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
+- Neuromodulation affects plasticity and neural dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Python Bindings
+
+This project includes Python bindings for the NLM framework:
+
+- **Installation**: Build the Python module using `scikit-build-core` or pip
+- **Location**: `python/bindings.cpp` contains the complete Python API
+- **Documentation**: See `easy_usage.md` for beginner-friendly examples
+- **Advanced Usage**: See `HOW_TO_USE.md` for comprehensive documentation
+
+The Python bindings provide access to all major NLM components including:
+- Brain simulation and control
+- Configuration management
+- Sensory processing
+- Motor actions
+- Agent interfaces for world interaction
+- World simulation
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No detailed cortical architecture
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+Phase 6 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
 
 ## Scientific Limitations
 

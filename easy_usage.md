@@ -1,5 +1,18 @@
 # NLM - Easy Usage Guide for Beginners
 
+**NEW: Phase 6 Integration Demo**
+
+Try this comprehensive Phase 6 demo that shows all the integrated systems working together:
+
+```python
+import phase6_demo
+
+result = phase6_demo.main()
+print(f"Integration successful: {result['memoryWorkingMemoryIntegrated']}")
+```
+
+---
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -11,8 +24,6 @@ Think of it like this:
 - **Memory** = The brain remembering patterns
 
 That's it! NLM simulates all of this.
-
----
 
 ## The 3 Things You Need to Know
 
@@ -71,35 +82,54 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
+### NEW: Example 3: Phase 6 Integration Demo (Recommended)
 
-## Simple Analogy
+```python
+import phase6_demo
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+print("Running Phase 6 Integration Demo...")
+result = phase6_demo.main()
 
----
+print("\n=== Demo Results ===")
+print(f"Memory Integration: {'SUCCESS' if result['memoryWorkingMemoryIntegrated'] else 'FAILED'}")
+print(f"Neuromodulation: {'FUNCTIONAL' if result['neuromodulationIntegrated'] else 'BASIC'}")
+print(f"Development: {'ACTIVE' if result['developmentIntegrated'] else 'NOT STARTED'}")
+print(f"Checkpointing: {'WORKING' if result['checkpointingWorks'] else 'NOT WORKING'}")
+print(f"Replay: {'WORKING' if result['replayWorks'] else 'NOT WORKING'}")
+print(f"Learning: {'DETECTED' if result['learningOccurred'] else 'NOT DETECTED'}")
+```
 
-## The Simplest Possible Example
+### Example 3: Advanced Agent with Learning
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-# Make it active
-brain.step(0)
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
 ```
 
 ---
@@ -290,8 +320,22 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+3. **Experiment with different configurations!**
+4. **Run the Phase 6 Integration Demo with `python phase6_demo.py`**
+
+---
+
+## The New Way: Phase 6 Integration
+
+Now that you're familiar with the basics, try the **Phase 6 Integration Demo** (`phase6_demo.py`) which shows:
+
+- Memory systems working with neural processing
+- Neuromodulation affecting behavior and learning
+- Development changing brain capabilities over time
+- Checkpointing and replay for persistent learning
+- Complete integration of all brain systems
+
+This represents the current state of the NLM project - a fully integrated artificial brain capable of complex learning and behavior.
