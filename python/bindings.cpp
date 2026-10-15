@@ -142,16 +142,16 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,46 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate,
+             "Validate all configuration parameters and return error messages")
+        .def("isValidKey", &Config::isValidKey, py::arg("key"),
+             "Check if a key is a valid configuration parameter")
+        .def("get", [](Config& self, const std::string& key) {
+            // Return a tuple with value and type for type-safe access
+            auto metadata = Config::getParamMetadata(key);
+            if (metadata.type == ConfigParamType::Integer) {
+                return py::make_tuple(self.get<int>(key), "int");
+            } else if (metadata.type == ConfigParamType::Float) {
+                return py::make_tuple(self.get<double>(key), "float");
+            } else if (metadata.type == ConfigParamType::String) {
+                return py::make_tuple(self.get<std::string>(key), "string");
+            } else if (metadata.type == ConfigParamType::Boolean) {
+                return py::make_tuple(self.get<bool>(key), "bool");
+            } else if (metadata.type == ConfigParamType::VectorInt) {
+                return py::make_tuple(self.get<std::vector<int>>(key), "vector<int>");
+            } else if (metadata.type == ConfigParamType::VectorFloat) {
+                return py::make_tuple(self.get<std::vector<double>>(key), "vector<float>");
+            } else if (metadata.type == ConfigParamType::VectorString) {
+                return py::make_tuple(self.get<std::vector<std::string>>(key), "vector<string>");
+            } else {
+                return py::make_tuple(py::none(), "unknown");
+            }
+        }, py::arg("key"), "Get a configuration value with type information")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Try to convert Python object to appropriate C++ type
+            if (value.is(py::int_())) {
+                self.set(key, value.cast<int>());
+            } else if (value.is(py::float_())) {
+                self.set(key, value.cast<double>());
+            } else if (value.is(py::bool_())) {
+                self.set(key, value.cast<bool>());
+            } else if (value.is(py::str())) {
+                self.set(key, value.cast<std::string>());
+            } else {
+                throw py::value_error("Unsupported type for configuration value");
+            }
+        }, py::arg("key"), py::arg("value"),
+            "Set a configuration value with type inference")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

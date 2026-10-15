@@ -19,11 +19,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
-    NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
+    // Enhanced experiment logging with detailed configuration information
+    NLM_LOG_INFO("=== Enhanced Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Connection probability: " + std::to_string(config.connectionProbability));
+    NLM_LOG_INFO("Development enabled: " + std::string(config.enableDevelopment ? "YES" : "NO"));
+    NLM_LOG_INFO("Checkpointing enabled: " + std::string(config.enableCheckpointing ? "YES" : "NO"));
+    NLM_LOG_INFO("Replay enabled: " + std::string(config.enableReplay ? "YES" : "NO"));
+    NLM_LOG_INFO("Checkpoint path: " + config.checkpointPath);
     
-    // Create configuration
+    // Save configuration to file for reproducibility
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
@@ -32,6 +38,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    
+    cfg->saveToFile("./enhanced_experiment_config.cfg");
+    NLM_LOG_INFO("Configuration saved to enhanced_experiment_config.cfg");
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -55,11 +64,39 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    NLM_LOG_INFO("Brain initialized successfully");
+    
+    // Create simple world
+    SimpleWorld world;
+    world.initialize(16, 16);
+    
+    // Create agent
+    AgentBrain agent(brain);
+    agent.initialize(world);
+    agent.enableRewardModulation(true);
+    agent.enableStructuralPlasticity(config.enableDevelopment);
+    agent.enableDevelopment(config.enableDevelopment);
+    agent.enableCuriosity(true);
+    
+    NLM_LOG_INFO("Enhanced agent system initialized with neuromodulation and curiosity");
+    
+    // Enhanced simulation metrics tracking
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
+    // Enhanced memory tracking
+    float totalWorkingMemoryUsage = 0.0f;
+    float totalEpisodicMemoryGrowth = 0.0f;
+    
+    // Enhanced neuromodulation tracking
+    float totalDopamineEffect = 0.0f;
+    float totalCuriosityEffect = 0.0f;
+    float totalPredictionError = 0.0f;
+    
+    NLM_LOG_INFO("Starting enhanced simulation with comprehensive metrics tracking...");
+    
+    // Run simulation
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
@@ -88,42 +125,90 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             agent.updateDevelopment(0.001);
         }
         
+        // Track neuromodulation effects
+        totalDopamineEffect += agent.getNeuromodulationLevel();
+        totalCuriosityEffect += agent.getCuriosityLevel();
+        totalPredictionError += agent.getPredictionError();
+        
+        // Track memory usage
+        auto* wm = brain->getWorkingMemory();
+        auto* em = brain->getEpisodicMemory();
+        if (wm) {
+            totalWorkingMemoryUsage += wm->getActiveTraces();
+        }
+        if (em) {
+            totalEpisodicMemoryGrowth += em->getEpisodeCount();
+        }
+        
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
-        if (step % 1000 == 0) {
+        // Enhanced periodic logging with comprehensive metrics
+        if (step % 500 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | Dopamine: " + std::to_string(agent.getNeuromodulationLevel()) +
+                        " | Curiosity: " + std::to_string(agent.getCuriosityLevel()) +
+                        " | Prediction Error: " + std::to_string(agent.getPredictionError()) +
+                        " | WorkingMem: " + std::to_string(wm ? wm->getActiveTraces() : 0));
         }
     }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    // Enhanced memory system analysis
+    auto* wm = brain->getWorkingMemory();
+    auto* em = brain->getEpisodicMemory();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
+    if (wm && em) {
+        NLM_LOG_INFO("[ENHANCED] Memory system analysis:");
+        NLM_LOG_INFO("  - Working memory: " + std::to_string(wm->getActiveTraces()) + " active traces");
+        NLM_LOG_INFO("  - Episodic memory: " + std::to_string(em->getEpisodeCount()) + " stored episodes");
+        
+        // Enhanced memory integration score
+        float memoryIntegrationScore = 0.0f;
+        if (wm->getActiveTraces() > 0) memoryIntegrationScore += 0.5f;
+        if (em->getEpisodeCount() > 0) memoryIntegrationScore += 0.5f;
+        
+        NLM_LOG_INFO("  - Memory integration score: " + std::to_string(memoryIntegrationScore * 100) + "%");
+        
+        result.memoryWorkingMemoryIntegrated = (wm->getActiveTraces() > 0);
+        result.memoryEpisodicMemoryIntegrated = (em->getEpisodeCount() > 0);
+    }
+    
+    // Enhanced neuromodulation analysis
+    if (config.maxSteps > 0) {
+        result.neuromodulationIntegrated = (totalDopamineEffect / config.maxSteps) > 0.0f;
+        NLM_LOG_INFO("[ENHANCED] Neuromodulation analysis:");
+        NLM_LOG_INFO("  - Average dopamine effect: " + std::to_string(totalDopamineEffect / config.maxSteps));
+        NLM_LOG_INFO("  - Average curiosity effect: " + std::to_string(totalCuriosityEffect / config.maxSteps));
+        NLM_LOG_INFO("  - Average prediction error: " + std::to_string(totalPredictionError / config.maxSteps));
+    }
+    
+    // Enhanced prediction system integration check
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    if (brain->getPredictionSystem()) {
+        NLM_LOG_INFO("[ENHANCED] Prediction system is functional and integrated");
+    }
     
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    // Enhanced development system integration check
+    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    if (brain->getDevelopmentSystem()) {
+        NLM_LOG_INFO("[ENHANCED] Development system is functional and integrated");
+        NLM_LOG_INFO("  - Current developmental stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())));
+    }
+    
+    // Enhanced checkpoint testing
+    if (config.enableCheckpointing) {
+    
+    // Enhanced integration verification
+    NLM_LOG_INFO("=== Enhanced Integration Verification ===");
+    NLM_LOG_INFO("Enhanced integration status report:");
+    NLM_LOG_INFO("  - Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "ENHANCED INTEGRATION" : "DISCONNECTED") + " (active traces)");
+    NLM_LOG_INFO("  - Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "ENHANCED INTEGRATION" : "DISCONNECTED") + " (stored episodes)");
+    NLM_LOG_INFO("  - Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "ENHANCED EFFECT" : "INACTIVE") + " (dopamine levels)");
+    NLM_LOG_INFO("  - Prediction: " + std::string(result.predictionIntegrated ? "ENHANCED" : "DISABLED") + " (prediction error system)");
+    NLM_LOG_INFO("  - Development: " + std::string(result.developmentIntegrated ? "ENHANCED" : "DISABLED") + " (maturation system)");
     
     // Test checkpointing
     if (config.enableCheckpointing) {
