@@ -404,9 +404,111 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Create brain with config file and command line args
+    m.def("createBrain", [](const std::string& configFile, int argc, char** argv) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Load from config file
+        if (configFile.empty() || !config->loadFromFile(configFile)) {
+            if (!configFile.empty()) {
+                // Try to create a config file if it doesn't exist
+                config->loadFromFile("configs/default.cfg");
+            }
+        }
+        
+        // Override with command line args
+        config->loadFromArgs(argc, argv);
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile") = "", py::arg("argc") = 0, py::arg("argv") = nullptr,
+       "Create a new brain with config file and command line arguments");
+
+    m.def("createBrainFromConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    // Create world with configuration
+    m.def("createSimpleWorld", [](const std::string& configFile) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        
+        if (!configFile.empty() && configFile != "default") {
+            // Try to load config file for world settings
+            auto config = std::make_shared<Config>();
+            if (config->loadFromFile(configFile)) {
+                // Apply world config if available
+                if (config->has("world.width")) {
+                    world->configure(config->getOr<double>("world.width", 20.0f),
+                                   config->getOr<double>("world.height", 20.0f),
+                                   config->getOr<size_t>("world.visionWidth", 16),
+                                   config->getOr<size_t>("world.visionHeight", 16));
+                }
+                if (config->has("world.max_energy")) {
+                    world->setMaxEnergy(config->getOr<double>("world.max_energy", 100.0f));
+                }
+            }
+        }
+        
+        return world;
+    }, py::arg("configFile") = "default", "Create a new simple world with config file");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    // Create brain with config file and command line args
+    m.def("createBrain", [](const std::string& configFile, int argc, char** argv) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Load from config file
+        if (configFile.empty() || !config->loadFromFile(configFile)) {
+            if (!configFile.empty()) {
+                // Try to create a config file if it doesn't exist
+                config->loadFromFile("configs/default.cfg");
+            }
+        }
+        
+        // Override with command line args
+        config->loadFromArgs(argc, argv);
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile") = "", py::arg("argc") = 0, py::arg("argv") = nullptr,
+       "Create a new brain with config file and command line arguments");
+
+    m.def("createBrainFromConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    // Create world with configuration
+    m.def("createSimpleWorld", [](const std::string& configFile) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        
+        if (!configFile.empty() && configFile != "default") {
+            // Try to load config file for world settings
+            auto config = std::make_shared<Config>();
+            if (config->loadFromFile(configFile)) {
+                // Apply world config if available
+                if (config->has("world.width")) {
+                    world->configure(config->getOr<double>("world.width", 20.0f),
+                                   config->getOr<double>("world.height", 20.0f),
+                                   config->getOr<size_t>("world.visionWidth", 16),
+                                   config->getOr<size_t>("world.visionHeight", 16));
+                }
+                if (config->has("world.max_energy")) {
+                    world->setMaxEnergy(config->getOr<double>("world.max_energy", 100.0f));
+                }
+            }
+        }
+        
+        return world;
+    }, py::arg("configFile") = "default", "Create a new simple world with config file");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -420,6 +522,199 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Set up global Python logging configuration
+    py::module_ sys = py::module_::import("sys");
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>();
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Enable Python exception translation
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Set Python logging level from environment or default to INFO
+    try {
+        py::object logLevel = sys.attr("getenv")("NLM_LOG_LEVEL");
+        if (!logLevel.is_none()) {
+            std::string levelStr = logLevel.cast<std::string>();
+            if (levelStr == "DEBUG") {
+                logger->setLevel(LogLevel::Debug);
+            } else if (levelStr == "WARNING") {
+                logger->setLevel(LogLevel::Warning);
+            } else if (levelStr == "ERROR") {
+                logger->setLevel(LogLevel::Error);
+            } else if (levelStr == "CRITICAL") {
+                logger->setLevel(LogLevel::Critical);
+            } else {
+                logger->setLevel(LogLevel::Info);  // Default
+            }
+        } else {
+            logger->setLevel(LogLevel::Info);
+        }
+    } catch (...) {
+        logger->setLevel(LogLevel::Info);
+    }
+
+    // High-level training loop
+    m.def("runTrainingEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                                 size_t maxSteps, bool enableRewardModulation, bool enableCuriosity,
+                                 bool enableDevelopment, const std::string& configFile) {
+        
+        // Load config if provided
+        if (!configFile.empty() && configFile != "default") {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(configFile);
+            
+            // Enable requested subsystems
+            if (enableRewardModulation) {
+                agent->enableRewardModulation(true);
+            }
+            if (enableCuriosity) {
+                agent->enableCuriosity(true);
+            }
+            if (enableDevelopment) {
+                agent->enableDevelopment(true);
+            }
+        } else {
+            // Enable based on Python flags
+            if (enableRewardModulation) {
+                agent->enableRewardModulation(true);
+            }
+            if (enableCuriosity) {
+                agent->enableCuriosity(true);
+            }
+            if (enableDevelopment) {
+                agent->enableDevelopment(true);
+            }
+        }
+        
+        // Initialize world
+        world->reset();
+        agent->initialize(*world);
+        
+        float totalReward = 0.0f;
+        size_t stepsCompleted = 0;
+        bool episodeComplete = false;
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            agent->decodeMotorCommand();
+            
+            // Get action from brain
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            auto result = world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward and apply neuromodulation
+            if (agent->isRewardModulationEnabled()) {
+                agent->applyRewardModulation(result.reward, agent->getPredictionError());
+            }
+            
+            // Update development
+            if (agent->isDevelopmentEnabled()) {
+                agent->updateDevelopment(0.1);
+            }
+            
+            // Accumulate reward
+            totalReward += result.reward;
+            stepsCompleted++;
+            
+            // Check if episode should end (all hazards consumed or time limit)
+            if (!result.success && step > 50) {  // Give up after many failed attempts
+                episodeComplete = true;
+                break;
+            }
+        }
+        
+        // Episode statistics
+        auto episodeStats = py::dict(
+            "total_reward", totalReward,
+            "steps_completed", stepsCompleted,
+            "avg_reward_per_step", totalReward / std::max<size_t>(stepsCompleted, 1),
+            "episode_complete", episodeComplete,
+            "agent_stats", py::dict(
+                "curiosity", agent->getCuriosityLevel(),
+                "novelty", agent->getNoveltyLevel(),
+                "neuromodulation", agent->getNeuromodulationLevel(),
+                "prediction_error", agent->getPredictionError(),
+                "developmental_stage", static_cast<int>(agent->getDevelopmentalStage())
+            )
+        );
+        
+        return episodeStats;
+    }, py::arg("agent"), py::arg("world"), py::arg("maxSteps") = 1000,
+       py::arg("enableRewardModulation") = true,
+       py::arg("enableCuriosity") = true,
+       py::arg("enableDevelopment") = true,
+       py::arg("configFile") = "default",
+       "Run a complete training episode with advanced features");
+
+    // Simplified training loop for quick testing
+    m.def("runQuickSimulation", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world,
+                                   size_t steps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            agent->decodeMotorCommand();
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return steps;
+    }, py::arg("agent"), py::arg("world"), py::arg("steps") = 100,
+       "Quick simulation for testing and basic usage");
+
+    // Advanced configuration utility
+    m.def("configureBrainForTask", [](std::shared_ptr<Config> config, const std::string& taskType,
+                                     size_t neuronCount, size_t memoryCapacity) {
+        // Set basic configuration for the task
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Runtime);
+        config->set("brain.memory_capacity", static_cast<int64_t>(memoryCapacity), ConfigSource::Runtime);
+        
+        // Task-specific configurations
+        if (taskType == "exploration") {
+            config->set("brain.curiosity_enabled", true, ConfigSource::Runtime);
+            config->set("brain.exploration_rate", 0.5, ConfigSource::Runtime);
+            config->set("brain.novelty_threshold", 0.3, ConfigSource::Runtime);
+        } else if (taskType == "navigation") {
+            config->set("brain.reward_modulation_enabled", true, ConfigSource::Runtime);
+            config->set("brain.exploration_rate", 0.2, ConfigSource::Runtime);
+            config->set("brain.navigation_mode", true, ConfigSource::Runtime);
+        } else if (taskType == "memory") {
+            config->set("brain.episodic_memory_enabled", true, ConfigSource::Runtime);
+            config->set("brain.associative_memory_enabled", true, ConfigSource::Runtime);
+            config->set("brain.memory_replay_enabled", true, ConfigSource::Runtime);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("taskType"), py::arg("neuronCount") = 1000,
+       py::arg("memoryCapacity") = 10000,
+       "Configure brain for specific task types");
+
+    // Get configuration summary as Python dict
+    m.def("getConfigAsDict", [](const Config& config) {
+        py::dict result;
+        for (const auto& key : config.getKeys()) {
+            auto value = config.get<std::string>(key);
+            if (value.has_value()) {
+                result[key] = value.value();
+            }
+        }
+        return result;
+    }, py::arg("config"), "Get configuration as Python dictionary");
 }
 
 } // namespace nlm

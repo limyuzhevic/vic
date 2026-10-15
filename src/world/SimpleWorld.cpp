@@ -258,7 +258,7 @@ ActionResult SimpleWorld::interact() {
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
     // Check world boundaries
-    if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
+    if (x < 0.0f || x > width_ || y < 0.0f || y > height_) {
         return false;
     }
     return true;
