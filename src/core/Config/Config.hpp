@@ -1,10 +1,24 @@
-#pragma once
+// Configuration schema for validation and documentation
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "double", "string", "bool", "int_array", "double_array", "string_array"
+    ConfigValue defaultValue;
+    std::string description;
+    std::vector<std::string> allowedValues;
+    
+    ConfigSchema() : key(), type(), defaultValue(), description() {}
+    ConfigSchema(const std::string& k, const std::string& t, const ConfigValue& dv, 
+                 const std::string& desc = "", const std::vector<std::string>& av = {})
+        : key(k), type(t), defaultValue(dv), description(desc), allowedValues(av) {}
+};
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+class ConfigSchemaValidator {
+public:
+    static std::vector<ConfigSchema> getDefaultSchema();
+    static bool validate(const ConfigSchema& schema, const std::string& key, const ConfigValue& value);
+    static std::string valueToString(const ConfigValue& value);
+    static bool stringToValue(const std::string& type, const std::string& str, ConfigValue& outValue);
+};
 
 namespace nlm {
 
@@ -55,11 +69,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from arguments with type validation
+    bool loadFromArgsWithValidation(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -75,6 +89,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -92,6 +107,15 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Help and validation
+    std::string help() const;
+    bool validate() const;
+    std::string getUsage() const;
+    
+    // Schema validation
+    static std::vector<ConfigSchema> getDefaultSchema();
+    bool validateAgainstSchema(const ConfigSchema& schema) const;
     
 private:
     struct Impl;

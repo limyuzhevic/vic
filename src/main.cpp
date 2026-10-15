@@ -324,6 +324,34 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Check for help or version flags before initialization
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            // Show help message
+            auto config = std::make_shared<Config>();
+            std::cout << config->help() << std::endl;
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+            std::cout << "Version: 2.0" << std::endl;
+            std::cout << "Build: Release" << std::endl;
+            return 0;
+        } else if (arg == "--validate") {
+            auto config = std::make_shared<Config>();
+            // Try to load from default config file
+            config->loadFromFile("configs/default.cfg");
+            // Load from command line args
+            config->loadFromArgs(argc, argv);
+            if (config->validate()) {
+                std::cout << "Configuration validation passed." << std::endl;
+            } else {
+                std::cout << "Configuration validation failed." << std::endl;
+            }
+            return 0;
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -363,8 +391,8 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args using type-aware parsing
+    config->loadFromArgsWithValidation(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -376,7 +404,7 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
@@ -391,6 +419,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Validate configuration
+    if (config->validate()) {
+        NLM_LOG_INFO("Configuration validation passed.");
+    } else {
+        NLM_LOG_WARNING("Configuration validation failed. Using defaults.");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
