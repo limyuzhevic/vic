@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -17,7 +18,7 @@ public:
     void setProgress(float progress);
     
     // Update maturation
-    void update(class Brain* brain, SimulationStep currentStep);
+    void update(Brain* brain, SimulationStep currentStep);
     
     // Get mature properties
     MembranePotential getMatureThreshold() const;

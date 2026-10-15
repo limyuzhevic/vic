@@ -25,9 +25,13 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuromodulationManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -170,18 +174,18 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+// ========== NEUROMODULATION SYSTEMS ==========
+
+    // Neuromodulation manager with integrated neuromodulators
+    NeuromodulationManager* getNeuromodulationManager();
     
-    // Dopamine - reward and reinforcement
+    // Individual neuromodulators for direct access
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
     // Get current configuration

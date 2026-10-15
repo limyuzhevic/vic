@@ -8,6 +8,9 @@ namespace nlm {
 
 // Forward declarations
 class RandomGenerator;
+class Synaptogenesis;
+class Pruning;
+class Maturation;
 
 // Development system: orchestrates neural development
 // Implements developmental stages, plasticity modulation, and structural changes

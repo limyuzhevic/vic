@@ -219,12 +219,85 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    // Enhanced memory consolidation with priority-based retention
+    // Consolidation occurs during rest periods or periodically
+    
+    std::vector<std::pair<float, size_t>> scoredEpisodes;  // (score, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float score = computeConsolidationScore(episodes_[i]);
+        scoredEpisodes.emplace_back(score, i);
     }
+    
+    // Sort by consolidation score (highest first)
+    std::sort(scoredEpisodes.begin(), scoredEpisodes.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    // Keep episodes above relevance threshold
+    size_t keepCount = 0;
+    for (const auto& scored : scoredEpisodes) {
+        if (scored.first >= relevanceThreshold) {
+            keepCount++;
+        } else {
+            break;
+        }
+    }
+    
+    // Remove low-priority episodes
+    if (keepCount < episodes_.size()) {
+        std::vector<EpisodicMemoryItem> keptEpisodes;
+        keptEpisodes.reserve(keepCount);
+        
+        for (size_t i = 0; i < keepCount; ++i) {
+            keptEpisodes.push_back(episodes_[scoredEpisodes[i].second]);
+        }
+        
+        episodes_ = std::move(keptEpisodes);
+        
+        // Update episode neurons list
+        pImpl->episodeNeurons.clear();
+        for (size_t i = 0; i < episodes_.size(); ++i) {
+            NeuronId epNeuron(i + 20000);
+            pImpl->episodeNeurons.push_back(epNeuron);
+        }
+        
+        NLM_LOG_INFO("Memory consolidation removed " + 
+                   std::to_string(episodes_.size() - keepCount) + " low-priority episodes");
+    }
+}
+
+float NeuralEpisodicMemory::computeConsolidationScore(const EpisodicMemoryItem& episode) const {
+    // Enhanced consolidation score based on multiple factors
+    
+    // 1. Recency bonus (more recent episodes have higher consolidation priority)
+    float recencyScore = 1.0f / (episode.age + 1);
+    
+    // 2. Reward value (higher reward increases consolidation)
+    float rewardScore = std::min(1.0f, episode.reward / 10.0f);
+    
+    // 3. Novelty contribution (novel experiences get boosted consolidation)
+    float noveltyScore = std::min(1.0f, episode.novelty / 5.0f);
+    
+    // 4. Action uniqueness (unique actions get higher priority)
+    std::unordered_set<ActionType> uniqueActions;
+    for (const auto& ep : episodes_) {
+        uniqueActions.insert(ep.action);
+    }
+    float actionUniqueness = static_cast<float>(uniqueActions.size()) / static_cast<float>(ActionTypeCount);
+    
+    // 5. Prediction error signal (from neuromodulation system)
+    // In a full implementation, this would integrate with dopamine prediction errors
+    float predictionErrorScore = 0.5f;  // Placeholder for now
+    
+    // Combine factors with weights
+    float consolidationScore = 
+        recencyScore * 0.25f +
+        rewardScore * 0.30f +
+        noveltyScore * 0.20f +
+        actionUniqueness * 0.15f +
+        predictionErrorScore * 0.10f;
+    
+    return consolidationScore;
 }
 
 void NeuralEpisodicMemory::clear() {
@@ -574,4 +647,70 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-} // namespace nlm
+void NeuralEpisodicMemory::updateConsolidationBasedOnNeuromodulation(
+    float dopamineLevel, 
+    float acetylcholineLevel,
+    float norepinephrineLevel) {
+    
+    // Update episode relevance based on neuromodulatory signals
+    // Dopamine enhances consolidation of rewarded experiences
+    // Acetylcholine enhances consolidation of attended experiences
+    // Norepinephrine enhances consolidation of salient/novel experiences
+    
+    float dopamineBoost = 1.0f + dopamineLevel * 0.5f;
+    float AChBoost = 1.0f + acetylcholineLevel * 0.3f;
+    float NEBoost = 1.0f + norepinephrineLevel * 0.4f;
+    
+    // Adjust relevance thresholds based on neuromodulation
+    float dopamineWeight = dopamineBoost * 0.4f;
+    float AChWeight = AChBoost * 0.3f;
+    float NEWeight = NEBoost * 0.3f;
+    
+    // Update relevance scores
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        // Base relevance on episode characteristics
+        float baseRelevance = computeConsolidationScore(episodes_[i]);
+        
+        // Apply neuromodulatory influences
+        float neuromodulatedRelevance = baseRelevance * 
+                                       (1.0f + dopamineWeight + AChWeight + NEWeight);
+        
+        episodeRelevance_[i] = neuromodulatedRelevance;
+    }
+    
+    // Update replay order based on relevance
+    replayOrder_.clear();
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        replayOrder_.push_back(i);
+    }
+    
+float NeuralEpisodicMemory::computeConsolidationScore(const EpisodicMemoryItem& episode) const {
+    // Enhanced consolidation score based on multiple factors
+    
+    // 1. Recency bonus (more recent episodes have higher consolidation priority)
+    float recencyScore = 1.0f / (episode.age + 1);
+    
+    // 2. Reward value (higher reward increases consolidation)
+    float rewardScore = std::min(1.0f, episode.reward / 10.0f);
+    
+    // 3. Novelty contribution (novel experiences get boosted consolidation)
+    float noveltyScore = std::min(1.0f, episode.novelty / 5.0f);
+    
+    // 4. Action uniqueness (unique actions get higher priority)
+    // For now, use a placeholder calculation based on action type
+    float actionUniqueness = 1.0f / (static_cast<int>(episode.action) + 1) * 0.5f;
+    
+    // 5. Prediction error signal (from neuromodulation system)
+    // In a full implementation, this would integrate with dopamine prediction errors
+    float predictionErrorScore = 0.5f;  // Placeholder for now
+    
+    // Combine factors with weights
+    float consolidationScore = 
+        recencyScore * 0.25f +
+        rewardScore * 0.30f +
+        noveltyScore * 0.20f +
+        actionUniqueness * 0.15f +
+        predictionErrorScore * 0.10f;
+    
+    return consolidationScore;
+}

@@ -12,17 +12,27 @@ struct Novelty::Impl {
     std::vector<float> history;
     std::vector<float> lastPattern;
     float noveltyThreshold;
+    float sensitivity;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() 
+        : brain(nullptr)
+        , level(0.0f)
+        , decayRate(0.1f)
+        , noveltyThreshold(0.3f)
+        , sensitivity(1.0f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
 
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
+void Novelty::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
+}
+
+const char* Novelty::getName() const {
+    return "Novelty";
 }
 
 float Novelty::getLevel() const {
@@ -30,14 +40,34 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Novelty::getPlasticityFactor() const {
+    // Novelty enhances exploration and learning
+    float effectiveLevel = std::min(pImpl->level / pImpl->noveltyThreshold, 1.0f);
+    
+    // Novelty increases plasticity for novel experiences
+    float plasticityFactor = 1.0f + 0.8f * effectiveLevel;
+    
+    // Higher novelty leads to more exploratory learning
+    plasticityFactor = std::min(plasticityFactor, 2.5f);
+    
+    return plasticityFactor;
+}
+
+void Novelty::update(TimestepDuration dt) {
+    float dtFloat = static_cast<float>(dt);
+    
+    // Decay novelty over time
+    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * dtFloat);
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
+    // Extract features from observations and compute novelty
+    // For now, use a simple placeholder implementation
+    pImpl->level = 1.0f;  // High novelty by default
     pImpl->history.push_back(pImpl->level);
 }
 
@@ -57,20 +87,13 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
         totalDiff += diff;
     }
     
-    // Normalize by pattern size
+    // Normalize by pattern size and sensitivity
     float avgDiff = totalDiff / compareLen;
-    
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    pImpl->level = std::min(1.0f, avgDiff * pImpl->sensitivity / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
-}
-
-void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {
@@ -78,6 +101,27 @@ const std::vector<float>& Novelty::getHistory() const {
 }
 
 void Novelty::clearHistory() {
+    pImpl->history.clear();
+}
+
+float Novelty::getDecayRate() const {
+    return pImpl->decayRate;
+}
+
+float Novelty::getNoveltyThreshold() const {
+    return pImpl->noveltyThreshold;
+}
+
+void Novelty::setDecayRate(float rate) {
+    pImpl->decayRate = std::max(0.0f, rate);
+}
+
+void Novelty::setNoveltyThreshold(float threshold) {
+    pImpl->noveltyThreshold = std::max(0.1f, threshold);
+}
+
+void Novelty::reset() {
+    pImpl->level = 0.0f;
     pImpl->history.clear();
 }
 

@@ -6,8 +6,22 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
 
 namespace nlm {
+
+// ActionType count for normalization
+enum class ActionType {
+    Wait,
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    Grab,
+    Release
+};
+
+inline constexpr size_t ActionTypeCount = 7;
 
 // EpisodicMemoryItem: Represents a stored experience
 // NOT a textual record - stores neural activity patterns and associations
@@ -62,87 +76,102 @@ class NeuralEpisodicMemory {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
-
+    
     // Initialize with brain reference
     void initialize(Brain* brain);
-
+    
     // Store a new experience
     // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);
-
+    
     // Retrieve episodes similar to a query pattern
     // Returns episodes ordered by relevance
     std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
                                                            size_t maxResults = 5) const;
-
+    
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
                                                             SimulationStep endTime,
                                                             size_t maxResults = 10) const;
-
+    
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
                                                              float radius,
                                                              size_t maxResults = 5) const;
-
+    
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
-
+                                                               size_t maxResults = 5) const;
+    
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
     void replayEpisode(const EpisodicMemoryItem* episode);
-
+    
     // Update episode relevance based on recent use
     void updateRelevance(SimulationStep episodeId, float relevanceDelta);
-
+    
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
-
+    
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
-
+    
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
-
+    
     // Get average reward from episodes
     float getAverageReward() const;
-
-    // Clear old episodes
+    
+    // Enhanced consolidation with priority-based retention
     void consolidate(float relevanceThreshold);
-
+    
+    // Clear old episodes
+    void consolidateOldEpisodes(float relevanceThreshold);
+    
     // Clear all episodes
     void clear();
-
+    
     // Enable/disable replay
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
-
+    
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
-
+    
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
-
+    
+    // Compute consolidation score for an episode
+    float computeConsolidationScore(const EpisodicMemoryItem& episode) const;
+    
+    // Update consolidation based on neuromodulation signals
+    void updateConsolidationBasedOnNeuromodulation(float dopamineLevel, 
+                                                   float acetylcholineLevel,
+                                                   float norepinephrineLevel);
+    
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
                           const EpisodicMemoryItem& episode) const;
-
+    
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
                         const std::vector<float>* sensoryQuery,
                         SimulationStep* startTime,
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
-
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    
+    // Consolidation state
+    std::unordered_map<size_t, float> episodeRelevance_;
+    std::vector<size_t> replayOrder_;
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

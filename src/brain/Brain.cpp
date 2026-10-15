@@ -6,9 +6,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -45,7 +43,13 @@ struct Brain::Impl {
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager;
+    
+    // Individual neuromodulators (maintained for backward compatibility)
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -124,11 +128,15 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize neuromodulation manager with integrated systems
+        neuromodulationManager = std::make_unique<NeuromodulationManager>();
+        neuromodulationManager->initialize(this);
+        
+        // Set up curiosity with brain reference (for backward compatibility)
+        curiosity = neuromodulationManager->getCuriosity();
+        
+        // Set up dopamine with brain reference (for backward compatibility)
+        dopamine = neuromodulationManager->getDopamine();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

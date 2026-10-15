@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -21,7 +23,7 @@ public:
     void setTargetDensity(float density);
     
     // Update synapse formation
-    void update(class Brain* brain, class RandomGenerator& rng);
+    void update(Brain* brain, RandomGenerator& rng);
     
 private:
     struct Impl;

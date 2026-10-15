@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include "../core/Random/Random.hpp"
+#include "../brain/Synapse.hpp"
 
 namespace nlm {
 
@@ -21,10 +24,10 @@ public:
     void setPruningRate(float rate);
     
     // Update pruning
-    void update(class Brain* brain, class RandomGenerator& rng);
+    void update(Brain* brain, RandomGenerator& rng);
     
     // Force pruning of specific synapse
-    bool pruneSynapse(class Synapse* synapse);
+    bool pruneSynapse(Synapse* synapse);
     
 private:
     struct Impl;

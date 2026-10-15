@@ -1,22 +1,28 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Neuromodulator.hpp"
 
 namespace nlm {
 
 // Prediction error signal for curiosity and learning
 // Computes difference between predicted and actual values
+// Now properly inherits from Neuromodulator
 
-class PredictionError {
+class PredictionError : public Neuromodulator {
 public:
     PredictionError();
-    ~PredictionError();
+    ~PredictionError() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get error value
-    float getError() const;
+    // Neuromodulator interface
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
     // Compute prediction error
     void computeError(float predicted, float actual);
@@ -30,6 +36,17 @@ public:
     
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
+    
+    // Get prediction error parameters
+    float getLearningRate() const;
+    float getErrorThreshold() const;
+    
+    // Set prediction error parameters
+    void setLearningRate(float rate);
+    void setErrorThreshold(float threshold);
+    
+    // Reset to baseline
+    void reset();
     
 private:
     struct Impl;

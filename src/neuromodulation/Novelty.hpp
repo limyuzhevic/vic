@@ -1,23 +1,28 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Neuromodulator.hpp"
 
 namespace nlm {
 
 // Novelty detection signal
 // Computes novelty from comparison with previous observations
+// Now properly inherits from Neuromodulator
 
-class Novelty {
+class Novelty : public Neuromodulator {
 public:
     Novelty();
-    ~Novelty();
+    ~Novelty() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get novelty level
-    float getLevel() const;
-    void setLevel(float level);
+    // Neuromodulator interface
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
     // Detect novelty from observation
     void detectNovelty(const class Observation& observation, 
@@ -33,6 +38,17 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Get novelty parameters
+    float getDecayRate() const;
+    float getNoveltyThreshold() const;
+    
+    // Set novelty parameters
+    void setDecayRate(float rate);
+    void setNoveltyThreshold(float threshold);
+    
+    // Reset to baseline
+    void reset();
     
 private:
     struct Impl;
