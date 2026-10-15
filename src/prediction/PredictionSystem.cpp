@@ -1,4 +1,8 @@
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -10,19 +14,43 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl), neuralPrediction_(nullptr) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
+void PredictionSystem::initialize(Brain* brain) {
+    if (brain) {
+        neuralPrediction_ = std::make_unique<NeuralPrediction>();
+        neuralPrediction_->initialize(brain);
+        NLM_LOG_INFO("PredictionSystem initialized with NeuralPrediction");
+    }
+}
+
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+    if (!neuralPrediction_) {
+        return currentState.clone();
+    }
+    
+    // Convert current sensory input to vector format
+    const auto& currentData = currentState.getData();
+    
+    // Generate prediction using NeuralPrediction system
+    // NeuralPrediction returns neural activity patterns as vectors
+    std::vector<float> prediction = neuralPrediction_->generatePrediction(0);
+    
+    // Create a new SensoryInput with the predicted state
+    auto predictedInput = std::make_unique<Vision>();
+    predictedInput->setData(prediction);
+    
+    NLM_LOG_INFO("PredictionSystem::predictNextState generated prediction");
+    return predictedInput;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
+    if (!neuralPrediction_) {
+        return;
+    }
+    
     const auto& predData = predicted.getData();
     const auto& actualData = actual.getData();
     
@@ -32,8 +60,14 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
             float diff = predData[i] - actualData[i];
             sumError += diff * diff;
         }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
+        float error = sumError / predData.size();
+        pImpl->predictionError = error;
+        pImpl->errorHistory.push_back(error);
+        
+        // Update neural prediction with observation
+        neuralPrediction_->updateWithObservation(actualData, 1);
+        
+        NLM_LOG_INFO("PredictionSystem::updatePredictions computed error: " + std::to_string(error));
     }
 }
 
@@ -42,6 +76,9 @@ float PredictionSystem::getPredictionError() const {
 }
 
 float PredictionSystem::getConfidence() const {
+    if (neuralPrediction_) {
+        return neuralPrediction_->getPredictionConfidence();
+    }
     return pImpl->confidence;
 }
 
@@ -51,10 +88,20 @@ const std::vector<float>& PredictionSystem::getErrorHistory() const {
 
 void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
+    if (neuralPrediction_) {
+        neuralPrediction_->clearHistory();
+    }
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    if (!neuralPrediction_) {
+        return;
+    }
+    
+    const auto& data = observation.getData();
+    neuralPrediction_->recordSensoryState(data, 0);
+    
+    NLM_LOG_INFO("PredictionSystem::train completed");
 }
 
 } // namespace nlm

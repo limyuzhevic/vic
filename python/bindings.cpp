@@ -400,6 +400,233 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Memory system access
+    py::class_<NeuralWorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuronId"), py::arg("value"),
+             "Store value to specific neuron")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons storing memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity,
+             "Get working memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("capacity"),
+             "Set working memory capacity")
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference");
+
+    py::class_<NeuralEpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes for replay")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episode")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("threshold"),
+             "Consolidate memory")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("clearEpisodes", &NeuralEpisodicMemory::clearEpisodes,
+             "Clear all episodes")
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference");
+
+    // Cognition system access
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planning system)pbdoc")
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward"),
+             "Plan action for given state")
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence, py::arg("actions"), py::arg("startState"),
+             "Evaluate action sequence")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"),
+             "Set planning depth")
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth,
+             "Get planning depth");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation system)pbdoc")
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("processPattern", &ConceptFormation::processPattern, py::arg("pattern"),
+             "Process pattern for concept formation")
+        .def("getConceptCount", &ConceptFormation::getConceptCount,
+             "Get number of concepts formed")
+        .def("getConceptAt", &ConceptFormation::getConceptAt, py::arg("index"),
+             "Get concept at index");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attention selection system)pbdoc")
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("update", &AttentionalSelection::update, py::arg("timestep"),
+             "Update attention selection")
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"),
+             "Process competitive attention")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"),
+             "Set inhibition strength")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"),
+             "Set excitation strength");
+
+    // Neuromodulation system access
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator)pbdoc")
+        .def("initialize", &Dopamine::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level")
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"),
+             "Set dopamine level")
+        .def("getEffect", &Dopamine::getEffect,
+             "Get dopamine effect on neural activity");
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection system)pbdoc")
+        .def("initialize", &Novelty::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"),
+             "Set novelty level")
+        .def("detectNovelty", &Novelty::detectNovelty, py::arg("currentState"), py::arg("previousState"),
+             "Detect novelty in state changes");
+
+    // Development system access
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system)pbdoc")
+        .def("initialize", &DevelopmentSystem::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("update", &DevelopmentSystem::update, py::arg("brain"), py::arg("rng"), py::arg("timestep"),
+             "Update development system")
+        .def("getCurrentStage", &DevelopmentSystem::getCurrentStage,
+             "Get current developmental stage")
+        .def("setCurrentStage", &DevelopmentSystem::setCurrentStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate,
+             "Get current plasticity rate");
+
+    // Prediction system access
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system using NeuralPrediction)pbdoc")
+        .def("initialize", &PredictionSystem::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"),
+             "Predict next sensory state")
+        .def("updatePredictions", &PredictionSystem::updatePredictions, py::arg("predicted"), py::arg("actual"),
+             "Update predictions with actual observation")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error (0 = perfect, 1 = total error)")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction history")
+        .def("train", &PredictionSystem::train, py::arg("observation"),
+             "Train prediction model")
+        .def("getNeuralPrediction", &PredictionSystem::getNeuralPrediction,
+             "Get underlying NeuralPrediction instance")
+        .def("isInitialized", &PredictionSystem::isInitialized,
+             "Check if prediction system is initialized");
+
+    // Brain system access methods
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        // Add memory system access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             "Get associative memory system")
+        // Add prediction system access
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             "Get prediction system")
+        // Add cognition system access
+        .def("getPlanner", &Brain::getPlanner,
+             "Get neural planner system")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             "Get attentional selection system")
+        // Add neuromodulation system access
+        .def("getDopamine", &Brain::getDopamine,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             "Get prediction error neuromodulator")
+        // Add development system access
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             "Get development system")
+        // Add plasticity system access
+        .def("getSTDP", &Brain::getSTDP,
+             "Get STDP plasticity rule")
+        .def("getHebbian", &Brain::getHebbian,
+             "Get Hebbian plasticity rule")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             "Get structural plasticity system")
+        // Add spike system access
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             "Get spike system");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
