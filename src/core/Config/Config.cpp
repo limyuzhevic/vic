@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
 
 namespace nlm {
 
@@ -19,16 +23,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first (modern format)
+    std::string firstChar = file.peek() != std::ifstream::traits_type::eof() ? 
+        std::string(1, file.get()) : "";
+    file.clear();
+    file.seekg(0);
+    
+    if (firstChar == "{") {
+        // Parse as JSON
+        return loadFromJSON(filepath);
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +64,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Log warning about malformed line
+            std::cerr << "WARNING: Config file " << filepath << 
+                         " line " << lineNumber << 
+                         ": malformed line, skipping: " << line << std::endl;
         }
     }
     
@@ -84,12 +104,16 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    // Determine file format based on extension
+    std::string extension = "." + filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
-    return true;
+    if (extension == ".json") {
+        return saveToJSON(filepath);
+    } else {
+        // Fall back to simple key=value format for backward compatibility
+        return saveToSimpleFormat(filepath);
+    }
 }
 
 template<typename T>
@@ -114,102 +138,192 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    rapidjson::IStreamWrapper isw(file);
+    rapidjson::Document doc;
+    
+    if (doc.ParseStream(isw).HasParseError()) {
+        std::cerr << "ERROR: Failed to parse JSON file: " << filepath << std::endl;
+        return false;
+    }
+    
+    if (!doc.IsObject()) {
+        std::cerr << "ERROR: JSON document is not an object: " << filepath << std::endl;
+        return false;
+    }
+    
+    // Parse JSON object
+    for (rapidjson::Value::ConstMemberIterator it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
+        std::string key = it->name.GetString();
+        
+        // Convert JSON value to ConfigValue
+        ConfigValue configValue;
+        bool success = convertJSONValueToConfigValue(it->value, configValue);
+        
+        if (success) {
+            set(key, configValue, ConfigSource::File);
+        } else {
+            std::cerr << "WARNING: Failed to convert JSON value for key \"" << key << "\"" << std::endl;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    
+    writer.StartObject();
+    
+    for (const auto& entry : pImpl->entries) {
+        writer.Key(entry.key.c_str());
+        writeConfigValueToJSON(writer, entry.value);
+    }
+    
+    writer.EndObject();
+    
+    file << buffer.GetString();
+    
+    return true;
+}
+
+bool Config::convertJSONValueToConfigValue(const rapidjson::Value& jsonValue, ConfigValue& configValue) {
+    if (jsonValue.IsInt()) {
+        configValue = jsonValue.GetInt();
+    } else if (jsonValue.IsUint64()) {
+        configValue = static_cast<int64_t>(jsonValue.GetUint64());
+    } else if (jsonValue.IsInt64()) {
+        configValue = jsonValue.GetInt64();
+    } else if (jsonValue.IsDouble()) {
+        configValue = jsonValue.GetDouble();
+    } else if (jsonValue.IsBool()) {
+        configValue = jsonValue.GetBool();
+    } else if (jsonValue.IsString()) {
+        configValue = std::string(jsonValue.GetString());
+    } else if (jsonValue.IsArray()) {
+        // Parse array as vector of doubles (most flexible)
+        std::vector<double> array;
+        for (rapidjson::SizeType i = 0; i < jsonValue.Size(); ++i) {
+            if (jsonValue[i].IsNumber()) {
+                array.push_back(jsonValue[i].GetDouble());
+            } else if (jsonValue[i].IsInt()) {
+                array.push_back(static_cast<double>(jsonValue[i].GetInt()));
+            }
+        }
+        configValue = array;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        std::cerr << "WARNING: Unsupported JSON value type" << std::endl;
+        return false;
     }
+    
+    return true;
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::writeConfigValueToJSON(rapidjson::Writer<rapidjson::StringBuffer>& writer, const ConfigValue& configValue) {
+    std::visit([&writer](auto&& value) {
+        using T = std::decay_t<decltype(value)>;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            writer.Int(value);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            writer.Int64(value);
+        } else if constexpr (std::is_same_v<T, double>) {
+            writer.Double(value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            writer.Bool(value);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            writer.String(value.c_str());
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            writer.StartArray();
+            for (int item : value) {
+                writer.Int(item);
+            }
+            writer.EndArray();
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            writer.StartArray();
+            for (double item : value) {
+                writer.Double(item);
+            }
+            writer.EndArray();
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            writer.StartArray();
+            for (const std::string& item : value) {
+                writer.String(item.c_str());
+            }
+            writer.EndArray();
+        } else {
+            writer.Null();
+        }
+    }, configValue);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
+        file << "# " << entry.description << "\n";
+        
+        // Write key with appropriate formatting
+        file << entry.key << " = ";
+        
+        // Write value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                // Quote strings that contain spaces or special characters
+                if (value.find(' ') != std::string::npos || value.find('=') != std::string::npos) {
+                    file << "\"" << value << "\"";
+                } else {
+                    file << value;
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (value[i].find(' ') != std::string::npos || value[i].find('=') != std::string::npos) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]";
             } else {
-                oss << arg;
+                file << value;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        
+        file << "\n\n";
     }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+    
+    } // namespace nlm
