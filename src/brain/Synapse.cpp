@@ -56,8 +56,8 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->shortTermDepression = 1.0f;  // Fully recovered initially
+    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
 }
@@ -228,6 +228,7 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->plasticityFlags = PlasticityFlags();  // Reset to default
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {

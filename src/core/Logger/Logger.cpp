@@ -102,12 +102,6 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
-struct Logger::Impl {
-    std::vector<std::shared_ptr<ILogger>> loggers;
-    std::mutex mutex;
-};
-
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
 Logger::~Logger() = default;
@@ -182,8 +176,22 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Advanced global logger management
+    if (logger) {
+        // Replace the global logger's internal state with the provided one
+        // This is an advanced feature for log manager frameworks
+        static Logger& global = getGlobal();
+        std::lock_guard<std::mutex> lock(global.pImpl->mutex);
+        
+        // Clear existing loggers
+        global.pImpl->loggers.clear();
+        
+        // Add loggers from the provided logger
+        std::lock_guard<std::mutex> loggerLock(logger->pImpl->mutex);
+        for (auto& srcLogger : logger->pImpl->loggers) {
+            global.pImpl->loggers.push_back(srcLogger);
+        }
+    }
 }
 
 // LogStream implementation

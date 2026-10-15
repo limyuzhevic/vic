@@ -11,8 +11,7 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
+    MembranePotential synapticInput;  // Accumulated synaptic input (formerly totalCurrent + synapticInput)
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -24,7 +23,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             synapticInput(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -32,7 +31,7 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
 }
 
 Neuron::~Neuron() = default;
@@ -246,11 +245,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is not firing
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
