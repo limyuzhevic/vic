@@ -74,114 +74,57 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
-private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+    // ========== NEUROMODULATORY CONTROL ==========
 
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
+    // Apply neuromodulatory effects
+    void applyNeuromodulation();
 
-    // Decay weak memory traces
-    void decayWeakTraces();
+    // Set neuromodulator levels for control
+    void setDopamineLevel(float level);
+    void setNoveltyLevel(float level);
+    void setAcetylcholineLevel(float level);
+    void setNorepinephrineLevel(float level);
+    void setSerotoninLevel(float level);
 
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get current neuromodulator levels
+    float getDopamineLevel() const;
+    float getNoveltyLevel() const;
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
 
-    Brain* brain_;
-    size_t capacity_;
-    float decayRate_;
-    
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
-    
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
-    
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
-};
+    // ========== BIDIRECTIONAL INTEGRATION ==========
 
-// AttentionalSelection: Neural attention through competition
-// NOT Transformer attention - uses lateral inhibition and gain modulation
-//
-// Mechanisms:
-// - Competition between neural populations
-// - Salience-based selection
-// - Recurrent amplification of winners
-// - Inhibitory surround suppression
+    // WorkingMemory <-> Attention
+    void integrateWithAttention();
+    void updateAttentionThroughMemory();
 
-class AttentionalSelection {
-public:
-    AttentionalSelection();
-    ~AttentionalSelection();
+    // WorkingMemory <-> Neuromodulation
+    void integrateWithNeuromodulation();
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
+    // WorkingMemory <-> Sensory
+    void integrateWithSensory(const std::vector<float>& sensoryInput);
+    void updateSensoryFromMemory();
 
-    // Process competing sensory inputs and select winners
-    // Returns IDs of winning neural populations
-    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
-                                              float globalInhibition = 0.5f);
+    // WorkingMemory <-> Prediction
+    void integrateWithPrediction();
+    void updatePredictionFromMemory();
 
-    // Apply attention to a specific region (focus processing there)
-    void focusOnRegion(RegionId region);
+    // ========== CAPACITY AND DECAY MODULATION ==========
 
-    // Release attention (allow all regions equal processing)
-    void releaseAttention();
+    // Modulate capacity based on neuromodulators
+    void modulateCapacity();
 
-    // Get current attention focus
-    std::vector<RegionId> getAttendedRegions() const;
+    // Modulate decay rate based on neuromodulators
+    void modulateDecayRate();
 
-    // Set attention parameters
-    void setInhibitionStrength(float strength);
-    void setExcitationStrength(float strength);
-    void setCompetitionThreshold(float threshold);
-
-    // Get inhibition level for a neuron
-    float getInhibitionFor(NeuronId neuron) const;
-
-    // Get excitation level for a neuron
-    float getExcitationFor(NeuronId neuron) const;
-
-    // Update attention dynamics
-    void update(TimestepDuration dt);
-
-    // Is this neuron currently attended?
-    bool isAttended(NeuronId neuron) const;
-
-    // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
-
-    // Top-down attention (goal-directed)
-    void applyTopDownBias(NeuronId neuron, float biasStrength);
-
-    // Bottom-up attention (stimulus-driven)
-    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
-    // Reset attention
-    void reset();
+    // Modulate encoding strength based on neuromodulators
+    void modulateEncodingStrength();
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    float inhibitionStrength_;
-    float excitationStrength_;
-    float competitionThreshold_;
-    
-    std::vector<RegionId> attendedRegions_;
-    std::vector<NeuronId> winners_;
-    std::vector<float> neuronSalience_;
-    
-    // Biases/salience stored by NeuronId for correct lookup in processCompetition
-    std::unordered_map<uint64_t, float> topDownBias_;
-    std::unordered_map<uint64_t, float> bottomUpSalience_;
-};
-
-} // namespace nlm
+    // Neuromodulator levels
+    float dopamineLevel_;
+    float noveltyLevel_;
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;

@@ -28,21 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
-
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Novelty;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -178,11 +167,14 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+// Acetylcholine: Attention and encoding
+    Acetylcholine* getAcetylcholine();
+
+    // Norepinephrine: Arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+
+    // Serotonin: Reward and mood
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
