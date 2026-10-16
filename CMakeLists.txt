@@ -23,13 +23,21 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
+    # Core utilities
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    src/core/ErrorHandling.cpp
+    src/core/ErrorReporting.cpp
+    src/core/ErrorRecovery.cpp
+    # Core error handling infrastructure
+    src/core/ErrorHandling.hpp
+    src/core/ErrorReporting.hpp
+    src/core/ErrorRecovery.hpp
+    # Error handling documentation
+    # Brain components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
@@ -54,12 +62,8 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    # Memory systems
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -75,16 +79,22 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # World
+    src/world/SimpleWorld.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -92,7 +102,7 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Agent system
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
@@ -100,8 +110,9 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
+# World system
 add_library(nlm_world STATIC
+    src/world/Observation.cpp
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
@@ -119,13 +130,38 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Utility modules
+add_library(nlm_utils STATIC
+    src/test_functions.cpp
+    src/config_setup.cpp
+    src/logging_setup.cpp
+    src/timing.cpp
+    src/argument_parser.cpp
+)
+target_include_directories(nlm_utils PUBLIC src)
+target_link_libraries(nlm_utils PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_utils)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,12 +175,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# CLI executable
+add_executable(nlm_cli
+    src/CLI/CLI.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_utils)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
+    nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/nlm.dir/link.d CMakeFiles/nlm.dir/src/main.cpp.o -o nlm  libnlm_core.a libnlm_utils.a libnlm_core.a

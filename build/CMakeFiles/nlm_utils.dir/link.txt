@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_utils.a CMakeFiles/nlm_utils.dir/src/test_functions.cpp.o CMakeFiles/nlm_utils.dir/src/config_setup.cpp.o CMakeFiles/nlm_utils.dir/src/logging_setup.cpp.o CMakeFiles/nlm_utils.dir/src/timing.cpp.o CMakeFiles/nlm_utils.dir/src/argument_parser.cpp.o
+/usr/bin/ranlib libnlm_utils.a

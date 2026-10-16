@@ -1,0 +1,77 @@
+<!-- NLM Configuration Example (XML format) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<nlm-config version="2.0">
+  <description>NLM Configuration Example</description>
+  
+  <brain>
+    <neuron_count>1000</neuron_count>
+    <region_count>2</region_count>
+    <connection_probability>0.1</connection_probability>
+    <random_seed>42</random_seed>
+    <simulation_timestep>0.001</simulation_timestep>
+    <plasticity>
+      <learning_rate>0.01</learning_rate>
+      <stdp_ltp_weight>0.01</stdp_ltp_weight>
+      <stdp_ltd_weight>0.012</stdp_ltd_weight>
+      <stdp_time_constant>20.0</stdp_time_constant>
+      <hebbian_strength>0.005</hebbian_strength>
+    </plasticity>
+    <development>
+      <synaptogenesis_rate>0.0001</synaptogenesis_rate>
+      <pruning_rate>0.00001</pruning_rate>
+      <maturation_rate>0.001</maturation_rate>
+      <critical_period>true</critical_period>
+    </development>
+  </brain>
+  
+  <memory>
+    <working_memory_capacity>100</working_memory_capacity>
+    <episodic_memory_capacity>1000</episodic_memory_capacity>
+    <decay_rate>0.01</decay_rate>
+    <retrieval_threshold>0.5</retrieval_threshold>
+  </memory>
+  
+  <neuromodulation>
+    <dopamine_baseline>0.1</dopamine_baseline>
+    <dopamine_gain>1.0</dopamine_gain>
+    <curiosity_rate>0.01</curiosity_rate>
+    <novelty_sensitivity>0.5</novelty_sensitivity>
+    <reward_discount_factor>0.99</reward_discount_factor>
+  </neuromodulation>
+  
+  <performance>
+    <optimization_level>2</optimization_level>
+    <thread_count>4</thread_count>
+    <vectorization_enabled>true</vectorization_enabled>
+    <sparse_connectivity>true</sparse_connectivity>
+  </performance>
+  
+  <output>
+    <format>text</format>
+    <verbose>true</verbose>
+    <quiet>false</quiet>
+    <progress_interval>100</progress_interval>
+    <log_to_file>false</log_to_file>
+    <log_filename>nlm.log</log_filename>
+  </output>
+  
+  <debug>
+    <debug_mode>false</debug_mode>
+    <trace_level>0</trace_level>
+    <validate_every_step>false</validate_every_step>
+  </debug>
+  
+  <logging>
+    <log_level>info</log_level>
+    <log_to_file>false</log_to_file>
+    <log_filename>nlm.log</log_filename>
+    <log_append>true</log_append>
+  </logging>
+  
+  <experiment>
+    <max_simulation_steps>10000</max_simulation_steps>
+    <simulation_time_limit>0.0</simulation_time_limit>
+    <random_seed>42</random_seed>
+    <checkpoint_interval>1000</checkpoint_interval>
+  </experiment>
+</nlm-config>

@@ -1,0 +1,68 @@
+{
+  "nlm_version": "2.0",
+  "description": "NLM Configuration Example",
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "plasticity": {
+      "learning_rate": 0.01,
+      "stdp_ltp_weight": 0.01,
+      "stdp_ltd_weight": 0.012,
+      "stdp_time_constant": 20.0,
+      "hebbian_strength": 0.005
+    },
+    "development": {
+      "synaptogenesis_rate": 0.0001,
+      "pruning_rate": 0.00001,
+      "maturation_rate": 0.001,
+      "critical_period": true
+    }
+  },
+  "memory": {
+    "working_memory_capacity": 100,
+    "episodic_memory_capacity": 1000,
+    "decay_rate": 0.01,
+    "retrieval_threshold": 0.5
+  },
+  "neuromodulation": {
+    "dopamine_baseline": 0.1,
+    "dopamine_gain": 1.0,
+    "curiosity_rate": 0.01,
+    "novelty_sensitivity": 0.5,
+    "reward_discount_factor": 0.99
+  },
+  "performance": {
+    "optimization_level": 2,
+    "thread_count": 4,
+    "vectorization_enabled": true,
+    "sparse_connectivity": true
+  },
+  "output": {
+    "format": "text",
+    "verbose": true,
+    "quiet": false,
+    "progress_interval": 100,
+    "log_to_file": false,
+    "log_filename": "nlm.log"
+  },
+  "debug": {
+    "debug_mode": false,
+    "trace_level": 0,
+    "validate_every_step": false
+  },
+  "logging": {
+    "log_level": "info",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    "log_append": true
+  },
+  "experiment": {
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    "random_seed": 42,
+    "checkpoint_interval": 1000
+  }
+}
