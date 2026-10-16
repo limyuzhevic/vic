@@ -12,33 +12,43 @@ namespace nlm {
 class Config;
 
 // Configuration value types
+// Defines the set of types that can be stored as configuration values
+// Each configuration key-value pair uses this variant type, allowing flexibility
+// while maintaining type safety through the get() and set() methods.
 using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    int,                    // 32-bit integer (e.g., neuron_count, region_count)
+    int64_t,                // 64-bit integer (e.g., random_seed)
+    double,                 // Double-precision floating point (e.g., simulation_timestep)
+    float,                  // Single-precision floating point (e.g., connection_probability)
+    bool,                   // Boolean value (e.g., enable_logging)
+    std::string,            // String value (e.g., log_filename, environment_name)
+    std::vector<int>,       // Vector of integers (e.g., list of neuron IDs)
+    std::vector<double>,    // Vector of doubles (e.g., parameter ranges)
+    std::vector<std::string> // Vector of strings (e.g., list of concept names)
 >;
 
 // Configuration source
+// Tracks where configuration values originated from, enabling priority resolution
+// when the same key is set from multiple sources (File > CommandLine > Default)
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    // Built-in default values (lowest priority)
+    File,       // Loaded from configuration file
+    CommandLine, // Set via command-line arguments
+    Runtime     // Set programmatically at runtime (highest priority)
 };
 
 // Configuration entry
+// Represents a single key-value pair in the configuration system
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;           // Configuration key (e.g., "neuron_count")
+    ConfigValue value;         // Stored value (type depends on key)
+    ConfigSource source;       // Source of this value
+    std::string description;   // Human-readable description for documentation
     
+    // Default constructor creates an empty entry
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    // Constructor with description parameter
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
@@ -76,6 +86,7 @@ public:
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
