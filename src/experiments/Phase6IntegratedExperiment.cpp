@@ -14,6 +14,16 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+    // Validate configuration
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: neuronCount must be > 0");
+        return Phase6IntegrationResult();
+    }
+    if (config.maxSteps == 0) {
+        NLM_LOG_ERROR("Invalid configuration: maxSteps must be > 0");
+        return Phase6IntegrationResult();
+    }
+    
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
@@ -22,6 +32,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Checkpointing: " + std::string(config.enableCheckpointing ? "Yes" : "No"));
+    NLM_LOG_INFO("Replay: " + std::string(config.enableReplay ? "Yes" : "No"));
+    NLM_LOG_INFO("Development: " + std::string(config.enableDevelopment ? "Yes" : "No"));
     
     // Create configuration
     auto cfg = std::make_shared<Config>();

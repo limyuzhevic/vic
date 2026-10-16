@@ -133,15 +133,63 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+# Additional tools
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Python benchmarking tool
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmark.py
+    ${CMAKE_CURRENT_BINARY_DIR}/benchmark.py
+    COPYONLY
+)
+
+# Python visualization tool
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/visualize.py
+    ${CMAKE_CURRENT_BINARY_DIR}/visualize.py
+    COPYONLY
+)
+
+# Phase 6 demo executable with enhanced CLI
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Testing executables
+add_executable(nlm_demo
+    src/main.cpp
+)
+target_link_libraries(nlm_demo PUBLIC nlm_core)
+
+# Copy Python scripts to build directory for easy access
+add_custom_target(copy_python_scripts ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/benchmark.py
+        ${CMAKE_CURRENT_BINARY_DIR}/
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/visualize.py
+        ${CMAKE_CURRENT_BINARY_DIR}/
+    COMMENT "Copying Python tools to build directory"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+# Installation targets (future)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_demo
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/configs/default.cfg
+    DESTINATION etc/nlm
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/benchmark.py
+    ${CMAKE_CURRENT_BINARY_DIR}/visualize.py
+    DESTINATION bin
+)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

@@ -72,15 +72,54 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
+**Basic Usage:**
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+**With Advanced Options:**
+```bash
+./nlm_phase6_demo --neurons=1000 --steps=3000 --visualization --visualization-type=comprehensive --visualization-format=json
+```
+
+**Help:**
+```bash
+./nlm_phase6_demo --help
+```
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+### Python Tools
+
+The repository includes Python tools for benchmarking and visualization:
+
+**Benchmark Tool:**
+```bash
+python3 benchmark.py --neurons=500 --steps=1000
+```
+
+**Visualization Tool:**
+```bash
+python3 visualize.py --neurons=200 --steps=300 --type=comprehensive
+```
+
+**Help:**
+```bash
+python3 benchmark.py --help
+python3 visualize.py --help
+```
 
 ## Project Structure
 
