@@ -199,17 +199,200 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Apply configuration preset
+void Config::applyPreset(const std::string& presetName) {
+    clear();
+    
+    // Convert to lowercase for case-insensitive comparison
+    std::string presetLower = toLower(presetName);
+    
+    if (presetLower == "quick") {
+        // Quick test configuration
+        set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        set("connection_probability", 0.1f, ConfigSource::Default);
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("simulation_timestep", 0.001, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        set("stdp_tau", 20.0f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        set("pruning_rate", 0.00001f, ConfigSource::Default);
+        set("enable_checkpointing", false, ConfigSource::Default);
+        set("enable_replay", false, ConfigSource::Default);
+        set("enable_development", false, ConfigSource::Default);
+        set("enable_plasticity", false, ConfigSource::Default);
+        set("enable_structural_plasticity", false, ConfigSource::Default);
+    }
+    else if (presetLower == "balanced") {
+        // Balanced test configuration (Phase 6 standard)
+        set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        set("connection_probability", 0.15f, ConfigSource::Default);
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("simulation_timestep", 0.001, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        set("stdp_tau", 20.0f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        set("pruning_rate", 0.00001f, ConfigSource::Default);
+        set("enable_checkpointing", true, ConfigSource::Default);
+        set("enable_replay", true, ConfigSource::Default);
+        set("enable_development", true, ConfigSource::Default);
+        set("enable_plasticity", true, ConfigSource::Default);
+        set("enable_structural_plasticity", true, ConfigSource::Default);
+    }
+    else if (presetLower == "advanced") {
+        // Advanced test configuration
+        set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        set("connection_probability", 0.1f, ConfigSource::Default);
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("simulation_timestep", 0.001, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.03f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.02f, ConfigSource::Default);
+        set("stdp_tau", 15.0f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        set("pruning_rate", 0.00005f, ConfigSource::Default);
+        set("enable_checkpointing", true, ConfigSource::Default);
+        set("enable_replay", true, ConfigSource::Default);
+        set("enable_development", true, ConfigSource::Default);
+        set("enable_plasticity", true, ConfigSource::Default);
+        set("enable_structural_plasticity", true, ConfigSource::Default);
+        set("enable_curiosity", true, ConfigSource::Default);
+        set("enable_novelty", true, ConfigSource::Default);
+    }
+    else if (presetLower == "extreme") {
+        // Extreme test configuration for maximum coverage
+        set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        set("connection_probability", 0.05f, ConfigSource::Default);
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("simulation_timestep", 0.001, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.05f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.04f, ConfigSource::Default);
+        set("stdp_tau", 10.0f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0005f, ConfigSource::Default);
+        set("pruning_rate", 0.0002f, ConfigSource::Default);
+        set("enable_checkpointing", true, ConfigSource::Default);
+        set("enable_replay", true, ConfigSource::Default);
+        set("enable_development", true, ConfigSource::Default);
+        set("enable_plasticity", true, ConfigSource::Default);
+        set("enable_structural_plasticity", true, ConfigSource::Default);
+        set("enable_curiosity", true, ConfigSource::Default);
+        set("enable_novelty", true, ConfigSource::Default);
+        set("enable_prediction", true, ConfigSource::Default);
+        set("enable_planning", true, ConfigSource::Default);
+        set("enable_concept_formation", true, ConfigSource::Default);
+        set("enable_attention", true, ConfigSource::Default);
+    }
+    else {
+        // Default configuration
+        set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        set("connection_probability", 0.1f, ConfigSource::Default);
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("simulation_timestep", 0.001, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        set("stdp_tau", 20.0f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        set("pruning_rate", 0.00001f, ConfigSource::Default);
+        set("enable_checkpointing", true, ConfigSource::Default);
+        set("enable_replay", true, ConfigSource::Default);
+        set("enable_development", true, ConfigSource::Default);
+        set("enable_plasticity", true, ConfigSource::Default);
+        set("enable_structural_plasticity", true, ConfigSource::Default);
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Validate configuration values
+bool Config::validate() const {
+    bool isValid = true;
+    
+    // Get values safely with validation
+    auto neuronCountOpt = get<int64_t>("neuron_count");
+    if (!neuronCountOpt) {
+        std::cerr << "Error: neuron_count not set" << std::endl;
+        isValid = false;
+    } else {
+        int64_t neuronCount = *neuronCountOpt;
+        if (neuronCount < 10) {
+            std::cerr << "Error: neuron_count too low (minimum 10)" << std::endl;
+            isValid = false;
+        } else if (neuronCount > 10000) {
+            std::cerr << "Error: neuron_count too high (maximum 10000)" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    auto regionCountOpt = get<int64_t>("region_count");
+    if (!regionCountOpt) {
+        std::cerr << "Error: region_count not set" << std::endl;
+        isValid = false;
+    } else {
+        int64_t regionCount = *regionCountOpt;
+        if (regionCount < 1) {
+            std::cerr << "Error: region_count must be at least 1" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    auto connectionProbOpt = get<double>("connection_probability");
+    if (!connectionProbOpt) {
+        std::cerr << "Error: connection_probability not set" << std::endl;
+        isValid = false;
+    } else {
+        double connectionProb = *connectionProbOpt;
+        if (connectionProb < 0.0 || connectionProb > 1.0) {
+            std::cerr << "Error: connection_probability must be between 0.0 and 1.0" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    auto simulationTimestepOpt = get<double>("simulation_timestep");
+    if (!simulationTimestepOpt) {
+        std::cerr << "Error: simulation_timestep not set" << std::endl;
+        isValid = false;
+    } else {
+        double timestep = *simulationTimestepOpt;
+        if (timestep <= 0.0) {
+            std::cerr << "Error: simulation_timestep must be positive" << std::endl;
+            isValid = false;
+        } else if (timestep > 0.1) {
+            std::cerr << "Warning: simulation_timestep is large (max recommended 0.1)" << std::endl;
+        }
+    }
+    
+    return isValid;
+}
 
-} // namespace nlm
+// Enhanced save to file with actual values
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "Error: Cannot open file for writing: " << filepath << std::endl;
+        return false;
+    }
+    
+    file << "# NLM Configuration File\n";
+    file << "# Generated on: " << std::endl;
+    file << "# Format: key = value (quoted strings)\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
+    }
+    
+    return true;
+}

@@ -90,9 +90,15 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+// Get configuration summary
     std::string summary() const;
     
+    // Apply configuration preset
+    void applyPreset(const std::string& presetName);
+    
+    // Validate configuration values
+    bool validate() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
