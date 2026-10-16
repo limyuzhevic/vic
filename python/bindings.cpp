@@ -144,20 +144,121 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def(py::init<const std::string&>(), py::arg("filepath"), 
+             "Create config from JSON/YAML file")
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile), py::arg("filepath"),
              "Load configuration from a JSON file")
+        .def("saveToFile", py::overload_cast<const std::string&>(&Config::saveToFile), py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("loadFromString", &Config::loadFromFile, py::arg("content"),
+             "Load configuration from JSON string content")
+        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            // Convert Python list to char* array
+            std::vector<char*> c_args;
+            for (const auto& arg : args) {
+                c_args.push_back(const_cast<char*>(arg.c_str()));
+            }
+            return self.loadFromArgs(static_cast<int>(c_args.size()), c_args.data());
+        }, py::arg("args"), "Load configuration from command line argument list")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+        .def("get", py::overload_cast<const std::string&>(&Config::getKeys), py::arg("key"),
+             "Get configuration value by key with type inference")
+        .def("get", py::overload_cast<const std::string&>(&Config::getKeys), py::arg("key"),
+             "Get configuration keys (overload)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return *val;
+            throw py::value_error("Configuration key \"" + key + "\" not found or not an integer");
+        }, py::arg("key"), "Get integer configuration value")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) return *val;
+            throw py::value_error("Configuration key \"" + key + "\" not found or not a float");
+        }, py::arg("key"), "Get float configuration value")
+        .def("getString", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val) return *val;
+            throw py::value_error("Configuration key \"" + key + "\" not found or not a string");
+        }, py::arg("key"), "Get string configuration value")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) return *val;
+            throw py::value_error("Configuration key \"" + key + "\" not found or not a boolean");
+        }, py::arg("key"), "Get boolean configuration value")
+        .def("set", py::overload_cast<const std::string&, const ConfigValue&>(&Config::set), py::arg("key"), py::arg("value"),
+             "Set configuration value (generic)")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set float configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set string configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set boolean configuration value")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        .def("keys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("__len__", &Config::getKeys,
+             "Get number of configuration entries")
+        .def("__getitem__", [](const Config& self, const std::string& key) {
+            auto val = self.get<ConfigValue>(key);
+            if (!val) {
+                throw py::key_error("Configuration key \"" + key + "\" not found");
+            }
+            // Convert ConfigValue to Python object
+            py::object result;
+            std::visit([&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    result = py::cast(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    result = py::cast(arg);
+                }
+            }, *val);
+            return result;
+        }, py::arg("key"), "Get configuration value with Python dictionary-like access")
+        .def("__setitem__", [](Config& self, const std::string& key, py::object value) {
+            if (value.is_none()) {
+                throw py::type_error("None cannot be stored in configuration");
+            }
+            
+            if (value.is(py::int_())) {
+                self.set(key, static_cast<int>(value.cast<long>()));
+            } else if (value.is(py::float_())) {
+                self.set(key, value.cast<double>());
+            } else if (value.is(py::bool_())) {
+                self.set(key, value.cast<bool>());
+            } else if (value.is(py::str())) {
+                self.set(key, value.cast<std::string>());
+            } else if (py::isinstance(value, py::list())) {
+                auto list = value.cast<std::vector<int>>();
+                self.set(key, ConfigValue(list));
+            } else {
+                throw py::type_error("Unsupported Python type for configuration value");
+            }
+        }, py::arg("key"), py::arg("value"), "Set configuration value with Python dictionary-like access")
+        .def("__contains__", &Config::has, py::arg("key"),
+             "Check if configuration key exists (in operator)")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
@@ -299,24 +400,78 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status information")
+        // Statistics and monitoring
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get random generator for advanced users")
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             "Get associative memory system")
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             "Get prediction system")
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             "Get attentional selection system")
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             "Get development system")
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             "Get prediction error signal")
+        // State management
+        .def("addRegion", [](Brain& brain, const std::string& name) {
+            return brain.addRegion(name);
+        }, py::arg("name"),
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
@@ -328,30 +483,56 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+        // Spike system
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             "Get structural plasticity system")
+        // Event-driven operations
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        // Integration and control
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             "Apply neuromodulatory signals")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules (called automatically in step)")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes (called automatically in step)")
+        // Context manager support for safe resource management
+        .def("__enter__", [](Brain& brain) {
+            return &brain;
+        })
+        .def("__exit__", [](Brain& /*brain*/, py::object, py::object, py::object) {
+            // Cleanup not needed for now
+        })
+        .def("__len__", &Brain::getTotalNeuronCount,
+             "Get number of neurons in brain (len() support)")
+        .def("__getitem__", [](Brain& brain, size_t index) {
+            const auto& regions = brain.getRegions();
+            if (index >= regions.size()) {
+                throw py::index_error("Region index out of range");
+            }
+            return regions[index].get();
+        }, py::arg("index"), "Access region by index (Pythonic iteration)")
+        .def("__iter__", [](Brain& brain) {
+            return py::make_iterator(brain.getRegions().begin(), brain.getRegions().end());
+        })
+        .def("regions", [](Brain& brain) {
+            return brain.getRegions();
+        }, "Get all regions as Python list (legacy support)")
+        .def("__repr__", [](const Brain& brain) {
+            return "<Brain: " + std::to_string(brain.getTotalNeuronCount()) + 
+                   " neurons, " + std::to_string(brain.getTotalSynapseCount()) +
+                   " synapses>";
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

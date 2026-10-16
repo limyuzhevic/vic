@@ -69,6 +69,44 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced functionality for advanced agents
+    // These methods provide advanced agent capabilities
+    virtual void enableAdvancedLearning(bool enable) {}
+    virtual bool isAdvancedLearningEnabled() const { return false; }
+    
+    virtual void setActionSelectionStrategy(int strategy) {}
+    virtual int getActionSelectionStrategy() const { return 0; }
+    
+    virtual void enableMetaLearning(bool enable) {}
+    virtual bool isMetaLearningEnabled() const { return false; }
+    
+    virtual void setExperienceReplaySize(size_t size) {}
+    virtual size_t getExperienceReplaySize() const { return 0; }
+    
+    virtual void enableAdaptiveExploration(bool enable) {}
+    virtual bool isAdaptiveExplorationEnabled() const { return false; }
+    
+    virtual void configurePolicyNetwork(size_t inputSize, size_t hiddenSize, size_t outputSize) {}
+    
+    // Performance monitoring
+    virtual float getExpectedValue(const std::vector<float>& state) const { return 0.0f; }
+    virtual float getPolicyEntropy() const { return 0.0f; }
+    virtual float getLearningProgress() const { return 0.0f; }
+    virtual float getCuriosityScore() const { return 0.0f; }
+    virtual float getNoveltyScore() const { return 0.0f; }
+    
+    // Advanced statistics
+    virtual size_t getExperienceBufferSize() const { return 0; }
+    virtual size_t getTotalLearningSteps() const { return 0; }
+    virtual float getTotalReward() const { return 0.0f; }
+    
+    // Policy export/import
+    virtual void savePolicy(const std::string& filepath) const {}
+    virtual bool loadPolicy(const std::string& filepath) { return false; }
+    
+    // Statistics and debugging
+    virtual void logStatus() const {}
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -113,5 +151,18 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+// Forward declaration for AdvancedAgentBrain
+class AdvancedAgentBrain;
+
+// Factory function for creating advanced agent brains
+inline std::shared_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain, bool advanced = false) {
+    if (advanced) {
+        // Return advanced agent brain (in a real implementation, this would return AdvancedAgentBrain)
+        // For now, return basic AgentBrain
+        return std::make_shared<AgentBrain>(brain);
+    }
+    return std::make_shared<AgentBrain>(brain);
+}
 
 } // namespace nlm

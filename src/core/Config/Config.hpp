@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -28,7 +29,8 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Environment
 };
 
 // Configuration entry
@@ -37,10 +39,26 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string filePath;  // Track which file loaded this value
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : source(ConfigSource::Default) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& file = "")
+        : key(k), value(v), source(s), description(desc), filePath(file) {}
+};
+
+// Simple configuration schema for validation
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "float", "bool", "string", "list"
+    std::string description;
+    std::optional<ConfigValue> defaultValue;
+    bool required = false;
+    
+    ConfigSchema() = default;
+    ConfigSchema(const std::string& k, const std::string& t, const std::string& desc = "",
+                const std::optional<ConfigValue>& def = std::nullopt, bool req = false)
+        : key(k), type(t), description(desc), defaultValue(def), required(req) {}
 };
 
 // Main configuration class
@@ -55,14 +73,21 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from string content (JSON/YAML)
+    bool loadFromString(const std::string& content, const std::string& format = "auto");
+    
+    // Load from environment variables
+    bool loadFromEnv(const std::map<std::string, std::string>& envVars);
+    
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath, const std::string& format = "json") const;
+    std::string saveToString(const std::string& format = "json") const;
     
     // Get values
     template<typename T>
@@ -86,12 +111,26 @@ public:
     
     // Get all keys
     std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
     
     // Clear all
     void clear();
     
+    // Statistics
+    size_t getEntryCount() const;
+    
     // Get configuration summary
     std::string summary() const;
+    
+    // Schema support (for validation)
+    void addSchema(const ConfigSchema& schema);
+    bool removeSchema(const std::string& key);
+    void clearSchemas();
+    bool hasSchema(const std::string& key) const;
+    bool validate() const;
+    bool validate(const std::string& key) const;
+    bool isValid(const std::string& key) const;
+    std::string getValidationError(const std::string& key) const;
     
 private:
     struct Impl;
