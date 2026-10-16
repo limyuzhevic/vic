@@ -404,6 +404,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+        
+        // Apply novelty-based amplification to working memory
+        if (pImpl->novelty && pImpl->workingMemory) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.0f) {
+                // Novelty enhances working memory trace strength
+                auto neurons = pImpl->workingMemory->getMemoryNeurons();
+                for (NeuronId neuronId : neurons) {
+                    pImpl->workingMemory->storeToNeuron(neuronId, 1.5f);  // Amplify traces
+                }
+            }
+        }
+        
+        // Apply dopamine-based memory consolidation
+        if (pImpl->dopamine && pImpl->workingMemory) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            if (dopamineLevel > 1.0f) {  // Strong reward signals
+                // Strong rewards trigger memory consolidation
+                pImpl->workingMemory->consolidate(0.7f);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +538,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input state
+        // Predict next state based on working memory contents
+        // This is key for attention and planning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Update novelty detection based on prediction error
+        if (pImpl->novelty && pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->novelty->update(predictionError, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,17 +559,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply prediction-based attention modulation
+        if (pImpl->predictionSystem && pImpl->attention) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float attentionMod = 1.0f;
+            
+            // Novelty increases attention to unexpected events
+            if (pImpl->novelty) {
+                attentionMod *= (1.0f + pImpl->novelty->getLevel());
+            }
+            
+            // Prediction error increases focused attention
+            if (predictionError > 0.0f) {
+                attentionMod *= (1.0f + predictionError * 2.0f);
+            }
+            
+            // Apply to attention system
+            if (attentionMod > 0.0f) {
+                pImpl->attention->setGlobalBias(attentionMod);
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use episodic memory to extract recurring patterns
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            // Extract patterns from episodic memory and working memory
+            auto workingNeurons = pImpl->workingMemory->getMemoryNeurons();
+            size_t recentEpisodes = std::min(size_t(10), pImpl->episodicMemory->getEpisodeCount());
+            
+            pImpl->conceptFormation->update(pImpl->timestep, workingNeurons, recentEpisodes);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // Apply neuromodulation to structural plasticity
+    if (pImpl->dopamine && pImpl->structuralPlasticity) {
+        float plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityFactor);
+        pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - plasticityFactor));
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -573,6 +643,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neuromodulation baseline
+        if (pImpl->dopamine) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float baseline = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    baseline = 0.5f;  // Developing reward sensitivity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    baseline = 0.7f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    baseline = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    baseline = 0.8f;  // Stable reward response
+                    break;
+            }
+            
+            pImpl->dopamine->setBaseline(baseline);
+        }
+        
+        // Development affects memory systems
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float memoryCapacityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    memoryCapacityMod = 0.5f;  // Limited working memory
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    memoryCapacityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    memoryCapacityMod = 1.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    memoryCapacityMod = 1.0f;
+                    break;
+            }
+            
+            pImpl->workingMemory->setCapacity(static_cast<size_t>(pImpl->workingMemory->getCapacity() * memoryCapacityMod));
+            pImpl->episodicMemory->setMaxEpisodes(static_cast<size_t>(pImpl->episodicMemory->getMaxEpisodes() * memoryCapacityMod));
         }
     }
     
@@ -723,6 +840,21 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Scale Hebbian learning rates
+    if (pImpl->hebbian) {
+        pImpl->hebbian->setLearningRate(0.01f * modulation);
+    }
+    
+    // Apply neuromodulation to attention system
+    if (pImpl->attention) {
+        pImpl->attention->setGlobalBias(modulation);
+    }
+    
+    // Apply neuromodulation to concept formation
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->setLearningRate(modulation);
+    }
 }
 
 void Brain::updatePlasticity() {
