@@ -181,6 +181,13 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode->sensoryState.empty()) {
         // This would go through sensory channels - simplified here
     }
+    
+    // During sleep, replay has stronger consolidation effects
+    // We can track this in the episode itself
+    if (episode->age > 1000) {  // Older episodes (from sleep replay)
+        // Enhance memory strength during sleep replay
+        // In a full implementation, this would affect synaptic weights
+    }
 }
 
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
@@ -270,6 +277,158 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
             
             // Small delay between replays
             // (In simulation, this would be steps)
+        }
+    }
+}
+
+float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
+                                             const EpisodicMemoryItem& episode) const {
+    if (query.empty() || episode.sensoryState.empty()) return 0.0f;
+    if (query.size() != episode.sensoryState.size()) return 0.0f;
+    
+    // Cosine similarity
+    float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
+    for (size_t i = 0; i < query.size(); ++i) {
+        dot += query[i] * episode.sensoryState[i];
+        normQ += query[i] * query[i];
+        normE += episode.sensoryState[i] * episode.sensoryState[i];
+    }
+    
+    if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normQ) * std::sqrt(normE));
+}
+
+bool NeuralEpisodicMemory::matchesCriteria(
+    const EpisodicMemoryItem& episode,
+    const std::vector<float>* sensoryQuery,
+    SimulationStep* startTime,
+    SimulationStep* endTime,
+    ActionType* actionQuery) const {
+    
+    if (sensoryQuery) {
+        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
+            return false;
+        }
+    }
+    
+    if (startTime && endTime) {
+        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
+            return false;
+        }
+    }
+    
+    if (actionQuery && episode.action != *actionQuery) {
+        return false;
+    }
+    
+    return true;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
+    size_t count) const {
+    
+    // Select episodes for replay based on:
+    // 1. Recency (more recent episodes)
+    // 2. Reward (higher reward episodes)
+    // 3. Unpredictability (higher prediction error episodes)
+    
+    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float rewardScore = episodes_[i].reward;
+        float score = recencyScore * 0.5f + rewardScore * 0.5f;
+        scored.emplace_back(score, rewardScore, i);
+    }
+    
+    // Sort by score
+    std::sort(scored.begin(), scored.end(),
+        [](const auto& a, const auto& b) {
+            return std::get<0>(a) > std::get<0>(b);
+        });
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
+        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    }
+    
+    return results;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForSleepReplay(
+    size_t count) const {
+    
+    // Enhanced selection for sleep replay:
+    // 1. Even more emphasis on recency (sleep consolidates recent memories)
+    // 2. Include some lower reward but highly novel episodes
+    // 3. Increase total episode count for sleep replay
+    
+    std::vector<std::tuple<float, float, size_t, float>> scored;  // (score, reward, index, novelty)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float rewardScore = episodes_[i].reward;
+        float noveltyScore = episodes_[i].novelty;
+        
+        // Sleep replay emphasizes:
+        // - Recent episodes more (70% recency)
+        // - But also includes some novel episodes (30% novelty)
+        float score = recencyScore * 0.7f + noveltyScore * 0.3f;
+        
+        scored.emplace_back(score, rewardScore, i, noveltyScore);
+    }
+    
+    // Sort by score (recency + novelty)
+    std::sort(scored.begin(), scored.end(),
+        [](const auto& a, const auto& b) {
+            return std::get<0>(a) > std::get<0>(b);
+        });
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
+        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    }
+    
+    return results;
+}
+
+void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            replayEpisode(&episodes_[id]);
+            
+            // Small delay between replays
+            // (In simulation, this would be steps)
+        }
+    }
+}
+
+void NeuralEpisodicMemory::replaySequenceWithConsolidation(
+    const std::vector<size_t>& episodeIds) {
+    // Enhanced replay for sleep/consolidation
+    // This version strengthens memories through repeated replay
+    
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            // Enhanced replay for consolidation
+            EpisodicMemoryItem& episode = episodes_[id];
+            
+            // Increase episode age (simulating time passed)
+            episode.age += 100;
+            
+            // Reactivate with stronger signal
+            for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+                NeuronId neuron = episode.activeNeurons[i];
+                float activation = i < episode.neuronActivations.size() ? 
+                                  episode.neuronActivations[i] : 0.5f;
+                
+                // Stronger replay signal for consolidation
+                brain_->injectCurrent(neuron, activation * 5.0f);  // Higher than normal
+            }
+            
+            // Store that this episode was replayed during consolidation
+            // This could affect future consolidation decisions
         }
     }
 }

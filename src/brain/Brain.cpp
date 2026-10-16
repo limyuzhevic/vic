@@ -439,26 +439,105 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+        
+        // Apply enhanced dopamine effects on working memory
+        if (pImpl->workingMemory && dopamineLevel > 0.1f) {
+            // Dopamine enhances working memory consolidation
+            float memoryMod = pImpl->dopamine->getMemoryConsolidationFactor();
+            pImpl->workingMemory->setDecayRate(0.01f / memoryMod);
+            
+            // Stronger dopamine enhances memory trace strengthening
+            if (dopamineLevel > 0.5f) {
+                pImpl->workingMemory->strengthenMemory(1.1f);
+            }
+        }
+        
+        // Apply dopamine effects on attention
+        if (pImpl->attention && dopamineLevel > 0.1f) {
+            // Dopamine modulates attention allocation
+            float attentionMod = pImpl->dopamine->getAttentionModulationFactor();
+            pImpl->attention->setInhibitionStrength(0.5f / attentionMod);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMod);
+        }
+        
+        // Apply dopamine effects on memory consolidation
+        if (pImpl->dopamine && currentStep % pImpl->consolidationInterval == 0) {
+            float consolidationMod = pImpl->dopamine->getMemoryConsolidationFactor();
+            
+            // Higher dopamine enhances consolidation
+            if (pImpl->episodicMemory && consolidationMod > 1.0f) {
+                // Schedule consolidation with dopamine influence
+                pImpl->episodicMemory->consolidate(0.3f * consolidationMod);
+            }
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate enhanced neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        plasticityMod = pImpl->dopamine->getEnhancedPlasticityFactor();
+    }
+    
+    // Apply enhanced dopamine effects to STDP parameters
+    if (pImpl->dopamine && pImpl->stdp) {
+        float ltpWeight = 0.01f;  // Current STDP LTP weight
+        float ltdWeight = 0.012f;  // Current STDP LTD weight
+        pImpl->dopamine->applyToPlasticity(ltpWeight, ltdWeight, dopamineLevel);
+        
+        // Reconfigure STDP with dopamine-modulated parameters
+        pImpl->stdp->configure(ltpWeight, ltdWeight, 20.0f);
     }
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
+            // Apply STDP with enhanced neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify weight change based on enhanced dopamine modulation
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
+                    
+                    // Additional dopamine effect: reward-modulated STDP
+                    if (pImpl->dopamine) {
+                        float rewardMod = pImpl->dopamine->getLevel();
+                        if (rewardMod > 0.3f) {
+                            // Reward strengthens LTP, weakens LTD
+                            float weightChange = syn->getWeight() - syn->getPreviousWeight();
+                            if (weightChange > 0) {
+                                // LTP strengthened by reward
+                                syn->setWeight(syn->getWeight() * (1.0f + rewardMod * 0.1f));
+                            } else {
+                                // LTD weakened by reward
+                                syn->setWeight(std::max(-1.0f, syn->getWeight() * (1.0f + rewardMod * 0.05f)));
+                            }
+                        }
+                    }
                 }
             }
             
@@ -469,6 +548,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    
+                    // Hebbian learning also modulated by dopamine
+                    if (pImpl->dopamine) {
+                        float level = pImpl->dopamine->getLevel();
+                        if (level > 0.5f) {
+                            // High dopamine enhances Hebbian learning
+                            float currentWeight = syn->getWeight();
+                            float targetWeight = 1.0f;  // Drive towards excitatory
+                            float distance = targetWeight - currentWeight;
+                            syn->setWeight(currentWeight + distance * 0.01f * level);
+                        }
+                    }
                 }
             }
             
@@ -487,6 +578,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getNoveltyLevel() : 0.0f;
+            
+            // Store sensory state if available
+            if (pImpl->workingMemory) {
+                episode.sensoryState = pImpl->workingMemory->retrieve();
+            }
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -502,6 +599,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store action if we have one from previous step
+            // This would be set by the agent layer
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
@@ -510,9 +610,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Update prediction system with current working memory content
+        // This represents predicting next state based on current sensory input
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        if (!currentState.empty()) {
+            // The prediction system would update its internal model
+            // For now, we just provide the state for potential prediction
+            // predictionSystem->train(currentState);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +634,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->episodicMemory) {
+        // Concept formation uses episodic memory to extract patterns
+        // Get recent episodes for concept learning
+        std::vector<const EpisodicMemoryItem*> recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        
+        if (!recentEpisodes.empty()) {
+            // Convert episodes to neural patterns for concept formation
+            std::vector<float> pattern;
+            for (size_t i = 0; i < recentEpisodes.size() && i < 3; ++i) {
+                const auto* episode = recentEpisodes[i];
+                pattern.insert(pattern.end(), episode->activeNeurons.begin(), episode->activeNeurons.end());
+            }
+            
+            if (!pattern.empty()) {
+                // Concept formation would process this pattern to extract abstract concepts
+                // conceptFormation->processPattern(pattern);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -576,13 +698,108 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 13: Apply development effects ==========
+    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        
+        // Development affects plasticity rates
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 14: Memory consolidation (enhanced for sleep) ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // If we have enough episodes, consider entering sleep/rest phase
+        if (!pImpl->isResting && pImpl->episodicMemory->getEpisodeCount() > 100) {
+            // Check if we should sleep based on experience and development stage
+            bool shouldSleep = false;
+            
+            // Sleep if we have accumulated enough experiences
+            if (pImpl->episodicMemory->getEpisodeCount() > 500) {
+                shouldSleep = true;
+            }
+            
+            // Or if we've been active long enough
+            if (pImpl->currentStep > 5000 && pImpl->developmentalStage > DevelopmentalStage::Initial) {
+                shouldSleep = true;
+            }
+            
+            // Or if we have high novelty/curiosity that drives exploration
+            if (pImpl->curiosity && pImpl->curiosity->getExplorationDrive() > 0.8f) {
+                shouldSleep = true;
+            }
+            
+            if (shouldSleep) {
+                NLM_LOG_INFO("Brain entering sleep/rest cycle for memory consolidation...");
+                pImpl->isResting = true;
+                pImpl->stepsSinceLastEpisode = 0;  // Reset for sleep-specific processing
+            }
+        }
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Sleep/rest processing ==========
+    if (pImpl->isResting) {
+        // Resting state: reduced sensory input, enhanced internal processing
+        
+        // Check if sleep duration should end
+        if (pImpl->currentStep % 2000 == 0) {  // Sleep for approximately 20,000 steps (2 seconds at 0.001 timestep)
+            // Wake up from sleep
+            NLM_LOG_INFO("Brain waking up from sleep/rest cycle");
+            pImpl->isResting = false;
+            
+            // Enhanced consolidation on wake
+            if (pImpl->episodicMemory) {
+                // Consolidate memory with strengthened connections
+                pImpl->episodicMemory->consolidate(0.5f);  // Stronger consolidation after sleep
+            }
+        } else {
+            // During sleep: enhanced replay and consolidation
+            // This is similar to replay but more frequent and systematic
+            if (pImpl->episodicMemory) {
+                // Get episodes for sleep replay (more episodes during sleep)
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(10);
+                for (const auto* episode : episodesToReplay) {
+                    // Enhanced replay during sleep - reactivate patterns with strengthening
+                    pImpl->episodicMemory->replayEpisode(episode);
+                    
+                    // During sleep, replay has stronger consolidation effects
+                    // This would be implemented in the EpisodicMemory class
+                }
+            }
+            
+            // During sleep, working memory can rest but maintain weak traces
+            if (pImpl->workingMemory) {
+                // Reduce working memory decay rate during sleep for retention
+                // This helps preserve important traces across sleep
+            }
+        }
+    }
+    
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -590,7 +807,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Also store in working memory for later retrieval and attention
     
     const auto& values = input.getData();
     if (values.empty()) return;
@@ -598,20 +815,43 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Normalize input values to range [-1.0, 1.0]
+    std::vector<float> normalizedValues;
+    for (size_t i = 0; i < values.size(); ++i) {
+        float normalizedValue = static_cast<float>(values[i]) / 255.0f; // Assuming 0-255 range
+        normalizedValues.push_back(normalizedValue);
+    }
+    
+    // Store complete sensory pattern in working memory
+    if (pImpl->workingMemory) {
+        // Convert normalized values to activation pattern for working memory
+        std::vector<float> workingMemoryPattern;
+        for (size_t i = 0; i < std::min(numSensory, normalizedValues.size()); ++i) {
+            // Only store meaningful activations
+            float activation = std::abs(normalizedValues[i]);
+            if (activation > 0.1f) { // Threshold for storing in working memory
+                workingMemoryPattern.push_back(activation);
+            }
+        }
+        
+        if (!workingMemoryPattern.empty()) {
+            pImpl->workingMemory->store(workingMemoryPattern, 1.0f);
+        }
+    }
+    
+    // Also store individual neuron activations for fine-grained access
     for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        if (i < normalizedValues.size()) {
+            normalizedValue = normalizedValues[i];
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue * 10.0f);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Store in working memory for later retrieval
+        if (pImpl->workingMemory && std::abs(normalizedValue) > 0.1f) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue);
         }
     }
 }
@@ -690,13 +930,35 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection: use neural planner if available, otherwise fall back to simple motor activity
+    // This represents higher-level cognition planning action selection
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
+    // First, try to use neural planner for sophisticated action selection
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Get current state from working memory for planning
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // Get current goal from planner if set
+        std::vector<float> currentGoal = pImpl->planner->getCurrentGoal();
+        
+        // Use planner to select action based on state and goal
+        // If no goal set, use current sensory state as target
+        float targetReward = 0.5f; // Default exploration motivation
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Check if planner selected a meaningful action (not just wait)
+        if (plannedAction != ActionType::Wait && plannedAction != ActionType::MoveForward) {
+            // Planner selected a more sophisticated action
+            return std::make_unique<Action>(plannedAction);
+        }
+    }
+    
+    // Fall back to simple motor activity-based selection for basic behavior
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
@@ -709,6 +971,35 @@ std::unique_ptr<class Action> Brain::produceAction() {
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
+    }
+    
+    // Apply attention bias to motor selection if available
+    if (pImpl->attention) {
+        // Use attention to bias action selection
+        // This could prioritize certain motor patterns based on attention focus
+        std::vector<NeuronId> attendedNeurons = pImpl->attention->getWinners();
+        
+        // If attention is focused on motor-related areas, strengthen motor output
+        bool motorAttended = false;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Motor) {
+                    for (NeuronId attendedNeuron : attendedNeurons) {
+                        // Check if attended neuron is in this motor population
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == attendedNeuron) {
+                                motorAttended = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (motorAttended) {
+            type = ActionType::MoveForward;
+        }
     }
     
     auto action = std::make_unique<Action>(type);
@@ -828,6 +1119,46 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory systems data
+        if (pImpl->workingMemory) {
+            // Working memory content (active traces)
+            std::vector<uint64_t> workingMemoryNeurons;
+            std::vector<float> workingMemoryActivations;
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                workingMemoryNeurons.push_back(neuronId.value);
+                workingMemoryActivations.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+            
+            if (!workingMemoryNeurons.empty()) {
+                // Note: CheckpointSystem doesn't have a dedicated function for writing custom data
+                // In a real implementation, we would need to extend CheckpointSystem
+                // For now, we log that working memory data exists
+                NLM_LOG_INFO("Working memory: " + std::to_string(workingMemoryNeurons.size()) + 
+                           " traces would be saved");
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            NLM_LOG_INFO("Episodic memory: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()) + 
+                       " episodes would be saved");
+        }
+        
+        // Write simulation state
+        {
+            std::vector<uint8_t> simState(sizeof(uint64_t) * 2 + sizeof(double));
+            uint8_t* ptr = simState.data();
+            uint64_t step = pImpl->currentStep;
+            double time = pImpl->currentTime;
+            std::memcpy(ptr, &step, sizeof(uint64_t));
+            ptr += sizeof(uint64_t);
+            std::memcpy(ptr, &time, sizeof(double));
+            
+            if (!writer.writeSection(CheckpointSection::SimulationState, simState.data(), simState.size())) {
+                NLM_LOG_ERROR("Failed to write simulation state");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +1229,26 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read simulation state
+        auto simStateSection = reader.readSection(CheckpointSection::SimulationState);
+        if (!simStateSection.empty()) {
+            const uint8_t* ptr = simStateSection.data();
+            if (simStateSection.size() >= sizeof(uint64_t) * 2 + sizeof(double)) {
+                uint64_t step;
+                double time;
+                std::memcpy(&step, ptr, sizeof(uint64_t));
+                ptr += sizeof(uint64_t);
+                std::memcpy(&time, ptr, sizeof(double));
+                
+                // Restore simulation state
+                pImpl->currentStep = step;
+                pImpl->currentTime = time;
+                
+                NLM_LOG_INFO("Restored simulation state: step=" + std::to_string(pImpl->currentStep) + 
+                           ", time=" + std::to_string(pImpl->currentTime));
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

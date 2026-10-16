@@ -120,9 +120,15 @@ public:
 
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    
+    // Enhanced version for sleep/rest cycle (more episodes, stronger replay)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForSleepReplay(size_t count) const;
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+    
+    // Enhanced replay for sleep (strengthens memories)
+    void replaySequenceWithConsolidation(const std::vector<size_t>& episodeIds);
 
 private:
     // Compute similarity between query and stored episode
