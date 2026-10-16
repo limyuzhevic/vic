@@ -1,13 +1,15 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
 #include <unordered_map>
 
 namespace nlm {
+
+// Forward declaration to break circular dependency
+class Brain;
 
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
@@ -23,8 +25,11 @@ public:
     NeuralWorkingMemory();
     ~NeuralWorkingMemory();
 
-    // Initialize with brain reference
+    // Initialize with brain reference (will be deprecated)
     void initialize(Brain* brain);
+    
+    // New initialization without Brain dependency
+    void initializeWithoutBrain();
 
     // Store information in working memory
     // The information is encoded as neural activity pattern
@@ -87,6 +92,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+    // Optional: Weak reference to brain for backward compatibility
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
@@ -109,7 +115,7 @@ private:
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation
 //
-// Mechanisms:
+// Key mechanisms:
 // - Competition between neural populations
 // - Salience-based selection
 // - Recurrent amplification of winners
@@ -120,8 +126,11 @@ public:
     AttentionalSelection();
     ~AttentionalSelection();
 
-    // Initialize with brain reference
+    // Initialize with brain reference (will be deprecated)
     void initialize(Brain* brain);
+    
+    // New initialization without Brain dependency
+    void initializeWithoutBrain();
 
     // Process competing sensory inputs and select winners
     // Returns IDs of winning neural populations
@@ -170,6 +179,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+    // Optional: Weak reference to brain for backward compatibility
     Brain* brain_;
     float inhibitionStrength_;
     float excitationStrength_;

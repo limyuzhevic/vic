@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declaration to break circular dependency
+class Brain;
+
 // EpisodicMemoryItem: Represents a stored experience
 // NOT a textual record - stores neural activity patterns and associations
 struct EpisodicMemoryItem {
@@ -63,8 +66,11 @@ public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
 
-    // Initialize with brain reference
+    // Initialize with brain reference (will be deprecated)
     void initialize(Brain* brain);
+    
+    // New initialization without Brain dependency
+    void initializeWithoutBrain();
 
     // Store a new experience
     // The experience is encoded as neural activity and can influence future processing
@@ -77,17 +83,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -139,6 +145,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+    // Optional: Weak reference to brain for backward compatibility
     Brain* brain_;
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
@@ -159,8 +166,11 @@ public:
     NeuralAssociativeMemory();
     ~NeuralAssociativeMemory();
 
-    // Initialize with brain reference
+    // Initialize with brain reference (will be deprecated)
     void initialize(Brain* brain);
+    
+    // New initialization without Brain dependency
+    void initializeWithoutBrain();
 
     // Create association between two neural patterns
     // Both patterns should be from actual neural activity
@@ -173,7 +183,7 @@ public:
 
     // Retrieve patterns associated with a query pattern
     std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
+                                             size_t maxResults = 5) const;
 
     // Get association strength between two patterns
     float getAssociationStrength(const std::vector<float>& patternA,
@@ -201,11 +211,12 @@ private:
 
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
+                          const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+    // Optional: Weak reference to brain for backward compatibility
     Brain* brain_;
     std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons_;
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;

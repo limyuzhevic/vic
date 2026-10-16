@@ -100,6 +100,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation methods
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    bool validateBrainConfig(const std::string& key, const ConfigValue& value) const;
+    bool validatePlasticityConfig(const std::string& key, const ConfigValue& value) const;
+    bool validateNeuromodulationConfig(const std::string& key, const ConfigValue& value) const;
+    bool validateGeneralConfig(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm

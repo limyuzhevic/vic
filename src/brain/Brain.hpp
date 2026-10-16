@@ -1,13 +1,9 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../performance/PerformanceProfiler.hpp"
+
+// Forward declarations for performance profiling
+class PerformanceProfiler;
 
 namespace nlm {
 
@@ -28,6 +24,12 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Forward declarations for performance profiling
+class PerformanceProfiler;
+
+// Forward declarations for registry
+class SystemRegistry;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -80,93 +82,83 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    // ========= SYSTEM REGISTRY ACCESS =========
     
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    // Get a system by name (type-safe access)
+    BrainSystem* getSystem(const std::string& name);
+    const BrainSystem* getSystem(const std::string& name) const;
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    // Get specific system type (type-safe, throws if type mismatch)
+    template<typename T>
+    T* getSystemAs() {
+        static_assert(std::is_base_of<BrainSystem, T>::value, 
+                     "T must derive from BrainSystem");
+        // Registry access - can be overridden by implementations
+        return nullptr;
+    }
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    template<typename T>
+    const T* getSystemAs() const {
+        static_assert(std::is_base_of<BrainSystem, T>::value, 
+                     "T must derive from BrainSystem");
+        // Registry access - can be overridden by implementations
+        return nullptr;
+    }
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Check if system is available
+    bool hasSystem(const std::string& name) const;
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Get all registered system names
+    std::vector<std::string> getRegisteredSystemNames() const;
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Get underlying concrete systems (for backward compatibility)
+    NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
-    // Reset brain state
-    void reset();
+    NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    DevelopmentSystem* getDevelopmentSystem();
+    const DevelopmentSystem* getDevelopmentSystem() const;
     
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // (delegated to registry)
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // (delegated to registry)
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // (delegated to registry)
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // (delegated to registry)
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
@@ -174,24 +166,51 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    const Novelty* getNovelty() const;
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    const PredictionError* getPredictionErrorSignal() const;
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+        // Get performance profiler
+    PerformanceProfiler& getPerformanceProfiler() { return *pImpl->performanceProfiler; }
+    const PerformanceProfiler& getPerformanceProfiler() const { return *pImpl->performanceProfiler; }
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Performance monitoring
+    void startPerformanceMonitoring();
+    void stopPerformanceMonitoring();
+    bool isPerformanceMonitoring() const;
+    void recordPerformanceSnapshot();
     
-    // Logging
-    void logStatus() const;
+    // Memory tracking
+    void enableMemoryTracking(bool enable) { pImpl->performanceProfiler->setMemoryTrackingEnabled(enable); }
+    void enableOperationProfiling(bool enable) { pImpl->performanceProfiler->setOperationProfilingEnabled(enable); }
+    void enableMetricsCollection(bool enable) { pImpl->performanceProfiler->setMetricsCollectionEnabled(enable); }
+    
+    // Get performance statistics
+    std::string generatePerformanceReport() const;
+    std::string generateOptimizationReport() const;
+    
+    // Get current simulation metrics
+    size_t getCurrentStep() const { return pImpl->currentStep; }
+    double getCurrentSimulationTime() const { return pImpl->currentTime; }
+    size_t getTotalNeuronCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    size_t getPendingSpikeCount() const;
+    size_t getTotalSpikeCount() const;
+    
+    // Performance helper functions
+    static std::string getOperationTypeName(OperationProfiler::OperationType type);
+    static std::string getAllocationTypeName(MemoryTracker::AllocationType type);
     
 private:
     struct Impl;

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -86,7 +87,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save actual value
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -115,10 +127,15 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate configuration key
+    validateKey(key);
+    validateValue(key, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); });
     
     if (it != pImpl->entries.end()) {
+        // Allow re-setting same key (e.g., from file to command line)
         it->value = value;
         it->source = source;
     } else {
@@ -199,6 +216,240 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+void Config::remove(const std::string& key) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); }),
+        pImpl->entries.end()
+    );
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+void Config::clear() {
+    pImpl->entries.clear();
+}
+
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
+
+// Validation methods
+bool Config::validateKey(const std::string& key) const {
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
+    
+    if (key.find(' ') != std::string::npos) {
+        throw std::invalid_argument("Configuration key cannot contain spaces: " + key);
+    }
+    
+    // Check for duplicate keys (case-insensitive)
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); });
+    
+    if (it != pImpl->entries.end() && it->key != key) {
+        throw std::invalid_argument("Duplicate configuration key: " + key);
+    }
+    
+    return true;
+}
+
+bool Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    // Validate based on key pattern
+    if (key.find("brain.") == 0) {
+        validateBrainConfig(key, value);
+    } else if (key.find("plasticity.") == 0) {
+        validatePlasticityConfig(key, value);
+    } else if (key.find("neuromod.") == 0) {
+        validateNeuromodulationConfig(key, value);
+    } else {
+        // General validation for other keys
+        validateGeneralConfig(key, value);
+    }
+    
+    return true;
+}
+
+bool Config::validateBrainConfig(const std::string& key, const ConfigValue& value) const {
+    // Validate brain configuration parameters
+    if (key == "brain.neuron_count") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val <= 0) {
+            throw std::invalid_argument("brain.neuron_count must be positive");
+        }
+        if (val > 100000) {
+            throw std::invalid_argument("brain.neuron_count cannot exceed 100000");
+        }
+    } else if (key == "brain.synapse_density") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("brain.synapse_density must be between 0.0 and 1.0");
+        }
+    } else if (key == "brain.connection_probability") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("brain.connection_probability must be between 0.0 and 1.0");
+        }
+    } else if (key == "brain.v_thresh") {
+        const double val = std::get<double>(value);
+        if (val < -100.0 || val > -20.0) {
+            throw std::invalid_argument("brain.v_thresh should be between -100.0 and -20.0");
+        }
+    } else if (key == "brain.v_rest") {
+        const double val = std::get<double>(value);
+        if (val < -80.0 || val > -60.0) {
+            throw std::invalid_argument("brain.v_rest should be between -80.0 and -60.0");
+        }
+    } else if (key == "brain.v_reset") {
+        const double val = std::get<double>(value);
+        if (val < -90.0 || val > -70.0) {
+            throw std::invalid_argument("brain.v_reset should be between -90.0 and -70.0");
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validatePlasticityConfig(const std::string& key, const ConfigValue& value) const {
+    // Validate plasticity configuration parameters
+    if (key == "plasticity.stdp.learning_rate") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("plasticity.stdp.learning_rate must be between 0.0 and 1.0");
+        }
+    } else if (key == "plasticity.stdp.tau_plus") {
+        const double val = std::get<double>(value);
+        if (val <= 0.0) {
+            throw std::invalid_argument("plasticity.stdp.tau_plus must be positive");
+        }
+    } else if (key == "plasticity.stdp.tau_minus") {
+        const double val = std::get<double>(value);
+        if (val <= 0.0) {
+            throw std::invalid_argument("plasticity.stdp.tau_minus must be positive");
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validateNeuromodulationConfig(const std::string& key, const ConfigValue& value) const {
+    // Validate neuromodulation configuration parameters
+    if (key == "neuromod.dopamine.scale") {
+        const double val = std::get<double>(value);
+        if (val < 0.0) {
+            throw std::invalid_argument("neuromod.dopamine.scale must be non-negative");
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validateGeneralConfig(const std::string& key, const ConfigValue& value) const {
+    // Validate general configuration parameters
+    if (key == "random_seed") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val < 0) {
+            throw std::invalid_argument("random_seed must be non-negative");
+        }
+    } else if (key == "simulation_timestep") {
+        const double val = std::get<double>(value);
+        if (val <= 0.0) {
+            throw std::invalid_argument("simulation_timestep must be positive");
+        } else if (val > 0.1) {
+            throw std::invalid_argument("simulation_timestep should not exceed 0.1 seconds");
+        }
+    } else if (key == "neuron_count") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val <= 0) {
+            throw std::invalid_argument("neuron_count must be positive");
+        }
+    } else if (key == "region_count") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val <= 0) {
+            throw std::invalid_argument("region_count must be positive");
+        }
+    } else if (key == "connection_probability") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("connection_probability must be between 0.0 and 1.0");
+        }
+    } else if (key == "development_synaptogenesis_rate") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("development_synaptogenesis_rate must be between 0.0 and 1.0");
+        }
+    } else if (key == "development_pruning_rate") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("development_pruning_rate must be between 0.0 and 1.0");
+        }
+    } else if (key == "plasticity_learning_rate") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("plasticity_learning_rate must be between 0.0 and 1.0");
+        }
+    } else if (key == "stdp_ltp_weight") {
+        const double val = std::get<double>(value);
+        if (val < 0.0) {
+            throw std::invalid_argument("stdp_ltp_weight must be non-negative");
+        }
+    } else if (key == "stdp_ltd_weight") {
+        const double val = std::get<double>(value);
+        if (val < 0.0) {
+            throw std::invalid_argument("stdp_ltd_weight must be non-negative");
+        }
+    } else if (key == "stdp_time_constant") {
+        const double val = std::get<double>(value);
+        if (val <= 0.0) {
+            throw std::invalid_argument("stdp_time_constant must be positive");
+        }
+    } else if (key == "reward_discount_factor") {
+        const double val = std::get<double>(value);
+        if (val < 0.0 || val > 1.0) {
+            throw std::invalid_argument("reward_discount_factor must be between 0.0 and 1.0");
+        }
+    } else if (key == "environment_width" || key == "environment_height") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val <= 0) {
+            throw std::invalid_argument("(key) must be positive");
+        }
+    } else if (key == "max_simulation_steps") {
+        const int64_t val = std::get<int64_t>(value);
+        if (val <= 0) {
+            throw std::invalid_argument("max_simulation_steps must be positive");
+        }
+    } else if (key == "visualization_update_rate") {
+        const double val = std::get<double>(value);
+        if (val <= 0.0) {
+            throw std::invalid_argument("visualization_update_rate must be positive");
+        }
+    }
+    
+    return true;
+}
+
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
@@ -211,5 +462,3 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
