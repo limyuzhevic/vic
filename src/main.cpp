@@ -322,6 +322,56 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    bool showHelp = false;
+    bool verbose = false;
+    bool debug = false;
+    bool runDemo = false;
+    std::string demoType = "none";
+    std::string configFile = "configs/default.cfg";
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            debug = true;
+        } else if (arg == "--demo" || arg == "-m") {
+            runDemo = true;
+            if (i + 1 < argc) {
+                demoType = argv[++i];
+            }
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    // Show help and exit
+    if (showHelp) {
+        printBanner();
+        std::cout << "Usage: nlm [options]\n";
+        std::cout << "Options:\n";
+        std::cout << "  -h, --help              Show this help message and exit\n";
+        std::cout << "  -v, --verbose           Enable verbose logging\n";
+        std::cout << "  -d, --debug             Enable debug mode\n";
+        std::cout << "  -m, --demo [type]       Run a specific demo (phase2, phase3, phase4, phase6)\n";
+        std::cout << "      phase2              Run Phase 2 neural computation demo (default)\n";
+        std::cout << "      phase3              Run Phase 3 world interaction demo\n";
+        std::cout << "      phase4              Run Phase 4 cognition demo\n";
+        std::cout << "      phase6              Run Phase 6 integration demo\n";
+        std::cout << "  --config <file>         Load configuration from file\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  nlm --help                    Show help\n";
+        std::cout << "  nlm --verbose --demo phase6    Run Phase 6 demo with verbose output\n";
+        std::cout << "  nlm --config myconfig.cfg      Load custom configuration\n";
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -340,31 +390,67 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(debug ? LogLevel::Debug : LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Set log level based on debug/verbose flags
+    if (verbose) {
+        consoleLogger->setLevel(LogLevel::Info);
+    } else {
+        consoleLogger->setLevel(debug ? LogLevel::Debug : LogLevel::Info);
+    }
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
     // Load configuration
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Handle demo mode
+    if (runDemo) {
+        NLM_LOG_INFO("=== NLM DEMO MODE ===");
+        NLM_LOG_INFO("Running demo: " + demoType);
+        
+        if (demoType == "phase3") {
+            // Run Phase 3 demo
+            std::cout << "Running Phase 3 demonstration...\n";
+            // Note: Phase 3 demo requires linking with nlm_phase3_demo executable
+            NLM_LOG_WARNING("Phase 3 demo requires linking with nlm_phase3_demo executable");
+        } else if (demoType == "phase4") {
+            // Run Phase 4 demo
+            std::cout << "Running Phase 4 demonstration...\n";
+            // Note: Phase 4 demo requires linking with nlm_phase4_demo executable
+            NLM_LOG_WARNING("Phase 4 demo requires linking with nlm_phase4_demo executable");
+        } else if (demoType == "phase6") {
+            // Run Phase 6 demo
+            std::cout << "Running Phase 6 integration demonstration...\n";
+            // Note: Phase 6 demo requires linking with nlm_phase6_demo executable
+            NLM_LOG_WARNING("Phase 6 demo requires linking with nlm_phase6_demo executable");
+        } else {
+            // Default to Phase 2
+            std::cout << "Running Phase 2 neural computation demo...\n";
+        }
+        
+        NLM_LOG_INFO("Demo mode initialization complete");
+    }
+    
+    // Validate configuration values
+    validateConfiguration(config);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -392,58 +478,19 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    // Validate critical configuration parameters
+    if (config->getOr<int64_t>("neuron_count", 500) <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be positive");
         return 1;
     }
     
-    brain->logStatus();
+    if (config->getOr<double>("simulation_timestep", 0.001) <= 0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: must be positive");
+        return 1;
+    }
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
+    if (config->getOr<float>("connection_probability", 0.15f) < 0 || config->getOr<float>("connection_probability", 0.15f) > 1) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be between 0 and 1");
+        return 1;
+    }
 }

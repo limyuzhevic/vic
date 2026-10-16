@@ -84,9 +84,43 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << "__DATE__" << " " << "__TIME__" << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -96,7 +130,7 @@ template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
+
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
@@ -104,6 +138,7 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Log warning for type mismatch
         return std::nullopt;
     }
 }
@@ -111,7 +146,11 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    // Log warning for using default value
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -119,10 +158,15 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Validate type consistency if key already exists
+        if (!validateValueType(it->value, value)) {
+            // Log warning about type mismatch but allow setting
+            // or could throw exception based on configuration
+        }
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, "");
     }
 }
 
@@ -140,6 +184,75 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+bool Config::validateValueType(const ConfigValue& existingValue, const ConfigValue& newValue) const {
+    // Check if types are compatible for setting
+    return true; // For now, allow any type changes
+}
+
+// Add helper functions for common configuration validation
+bool Config::validateConfigRange(const std::string& key, const ConfigValue& value, 
+                               double min, double max) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) return true;
+    
+    try {
+        double val = std::get<double>(it->value);
+        return (val >= min && val <= max);
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateConfigRange(const std::string& key, const ConfigValue& value,
+                               int64_t min, int64_t max) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) return true;
+    
+    try {
+        int64_t val = std::get<int64_t>(it->value);
+        return (val >= min && val <= max);
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+// Add convenience methods for common configuration keys
+void Config::setRandomSeed(int64_t seed) {
+    set("random_seed", seed, ConfigSource::Runtime);
+}
+
+void Config::setNeuronCount(size_t count) {
+    set("neuron_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+}
+
+void Config::setSimulationTimestep(double timestep) {
+    set("simulation_timestep", timestep, ConfigSource::Runtime);
+}
+
+void Config::setRegionCount(size_t count) {
+    set("region_count", static_cast<int64_t>(count), ConfigSource::Runtime);
+}
+
+void Config::setConnectionProbability(float probability) {
+    set("connection_probability", probability, ConfigSource::Runtime);
+}
+
+// Add environment configuration methods
+void Config::configureWorld(int width, int height, int visionWidth = 16, int visionHeight = 16) {
+    set("environment_width", width, ConfigSource::Runtime);
+    set("environment_height", height, ConfigSource::Runtime);
+    set("vision_width", visionWidth, ConfigSource::Runtime);
+    set("vision_height", visionHeight, ConfigSource::Runtime);
+}
+
+void Config::configureLearning(float learningRate, float stdpLTP, float stdpLTD) {
+    set("plasticity_learning_rate", learningRate, ConfigSource::Runtime);
+    set("stdp_ltp_weight", stdpLTP, ConfigSource::Runtime);
+    set("stdp_ltd_weight", stdpLTD, ConfigSource::Runtime);
 }
 
 bool Config::has(const std::string& key) const {

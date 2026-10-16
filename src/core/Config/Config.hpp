@@ -78,20 +78,20 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Convenience methods for common configuration keys
+    void setRandomSeed(int64_t seed);
+    void setNeuronCount(size_t count);
+    void setSimulationTimestep(double timestep);
+    void setRegionCount(size_t count);
+    void setConnectionProbability(float probability);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Environment configuration methods
+    void configureWorld(int width, int height, int visionWidth = 16, int visionHeight = 16);
+    void configureLearning(float learningRate, float stdpLTP, float stdpLTD);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation
+    bool validateConfigRange(const std::string& key, const ConfigValue& value, double min, double max) const;
+    bool validateConfigRange(const std::string& key, const ConfigValue& value, int64_t min, int64_t max) const;
     
 private:
     struct Impl;
@@ -100,6 +100,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // Validation helpers
+    bool validateValueType(const ConfigValue& existingValue, const ConfigValue& newValue) const;;
 
 } // namespace nlm
