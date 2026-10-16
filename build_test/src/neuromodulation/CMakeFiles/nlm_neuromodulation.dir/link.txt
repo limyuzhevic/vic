@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_neuromodulation.a CMakeFiles/nlm_neuromodulation.dir/Reward.cpp.o CMakeFiles/nlm_neuromodulation.dir/PredictionError.cpp.o CMakeFiles/nlm_neuromodulation.dir/Novelty.cpp.o CMakeFiles/nlm_neuromodulation.dir/Neuromodulator.cpp.o CMakeFiles/nlm_neuromodulation.dir/Curiosity.cpp.o
+/usr/bin/ranlib libnlm_neuromodulation.a

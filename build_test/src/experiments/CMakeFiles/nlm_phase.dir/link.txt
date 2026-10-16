@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_phase.a CMakeFiles/nlm_phase.dir/Experiment.cpp.o CMakeFiles/nlm_phase.dir/ExperimentRunner.cpp.o CMakeFiles/nlm_phase.dir/Metrics.cpp.o CMakeFiles/nlm_phase.dir/Phase3Demo.cpp.o CMakeFiles/nlm_phase.dir/Phase3Experiment.cpp.o CMakeFiles/nlm_phase.dir/Phase4Demo.cpp.o CMakeFiles/nlm_phase.dir/Phase4Experiment.cpp.o CMakeFiles/nlm_phase.dir/Phase5Experiment.cpp.o CMakeFiles/nlm_phase.dir/Phase6Demo.cpp.o CMakeFiles/nlm_phase.dir/Phase6IntegratedExperiment.cpp.o
+/usr/bin/ranlib libnlm_phase.a

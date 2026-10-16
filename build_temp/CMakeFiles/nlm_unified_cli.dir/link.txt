@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/nlm_unified_cli.dir/link.d CMakeFiles/nlm_unified_cli.dir/src/main.cpp.o -o nlm_unified_cli  libnlm_core.a -lyaml-cpp

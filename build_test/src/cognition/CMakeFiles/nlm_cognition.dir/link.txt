@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_cognition.a CMakeFiles/nlm_cognition.dir/NeuralPlanner.cpp.o CMakeFiles/nlm_cognition.dir/ConceptFormation.cpp.o
+/usr/bin/ranlib libnlm_cognition.a

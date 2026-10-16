@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_world.a CMakeFiles/nlm_world.dir/__/environment/Environment.cpp.o CMakeFiles/nlm_world.dir/Observation.cpp.o
+/usr/bin/ranlib libnlm_world.a

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_core.a CMakeFiles/nlm_core.dir/Config/Config.cpp.o CMakeFiles/nlm_core.dir/Logger/Logger.cpp.o CMakeFiles/nlm_core.dir/Random/Random.cpp.o CMakeFiles/nlm_core.dir/SimulationClock/SimulationClock.cpp.o CMakeFiles/nlm_core.dir/Types/Types.cpp.o
+/usr/bin/ranlib libnlm_core.a
