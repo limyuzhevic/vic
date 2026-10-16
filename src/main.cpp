@@ -345,6 +345,9 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool verboseMode = false;
+    bool helpMode = false;
+
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,7 +356,47 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--help" || arg == "-h") {
+            helpMode = true;
+        } else if (arg.substr(0, 5) == "--log=") {
+            // Set log level based on command line
+            std::string levelStr = arg.substr(5);
+            LogLevel level;
+            if (levelStr == "debug" || levelStr == "DEBUG") level = LogLevel::Debug;
+            else if (levelStr == "info" || levelStr == "INFO") level = LogLevel::Info;
+            else if (levelStr == "warning" || levelStr == "WARNING") level = LogLevel::Warning;
+            else if (levelStr == "error" || levelStr == "ERROR") level = LogLevel::Error;
+            else if (levelStr == "critical" || levelStr == "CRITICAL") level = LogLevel::Critical;
+            else {
+                NLM_LOG_WARNING("Unknown log level: " + levelStr + ". Using INFO.");
+                level = LogLevel::Info;
+            }
+            consoleLogger->setLevel(level);
         }
+    }
+
+    if (helpMode) {
+        printBanner();
+        std::cout << "\nUsage: nlm [--config=<file>] [--verbose|-v] [--help|-h] [--log=<level>]" << std::endl;
+        std::cout << "\nOptions:" << std::endl;
+        std::cout << "  --config=<file>    Specify configuration file (default: configs/default.cfg)" << std::endl;
+        std::cout << "  --verbose, -v       Enable verbose logging output" << std::endl;
+        std::cout << "  --help, -h          Show this help message" << std::endl;
+        std::cout << "  --log=<level>       Set log level: debug, info, warning, error, critical" << std::endl;
+        std::cout << "\nConfiguration file format:" << std::endl;
+        std::cout << "  key = value          # Simple key=value pairs" << std::endl;
+        std::cout << "  # comment            # Comments start with # or /" << std::endl;
+        std::cout << "\nFor Phase 6 integration demo (recommended):" << std::endl;
+        std::cout << "  ./nlm_phase6_demo [--config=<file>] [--verbose] [--log=<level>]" << std::endl;
+        std::cout << "\nPhase 2 is available as the primary nlm executable with improved configuration handling." << std::endl;
+        return 0;
+    }
+
+    if (verboseMode) {
+        consoleLogger->setLevel(LogLevel::Debug);
+        NLM_LOG_DEBUG("Verbose mode enabled");
     }
     
     // Load config from file (ignore if not found)
@@ -365,22 +408,6 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
