@@ -52,7 +52,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    synapse->step(0.0, dt);  // Pass timestep parameter
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {

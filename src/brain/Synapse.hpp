@@ -73,6 +73,7 @@ public:
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
+    void step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset to initial state
     void reset();

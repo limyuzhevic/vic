@@ -64,23 +64,166 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Basic Usage
+
+The NLM project now supports multiple demonstration modes with a unified command-line interface:
+
 ```bash
-./nlm_phase6_demo
+# Run Phase 2 neural computation demo (default)
+nlm
+
+# Run Phase 3 world interaction demo
+nlm --phase3-demo
+
+# Run Phase 6 integration demo
+nlm --phase6-demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Command-Line Options
+
+```bash
+nlm [OPTIONS] [MODE]
+
+MODES:
+    --phase2-demo    Run Phase 2 neural computation demo (default)
+    --phase3-demo    Run Phase 3 world interaction demo
+    --phase6-demo    Run Phase 6 integration demo
+
+OPTIONS:
+    --help, -h       Show this help message
+    --config <file>  Load configuration from file (default: configs/default.cfg)
+    --episodes <n>   Number of episodes for demo modes (default: 5)
+    --steps <n>      Number of steps per episode (default: 200)
+
+EXAMPLES:
+    nlm                          # Run Phase 2 demo with default settings
+    nlm --phase3-demo --config custom.cfg
+    nlm --phase6-demo --episodes 3 --steps 500
+```
+
+### Configuration
+
+Configuration files use a simple key=value format:
+
+```ini
+# NLM Configuration File
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+synaptogenesis_rate = 0.001
+pruning_rate = 0.0001
+```
+
+You can override configuration values using command-line arguments:
+
+```bash
+nlm --random_seed=123 --neuron_count=2000 --stdp_ltp_weight=0.02
+```
+
+### Phase-Specific Features
+
+#### Phase 2: Real Neural Computation
+
+Phase 2 implements the core neural computation engine:
+
+- **Real LIF Neuron Dynamics**: Leaky Integrate-and-Fire neurons with realistic parameters
+- **Event-Driven Spike Propagation**: Spikes propagate through synapses with configurable delays
+- **STDP and Hebbian Plasticity**: Spike-Timing Dependent Plasticity and Hebbian learning rules
+- **Structural Plasticity**: Synaptogenesis (formation) and pruning (elimination) of connections
+
+The Phase 2 demo demonstrates:
+1. Basic neural connectivity and spike propagation
+2. Plasticity learning experiments showing measurable synaptic changes
+3. STDP verification showing pre-before-post spike timing effects
+
+#### Phase 3: World Interaction
+
+Phase 3 extends the neural core with world interaction capabilities:
+
+- **Sensory Processing**: Vision and audio input processing
+- **Motor Control**: Action selection and execution
+- **Reward Systems**: Dopamine-based reward prediction error
+- **Curiosity and Novelty**: Exploration and discovery behavior
+- **Agent-Brain Interface**: Integration between neural activity and behavior
+
+The Phase 3 demo shows:
+- An agent navigating a 2D grid world
+- Learning through trial-and-error
+- Developing sensory-motor coordination
+- Exhibiting goal-directed behavior
+
+#### Phase 6: Final Integration
+
+Phase 6 represents the final integration of all systems into a coherent artificial brain:
+
+- **Memory Systems**: Working memory, episodic memory, and associative memory integrated with neural processing
+- **Neuromodulation**: Dopamine, curiosity, novelty detection, and prediction error signals
+- **Prediction Systems**: Forward models and prediction error signals
+- **Cognition Systems**: Neural planning, concept formation, and attention
+- **Development**: Developmental stages affecting plasticity rates and neural maturation
+- **Persistence**: Checkpoint save/load and brain state serialization
+- **Replay and Consolidation**: Episodic memory replay during rest
+
+### Building and Running
+
+```bash
+# Create build directory
+mkdir build
+cd build
+
+# Configure with CMake
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build with parallel jobs
+make -j4
+
+# Run Phase 2 demo (default)
+./nlm
+
+# Run Phase 3 demo
+./nlm --phase3-demo
+
+# Run Phase 6 demo
+./nlm --phase6-demo
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **File not found errors**
+   - Ensure configuration files exist in the `configs/` directory
+   - Check file permissions
+
+2. **Memory issues**
+   - For large simulations, use a machine with sufficient RAM
+   - Reduce `neuron_count` in configuration
+
+3. **Compilation errors**
+   - Ensure you have a C++20 compatible compiler
+   - Install required dependencies: `build-essential`, `cmake`
+
+#### Getting Help
+
+For more detailed information about the scientific background and architecture, see the `docs/` directory:
+
+- `docs/ARCHITECTURE.md`: Technical architecture documentation
+- `docs/SCIENCE.md`: Scientific background and theory
+- `docs/ROADMAP.md`: Development roadmap and future plans
+- `docs/PHASE6_FINAL_AUDIT.md`: Phase 6 integration audit report
+
+For technical support, questions, or contributing, please refer to the project documentation.
+
+### License
+
+MIT License. See LICENSE file for details.
 
 ## Project Structure
 
@@ -113,79 +256,6 @@ NLM/
 ├── tests/
 └── configs/
 ```
-
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
 
 ## Architecture Philosophy
 
@@ -221,9 +291,30 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
-## License
+## Scientific Limitations
 
-MIT
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No detailed cortical architecture
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+Phase 6 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
 
 ## Authors
 

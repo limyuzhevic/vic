@@ -192,12 +192,14 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    step(currentTime, 0.001);  // Default timestep for backward compatibility
+}
+
+void Synapse::step(Timestamp currentTime, TimestepDuration dt) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
@@ -216,7 +218,7 @@ void Synapse::step(Timestamp currentTime) {
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    decayEligibilityTrace(dt * 0.001f);  // Scale dt to ms
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);

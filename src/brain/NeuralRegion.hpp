@@ -65,6 +65,7 @@ public:
     
     // Step all populations and synapses
     void step(Timestamp currentTime);
+    void step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset all neurons and synapses
     void reset();

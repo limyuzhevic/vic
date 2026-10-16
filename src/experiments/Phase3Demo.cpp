@@ -81,7 +81,7 @@ public:
                 
                 // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
+                    brain->step(neuralStep, neuralStep * 0.001);  // 1ms timestep
                 }
                 
                 // 4. Decode motor command from brain activity

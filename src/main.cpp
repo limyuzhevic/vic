@@ -28,25 +28,32 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+USAGE:
+    nlm [OPTIONS] [MODE]
+
+MODES:
+    --phase2-demo    Run Phase 2 neural computation demo (default)
+    --phase3-demo    Run Phase 3 world interaction demo
+    --phase6-demo    Run Phase 6 integration demo
+
+OPTIONS:
+    --help, -h       Show this help message
+    --config <file>  Load configuration from file (default: configs/default.cfg)
+    --episodes <n>   Number of episodes for demo modes (default: 5)
+    --steps <n>      Number of steps per episode (default: 200)
+
+EXAMPLES:
+    nlm                          # Run Phase 2 demo with default settings
+    nlm --phase3-demo --config custom.cfg
+    nlm --phase6-demo --episodes 3 --steps 500
+
+For more information about NLM, visit the documentation.
+)" << std::endl;
 }
+
+void runPhase2Demo();
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -322,9 +329,60 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Check for help argument
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    std::string mode = "--phase2-demo";  // Default mode
+    std::string configFile = "configs/default.cfg";
+    int numEpisodes = 5;
+    int stepsPerEpisode = 200;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--phase2-demo") {
+            mode = "--phase2-demo";
+        } else if (arg == "--phase3-demo") {
+            mode = "--phase3-demo";
+        } else if (arg == "--phase6-demo") {
+            mode = "--phase6-demo";
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 11) == "--episodes=") {
+            numEpisodes = std::atoi(arg.substr(11).c_str());
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            numEpisodes = std::atoi(argv[++i]);
+        } else if (arg.substr(0, 8) == "--steps=") {
+            stepsPerEpisode = std::atoi(arg.substr(8).c_str());
+        } else if (arg == "--steps" && i + 1 < argc) {
+            stepsPerEpisode = std::atoi(argv[++i]);
+        }
+    }
+    
+    // Run appropriate demo mode
+    if (mode == "--phase2-demo") {
+        return runPhase2Demo();
+    } else if (mode == "--phase3-demo") {
+        runPhase3Demo(numEpisodes, stepsPerEpisode);
+        return 0;
+    } else if (mode == "--phase6-demo") {
+        runPhase6Demo(numEpisodes, stepsPerEpisode);
+        return 0;
+    }
+    
+    // Fallback to Phase 2 demo for backward compatibility
+    return runPhase2Demo();
+}
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
