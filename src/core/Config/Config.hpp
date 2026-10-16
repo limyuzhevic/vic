@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 namespace nlm {
 
@@ -43,6 +47,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Helper for configuration parsing and serialization
+class ConfigParser {
+public:
+    static bool parseJSON(const std::string& content, std::vector<ConfigEntry>& entries);
+    static bool parseYAML(const std::string& content, std::vector<ConfigEntry>& entries);
+    static std::string serializeToJSON(const std::vector<ConfigEntry>& entries);
+    static std::string serializeToYAML(const std::vector<ConfigEntry>& entries);
+    
+    static ConfigValue parseValue(const std::string& str, bool& success);
+    static std::string valueToString(const ConfigValue& value);
+    
+private:
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
+    static std::string unescapeString(const std::string& str);
+    static bool isDigit(char c);
+    static bool isAlpha(char c);
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,13 +79,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
+    // Load from command line arguments (improved)
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,9 +117,71 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    
+    // Utility functions for advanced users
+    static std::vector<std::string> parseCommandLineArgs(int argc, char** argv);
+    static bool validateConfig(const std::vector<ConfigEntry>& entries);
+    
+    // Advanced utility functions
+    static Config createFromJSON(const std::string& jsonContent);
+    static Config createFromYAML(const std::string& yamlContent);
+    static Config createFromSimple(const std::vector<std::string>& lines);
+    
+    // Configuration merging and comparison
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    bool equals(const Config& other) const;
+    size_t hash() const;
+    
+    // Serialization utilities
+    static std::string toJSON(const Config& config);
+    static std::string toYAML(const Config& config);
+    static std::string toSimple(const Config& config);
+    
+    // Validation and schema
+    bool validate() const;
+    bool hasRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    size_t getEntryCount(ConfigSource source) const;
+    float getProgressPercentage(ConfigSource source) const;
+    
+    // Configuration import/export
+    bool importFromJSON(const std::string& jsonContent);
+    bool importFromYAML(const std::string& yamlContent);
+    bool exportToJSONFile(const std::string& filepath) const;
+    bool exportToYAMLFile(const std::string& filepath) const;
+    
+    // Configuration modification
+    void renameKey(const std::string& oldKey, const std::string& newKey);
+    void batchSet(const std::unordered_map<std::string, ConfigValue>& values, 
+                  ConfigSource source = ConfigSource::Runtime);
+    void removeBySource(ConfigSource source);
+    
+    // Configuration comparison
+    int compare(const Config& other, const std::string& key = "") const;
+    
+    // Configuration summary and reporting
+    std::string generateReport() const;
+    std::string generateDetailedReport() const;
+    
+    // Configuration validation schemas
+    static bool validateAgainstSchema(const Config& config, 
+                                      const std::string& schemaType);
+    
+    // Configuration compression and optimization
+    void removeUnusedEntries(const std::vector<std::string>& usedKeys);
+    void optimizeStorage();
+    
+    // Configuration backup and restore
+    bool backup(const std::string& backupPath) const;
+    bool restore(const std::string& backupPath);
+    
+    // Configuration monitoring
+    std::string getChangeSummary(const Config& previousConfig) const;
+    bool hasChanges(const Config& other) const;
     
     // Internal helpers
     static std::string trim(const std::string& str);

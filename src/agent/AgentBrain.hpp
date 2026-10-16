@@ -57,6 +57,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -71,10 +72,10 @@ public:
     
 private:
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    MotorCommand decodeFromMotorNeurons() const;
     
     // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd) const;
     
     std::shared_ptr<Brain> brain_;
     
