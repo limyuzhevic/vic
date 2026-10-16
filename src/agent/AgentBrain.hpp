@@ -76,6 +76,12 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for resetting state
+    void resetNeuromodulationState();
+    void resetDevelopmentState();
+    void resetMemoryState();
+    void resetSensoryState();
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

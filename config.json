@@ -1,0 +1,77 @@
+{
+    "plugins": {
+        "enabled": [
+            "lif-neuron",
+            "stdp-rule",
+            "dopamine-modulator"
+        ],
+        "disabled": [
+            "adaptive-exponential",
+            "working-memory"
+        ],
+        "pluginDirectories": [
+            "./plugins",
+            "/usr/local/lib/nlm/plugins"
+        ],
+        "autoLoad": true,
+        "autoStart": true,
+        "maxConcurrentLoads": 4,
+        "configCheckInterval": 30
+    },
+    "neuronTypes": {
+        "lif": {
+            "threshold": -55.0,
+            "restingPotential": -70.0,
+            "membraneTimeConstant": 20.0,
+            "refractoryPeriod": 5.0,
+            "leakConductance": 10.0
+        },
+        "adaptive-exponential": {
+            "threshold": -50.0,
+            "restingPotential": -65.0,
+            "membraneTimeConstant": 10.0,
+            "refractoryPeriod": 2.0,
+            "leakConductance": 8.0,
+            "adaptationVariable": 0.0
+        }
+    },
+    "plasticityRules": {
+        "stdp": {
+            "ltpWeight": 0.01,
+            "ltdWeight": 0.012,
+            "timeConstant": 20.0,
+            "minWeight": -1.0,
+            "maxWeight": 1.0
+        },
+        "hebbian": {
+            "learningRate": 0.01,
+            "maxWeight": 1.0,
+            "minWeight": -1.0,
+            "covarianceThreshold": 0.0
+        }
+    },
+    "neuromodulators": {
+        "dopamine": {
+            "baselineLevel": 0.0,
+            "rewardSensitivity": 1.0,
+            "predictionErrorSensitivity": 1.0
+        },
+        "serotonin": {
+            "baselineLevel": 0.0,
+            "moodInfluence": 1.0,
+            "impulsivitySuppression": 0.8
+        }
+    },
+    "memorySystems": {
+        "workingMemory": {
+            "maxCapacity": 100,
+            "activationDecay": 0.95,
+            "updateFrequency": 10.0
+        },
+        "episodicMemory": {
+            "maxCapacity": 1000,
+            "decayRate": 0.01,
+            "consolidationThreshold": 3.0
+        }
+    }
+}

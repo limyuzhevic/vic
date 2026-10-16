@@ -29,6 +29,9 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Plugin system
+    src/plugin/core/PluginBase.cpp
+    src/plugin/manager/PluginManager.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -85,6 +88,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Plugin examples
+    src/plugin/examples/PluginImplementations.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
