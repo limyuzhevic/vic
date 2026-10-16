@@ -18,6 +18,9 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "performance/CheckpointSystem.hpp"
+#include "agent/AgentBrain.hpp"
+#include "world/SimpleWorld.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +28,36 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <cmath>
+
+// NLM Version information
+const uint32_t NLM_VERSION_MAJOR = 0;
+const uint32_t NLM_VERSION_MINOR = 1;
+const uint32_t NLM_VERSION_PATCH = 0;
+const uint32_t NLM_PHASE = 2;
+const uint32_t NLM_SUBPHASE = 1;
+const std::string NLM_PHASE_NAME = "Enhanced Integration"; 
+
+// Command line options
+void printUsage() {
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=<file>        Configuration file" << std::endl;
+    std::cout << "  --show-version         Display version information" << std::endl;
+    std::cout << "  --help                 Display this help message" << std::endl;
+    std::cout << "  --checkpoints=<dir>    Checkpoint directory for saving state" << std::endl;
+    std::cout << "  --load=<checkpoint>    Load from checkpoint file" << std::endl;
+    std::cout << "  --save=<checkpoint>    Save checkpoint" << std::endl;
+    std::cout << "  --enable-replay        Enable memory replay during simulation" << std::endl;
+    std::cout << "  --enable-development   Enable developmental stages" << std::endl;
+    std::cout << "  --debug                Enable debug logging" << std::endl;
+    std::cout << "  --memory-capacity=<N>  Set working memory capacity" << std::endl;
+    std::cout << "  --novelty-threshold=<T> Set novelty detection threshold" << std::endl;
+    std::cout << "  --curiosity-scale=<S>  Scale curiosity modulation (0.0-1.0)" << std::endl;
+}
 
 using namespace nlm;
 
@@ -382,14 +415,34 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    // Parse command line options for enhanced Phase 2.1 functionality
+    std::string checkpointDir = "checkpoints";
+    std::string checkpointFileToLoad = "";
+    std::string checkpointFileToSave = "";
+    bool enableReplay = config->get<bool>("enable_replay", false);
+    bool enableDevelopment = config->get<bool>("enable_development", false);
+    bool enableDebug = config->get<bool>("debug", false);
+    
+    // Handle checkpoint directory
+    if (config->has("checkpoints")) {
+        checkpointDir = config->get<std::string>("checkpoints");
+    }
+    
+    // Handle checkpoint save/load
+    if (config->has("load")) {
+        checkpointFileToLoad = config->get<std::string>("load");
+    }
+    if (config->has("save")) {
+        checkpointFileToSave = config->get<std::string>("save");
+    }
+    
+    // Process advanced options
+    if (enableDebug) {
+        NLM_LOG_INFO("=== Advanced Mode Enabled ===");
+        NLM_LOG_INFO("Debug logging: ON");
+        NLM_LOG_INFO("Replay enabled: " + std::string(enableReplay ? "YES" : "NO"));
+        NLM_LOG_INFO("Development enabled: " + std::string(enableDevelopment ? "YES" : "NO"));
+    }
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
