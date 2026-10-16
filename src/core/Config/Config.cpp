@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Constants.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -24,6 +25,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     

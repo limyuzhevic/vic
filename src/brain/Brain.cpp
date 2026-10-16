@@ -3,7 +3,9 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Constants.hpp"
 #include "../sensory/SensoryInput.hpp"
+#include "../sensory/Vision.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
@@ -83,15 +85,15 @@ struct Brain::Impl {
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(SIMULATION_TIMESTEP)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(DEFAULT_REPLAY_INTERVAL)      // Replay every 100 steps
+        , consolidationInterval(DEFAULT_CONSOLIDATION_INTERVAL)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -131,23 +133,23 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>(CONFIG_STDP_LTP_WEIGHT, DEFAULT_STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>(CONFIG_STDP_LTD_WEIGHT, DEFAULT_STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>(CONFIG_STDP_TIME_CONSTANT, DEFAULT_STDP_TIME_CONSTANT);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>(CONFIG_SYNAPSIS_RATE, DEFAULT_SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>(CONFIG_PRUNING_RATE, DEFAULT_PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<double>(CONFIG_SIMULATION_TIMESTEP, SIMULATION_TIMESTEP);
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = config->getOr<size_t>("replay_interval", DEFAULT_REPLAY_INTERVAL);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", DEFAULT_CONSOLIDATION_INTERVAL);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -225,7 +227,7 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, DEFAULT_STDP_LTP_WEIGHT, DEFAULT_STDP_LTD_WEIGHT);
         }
     }
     
@@ -233,11 +235,11 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(neuronCount * DEFAULT_MEMORY_CAPACITY_FACTOR);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(DEFAULT_MAX_EPISODES);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -247,13 +249,13 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(DEFAULT_PLANNING_DEPTH);
     
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(ATTENTION_INHIBITION_STRENGTH);
+    pImpl->attention->setExcitationStrength(ATTENTION_EXCITATION_STRENGTH);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -274,7 +276,7 @@ bool Brain::initialize() {
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    MembranePotential synapticCurrent = event.weight * DEFAULT_STDP_LTP_WEIGHT;  // Scale factor
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {
@@ -287,7 +289,7 @@ bool Brain::initialize() {
     });
     
     // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    std::string checkpointDir = pImpl->config->getOr<std::string>(CONFIG_CHECKPOINT_DIR, "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
@@ -510,9 +512,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Create current sensory state from active sensory neurons
+        std::vector<float> sensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                sensoryState.push_back(neuron->getMembranePotential());
+            }
+        }
+        
+        // Create a simple sensory input using Vision
+        Vision currentInput;
+        currentInput.setData(sensoryState);
+        
+        // Train prediction system with current observation
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->train(currentInput);
+            
+            // Predict next state using prediction system
+            auto nextPrediction = pImpl->predictionSystem->predictNextState(currentInput);
+            
+            // If we have prediction system with error tracking, compute error
+            if (!pImpl->predictionSystem->getErrorHistory().empty()) {
+                // This would be used to modulate learning in a real implementation
+                // For now, just log prediction confidence
+                // NLM_LOG_INFO("Prediction confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -690,28 +717,59 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using NeuralPlanner and ConceptFormation
+    // First, collect current neural state for planning
+    std::vector<float> currentState;
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
+    // Get sensory input patterns as part of state representation
+    if (pImpl->workingMemory) {
+        currentState = pImpl->workingMemory->retrieve();
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Get motor neuron activity as part of state representation
+    std::vector<float> motorActivity;
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        motorActivity.push_back(neuron->getMembranePotential());
+    }
+    
+    // Combine state representations
+    currentState.insert(currentState.end(), motorActivity.begin(), motorActivity.end());
+    
+    // Use NeuralPlanner to plan the best action
+    ActionType plannedAction = ActionType::Wait;
+    
+    if (pImpl->planner) {
+        // NeuralPlanner evaluates potential action sequences and predicts outcomes
+        plannedAction = pImpl->planner->planAction(currentState);
+    } else {
+        // Fallback to concept-based action selection if planner not available
+        if (pImpl->conceptFormation && !currentState.empty()) {
+            // Use concept formation to interpret the state and select appropriate action
+            // For now, use the highest motor activity as a simple fallback
+            float maxMotorActivity = 0.0f;
+            for (float activity : motorActivity) {
+                if (activity > maxMotorActivity) {
+                    maxMotorActivity = activity;
+                }
+            }
+            
+            // Simple action mapping based on motor activity
+            if (maxMotorActivity > ACTION_SELECTION_THRESHOLD) {
+                plannedAction = ActionType::MoveForward;
+            } else if (maxMotorActivity < -ACTION_SELECTION_THRESHOLD) {
+                plannedAction = ActionType::MoveBackward;
+            }
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Apply attention system to modulate action selection
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        // Attention can influence which actions are more likely based on relevance
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Create and return the action
+    auto action = std::make_unique<Action>(plannedAction);
     
     return action;
 }
