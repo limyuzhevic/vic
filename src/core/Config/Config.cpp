@@ -18,41 +18,45 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_DEBUG("Config file not found: " + filepath);
         return false;
     }
     
+    // Try to detect file format
     std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
+    bool isJson = false;
+    bool isYaml = false;
+    
+    // Peek at first few lines to detect format
+    for (int i = 0; i < 5 && std::getline(file, line); ++i) {
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+        if (line.find('{') != std::string::npos || line.find("\"") != std::string::npos) {
+            isJson = true;
+            break;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (line.find("-") != std::string::npos && 
+            (line.find(" ") != std::string::npos || line.find(":") != std::string::npos)) {
+            isYaml = true;
         }
     }
     
-    return true;
+    // Reset file
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    if (isJson) {
+        NLM_LOG_INFO("Parsing JSON config file: " + filepath);
+        return loadFromJson(file, filepath);
+    } else if (isYaml) {
+        NLM_LOG_INFO("Parsing YAML config file: " + filepath);
+        return loadFromYaml(file, filepath);
+    } else {
+        // Use simple key=value format for backward compatibility
+        NLM_LOG_INFO("Parsing simple config file: " + filepath);
+        return loadFromSimpleFormat(file, filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,15 +82,44 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated automatically by NLM " << NLM_VERSION << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Use proper value formatting
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> ||
+                                  std::is_same_v<T, int64_t> ||
+                                  std::is_same_v<T, double> ||
+                                  std::is_same_v<T, float>) {
+                file << arg;
+            } else {
+                file << arg;  // Fallback
+            }
+        }, entry.value);
+        
+        file << "\n\n";
+    }
+    
+    file << "# Configuration saved successfully";
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("Error writing to config file: " + filepath);
+        return false;
     }
     
     return true;
@@ -108,22 +141,39 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
-template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_WARNING("Config key is empty");
+        return;
+    }
+    
+    // Check for valid characters in key
+    for (char c : key) {
+        if (!(std::isalnum(c) || c == '.' || c == '_' || c == '-')) {
+            NLM_LOG_WARNING("Config key contains invalid character: " + std::string(1, c) + ". Key: " + key);
+        }
+    }
+    
+    // Remove any existing entry with the same key
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
     if (it != pImpl->entries.end()) {
+        // Update existing entry
         it->value = value;
         it->source = source;
     } else {
+        // Add new entry
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Log successful config update
+    NLM_LOG_DEBUG("Config set: " + key + " = " + getValueString(value) + " (source: " + std::to_string(static_cast<int>(source)) + ")");
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
