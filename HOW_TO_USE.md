@@ -9,6 +9,8 @@ This document covers:
 2. Installing the Python library
 3. Using the NLM Python API
 
+For advanced features and enhanced API with utilities, see `python/NLM_ENHANCED_README.md`.
+
 ---
 
 ## Part 1: Building the C++ Project from Source
@@ -38,6 +40,21 @@ make -j$(nproc)
 
 # Run tests (if built)
 ctest --output-on-failure
+```
+
+### Enhanced Build Options
+
+For enhanced Python bindings with advanced features:
+
+```bash
+# Build with enhanced Python bindings
+cmake .. -DCMAKE_BUILD_TYPE=Release -DENHANCED_PYTHON_BINDINGS=ON
+
+# Build Python enhanced module
+pip install -e .  # Installs both original and enhanced APIs
+
+# Install enhanced API only
+pip install pynlm_enhanced
 ```
 
 ### Build Outputs
@@ -85,6 +102,21 @@ pip install .
 pip install -e .
 ```
 
+### Enhanced API Installation
+
+For enhanced features and utilities:
+
+```bash
+# Install the enhanced NLM package
+pip install pynlm_enhanced
+
+# Or install in development mode
+pip install -e .
+
+# Install enhanced API separately
+pip install pynlm_enhanced
+```
+
 ### Using pyproject.toml (Modern Python Packaging)
 
 ```bash
@@ -111,6 +143,15 @@ print(pynlm.__version__)
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+# Test enhanced API if available
+try:
+    import pynlm_enhanced as nlm_enhanced
+    print("Enhanced API available")
+    sim = nlm_enhanced.create_simulation("basic", 50, 50)
+    print(f"Enhanced simulation created with {sim.brain.getRegionCount()} regions")
+except ImportError:
+    print("Enhanced API not available - installing with 'pip install pynlm_enhanced'")
 ```
 
 ---
@@ -184,76 +225,87 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Enhanced Usage
+
+For advanced features and convenience, use the **enhanced API**:
+
+#### Enhanced Basic Usage
 
 ```python
-import pynlm
+import pynlm_enhanced as nlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+# Create enhanced simulation with utilities
+sim = nlm.create_simulation("basic", 50, 50)
+
+# Run with automatic statistics collection
+stats = sim.run_episode(max_steps=1000, random_seed=42)
+
+print(f"Episode completed: {stats['total_reward']} total reward")
+print(f"Success: {stats['success']}")
+print(f"Enhanced features available: DataAnalyzer, VisualizationHelper, etc.")
+```
+
+#### Enhanced Complete Agent Example
+
+```python
+import pynlm_enhanced as nlm
+
+def run_agent_simulation_enhanced(num_steps=1000):
+    """Enhanced agent simulation with utilities."""
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
+    # Use enhanced configuration presets
+    sim = nlm.create_learning_simulation(20, 20)
     
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
+    # Enable all subsystems
+    sim.agent.enableRewardModulation(True)
+    sim.agent.enableStructuralPlasticity(True)
+    sim.agent.enableDevelopment(True)
+    sim.agent.enableCuriosity(True)
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    # Add environment objects using enhanced API
+    sim.add_resource(5, 5, value=1.0)
+    sim.add_resource(15, 15, value=2.0)
+    sim.add_hazard(10, 10, value=-0.5)
     
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+    # Run simulation with performance monitoring
+    from pynlm_enhanced import PerformanceMonitor
+    monitor = PerformanceMonitor()
     
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
     for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
+        monitor.start_step()
         
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
+        # Enhanced simulation loop
+        sim.world.update(0.1)
+        percept = sim.world.getSensoryPercept()
+        sim.agent.processSensoryInput(percept)
+        sim.brain.step(step)
+        action = sim.agent.decodeMotorCommand()
+        sim.world.applyMotorCommand(action, sim.world.getSimulationTime())
         
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
+        # Apply reward and development
+        reward = 0.0
+        sim.agent.applyRewardModulation(reward, 0.0)
+        sim.agent.updateDevelopment(0.1)
         
-        # Run brain step
-        brain.step(step)
+        monitor.end_step(sim.brain.getPerformanceMetrics())
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
+        # Print progress with enhanced stats
         if step % 100 == 0:
             print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Firing neurons: {sim.brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {sim.agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {sim.agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {sim.brain.getDevelopmentalStage()}")
+    
+    # Get performance report
+    report = monitor.get_performance_report()
+    
+    return sim, sim.run_episode(num_steps)
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the enhanced simulation
+sim, stats = run_agent_simulation_enhanced(1000)
+print(f"Simulation completed with {stats['total_reward']} reward")
+print(f"Performance: {sim.brain.getAverageFiringRate():.3f} Hz average firing rate")
 ```
 
 ### Key Classes and Methods
@@ -290,6 +342,30 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+```
+
+#### Config Class
+
+```python
+# Create
+config = pynlm.createDefaultConfig()
+
+# Query
+if config.has("brain.neuron_count"):
+    keys = config.getKeys()
+
+# Modify
+config.set("brain.neuron_count", 1000)
+config.set("learning.rate", 0.001)
+
+# File I/O
+config.loadFromFile("config.json")
+config.saveToFile("config.json")
+
+# Enhanced configuration tools
+nlm.ConfigurationTools.create_preset_config("basic")
+nlm.ConfigurationTools.export_config(config, "my_config.json")
+nlm.ConfigurationTools.import_config("my_config.json")
 ```
 
 #### Config Class
