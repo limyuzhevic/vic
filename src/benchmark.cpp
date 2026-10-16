@@ -110,11 +110,13 @@ int main() {
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Initialize enhanced logger with statistics support
+    auto nlmLogger = std::make_shared<nlm::Logger>();
+    auto consoleLogger = std::make_shared<nlm::ConsoleLogger>(nlm::LogLevel::Warning);
+    nlmLogger->addLogger(consoleLogger);
+    
+    // Set global logger
+    nlm::Logger::setGlobal(nlmLogger);
     
     std::cout << "Running NLM Performance Benchmarks..." << std::endl;
     std::cout << std::endl;

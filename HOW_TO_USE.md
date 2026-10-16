@@ -452,6 +452,34 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
+### Environment Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `environment.name` | string | "GridWorld" | Environment type |
+| `environment.width` | float | 10.0 | Environment width |
+| `environment.height` | float | 10.0 | Environment height |
+| `environment.vision_range` | float | 20.0 | Vision detection range |
+| `environment.auditory_range` | float | 20.0 | Auditory detection range |
+
+### Logging Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `log.level` | string | "INFO" | Logging level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL) |
+| `log.to_file` | bool | false | Enable/disable file logging |
+| `log.filename` | string | "nlm.log" | Log filename |
+| `log.max_size` | int | 100 | Maximum log file size in MB |
+| `log.max_files` | int | 5 | Maximum number of log files to keep |
+
+### Simulation Control
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `simulation.max_steps` | int | 10000 | Maximum simulation steps |
+| `simulation.time_limit` | float | 0.0 | Time limit in seconds |
+| `simulation.checkpoint_interval` | int | 1000 | Checkpoint interval in steps |
+
 ---
 
 ## Part 5: Example Scripts

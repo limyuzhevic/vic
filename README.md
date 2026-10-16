@@ -82,6 +82,198 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Command Line Interface
+
+NLM provides several operational modes for different use cases:
+
+#### Basic Modes
+- **`test`** - Comprehensive test suite (runs all neural computation tests)
+- **`demo`** - Interactive demonstration with visualization
+- **`benchmark`** - Performance benchmarking mode
+- **`continuous`** - Continuous real-time simulation
+- **`runtime_config_test`** - Tests runtime configuration modifications
+- **`runtime_config_demo`** - Demonstrates runtime configuration changes
+- **`runtime_config_cli`** - Interactive command-line interface for runtime configuration
+
+#### Quick Start Examples
+```bash
+# Run comprehensive tests (default)
+./nlm
+
+# Run demo with visualization
+./nlm --mode demo --neurons 2000 --steps 5000 --pause
+
+# Run performance benchmark
+./nlm --mode benchmark --benchmark-scale --scaling-levels 100,500,1000,2000
+
+# Run continuous simulation
+./nlm --mode continuous --neurons 1000 --steps 10000 --max-time 300
+
+# Test runtime configuration
+./nlm --mode runtime_config_test --neurons 100
+
+# Interactive runtime configuration CLI
+./nlm --mode runtime_config_cli
+```
+
+### Configuration Files
+
+NLM uses configuration files (`.cfg` format) to control simulation parameters:
+
+#### Default Configuration
+- **File**: `configs/default.cfg`
+- **Purpose**: Standard configuration for most simulations
+- **Use**: Most applications and experiments
+
+#### Preset Configurations
+- **File**: `configs/presets/research.cfg` - Optimized for scientific research
+- **File**: `configs/presets/production.cfg` - Optimized for production use
+- **File**: `configs/presets/development.cfg` - Optimized for development
+- **File**: `configs/presets/benchmark.cfg` - Optimized for performance testing
+
+#### Using Presets
+```bash
+# Use research preset
+./nlm --mode test --config configs/presets/research.cfg --neurons 1000
+
+# Use production preset
+./nlm --mode continuous --config configs/presets/production.cfg
+
+# Use development preset
+./nlm --mode demo --config configs/presets/development.cfg
+
+# Use benchmark preset
+./nlm --mode benchmark --config configs/presets/benchmark.cfg
+```
+
+### Python Integration
+
+NLM provides Python bindings for programmatic control:
+
+#### Installation
+```bash
+pip install pynlm
+```
+
+#### Basic Usage
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation for 1000 steps
+for step in range(1000):
+    brain.step(step)
+    
+    # Log statistics periodically
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+```
+
+#### Advanced Python Usage
+```python
+import pynlm
+
+# Create brain and agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+
+# Create and configure world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+world.setAgentStart(10.0, 10.0)
+
+# Enable advanced subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run complete agent simulation
+for step in range(500):
+    world.update(timestep=0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+```
+
+### Documentation Resources
+
+#### Online Documentation
+- **CLI Help**: `docs/CLI_HELP.md` - Complete command-line interface documentation
+- **Configuration Guide**: `docs/CONFIG_GUIDE.md` - Detailed parameter documentation
+- **Advanced Guide**: `docs/ADVANCED_GUIDE.md` - Advanced usage patterns
+- **Troubleshooting**: `docs/TROUBLESHOOTING.md` - Common issues and solutions
+
+#### Local Documentation
+- **Architecture**: `docs/ARCHITECTURE.md` - System architecture overview
+- **Science**: `docs/SCIENCE.md` - Scientific background
+- **Experiments**: `docs/EXPERIMENTS.md` - Experiment descriptions
+- **Phase 6 Results**: `docs/PHASE6_FINAL_RESULTS.md` - Integration experiment results
+
+#### Quick Help
+```bash
+# Display basic help
+./nlm
+
+# Display help for specific mode
+./nlm --mode demo
+
+# Display help for runtime config mode
+./nlm --mode runtime_config_cli
+```
+
+### Development
+
+#### Building from Source
+```bash
+# Create build directory
+mkdir build
+cd build
+
+# Configure with CMake (Release for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j4
+```
+
+#### Running Tests
+```bash
+# Run unit tests
+cd build
+ctest --output-on-failure
+```
+
+#### Python Development
+```bash
+# Install in development mode
+pip install -e .
+
+# Run Python tests
+pytest
+```
+
+### Community and Support
+
+- **Documentation**: Comprehensive guides and tutorials
+- **Code Examples**: Real-world usage examples
+- **Performance Profiles**: Optimization strategies and presets
+- **Integration Examples**: Python bindings and agent usage
+
 ## Project Structure
 
 ```
