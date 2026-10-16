@@ -205,7 +205,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getType", &Action::getType)
         .def("setType", &Action::setType, py::arg("type"))
         .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("setParameters", &Action::setParameters, py::arg("parameters"))
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
 
@@ -415,6 +415,258 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python utility functions
+    m.def("runAgentSimulation", [](std::shared_ptr<Brain> brain, 
+                                   std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t numSteps) {
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward based on agent's internal signals
+            auto internal = percept->getInternal();
+            float reward = internal.empty() ? 0.0f : internal[0];
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete agent simulation loop");
+
+    m.def("createCompleteAgentSystem", []() {
+        // Create default configuration for brain
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("brain.v_thresh", -50.0f, ConfigSource::Default);
+        config->set("brain.v_rest", -70.0f, ConfigSource::Default);
+        
+        // Create brain and agent
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Create and configure world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        // Initialize agent with world
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }, "Create a complete agent system with default configuration");
+
+    // Performance monitoring utilities
+    m.def("getBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, std::variant<size_t, float, std::string>> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["development_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+
+    m.def("getAgentStats", [](const std::shared_ptr<AgentBrain>& agent) {
+        std::map<std::string, std::variant<float, bool>> stats;
+        stats["curiosity_level"] = agent->getCuriosityLevel();
+        stats["novelty_level"] = agent->getNoveltyLevel();
+        stats["prediction_error"] = agent->getPredictionError();
+        stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        stats["reward_modulation_enabled"] = agent->isRewardModulationEnabled();
+        stats["structural_plasticity_enabled"] = agent->isStructuralPlasticityEnabled();
+        stats["development_enabled"] = agent->isDevelopmentEnabled();
+        stats["curiosity_enabled"] = agent->isCuriosityEnabled();
+        return stats;
+    }, py::arg("agent"), "Get comprehensive agent statistics");
+
+    // Type conversion utilities
+    m.def("configToDict", [](const std::shared_ptr<Config>& config) {
+        std::map<std::string, std::variant<int, double, bool, std::string>> result;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto val = config->getOr<int>(key, 0);
+            if (val.has_value()) {
+                result[key] = *val;
+            } else {
+                auto valStr = config->getOr<std::string>(key, "");
+                if (valStr.has_value()) {
+                    result[key] = *valStr;
+                } else {
+                    auto valDbl = config->getOr<double>(key, 0.0);
+                    if (valDbl.has_value()) {
+                        result[key] = *valDbl;
+                    } else {
+                        auto valBool = config->getOr<bool>(key, false);
+                        if (valBool.has_value()) {
+                            result[key] = *valBool;
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }, py::arg("config"), "Convert configuration to Python dictionary");
+
+    m.def("dictToConfig", [](std::map<std::string, std::variant<int, double, bool, std::string>> dict) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : dict) {
+            config->set(pair.first, pair.second, ConfigSource::Runtime);
+        }
+        return config;
+    }, py::arg("dict"), "Create configuration from Python dictionary");
+
+    // Enhanced error handling and type conversion utilities
+    m.def("safeGetConfigValue", [](const std::shared_ptr<Config>& config, 
+                                   const std::string& key, 
+                                   const std::string& defaultValue) {
+        auto val = config->getOr<std::string>(key, "");
+        return val.has_value() ? *val : defaultValue;
+    }, py::arg("config"), py::arg("key"), py::arg("defaultValue") = "",
+              "Safely get configuration value with default");
+
+    m.def("safeGetConfigValueInt", [](const std::shared_ptr<Config>& config,
+                                      const std::string& key,
+                                      int defaultValue) {
+        auto val = config->getOr<int>(key, 0);
+        return val.has_value() ? *val : defaultValue;
+    }, py::arg("config"), py::arg("key"), py::arg("defaultValue") = 0,
+              "Safely get integer configuration value with default");
+
+    m.def("safeGetConfigValueFloat", [](const std::shared_ptr<Config>& config,
+                                        const std::string& key,
+                                        float defaultValue) {
+        auto val = config->getOr<double>(key, 0.0);
+        return val.has_value() ? static_cast<float>(*val) : defaultValue;
+    }, py::arg("config"), py::arg("key"), py::arg("defaultValue") = 0.0f,
+              "Safely get float configuration value with default");
+
+    m.def("safeGetConfigValueBool", [](const std::shared_ptr<Config>& config,
+                                       const std::string& key,
+                                       bool defaultValue) {
+        auto val = config->getOr<bool>(key, false);
+        return val.has_value() ? *val : defaultValue;
+    }, py::arg("config"), py::arg("key"), py::arg("defaultValue") = false,
+              "Safely get boolean configuration value with default");
+
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto val = config->getOr<int>(key, 0);
+            if (!val.has_value()) {
+                auto valStr = config->getOr<std::string>(key, "");
+                if (!valStr.has_value()) {
+                    auto valDbl = config->getOr<double>(key, 0.0);
+                    if (!valDbl.has_value()) {
+                        auto valBool = config->getOr<bool>(key, false);
+                        if (!valBool.has_value()) {
+                            errors.push_back("Key \"" + key + "\" has invalid value type");
+                        }
+                    }
+                }
+            }
+        }
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        std::map<std::string, int> stats;
+        stats["total_keys"] = config->getKeys().size();
+        
+        int intCount = 0, doubleCount = 0, stringCount = 0, boolCount = 0;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto val = config->getOr<int>(key, 0);
+            if (val.has_value()) {
+                intCount++;
+            } else {
+                auto valStr = config->getOr<std::string>(key, "");
+                if (valStr.has_value()) {
+                    stringCount++;
+                } else {
+                    auto valDbl = config->getOr<double>(key, 0.0);
+                    if (valDbl.has_value()) {
+                        doubleCount++;
+                    } else {
+                        auto valBool = config->getOr<bool>(key, false);
+                        if (valBool.has_value()) {
+                            boolCount++;
+                        }
+                    }
+                }
+            }
+        }
+        stats["int_values"] = intCount;
+        stats["float_values"] = doubleCount;
+        stats["string_values"] = stringCount;
+        stats["bool_values"] = boolCount;
+        return stats;
+    }, py::arg("config"), "Get configuration statistics");
+
+    m.def("mergeConfigs", [](std::shared_ptr<Config> baseConfig, 
+                             const std::shared_ptr<Config>& overrideConfig) {
+        auto keys = overrideConfig->getKeys();
+        for (const auto& key : keys) {
+            auto val = overrideConfig->getOr<int>(key, 0);
+            if (val.has_value()) {
+                baseConfig->set(key, *val, ConfigSource::Runtime);
+            } else {
+                auto valStr = overrideConfig->getOr<std::string>(key, "");
+                if (valStr.has_value()) {
+                    baseConfig->set(key, *valStr, ConfigSource::Runtime);
+                } else {
+                    auto valDbl = overrideConfig->getOr<double>(key, 0.0);
+                    if (valDbl.has_value()) {
+                        baseConfig->set(key, *valDbl, ConfigSource::Runtime);
+                    } else {
+                        auto valBool = overrideConfig->getOr<bool>(key, false);
+                        if (valBool.has_value()) {
+                            baseConfig->set(key, *valBool, ConfigSource::Runtime);
+                        }
+                    }
+                }
+            }
+        }
+        return baseConfig;
+    }, py::arg("baseConfig"), py::arg("overrideConfig"), "Merge two configurations");
+
+    m.def("cloneConfig", [](const std::shared_ptr<Config>& config) {
+        auto newConfig = std::make_shared<Config>();
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto val = config->getOr<int>(key, 0);
+            if (val.has_value()) {
+                newConfig->set(key, *val, ConfigSource::Runtime);
+            } else {
+                auto valStr = config->getOr<std::string>(key, "");
+                if (valStr.has_value()) {
+                    newConfig->set(key, *valStr, ConfigSource::Runtime);
+                } else {
+                    auto valDbl = config->getOr<double>(key, 0.0);
+                    if (valDbl.has_value()) {
+                        newConfig->set(key, *valDbl, ConfigSource::Runtime);
+                    } else {
+                        auto valBool = config->getOr<bool>(key, false);
+                        if (valBool.has_value()) {
+                            newConfig->set(key, *valBool, ConfigSource::Runtime);
+                        }
+                    }
+                }
+            }
+        }
+        return newConfig;
+    }, py::arg("config"), "Create a copy of a configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
