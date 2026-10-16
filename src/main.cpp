@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
 
@@ -318,8 +320,214 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    } // End runStdpVerification
+
+// Memory Management Commands for Phase 4+
+void processMemoryCommand(std::shared_ptr<Brain> brain, const std::string& command, const std::vector<std::string>& args) {
+    if (!brain) return;
+    
+    // Memory inspection commands
+    if (command == "--inspect-memory" || command == "--memory-status") {
+        brain->logStatus();
+        return;
     }
-}
+    
+    if (command == "--working-memory-state") {
+        auto* wm = brain->getWorkingMemory();
+        if (!wm) {
+            NLM_LOG_INFO("Working memory: Not available");
+            return;
+        }
+        NLM_LOG_INFO("Working memory state:");
+        NLM_LOG_INFO("  Capacity: " + std::to_string(wm->getCapacity()));
+        NLM_LOG_INFO("  Decay rate: " + std::to_string(wm->getDecayRate()));
+        NLM_LOG_INFO("  Active traces: " + std::to_string(wm->getActiveTraces()));
+        NLM_LOG_INFO("  Memory neurons: " + std::to_string(wm->getMemoryNeurons().size()));
+        NLM_LOG_INFO("  Memory activity: " + std::to_string(wm->getMemoryActivity()));
+    }
+    
+    if (command == "--episodic-memory-stats") {
+        auto* em = brain->getEpisodicMemory();
+        if (!em) {
+            NLM_LOG_INFO("Episodic memory: Not available");
+            return;
+        }
+        NLM_LOG_INFO("Episodic memory statistics:");
+        NLM_LOG_INFO("  Max episodes: " + std::to_string(em->getMaxEpisodes()));
+        NLM_LOG_INFO("  Current episodes: " + std::to_string(em->getEpisodeCount()));
+        NLM_LOG_INFO("  Replay enabled: " + std::to_string(em->getReplayEnabled() ? "Yes" : "No"));
+    }
+    
+    if (command == "--associative-memory-stats") {
+        auto* am = brain->getAssociativeMemory();
+        if (!am) {
+            NLM_LOG_INFO("Associative memory: Not available");
+            return;
+        }
+        // Note: Associative memory may not have getAssociationCount() method
+        NLM_LOG_INFO("Associative memory: Available (methods may vary)");
+    }
+    
+    if (command == "--memory-stats") {
+        NLM_LOG_INFO("=== Comprehensive Memory Statistics ===");
+        
+        // Working memory
+        auto* wm = brain->getWorkingMemory();
+        NLM_LOG_INFO("Working Memory:");
+        if (wm) {
+            NLM_LOG_INFO("  Active traces: " + std::to_string(wm->getActiveTraces()));
+            NLM_LOG_INFO("  Capacity: " + std::to_string(wm->getCapacity()));
+        } else {
+            NLM_LOG_INFO("  Status: Not available");
+        }
+        
+        // Episodic memory
+        auto* em = brain->getEpisodicMemory();
+        NLM_LOG_INFO("Episodic Memory:");
+        if (em) {
+            NLM_LOG_INFO("  Episodes: " + std::to_string(em->getEpisodeCount()));
+            NLM_LOG_INFO("  Max episodes: " + std::to_string(em->getMaxEpisodes()));
+        } else {
+            NLM_LOG_INFO("  Status: Not available");
+        }
+        
+        // Associated memory
+        auto* am = brain->getAssociativeMemory();
+        NLM_LOG_INFO("Associative Memory:");
+        if (am) {
+            NLM_LOG_INFO("  Status: Available");
+        } else {
+            NLM_LOG_INFO("  Status: Not available");
+        }
+        
+        // Cognition systems
+        NLM_LOG_INFO("Cognition Systems:");
+        if (brain->getPlanner()) {
+            NLM_LOG_INFO("  Neural Planner: Available");
+        } else {
+            NLM_LOG_INFO("  Neural Planner: Not available");
+        }
+        if (brain->getConceptFormation()) {
+            NLM_LOG_INFO("  Concept Formation: Available");
+        } else {
+            NLM_LOG_INFO("  Concept Formation: Not available");
+        }
+        if (brain->getAttention()) {
+            NLM_LOG_INFO("  Attention System: Available");
+        } else {
+            NLM_LOG_INFO("  Attention System: Not available");
+        }
+        
+        // Neuromodulation systems
+        NLM_LOG_INFO("Neuromodulation Systems:");
+        if (brain->getDopamine()) {
+            NLM_LOG_INFO("  Dopamine: Available (level: " + std::to_string(brain->getDopamine()->getLevel()) + ")");
+        } else {
+            NLM_LOG_INFO("  Dopamine: Not available");
+        }
+        if (brain->getCuriosity()) {
+            NLM_LOG_INFO("  Curiosity: Available (level: " + std::to_string(brain->getCuriosity()->getLevel()) + ")");
+        } else {
+            NLM_LOG_INFO("  Curiosity: Not available");
+        }
+        if (brain->getNovelty()) {
+            NLM_LOG_INFO("  Novelty: Available (level: " + std::to_string(brain->getNovelty()->getLevel()) + ")");
+        } else {
+            NLM_LOG_INFO("  Novelty: Not available");
+        }
+        
+        // Prediction system
+        auto* pred = brain->getPredictionSystem();
+        if (pred) {
+            NLM_LOG_INFO("Prediction System:");
+            NLM_LOG_INFO("  Error: " + std::to_string(pred->getPredictionError()));
+            NLM_LOG_INFO("  Confidence: " + std::to_string(pred->getConfidence()));
+        } else {
+            NLM_LOG_INFO("Prediction System: Not available");
+        }
+    }
+    
+    if (command == "--clear-memory" || command == "--reset-all-memory") {
+        NLM_LOG_INFO("Clearing all memory systems...");
+        
+        if (brain->getWorkingMemory()) {
+            brain->getWorkingMemory()->clear();
+            NLM_LOG_INFO("  Working memory cleared");
+        }
+        
+        if (brain->getEpisodicMemory()) {
+            brain->getEpisodicMemory()->clear();
+            NLM_LOG_INFO("  Episodic memory cleared");
+        }
+        
+        if (brain->getAssociativeMemory()) {
+            brain->getAssociativeMemory()->clear();
+            NLM_LOG_INFO("  Associative memory cleared");
+        }
+        
+        NLM_LOG_INFO("All memory systems cleared");
+    }
+    
+    if (command == "--export-memory" || command == "--save-memory-state") {
+        std::string filename = "memory_state.txt";
+        if (!args.empty()) {
+            filename = args[0];
+        }
+        // Also handle --export-memory=filename syntax
+        if (command.find('=') != std::string::npos) {
+            filename = command.substr(command.find('=') + 1);
+        }
+        
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open file for writing: " + filename);
+            return;
+        }
+        
+        file << "=== NLM Memory State Export ===\n";
+        file << "Export time: " << std::time(nullptr) << "\n";
+        
+        // Export working memory
+        auto* wm = brain->getWorkingMemory();
+        if (wm) {
+            file << "\n--- Working Memory ---\n";
+            file << "Active traces: " << wm->getActiveTraces() << "\n";
+            file << "Capacity: " << wm->getCapacity() << "\n";
+            file << "Decay rate: " << wm->getDecayRate() << "\n";
+        }
+        
+        // Export episodic memory
+        auto* em = brain->getEpisodicMemory();
+        if (em) {
+            file << "\n--- Episodic Memory ---\n";
+            file << "Episode count: " << em->getEpisodeCount() << "\n";
+        }
+        
+        // Export neuromodulation levels
+        file << "\n--- Neuromodulation ---\n";
+        if (brain->getDopamine()) {
+            file << "Dopamine level: " << brain->getDopamine()->getLevel() << "\n";
+        }
+        if (brain->getCuriosity()) {
+            file << "Curiosity level: " << brain->getCuriosity()->getLevel() << "\n";
+        }
+        
+        file.close();
+        NLM_LOG_INFO("Memory state exported to: " + filename);
+    }
+    
+    if (command == "--help-memory" || command == "--memory-help") {
+        NLM_LOG_INFO("=== Memory Management Commands ===");
+        NLM_LOG_INFO("--inspect-memory, --memory-status: Display brain status and memory stats");
+        NLM_LOG_INFO("--working-memory-state: Show working memory details");
+        NLM_LOG_INFO("--episodic-memory-stats: Show episodic memory statistics");
+        NLM_LOG_INFO("--associative-memory-stats: Show associative memory statistics");
+        NLM_LOG_INFO("--memory-stats: Comprehensive memory system statistics");
+        NLM_LOG_INFO("--clear-memory, --reset-all-memory: Clear all memory systems");
+        NLM_LOG_INFO("--export-memory <file>, --save-memory-state <file>: Export memory state to file");
+        NLM_LOG_INFO("--import-memory <file>, --load-memory-state <file>: Import memory state from file (placeholder)");
+        NLM_LOG_INFO("--demo-memory: Run memory commands demo");
+    }\n}
 
 int main(int argc, char** argv) {
     printBanner();
@@ -363,10 +571,54 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Process memory management commands
+    std::vector<std::string> memoryCommands = {
+        "--inspect-memory", "--memory-status", "--working-memory-state", "--episodic-memory-stats",
+        "--associative-memory-stats", "--memory-stats", "--clear-memory", "--reset-all-memory",
+        "--export-memory", "--save-memory-state", "--help-memory", "--memory-help"
+    };
     
-    // Set default values for Phase 2
+    bool memoryCommandFound = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        // Check if this is a memory command
+        for (const auto& memCmd : memoryCommands) {
+            if (arg == memCmd) {
+                memoryCommandFound = true;
+                // Extract filename for export commands
+                std::vector<std::string> args;
+                if (memCmd == "--export-memory" || memCmd == "--save-memory-state") {
+                    if (i + 1 < argc) {
+                        args.push_back(argv[i + 1]);
+                    }
+                }
+                // Process the memory command
+                processMemoryCommand(brain, arg, args);
+                break;
+            }
+        }
+        // Check for --import-memory command (needs special handling)
+        if (arg.substr(0, 14) == "--import-memory") {
+            memoryCommandFound = true;
+            std::vector<std::string> args;
+            if (arg.find('=') != std::string::npos) {
+                args.push_back(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.push_back(argv[i + 1]);
+            }
+            processMemoryCommand(brain, arg, args);
+        }
+    }
+    
+    // If memory commands were found, exit after processing
+    if (memoryCommandFound) {
+        NLM_LOG_INFO("Memory command processing complete.");
+        return 0;
+    }
+    
+    // If no memory commands, continue with normal execution
+    NLM_LOG_INFO("No memory commands found. Running normal NLM experiments...");
+    NLM_LOG_INFO("");
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -445,5 +697,5 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
-    return 0;
+    // Phase 4: Memory Management Commands Demo\n    // Demo: Show how memory commands work\n    if (argc > 1) {\n        std::string firstArg(argv[1]);\n        if (firstArg == "--demo-memory") {\n            NLM_LOG_INFO("");\n            NLM_LOG_INFO("=== Memory Management Commands Demo ===");\n            processMemoryCommand(brain, "--memory-stats", std::vector<std::string>());\n            processMemoryCommand(brain, "--working-memory-state", std::vector<std::string>());\n            processMemoryCommand(brain, "--help-memory", std::vector<std::string>());\n            NLM_LOG_INFO("");\n            NLM_LOG_INFO("Memory commands demonstration complete.");\n        }\n    }\n    \n    return 0;
 }
