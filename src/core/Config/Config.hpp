@@ -1,5 +1,3 @@
-#pragma once
-
 #include <string>
 #include <memory>
 #include <vector>
@@ -100,6 +98,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Legacy file format support
+    bool loadFromLegacyFormat(const std::string& filepath);
+    
+    // Enhanced file format support
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
 };
 
 } // namespace nlm

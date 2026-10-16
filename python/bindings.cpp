@@ -28,6 +28,28 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Register NLM-specific exceptions
+    py::register_exception<nlm::NLMException>(m, "NLMException");
+    py::register_exception<nlm::SystemError>(m, "SystemError");
+    py::register_exception<nlm::MemoryError>(m, "MemoryError");
+    py::register_exception<nlm::ConfigurationError>(m, "ConfigurationError");
+    py::register_exception<nlm::ConfigParseError>(m, "ConfigParseError");
+    py::register_exception<nlm::NeuralError>(m, "NeuralError");
+    py::register_exception<nlm::MemorySystemError>(m, "MemorySystemError");
+    py::register_exception<nlm::WorkingMemoryError>(m, "WorkingMemoryError");
+    py::register_exception<nlm::EpisodicMemoryError>(m, "EpisodicMemoryError");
+    py::register_exception<nlm::PlasticityError>(m, "PlasticityError");
+    py::register_exception<nlm::STDPError>(m, "STDPError");
+    py::register_exception<nlm::HebbianError>(m, "HebbianError");
+    py::register_exception<nlm::IntegrationError>(m, "IntegrationError");
+    py::register_exception<nlm::NeuromodulationError>(m, "NeuromodulationError");
+    py::register_exception<nlm::UserError>(m, "UserError");
+    py::register_exception<nlm::InvalidArgumentError>(m, "InvalidArgumentError");
+    py::register_exception<nlm::DevelopmentError>(m, "DevelopmentError");
+    py::register_exception<nlm::ResourceError>(m, "ResourceError");
+    py::register_exception<nlm::OutOfMemoryError>(m, "OutOfMemoryError");
+    py::register_exception<nlm::ConfigFileNotFoundError>(m, "ConfigFileNotFoundError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -144,22 +166,43 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const nlm::ConfigParseError& e) {
+                throw py::value_error(std::string("Configuration file parse error: ") + e.what());
+            } catch (const nlm::FileError& e) {
+                throw py::value_error(std::string("File error: ") + e.what());
+            } catch (const nlm::ConfigurationError& e) {
+                throw py::value_error(std::string("Configuration error: ") + e.what());
+            } catch (...) {
+                throw py::value_error("Unknown error loading configuration file");
+            }
+        }, py::arg("filepath"), "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const nlm::ConfigurationError& e) {
+                throw py::value_error(std::string("Configuration error: ") + e.what());
+            } catch (...) {
+                throw py::value_error("Unknown error loading configuration from arguments");
+            }
+        }, py::arg("argc"), py::arg("argv"), "Load configuration from command line arguments")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const nlm::FileError& e) {
+                throw py::value_error(std::string("File error: ") + e.what());
+            } catch (const nlm::ConfigurationError& e) {
+                throw py::value_error(std::string("Configuration error: ") + e.what());
+            } catch (...) {
+                throw py::value_error("Unknown error saving configuration file");
+            }
+        }, py::arg("filepath"), "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"), "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
