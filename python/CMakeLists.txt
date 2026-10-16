@@ -87,9 +87,15 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Create a combined bindings module that includes all submodules
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Note: The separate binding files (types_bindings.cpp, config_bindings.cpp,
+# brain_bindings.cpp, agent_bindings.cpp) are included via bindings.cpp
+# which calls their individual bind_* functions. This maintains a single
+# Python module while improving code organization and maintainability.
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)

@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <atomic>
+#include <mutex>
 
 namespace nlm {
 
@@ -44,6 +46,45 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Thread-safe pointer wrapper for pImpl
+class AtomicImplPtr {
+public:
+    AtomicImplPtr() : implPtr(nullptr) {}
+    explicit AtomicImplPtr(Impl* p) : implPtr(p) {}
+    
+    Impl* get() const {
+        return implPtr.load(std::memory_order_acquire);
+    }
+    
+    void set(Impl* p) {
+        implPtr.store(p, std::memory_order_release);
+    }
+    
+    Impl* exchange(Impl* p) {
+        return implPtr.exchange(p, std::memory_order_acq_rel);
+    }
+    
+    Impl* operator->() const {
+        return get();
+    }
+    
+    explicit operator bool() const {
+        return get() != nullptr;
+    }
+    
+    Impl& operator*() const {
+        return *get();
+    }
+    
+    ~AtomicImplPtr() {
+        delete get();
+    }
+
+private:
+    std::atomic<Impl*> implPtr;
+    friend class Brain;
+};
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
@@ -53,13 +94,18 @@ public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     
+    // Enhanced destructor with proper resource cleanup
     ~Brain();
     
-    // Disable copying, enable moving
+    // Disable copying to maintain encapsulation
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    
+    // Enhanced move constructor with safe pImpl transfer
+    Brain(Brain&& other) noexcept;
+    
+    // Enhanced move assignment operator
+    Brain& operator=(Brain&& other) noexcept;
     
     // Initialize brain with configuration
     bool initialize();
@@ -193,9 +239,112 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== RAII RESOURCE MANAGEMENT ==========
+    
+    // RAII resource wrapper for memory management
+    template<typename T>
+    class ResourceGuard {
+    public:
+        explicit ResourceGuard(T* resource) : resource_(resource) {}
+        ~ResourceGuard() {
+            if (resource_) {
+                delete resource_;
+            }
+        }
+        
+        T* get() const { return resource_; }
+        T* release() {
+            T* temp = resource_;
+            resource_ = nullptr;
+            return temp;
+        }
+        
+        // Disable copying
+        ResourceGuard(const ResourceGuard&) = delete;
+        ResourceGuard& operator=(const ResourceGuard&) = delete;
+        
+    private:
+        T* resource_;
+    };
+    
+    // Memory management helpers
+    void cleanupResources() noexcept;
+    bool validateResources() const noexcept;
+    void reportMemoryStatus() const;
+    
+    // Configuration validation and resource preparation
+    bool prepareResources();
+    void initializeSubsystems();
+    
+    // Atomic pointer wrapper for pImpl
+    class AtomicImplPtr {
+    public:
+        AtomicImplPtr() : implPtr(nullptr) {}
+        explicit AtomicImplPtr(Impl* p) : implPtr(p) {}
+        
+        Impl* get() const {
+            return implPtr.load(std::memory_order_acquire);
+        }
+        
+        void set(Impl* p) {
+            implPtr.store(p, std::memory_order_release);
+        }
+        
+        Impl* exchange(Impl* p) {
+            return implPtr.exchange(p, std::memory_order_acq_rel);
+        }
+        
+        Impl* operator->() const {
+            return get();
+        }
+        
+        explicit operator bool() const {
+            return get() != nullptr;
+        }
+        
+        Impl& operator*() const {
+            return *get();
+        }
+        
+        ~AtomicImplPtr() {
+            delete get();
+        }
+
+    private:
+        std::atomic<Impl*> implPtr;
+        friend class Brain;
+    };
+    
 private:
+    // Extract step responsibilities into focused methods to reduce cyclomatic complexity
+    void processDelayedSpikes();
+    void updateNeuronDynamics();
+    void detectAndScheduleSpikes();
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity();
+    void replayImportantMemories();
+    void applyDevelopmentEffects();
+    void consolidateMemories();
+    void manageCheckpoints();
+    
+    // Enhanced pImpl with thread-safe access and memory management
     struct Impl;
-    Impl* pImpl;
+    AtomicImplPtr pImpl;
+    
+    // Memory management helpers
+    void cleanupResources() noexcept;
+    bool validateResources() const noexcept;
+    void reportMemoryStatus() const;
+    
+    // Configuration validation and resource preparation
+    bool prepareResources();
+    void initializeSubsystems();
 };
 
 } // namespace nlm
