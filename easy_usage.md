@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Easy Usage Guide for Beginners
 
 ## What is NLM?
 
@@ -10,7 +10,7 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this, with an enhanced Python API for better usability and advanced features.
 
 ---
 
@@ -29,17 +29,173 @@ That's it! NLM simulates all of this.
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Make a brain with enhanced error handling
+try:
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+    exit(1)
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+    exit(1)
 
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
+# Step 2: Make it think for 100 steps
 for i in range(100):
     brain.step(i)  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+print("Current metrics:", brain.getMetrics())
+```
+
+### Example 2: Brain in a Simple World with Enhanced Features
+
+```python
+import pynlm
+
+# Create everything with enhanced error handling
+try:
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable learning features
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+except (pynlm.ConfigurationError, pynlm.SimulationError) as e:
+    print(f"Error setting up simulation: {e}")
+    exit(1)
+
+# Run for 50 steps with monitoring
+for step in range(50):
+    world.update(0.1)  # Update world
+    percept = world.getSensoryPercept()  # What does the agent see?
+    agent.processSensoryInput(percept)  # Brain sees it
+    brain.step(step)  # Brain thinks
+    action = agent.decodeMotorCommand()  # Brain decides action
+    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+    
+    if step % 10 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+
+print("Simulation finished!")
+```
+
+### Example 3: Complete Agent with Error Handling and Monitoring
+
+```python
+import pynlm
+
+def run_agent_simulation(num_steps=1000):
+    """Enhanced agent simulation with comprehensive error handling and monitoring."""
+    
+    try:
+        # 1. Create configuration with validation
+        config = pynlm.createDefaultConfig()
+        
+        # 2. Create brain and initialize with error handling
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # 3. Create agent brain interface
+        agent = pynlm.createAgentBrain(brain)
+        
+        # 4. Create and configure world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        # 5. Initialize agent with world
+        agent.initialize(world)
+        
+        # 6. Enable advanced subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # 7. Run simulation loop with monitoring
+        for step in range(num_steps):
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            agent.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            # Print progress
+            if step % 100 == 0:
+                print(f"Step {step}:")
+                print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+                print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        
+        return {
+            "success": True,
+            "steps_completed": num_steps,
+            "final_spikes": brain.getTotalSpikeCount(),
+            "firing_neurons": brain.getFiringNeuronCount(),
+            "curiosity": agent.getCuriosityLevel(),
+            "novelty": agent.getNoveltyLevel()
+        }
+        
+    except pynlm.ConfigurationError as e:
+        return {
+            "success": False,
+            "error": f"Configuration error: {e}",
+            "error_type": "configuration"
+        }
+    except pynlm.SimulationError as e:
+        return {
+            "success": False,
+            "error": f"Simulation error: {e}",
+            "error_type": "simulation"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Unexpected error: {e}",
+            "error_type": "unexpected"
+        }
+
+# Run the simulation
+result = run_agent_simulation(1000)
+if result["success"]:
+    print("Agent simulation complete!")
+else:
+    print(f"Simulation failed: {result['error']}")
 ```
 
 ### Example 2: Brain in a Simple World
