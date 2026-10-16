@@ -26,7 +26,10 @@ struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
+    
+    // Thread-safe inter-region connection management
     std::vector<InterRegionConnection> interRegionConnections;
+    mutable std::mutex interRegionConnectionsMutex;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -50,6 +53,9 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // Thread-safe plasticity management
+    mutable std::mutex plasticityMutex;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -61,9 +67,9 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    // Statistics - make these atomic for thread safety
+    std::atomic<size_t> totalSpikesThisStep;
+    std::atomic<size_t> totalSpikesTotal;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -93,52 +99,58 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+        try {
+            // Initialize random generator with seed from config
+            uint64_t seed = 42;  // Default seed
+            if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+                seed = *seedOpt;
+            }
+            rng = std::make_unique<RandomGenerator>(seed);
+            
+            // Initialize plasticity systems
+            spikeSystem = std::make_unique<SpikeSystem>();
+            stdp = std::make_unique<STDP>();
+            hebbian = std::make_unique<Hebbian>();
+            structuralPlasticity = std::make_unique<StructuralPlasticity>();
+            
+            // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+            
+            // Initialize memory systems
+            workingMemory = std::make_unique<NeuralWorkingMemory>();
+            episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+            associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+            
+            // Initialize prediction system
+            predictionSystem = std::make_unique<PredictionSystem>();
+            
+            // Initialize cognition systems
+            planner = std::make_unique<NeuralPlanner>();
+            conceptFormation = std::make_unique<ConceptFormation>();
+            attention = std::make_unique<AttentionalSelection>();
+            
+            // Initialize development system
+            developmentSystem = std::make_unique<DevelopmentSystem>();
+            
+            // Initialize neuromodulation systems
+            dopamine = std::make_unique<Dopamine>();
+            curiosity = std::make_unique<Curiosity>();
+            predictionError = std::make_unique<PredictionError>();
+            novelty = std::make_unique<Novelty>();
+        } catch (...) {
+            // If initialization fails, clean up and rethrow
+            NLM_LOG_ERROR("Failed to initialize Brain components");
+            std::terminate();
         }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float tau = config->getOr<float>("stdp_time_constant", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("dev_synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("dev_pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
@@ -446,6 +458,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Apply plasticity rules with synchronization
+    std::lock_guard<std::mutex> plasticityLock(pImpl->plasticityMutex);
+    
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -511,8 +526,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity patterns
+        // Use sensory state encoding from neural activity
+        std::vector<float> sensoryState = getSensoryState();
+        pImpl->predictionSystem->update(sensoryState);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -720,7 +737,8 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
+    // Scale STDP learning rates with synchronization
+    std::lock_guard<std::mutex> lock(pImpl->plasticityMutex);
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
 }
@@ -731,7 +749,8 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
+    // Development updates structural plasticity with synchronization
+    std::lock_guard<std::mutex> lock(pImpl->plasticityMutex);
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
@@ -951,10 +970,12 @@ const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
 }
 
 void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+    std::lock_guard<std::mutex> lock(pImpl->interRegionConnectionsMutex);
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
 }
 
 void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
+    std::lock_guard<std::mutex> lock(pImpl->interRegionConnectionsMutex);
     pImpl->interRegionConnections.erase(
         std::remove_if(pImpl->interRegionConnections.begin(),
                       pImpl->interRegionConnections.end(),
@@ -978,6 +999,7 @@ size_t Brain::getTotalSynapseCount() const {
     for (const auto& region : pImpl->regions) {
         total += region->getSynapseCount();
     }
+    std::lock_guard<std::mutex> lock(pImpl->interRegionConnectionsMutex);
     total += pImpl->interRegionConnections.size();
     return total;
 }

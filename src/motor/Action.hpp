@@ -45,8 +45,16 @@ public:
     // Get action name
     std::string getName() const;
     
+    // String representation
+    std::string toString() const;
+    static std::unique_ptr<Action> fromString(const std::string& str);
+    
     // Clone
     std::unique_ptr<Action> clone() const;
+    
+    // Error handling
+    bool hasError() const { return false; }
+    std::string getErrorMessage() const { return ""; }
     
 private:
     ActionType type_;

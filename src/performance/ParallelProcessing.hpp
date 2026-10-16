@@ -256,9 +256,9 @@ inline ThreadPool::ThreadPool(size_t numThreads)
                     }
                 }
                 
-                ++activeTasks_;
+                activeTasks_.fetch_add(1, std::memory_order_relaxed);
                 task();
-                --activeTasks_;
+                activeTasks_.fetch_sub(1, std::memory_order_relaxed);
             }
         });
     }
@@ -453,55 +453,59 @@ inline ParallelNeuralProcessor::ParallelNeuralProcessor(size_t numThreads)
 
 inline ParallelNeuralProcessor::~ParallelNeuralProcessor() = default;
 
-inline void ParallelNeuralProcessor::processNeurons(
+    inline void ParallelNeuralProcessor::processNeurons(
         size_t numNeurons,
         std::function<void(size_t, ThreadLocalState&)>& processFunc,
         std::function<void()>* syncFunc) {
-    
-    // Reset counters
-    totalSpikeCount_.store(0, std::memory_order_relaxed);
-    totalFiringCount_.store(0, std::memory_order_relaxed);
-    
-    for (auto& state : threadStates_) {
-        state = ThreadLocalState{};
-    }
-    
-    // Calculate chunk size
-    size_t chunkSize = (numNeurons + numThreads_ - 1) / numThreads_;
-    
-    std::vector<std::future<void>> futures;
-    futures.reserve(numThreads_);
-    
-    for (size_t t = 0; t < numThreads_; ++t) {
-        size_t begin = t * chunkSize;
-        size_t end = std::min(begin + chunkSize, numNeurons);
         
-        if (begin >= end) break;
+        // Reset counters
+        totalSpikeCount_.store(0, std::memory_order_relaxed);
+        totalFiringCount_.store(0, std::memory_order_relaxed);
         
-        futures.push_back(threadPool_.submitVoid([begin, end, &processFunc, this]() {
-            size_t threadId = ThreadPool::getCurrentThreadId();
-            ThreadLocalState& state = threadStates_[threadId % threadStates_.size()];
+        for (auto& state : threadStates_) {
+            state = ThreadLocalState{};
+        }
+        
+        // Calculate chunk size
+        size_t chunkSize = (numNeurons + numThreads_ - 1) / numThreads_;
+        
+        std::vector<std::future<void>> futures;
+        futures.reserve(numThreads_);
+        
+        for (size_t t = 0; t < numThreads_; ++t) {
+            size_t begin = t * chunkSize;
+            size_t end = std::min(begin + chunkSize, numNeurons);
             
-            for (size_t i = begin; i < end; ++i) {
-                processFunc(i, state);
-            }
-        }));
+            if (begin >= end) break;
+            
+            futures.push_back(threadPool_.submitVoid([begin, end, &processFunc, this]() {
+                size_t threadId = ThreadPool::getCurrentThreadId();
+                ThreadLocalState& state = threadStates_[threadId % threadStates_.size()];
+                
+                for (size_t i = begin; i < end; ++i) {
+                    processFunc(i, state);
+                }
+            }));
+        }
+        
+        for (auto& f : futures) {
+            f.wait();
+        }
+        
+        // Aggregate results with memory barrier
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        
+        for (const auto& state : threadStates_) {
+            totalSpikeCount_.fetch_add(state.localSpikeCount, std::memory_order_relaxed);
+            totalFiringCount_.fetch_add(state.localFiringCount, std::memory_order_relaxed);
+        }
+        
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        
+        if (syncFunc) {
+            (*syncFunc)();
+        }
     }
-    
-    for (auto& f : futures) {
-        f.wait();
-    }
-    
-    // Aggregate results
-    for (const auto& state : threadStates_) {
-        totalSpikeCount_.fetch_add(state.localSpikeCount, std::memory_order_relaxed);
-        totalFiringCount_.fetch_add(state.localFiringCount, std::memory_order_relaxed);
-    }
-    
-    if (syncFunc) {
-        (*syncFunc)();
-    }
-}
 
 inline uint64_t ParallelNeuralProcessor::getTotalSpikeCount() const {
     return totalSpikeCount_.load(std::memory_order_acquire);

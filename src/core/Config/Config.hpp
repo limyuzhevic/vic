@@ -28,7 +28,9 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Persistence,
+    RuntimeDefault
 };
 
 // Configuration entry
@@ -70,6 +72,23 @@ public:
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Convenience getter methods
+    std::optional<double> getFloat(const std::string& key) const;
+    std::optional<int> getInt(const std::string& key) const;
+    std::optional<bool> getBool(const std::string& key) const;
+    std::optional<std::string> getString(const std::string& key) const;
+    std::optional<std::vector<double>> getFloatArray(const std::string& key) const;
+    std::optional<std::vector<int>> getIntArray(const std::string& key) const;
+    
+    // Type-specific getter methods for common parameters
+    std::optional<double> getLearningRate() const;
+    std::optional<double> getDecayRate() const;
+    std::optional<int> getPopulationSize() const;
+    std::optional<double> getConnectionDensity() const;
+    std::optional<int> getMaxSynapticAge() const;
+    std::optional<bool> getEnablePlasticity() const;
+    std::optional<bool> getEnableNeuromodulation() const;
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);

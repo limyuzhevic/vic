@@ -19,29 +19,64 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // PHASE 2: Implement proper JSON/YAML parser
+    // For now, support both simple key=value format and JSON format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to detect file format
+    std::string firstLine;
+    if (std::getline(file, firstLine)) {
+        file.clear();
+        file.seekg(0);
+        
+        // Check if first non-empty line looks like JSON
+        bool isJSON = false;
+        bool isYAML = false;
+        std::string line;
+        
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#') continue;
+            
+            if (!isJSON && line[0] == '{' && line.back() == '}') {
+                isJSON = true;
+            }
+            if (!isYAML && (line.find(" : ") != std::string::npos || line.find("-") == 0)) {
+                isYAML = true;
+            }
+            break;
+        }
+        
+        file.clear();
+        file.seekg(0);
+        
+        if (isJSON) {
+            // TODO: Implement JSON parsing with nlohmann::json or similar
+            // For now, fall back to simple parsing
+        }
+        
+        if (isYAML) {
+            // TODO: Implement YAML parsing with yaml-cpp or similar
+            // For now, fall back to simple parsing
+        }
+    }
+    
+    // Simple key=value parsing (Phase 1 format)
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -106,6 +141,96 @@ std::optional<T> Config::get(const std::string& key) const {
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
+}
+
+std::optional<double> Config::getFloat(const std::string& key) const {
+    auto val = get<double>(key);
+    if (val) {
+        return *val;
+    }
+    
+    // Try to get as int and convert
+    auto intVal = get<int>(key);
+    if (intVal) {
+        return static_cast<double>(*intVal);
+    }
+    
+    return std::nullopt;
+}
+
+std::optional<int> Config::getInt(const std::string& key) const {
+    auto val = get<int>(key);
+    if (val) {
+        return *val;
+    }
+    
+    // Try to get as double and convert
+    auto doubleVal = get<double>(key);
+    if (doubleVal) {
+        return static_cast<int>(*doubleVal);
+    }
+    
+    return std::nullopt;
+}
+
+std::optional<bool> Config::getBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    if (val) {
+        return *val;
+    }
+    
+    // Try to get as string
+    auto stringVal = get<std::string>(key);
+    if (stringVal) {
+        std::string lower = toLower(*stringVal);
+        if (lower == "true" || lower == "yes" || lower == "1") {
+            return true;
+        } else if (lower == "false" || lower == "no" || lower == "0") {
+            return false;
+        }
+    }
+    
+    return std::nullopt;
+}
+
+std::optional<std::string> Config::getString(const std::string& key) const {
+    return get<std::string>(key);
+}
+
+std::optional<std::vector<double>> Config::getFloatArray(const std::string& key) const {
+    return get<std::vector<double>>(key);
+}
+
+std::optional<std::vector<int>> Config::getIntArray(const std::string& key) const {
+    return get<std::vector<int>>(key);
+}
+
+std::optional<double> Config::getLearningRate() const {
+    return getFloat("learning_rate");
+}
+
+std::optional<double> Config::getDecayRate() const {
+    return getFloat("decay_rate");
+}
+
+std::optional<int> Config::getPopulationSize() const {
+    return getInt("population_size");
+}
+
+std::optional<double> Config::getConnectionDensity() const {
+    return getFloat("connection_density");
+}
+
+std::optional<int> Config::getMaxSynapticAge() const {
+    return getInt("max_synaptic_age");
+}
+
+std::optional<bool> Config::getEnablePlasticity() const {
+    return getBool("enable_plasticity");
+}
+
+std::optional<bool> Config::getEnableNeuromodulation() const {
+    return getBool("enable_neuromodulation");
 }
 
 template<typename T>

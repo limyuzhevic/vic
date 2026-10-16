@@ -6,11 +6,74 @@
 
 namespace nlm {
 
+// Vision processing (placeholder)
+// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
+
+class VisionProcessor {
+public:
+    VisionProcessor();
+    ~VisionProcessor();
+    
+    // Process vision input
+    void process(const Vision& input);
+    
+    // Get feature representation
+    const std::vector<float>& getFeatures() const;
+    
+    // Get feature dimensionality
+    size_t getFeatureDimensions() const;
+    
+    // Vision processing methods
+    void applyFilter(const std::vector<float>& kernel);
+    void normalize(float targetMean = 0.0f, float targetStdDev = 1.0f);
+    void scale(float factor);
+    void resize(size_t newWidth, size_t newHeight);
+    std::vector<float> getChannelData(size_t channel) const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Audio processing (placeholder)
+// PLACEHOLDER - Phase 2 will implement real audio processing using NLM's own neurons
+
+class AudioProcessor {
+public:
+    AudioProcessor();
+    ~AudioProcessor();
+    
+    // Process audio input
+    void process(const Audio& input);
+    
+    // Get feature representation
+    const std::vector<float>& getFeatures() const;
+    
+    // Get feature dimensionality
+    size_t getFeatureDimensions() const;
+    
+    // Audio processing methods
+    void applyGain(float gainDb);
+    void setSampleRate(size_t rate);
+    float getDuration() const;
+    std::vector<float> getFrequency() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
 // Base class for all sensory input
 class SensoryInput {
 public:
     SensoryInput();
     virtual ~SensoryInput() = default;
+    
+    // Disable copying, enable moving
+    SensoryInput(const SensoryInput&) = delete;
+    SensoryInput& operator=(const SensoryInput&) = delete;
+    SensoryInput(SensoryInput&&) noexcept = default;
+    SensoryInput& operator=(SensoryInput&&) noexcept = default;
     
     // Get input type
     virtual const char* getType() const = 0;
@@ -28,8 +91,14 @@ public:
     // Clone
     virtual std::unique_ptr<SensoryInput> clone() const = 0;
     
+    // Error handling
+    virtual bool hasError() const { return false; }
+    virtual std::string getErrorMessage() const { return ""; }
+    
 protected:
     double timestamp_;
+    mutable std::string error_message_;
+    bool has_error_;
 };
 
 // Vision input placeholder
@@ -52,6 +121,13 @@ public:
     size_t getWidth() const;
     size_t getHeight() const;
     size_t getChannels() const;
+    
+    // Vision-specific methods
+    void applyFilter(const std::vector<float>& kernel);
+    void normalize(float targetMean = 0.0f, float targetStdDev = 1.0f);
+    void scale(float factor);
+    void resize(size_t newWidth, size_t newHeight);
+    std::vector<float> getChannelData(size_t channel) const;
     
 private:
     struct Impl;
@@ -76,6 +152,11 @@ public:
     
     size_t getSampleRate() const;
     size_t getNumSamples() const;
+    
+    // Audio-specific methods
+    void applyGain(float gainDb);
+    float getDuration() const;
+    std::vector<float> getFrequency() const;
     
 private:
     struct Impl;

@@ -147,7 +147,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error loading from arguments: " + std::string(e.what()));
+            }
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
@@ -160,6 +164,73 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Convenience getter methods
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            auto val = self.getFloat(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not a float: " + key);
+        }, py::arg("key"), "Get float value from configuration")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.getInt(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not an integer: " + key);
+        }, py::arg("key"), "Get integer value from configuration")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.getBool(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not a boolean: " + key);
+        }, py::arg("key"), "Get boolean value from configuration")
+        .def("getString", [](const Config& self, const std::string& key) {
+            auto val = self.getString(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not a string: " + key);
+        }, py::arg("key"), "Get string value from configuration")
+        .def("getFloatArray", [](const Config& self, const std::string& key) {
+            auto val = self.getFloatArray(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not a float array: " + key);
+        }, py::arg("key"), "Get float array value from configuration")
+        .def("getIntArray", [](const Config& self, const std::string& key) {
+            auto val = self.getIntArray(key);
+            if (val) return *val;
+            throw py::key_error("Configuration key not found or not an integer array: " + key);
+        }, py::arg("key"), "Get integer array value from configuration")
+        // Type-specific getter methods for common parameters
+        .def("getLearningRate", [](const Config& self) {
+            auto val = self.getLearningRate();
+            if (val) return *val;
+            return 0.01; // Default learning rate
+        }, "Get learning rate parameter")
+        .def("getDecayRate", [](const Config& self) {
+            auto val = self.getDecayRate();
+            if (val) return *val;
+            return 0.99; // Default decay rate
+        }, "Get decay rate parameter")
+        .def("getPopulationSize", [](const Config& self) {
+            auto val = self.getPopulationSize();
+            if (val) return *val;
+            return 100; // Default population size
+        }, "Get population size parameter")
+        .def("getConnectionDensity", [](const Config& self) {
+            auto val = self.getConnectionDensity();
+            if (val) return *val;
+            return 0.1; // Default connection density
+        }, "Get connection density parameter")
+        .def("getMaxSynapticAge", [](const Config& self) {
+            auto val = self.getMaxSynapticAge();
+            if (val) return *val;
+            return 1000; // Default max synaptic age
+        }, "Get max synaptic age parameter")
+        .def("getEnablePlasticity", [](const Config& self) {
+            auto val = self.getEnablePlasticity();
+            if (val) return *val;
+            return true; // Default plasticity enabled
+        }, "Get plasticity enable flag")
+        .def("getEnableNeuromodulation", [](const Config& self) {
+            auto val = self.getEnableNeuromodulation();
+            if (val) return *val;
+            return true; // Default neuromodulation enabled
+        }, "Get neuromodulation enable flag")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,7 +241,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Error handling methods
+        .def("hasError", &SensoryInput::hasError, "Check if the object has an error state")
+        .def("getErrorMessage", &SensoryInput::getErrorMessage, "Get error message if any");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +255,43 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Vision processing methods
+        .def("getChannelData", [](Vision& self, size_t channel) {
+            try {
+                return self.getChannelData(channel);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error getting channel data: " + std::string(e.what()));
+            }
+        }, py::arg("channel"), "Get specific color channel data")
+        .def("applyFilter", [](Vision& self, const std::vector<float>& kernel) {
+            try {
+                self.applyFilter(kernel);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error applying filter: " + std::string(e.what()));
+            }
+        }, py::arg("kernel"), "Apply a processing filter to the image")
+        .def("normalize", [](Vision& self, float targetMean, float targetStdDev) {
+            try {
+                self.normalize(targetMean, targetStdDev);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error normalizing image: " + std::string(e.what()));
+            }
+        }, py::arg("targetMean") = 0.0f, py::arg("targetStdDev") = 1.0f, "Normalize image data")
+        .def("scale", [](Vision& self, float factor) {
+            try {
+                self.scale(factor);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error scaling image: " + std::string(e.what()));
+            }
+        }, py::arg("factor"), "Scale image dimensions by a factor")
+        .def("resize", [](Vision& self, size_t newWidth, size_t newHeight) {
+            try {
+                self.resize(newWidth, newHeight);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error resizing image: " + std::string(e.what()));
+            }
+        }, py::arg("newWidth"), py::arg("newHeight"), "Resize image to specified dimensions");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,7 +301,23 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Audio processing methods
+        .def("applyGain", [](Audio& self, float gainDb) {
+            try {
+                self.applyGain(gainDb);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error applying gain: " + std::string(e.what()));
+            }
+        }, py::arg("gainDb"), "Apply gain in dB to audio signal")
+        .def("getDuration", &Audio::getDuration, "Get audio signal duration in seconds")
+        .def("getFrequency", [](Audio& self) {
+            try {
+                return self.getFrequency();
+            } catch (const std::exception& e) {
+                throw py::value_error("Error getting frequency content: " + std::string(e.what()));
+            }
+        }, "Get frequency content of audio signal");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -207,6 +333,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
+        // String representation methods
+        .def("toString", &Action::toString, "Get string representation of action")
+        .def("fromString", [](const std::string& str) {
+            auto action = Action::fromString(str);
+            if (!action) {
+                throw py::value_error("Failed to parse action from string: " + str);
+            }
+            return action;
+        }, py::arg("str"), "Parse action from string representation"),
         .def("clone", &Action::clone);
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
@@ -401,8 +536,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        // Set default configuration values
+        config->set("learning_rate", 0.01);
+        config->set("decay_rate", 0.99);
+        config->set("population_size", 100);
+        config->set("connection_density", 0.1);
+        config->set("max_synaptic_age", 1000);
+        config->set("enable_plasticity", true);
+        config->set("enable_neuromodulation", true);
+        return config;
+    }, "Create a default configuration with sensible defaults");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
@@ -416,6 +560,122 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Specialized factory functions for common use cases
+    m.def("createSimpleRobotBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("learning_rate", 0.05);
+        config->set("decay_rate", 0.98);
+        config->set("population_size", 200);
+        config->set("connection_density", 0.15);
+        config->set("enable_plasticity", true);
+        return std::make_shared<Brain>(config);
+    }, "Create a simple robot brain with basic settings");
+
+    m.def("createLearningAgentWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(800, 600, 84, 84); // 84x84 vision for RL
+        world->setAgentStart(400, 300);
+        return world;
+    }, "Create a simple world for learning agents");
+
+    m.def("createVisionSensor", [](size_t width, size_t height, size_t channels) -> std::shared_ptr<Vision> {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, "Create a vision sensor with specified dimensions");
+
+    m.def("createAudioSensor", [](size_t sampleRate, size_t numSamples) -> std::shared_ptr<Audio> {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"), "Create an audio sensor with specified parameters");
+
+    // Utility functions for common operations
+    m.def("normalizeData", [](const std::vector<float>& data, float targetMean, float targetStdDev) {
+        if (data.empty()) return std::vector<float>{};
+        
+        float mean = 0.0f, stddev = 0.0f;
+        for (float val : data) mean += val;
+        mean /= data.size();
+        
+        for (float val : data) stddev += (val - mean) * (val - mean);
+        stddev = std::sqrt(stddev / data.size());
+        
+        if (stddev == 0.0f) stddev = 1.0f; // Avoid division by zero
+        
+        std::vector<float> result;
+        result.reserve(data.size());
+        for (float val : data) {
+            result.push_back(targetStdDev * (val - mean) / stddev + targetMean);
+        }
+        
+        return result;
+    }, py::arg("data"), py::arg("targetMean") = 0.0f, py::arg("targetStdDev") = 1.0f, 
+       "Normalize data to specified mean and standard deviation");
+
+    m.def("scaleData", [](const std::vector<float>& data, float factor) {
+        std::vector<float> result;
+        result.reserve(data.size());
+        for (float val : data) {
+            result.push_back(val * factor);
+        }
+        return result;
+    }, py::arg("data"), py::arg("factor"), "Scale all data values by a factor");
+
+    m.def("clipData", [](const std::vector<float>& data, float min, float max) {
+        std::vector<float> result;
+        result.reserve(data.size());
+        for (float val : data) {
+            result.push_back(std::max(min, std::min(max, val)));
+        }
+        return result;
+    }, py::arg("data"), py::arg("min"), py::arg("max"), "Clip data values to specified range");
+
+    // Action creation helper functions
+    m.def("createAction", [](ActionType type, const std::vector<float>& parameters) -> std::unique_ptr<Action> {
+        return std::make_unique<Action>(type, parameters);
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(), "Create an action with specified type and parameters");
+
+    m.def("createMoveAction", [](float dx, float dy) -> std::unique_ptr<Action> {
+        auto action = std::make_unique<Action>(ActionType::Custom);
+        std::vector<float> params{dx, dy};
+        action->setParameters(params);
+        return action;
+    }, py::arg("dx"), py::arg("dy"), "Create a movement action with displacement");
+
+    m.def("createLookAction", [](float angleX, float angleY) -> std::unique_ptr<Action> {
+        auto action = std::make_unique<Action>(ActionType::Look);
+        std::vector<float> params{angleX, angleY};
+        action->setParameters(params);
+        return action;
+    }, py::arg("angleX"), py::arg("angleY"), "Create a look action with angles");
+
+    // Neural ID utility functions
+    m.def("getRandomNeuronId", []() -> NeuronId {
+        uint64_t random = std::rand();
+        return NeuronId(random);
+    }, "Get a random neuron ID");
+
+    m.def("getRandomSynapseId", []() -> SynapseId {
+        uint64_t random = std::rand();
+        return SynapseId(random);
+    }, "Get a random synapse ID");
+
+    m.def("getRandomRegionId", []() -> RegionId {
+        uint64_t random = std::rand();
+        return RegionId(random);
+    }, "Get a random region ID");
+
+    // Type conversion utility functions
+    m.def("neuronIdToInt", [](const NeuronId& id) -> uint64_t { return id.index(); }, 
+          "Convert NeuronId to unsigned integer");
+
+    m.def("intToNeuronId", [](uint64_t value) -> NeuronId { return NeuronId(value); },
+          "Create NeuronId from unsigned integer");
+
+    m.def("synapseIdToInt", [](const SynapseId& id) -> uint64_t { return id.index(); },
+          "Convert SynapseId to unsigned integer");
+
+    m.def("intToSynapseId", [](uint64_t value) -> SynapseId { return SynapseId(value); },
+          "Create SynapseId from unsigned integer");
+
+    // Get invalid IDs (sentinel values)
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

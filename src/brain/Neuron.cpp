@@ -269,21 +269,32 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    float membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Validate and clamp membrane potential
+    pImpl->state.membranePotential = std::clamp(membranePotential, -100.0f, 50.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    float threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Validate threshold is reasonable
+    pImpl->state.threshold = std::clamp(threshold, -80.0f, -40.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    float restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Validate resting potential
+    pImpl->state.restingPotential = std::clamp(restingPotential, -85.0f, -60.0f);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    float resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Validate reset potential is reasonable
+    pImpl->state.resetPotential = std::clamp(resetPotential, -80.0f, -50.0f);
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
@@ -297,6 +308,9 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
 }
 
 } // namespace nlm

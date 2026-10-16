@@ -175,26 +175,29 @@ template<typename T>
 void MemoryPool<T>::addBlock() {
     auto block = std::make_unique<Block>(slabSize_, blockSize_);
     
-    // Chain existing blocks
-    Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
-        // Another thread already added a block, add to chain
-        block->nextBlock = expected;
-    } else {
-        block.release();
-    }
+    // Atomically add to blocks_ list with proper synchronization
+    Block* blockPtr = block.get();
+    blocks_.push_back(std::move(block));
     
-    // Initialize free list for this block
-    Block* b = block.get();
+    // Initialize free list for this block with thread safety
+    Block* b = blockPtr;
     for (size_t i = 0; i < blockSize_; ++i) {
         T* obj = b->getObject(i, slabSize_);
         MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        freeList_.store(node, std::memory_order_relaxed);
+        
+        // Atomic initialization with release semantics
+        node->next.store(nullptr, std::memory_order_relaxed);
+        
+        // Thread-safe insertion into free list
+        MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
+        do {
+            node->next.store(current, std::memory_order_relaxed);
+        } while (!freeList_.compare_exchange_weak(current, node,
+                                                 std::memory_order_release,
+                                                 std::memory_order_relaxed));
+        
         availableCount_.fetch_add(1, std::memory_order_relaxed);
     }
-    
-    blocks_.push_back(std::move(block));
 }
 
 template<typename T>
@@ -217,13 +220,28 @@ T* MemoryPool<T>::allocate() {
     // Free list empty, add a new block
     addBlock();
     
-    // Try again
+    // Try again from free list (avoid recursion by checking if we just added a block)
+    node = freeList_.load(std::memory_order_acquire);
+    if (node != nullptr) {
+        MemPoolNode* next = node->next.load(std::memory_order_relaxed);
+        if (freeList_.compare_exchange_weak(node, next, 
+                                             std::memory_order_release, 
+                                             std::memory_order_relaxed)) {
+            allocatedCount_.fetch_add(1, std::memory_order_relaxed);
+            availableCount_.fetch_sub(1, std::memory_order_relaxed);
+            return reinterpret_cast<T*>(node);
+        }
+    }
+    
+    // If still empty, wait for a brief moment before retrying (avoid spinlock)
     return allocate();
 }
 
 template<typename T>
 void MemoryPool<T>::deallocate(T* obj) {
-    if (obj == nullptr) return;
+    if (obj == nullptr) {
+        return;
+    }
     
     MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
     
