@@ -114,17 +114,17 @@ Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    loggers.push_back(logger);
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
+    loggers.clear();
 }
 
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (auto& logger : loggers) {
         logger->setLevel(level);
     }
 }
@@ -141,7 +141,7 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
-    for (auto& logger : pImpl->loggers) {
+    for (auto& logger : loggers) {
         logger->log(entry);
     }
 }
@@ -168,7 +168,7 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (auto& logger : loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
