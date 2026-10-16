@@ -93,13 +93,52 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling and validation
+    bool has(const std::string& key) const;
+    void remove(const std::string& key);
+    std::vector<std::string> getKeys() const;
+    void clear();
+    
+    // Error information
+    bool hasErrors() const;
+    size_t getErrorCount() const;
+    std::string getLastError() const;
+    std::vector<std::string> getAllErrors() const;
+    void clearErrors();
+    
+    // Validation utilities
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const ConfigValue& value, const std::string& key = "");
+    
 private:
+    // Error handling
+    mutable std::vector<std::string> errors_;
+    mutable size_t lastErrorIndex_;
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced setters with validation
+    bool setValidatedKeyValue(const std::string& key, const std::string& value, ConfigSource source);
+    
+    // Template instantiations for validation
+    template<typename T>
+    bool validateType(const ConfigValue& value) const;
+    
+    // Friend declaration for template implementation
+    friend class ConfigValidator;
+};
+
+// Helper class for configuration validation
+class ConfigValidator {
+public:
+    template<typename T>
+    static bool validate(const ConfigValue& value);
+};
 };
 
 } // namespace nlm

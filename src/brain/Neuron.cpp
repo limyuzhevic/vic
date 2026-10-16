@@ -259,10 +259,25 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
+// Update neuron for one simulation step
+// Implements the main integration step using LIF dynamics
+// Handles refractory period, membrane potential integration, and spike detection
+// with improved error checking and robustness
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Validate input parameters
+    if (currentTime < 0) {
+        return; // Invalid time, skip processing
+    }
+    
+    // Use the pre-computed LIF step with default timestep
+    // This maintains backward compatibility while providing better error handling
+    TimestepDuration dt = 0.001; // 1ms standard timestep
+    bool fired = stepLIF(currentTime, dt);
+    
+    // Update spike count if neuron fired
+    if (fired) {
+        pImpl->state.spikeCount++;
+    }
 }
 
 void Neuron::reset() {
@@ -272,31 +287,138 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
+    // Validate input RNG to prevent undefined behavior
+    if (!rng.isValid()) {
+        // Fallback to deterministic initialization
+        pImpl->state.membranePotential = pImpl->state.restingPotential;
+        pImpl->state.threshold = -55.0f;
+        pImpl->state.restingPotential = -70.0f;
+        pImpl->state.resetPotential = pImpl->state.restingPotential;
+        pImpl->state.refractoryPeriod = 5;
+        return;
+    }
+    
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
+    // Membrane potential starts near resting potential (biological range: -73mV to -67mV)
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
+    // Threshold is typically -55mV with small variation (biological range: -57mV to -53mV)
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV (biological range: -72mV to -68mV)
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
+    // Reset potential is usually close to resting (0-5mV above resting)
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
+    // Refractory period: 2-10ms typical (biological range: 1-20ms)
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Ensure reasonable refractory period
+    pImpl->state.refractoryPeriod = std::max(static_cast<uint32_t>(1), 
+                                          std::min(pImpl->state.refractoryPeriod, static_cast<uint32_t>(20)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.spikeCount = 0;  // Reset spike counter
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Update resting potential to reflect the new threshold relationship
+    // Ensure threshold is reachable from resting potential
+    if (pImpl->state.threshold <= pImpl->state.restingPotential) {
+        pImpl->state.threshold = pImpl->state.restingPotential + 15.0f;
+    }
 }
 
-} // namespace nlm
+/**
+ * Calculate approximate energy consumption for this step
+ * 
+ * Uses a simplified biophysical model to estimate energy used
+ * based on membrane potential changes and spike activity.
+ * 
+ * @return Energy consumption in arbitrary units
+ */
+float Neuron::calculateEnergyConsumption() const {
+    float energy = 0.0f;
+    
+    // Energy from membrane potential changes (proportional to squared voltage)
+    float potentialChange = std::abs(pImpl->state.membranePotential - pImpl->state.restingPotential);
+    energy += potentialChange * potentialChange * 0.01f;
+    
+    // Energy from synaptic activity
+    energy += std::abs(pImpl->synapticInput) * 0.1f;
+    
+    // Significant energy cost for spikes
+    if (pImpl->state.firingState == FiringState::Active) {
+        energy += 1.0f;  // Base spike cost
+        energy += pImpl->state.adaptationVariable * 0.5f;  // Adaptation cost
+    }
+    
+    // Refractory period maintenance cost
+    if (pImpl->state.refractoryRemaining > 0) {
+        energy += 0.1f * static_cast<float>(pImpl->state.refractoryRemaining);
+    }
+    
+    return std::clamp(energy, 0.0f, 100.0f);  // Clamp to reasonable range
+}
+
+namespace nlm {
+
+/**
+ * Compute comprehensive neuron statistics for monitoring and analysis
+ * 
+ * Calculates firing statistics, adaptation level, energy consumption,
+ * and activity status based on current neuron state.
+ * 
+ * @return NeuronStats containing detailed neuron metrics
+ */
+NeuronStats Neuron::getStats() const {
+    NeuronStats stats;
+    
+    // Calculate firing rate from current state
+    stats.firingRate = pImpl->state.firingRate;
+    
+    // Adaptation level from adaptation variable
+    stats.adaptationLevel = std::clamp(pImpl->state.adaptationVariable, 0.0f, 1.0f);
+    
+    // Current membrane potential
+    stats.membranePotential = pImpl->state.membranePotential;
+    
+    // Distance to threshold (positive = below threshold)
+    stats.thresholdDistance = pImpl->state.threshold - pImpl->state.membranePotential;
+    
+    // Get recent spike count from spike history
+    stats.recentSpikes = static_cast<uint32_t>(std::min(pImpl->spikeHistory.size(), 
+                                                          static_cast<size_t>(Impl::MAX_SPIKE_HISTORY)));
+    
+    // Total spikes from counter
+    stats.spikeCount = pImpl->state.spikeCount;
+    
+    // Energy consumption calculation (simplified model)
+    stats.energyConsumption = calculateEnergyConsumption();
+    
+    // Determine if neuron is active
+    stats.isActive = (pImpl->state.firingState == FiringState::Active) && 
+                     (pImpl->state.refractoryRemaining == 0);
+    
+    return stats;
+}
+
+/**
+ * Check if neuron can accept new synaptic input
+ * 
+ * Neurons in refractory period cannot receive input to prevent
+ * interference during recovery from a spike.
+ * 
+ * @return true if neuron can receive input, false otherwise
+ */
+bool Neuron::canReceiveInput() const {
+    return pImpl->state.refractoryRemaining == 0 && 
+           pImpl->state.firingState != FiringState::Refractory;
+}
