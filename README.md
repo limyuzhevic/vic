@@ -63,24 +63,280 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
+
+### Build with Python Bindings (Recommended)
+
+```bash
+# Using scikit-build-core (recommended)
+pip install -e .[dev]
+
+# Or build from source
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_PYTHON_BINDINGS=ON
+make -j4
+```
+
+### Build without Python Bindings (C++ only)
 
 ```bash
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_PYTHON_BINDINGS=OFF
 make -j4
 ```
 
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Demo
+
+```bash
+python -m examples.advanced_usage
+```
+
+This runs advanced Python examples demonstrating the enhanced NLM API.
+
+### Running Tests
+
+```bash
+# Run C++ tests
+cd build
+ctest
+
+# Run Python binding tests
+pytest tests/test_pynlm_bindings.py -v
+
+# Run all tests
+pytest tests/ -v
+```
+
+### Interactive Python
+
+```python
+import pynlm
+import numpy as np
+
+# Create and test basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("NLM Python Bindings Test")
+print("=" * 30)
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Version: {pynlm.__version__}")
+```
+
+## Python API Features
+
+The NLM Python bindings provide a comprehensive, Pythonic interface to the neural
+simulation framework with enhanced documentation, error handling, and convenience
+functions.
+
+### Key Improvements
+
+- **Enhanced Documentation**: Comprehensive docstrings and examples
+- **Better Error Handling**: Robust error handling with meaningful messages
+- **Convenience Functions**: Higher-level APIs for common patterns
+- **Type Hints**: Improved type annotations for better IDE support
+- **Test Suite**: Comprehensive test coverage for Python bindings
+- **Advanced Examples**: Example scripts demonstrating advanced usage
+- **Performance Monitoring**: Built-in performance tracking utilities
+
+### Example Usage
+
+```python
+import pynlm
+
+# Create advanced brain with custom configuration
+brain = pynlm.createBrain(
+    config=pynlm.createDefaultConfig(),
+    enable_learning=True,
+    enable_development=True
+)
+
+# Run complex simulation
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=10, visionHeight=10)
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enhanced simulation with learning
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    agent.applyRewardModulation(0.5, 0.3)
+```
+
+## Advanced Features
+
+### 1. Complete Agent System
+
+- Neural processing with LIF dynamics
+- Working memory integration
+- Episodic and semantic memory systems
+- Prediction and planning modules
+- Neuromodulation (dopamine, curiosity, novelty)
+- Developmental stages and structural plasticity
+
+### 2. Enhanced API Design
+
+- Pythonic method names and parameters
+- Comprehensive error handling and validation
+- Type hints and documentation strings
+- Context managers for resource management
+- Convenience functions for common patterns
+
+### 3. Performance Optimization
+
+- Vectorized operations where possible
+- Memory-efficient data structures
+- Performance monitoring tools
+- Configurable complexity levels
+
+### 4. Visualization and Analysis
+
+- Network visualization support
+- Statistical analysis tools
+- Performance profiling
+- Data export utilities
+
+## Files and Directories
+
+```
+NLM/
+├── python/              # Python bindings source
+│   ├── bindings.cpp     # Main pybind11 bindings
+│   └── CMakeLists.txt   # Build configuration
+├── src/                 # C++ source code
+├── examples/            # Python examples
+├── tests/               # Test suites
+├── docs/                # Documentation
+├── configs/             # Configuration files
+└── .kilo/               # Kilo configuration
+```
+
+## Testing
+
+### Python Binding Tests
+
+The test suite includes comprehensive tests for:
+
+- Basic configuration management
+- Brain simulation functionality
+- World interaction
+- Agent brain interface
+- Advanced features and integrations
+- Error handling and edge cases
+- Performance benchmarks
+
+Run Python tests:
+
+```bash
+pytest tests/test_pynlm_bindings.py -v --tb=short
+```
+
+### C++ Tests
+
+Run C++ tests:
+
+```bash
+cd build
+ctest -V
+```
+
+### Example Tests
+
+Run example scripts:
+
+```bash
+python -m examples.advanced_usage
+python -m examples.tutorial
+```
+
+## Documentation
+
+### Available Documentation
+
+- **README.md** - Project overview and setup instructions
+- **docs/API.md** - Complete Python API documentation
+- **docs/ARCHITECTURE.md** - System architecture
+- **docs/SCIENCE.md** - Scientific background
+- **docs/ROADMAP.md** - Development roadmap
+- **examples/advanced_usage.py** - Advanced usage examples
+- **examples/tutorial.py** - Tutorial for beginners
+
+### Building Documentation
+
+Build documentation:
+
+```bash
+sphinx-build -b html docs/ docs/_build/html/
+```
+
+## Contributing
+
+### Python Development
+
+1. Install development dependencies:
+   ```bash
+   pip install -e .[dev]
+   ```
+
+2. Run tests:
+   ```bash
+   pytest tests/ -v
+   ```
+
+3. Run linters:
+   ```bash
+   ruff check python/ examples/ tests/
+   ```
+
+4. Format code:
+   ```bash
+   ruff format python/ examples/ tests/
+   ```
+
+### C++ Development
+
+1. Build with tests:
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DNLM_ENABLE_PYTHON_BINDINGS=ON -DNLM_ENABLE_TESTS=ON
+   make -j4
+   ```
+
+2. Run tests:
+   ```bash
+   ctest
+   ```
+
+3. Code style:
+   ```bash
+   clang-format -i src/*.cpp src/**/*.cpp
+   ```
+
+## License
+
+MIT License. See LICENSE file for details.
 
 ## Project Structure
 

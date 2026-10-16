@@ -1,0 +1,124 @@
+pynlm
+version = "0.1.0"
+description = "Python bindings for NLM (Neural Learning Machine) with enhanced API, comprehensive testing, and advanced features"
+authors = [
+    {name = "NLM Authors"}
+]
+license = {text = "MIT"}
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "artificial", "intelligence", "neuroscience", "cognitive", "modeling"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Artificial Life",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: pybind11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "numpy>=1.20",
+    "networkx>=2.6",
+    "matplotlib>=3.5",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "black>=22.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+pynlm-demo = "examples.advanced_usage:main"
+pynlm-examples = "examples.tutorial:main"
+pynlm-benchmark = "benchmarks.performance_test:main"
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+Discussions = "https://github.com/nlm-project/nlm/discussions"
+
+[tool.scikit-build]
+cmake.minimum-version = "3.16"
+cmake.build-type = "Release"
+cmake.args = [
+    "-DCMAKE_CXX_STANDARD=20",
+    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+    "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_TESTING=ON",
+    "-DNLM_ENABLE_ADVANCED_FEATURES=ON",
+]
+
+[tool.scikit-build.cmake.define]
+NLM_SOURCE_DIR = "src"
+NLM_PYTHON_EXAMPLES = "examples"
+NLM_ENABLE_TESTING = true
+NLM_ENABLE_ADVANCED_FEATURES = true
+NLM_ENABLE_DOCUMENTATION = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "examples"]
+python_files = ["test_*.py", "*_test.py", "example_*.py"]
+python_classes = ["Test*", "Example*"]
+python_functions = ["test_*", "run_example"]
+addopts = "-v --tb=short -x --cov=pynlm --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == __main__:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "I", "W", "C90", "N", "UP"]
+ignore = []
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["E501", "W503", "N999"]
+"examples/*" = ["E501", "W503", "N999"]
+"docs/*" = ["E501", "W503"]
+
+[tool.ruff.isort]
+known-first-party = ["pynlm"]
+known-third-party = ["numpy", "matplotlib", "networkx", "pytest"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = |
+  /(
+      \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | examples
+    | tests
+  )/
