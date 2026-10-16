@@ -185,6 +185,20 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
+    // Validate configuration parameters to ensure a functional brain
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: neuron_count must be > 0");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: region_count must be > 0");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid configuration: connection_probability must be between 0.0 and 1.0");
+        return false;
+    }
+    
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
@@ -593,10 +607,23 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // This is a simple mapping - sensory encoding
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Received empty sensory input");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_ERROR("No sensory neurons available to receive input");
+        return;
+    }
+    
+    // Validate input dimensions match available sensory neurons
+    if (values.size() > numSensory) {
+        NLM_LOG_WARNING("Sensory input size (" + std::to_string(values.size()) + ") " +
+                       "exceeds available sensory neurons (" + std::to_string(numSensory) + ")");
+        // Only process up to the number of available neurons
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -614,6 +641,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
+    
+    // Log input reception for debugging
+    NLM_LOG_DEBUG("Sensory input received and distributed to " + std::to_string(numSensory) + " neurons");
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {

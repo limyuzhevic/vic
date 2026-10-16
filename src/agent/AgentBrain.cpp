@@ -20,6 +20,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Validate brain pointer - early failure if brain is null
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain: Brain pointer is null in constructor!");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -28,42 +33,86 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Validate neuron pointer before adding
+                        if (!n) {
+                            NLM_LOG_WARNING("AgentBrain: Null neuron encountered in motor population");
+                            continue;
+                        }
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        // Guard against negative modulo (shouldn't happen with size_t but defensive)
+                        int safeIdx = idx % 6;
+                        if (safeIdx < 0) safeIdx = 0;
+                        
+                        switch (safeIdx) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
+                            default: 
+                                NLM_LOG_WARNING("AgentBrain: Unexpected neuron distribution index: " + std::to_string(safeIdx));
+                                break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Validate neuron pointer before adding
+                        if (!n) {
+                            NLM_LOG_WARNING("AgentBrain: Null neuron encountered in sensory population");
+                            continue;
+                        }
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
+                        // Guard against negative modulo
+                        int safeIdx = idx % 4;
+                        if (safeIdx < 0) safeIdx = 0;
+                        
+                        switch (safeIdx) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
                             case 3: sensoryProprioception_.push_back(n); break;
+                            default: 
+                                NLM_LOG_WARNING("AgentBrain: Unexpected sensory neuron distribution index: " + std::to_string(safeIdx));
+                                break;
                         }
                     }
                 }
             }
         }
+        
+        NLM_LOG_INFO("AgentBrain initialized with " + 
+                    std::to_string(motorForward_.size()) + " motor forward neurons, " +
+                    std::to_string(motorBackward_.size()) + " motor backward neurons, " +
+                    std::to_string(motorTurnLeft_.size()) + " motor turn left neurons, " +
+                    std::to_string(motorTurnRight_.size()) + " motor turn right neurons, " +
+                    std::to_string(motorInteract_.size()) + " motor interact neurons, " +
+                    std::to_string(motorWait_.size()) + " motor wait neurons");
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::initialize: Brain pointer is null!");
+        return;
+    }
+    
+    // Validate world parameter
+    if (!world.getVisionWidth() || !world.getVisionHeight()) {
+        NLM_LOG_WARNING("AgentBrain::initialize: World has zero vision dimensions");
+    }
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -71,7 +120,8 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -85,10 +135,20 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::processSensoryInput: Brain pointer is null!");
+        return;
+    }
+    
+    // Validate percept - check if all signal vectors have consistent dimensions
+    const auto& vision = percept.getVision();
+    if (!vision.empty() && vision.size() != percept.getVisionWidth() * percept.getVisionHeight()) {
+        NLM_LOG_WARNING("AgentBrain::processSensoryInput: Vision data size mismatch. " +
+                       std::to_string(vision.size()) + " != " +
+                       std::to_string(percept.getVisionWidth() * percept.getVisionHeight()));
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
@@ -215,18 +275,43 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
+        // Validate random generator exists before using it
+        if (!brain_ || !brain_->getRandomGenerator()) {
+            NLM_LOG_WARNING("AgentBrain::selectWithCuriosity: Cannot explore - missing random generator");
+            return defaultCmd;
+        }
+        
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command with additional exploration options
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 10);  // 11 options including LookLeft/LookRight
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
+                case 4: return MotorCommand::LookLeft;  // Additional exploration action
+                case 5: return MotorCommand::LookRight; // Additional exploration action
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
+                case 8: 
+                    // More advanced exploration - cycle through all motor commands
+                    // This helps break habitual patterns
+                    int allChoices = brain_->getRandomGenerator()->uniformInt(0, 6);
+                    switch (allChoices) {
+                        case 0: return MotorCommand::MoveForward;
+                        case 1: return MotorCommand::MoveBackward;
+                        case 2: return MotorCommand::TurnLeft;
+                        case 3: return MotorCommand::TurnRight;
+                        case 4: return MotorCommand::Interact;
+                        default: return MotorCommand::Wait;
+                    }
+                case 9: 
+                    // Randomly pause (Wait) to allow observation
+                    return MotorCommand::Wait;
+                case 10:
+                    // Randomly repeat the same action (habit loop disruption)
+                    return defaultCmd;
                 default: return MotorCommand::Wait;
             }
         }
