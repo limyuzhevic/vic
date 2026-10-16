@@ -12,8 +12,6 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
----
-
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
