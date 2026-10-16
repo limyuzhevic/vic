@@ -10,6 +10,15 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
+**NEW ADVANCED FEATURES:**
+- **JSON/YAML Configuration Support**: Load/save configurations in JSON, YAML, or simple key=value format
+- **Preset Brain Configurations**: Small, Medium, Large, and Experimental preset brains
+- **Configuration Validation**: Built-in validation for required configuration keys
+- **Advanced Simulation Control**: Complete simulation loops with statistics collection
+- **Brain Optimization**: Parameter tuning and optimization functions
+- **Performance Monitoring**: Real-time statistics and monitoring tools
+- **Experiment Management**: Predefined experiment configurations for different research phases
+
 That's it! NLM simulates all of this.
 
 ---

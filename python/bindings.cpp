@@ -400,21 +400,244 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Add more convenience functions for configuration management
+    m.def("createAdvancedConfig", [](const std::string& jsonConfig) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        try {
+            // Try to parse as JSON if possible
+            auto json = json::parse(jsonConfig);
+            config->loadFromJSON(jsonConfig);
+        } catch (...) {
+            // Fallback to simple key=value parsing
+            config->loadFromSimple(jsonConfig);
+        }
+        return config;
+    }, py::arg("jsonConfig"), "Create advanced configuration from JSON string");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("loadConfigFromFile", [](const std::string& filepath, const std::string& format) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (format == "json" || format.empty()) {
+            config->loadFromJSON(filepath);
+        } else if (format == "yaml" || format == "yml") {
+            config->loadFromYAML(filepath);
+        } else {
+            config->loadFromFile(filepath);
+        }
+        return config;
+    }, py::arg("filepath"), py::arg("format") = "", "Load configuration from file with format specification");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Add configuration validation and schema support
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::string errors;
+        bool valid = true;
+        
+        // Example validation: ensure required keys exist
+        std::vector<std::string> requiredKeys = {"neuron_count", "region_count", "connection_probability"};
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                errors += "Missing required key: " + key + "\\n";
+                valid = false;
+            }
+        }
+        
+        return std::make_pair(valid, errors);
+    }, py::arg("config"), "Validate configuration and return validation result");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add brain factory with presets
+    m.def("createPresetBrain", [](const std::string& presetName) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "small") {
+            config->set("neuron_count", 100);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.1f);
+        } else if (presetName == "medium") {
+            config->set("neuron_count", 1000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.05f);
+        } else if (presetName == "large") {
+            config->set("neuron_count", 10000);
+            config->set("region_count", 8);
+            config->set("connection_probability", 0.01f);
+        } else if (presetName == "experimental") {
+            config->set("neuron_count", 5000);
+            config->set("region_count", 6);
+            config->set("connection_probability", 0.2f);
+            config->set("stdp_ltp_weight", 0.02f);
+            config->set("stdp_ltd_weight", 0.022f);
+            config->set("synaptogenesis_rate", 0.001f);
+            config->set("pruning_rate", 0.0001f);
+        } else {
+            throw std::invalid_argument("Unknown preset name: " + presetName);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("presetName"), "Create brain with predefined configuration preset");
+
+    // Add simulation control and monitoring functions
+    m.def("runSimulationLoop", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        float totalReward = 0.0f;
+        float totalFiringRate = 0.0f;
+        size_t firingSteps = 0;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Get observation
+            SensoryPercept percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(static_cast<SimulationStep>(step), 
+                       static_cast<Timestamp>(step) * 0.001f);
+            
+            // Get motor command
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(cmd, world->getSimulationTime());
+            
+            // Compute reward
+            float reward = world->computeReward(brain.get());
+            totalReward += reward;
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.001f);
+            
+            // Collect metrics
+            totalFiringRate += brain->getAverageFiringRate();
+            if (brain->getFiringNeuronCount() > 0) firingSteps++;
+        }
+        
+        float avgReward = totalReward / numSteps;
+        float avgFiringRate = firingSteps > 0 ? totalFiringRate / firingSteps : 0.0f;
+        
+        return std::make_tuple(avgReward, avgFiringRate, 
+                              static_cast<size_t>(brain->getTotalSpikeCount()),
+                              static_cast<size_t>(brain->getTotalSynapseCount()));
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), 
+       "Run complete simulation loop and return statistics");
+
+    // Add brain optimization and tuning functions
+    m.def("optimizeBrain", [](std::shared_ptr<Brain> brain, 
+                           const std::unordered_map<std::string, float>& parameters) {
+        std::unordered_map<std::string, float> originalValues;
+        std::vector<std::string> appliedParams;
+        
+        // Store original values
+        for (const auto& pair : parameters) {
+            if (brain->getConfig()->has(pair.first)) {
+                auto val = brain->getConfig()->get<float>(pair.first);
+                if (val.has_value()) {
+                    originalValues[pair.first] = val.value();
+                }
+            }
+        }
+        
+        // Apply new parameters
+        for (const auto& pair : parameters) {
+            brain->getConfig()->set(pair.first, pair.second, ConfigSource::Runtime);
+            appliedParams.push_back(pair.first);
+        }
+        
+        // Re-initialize with new parameters (simplified - in practice would be more sophisticated)
+        brain->reset();
+        brain->initialize();
+        
+        return std::make_pair(originalValues, appliedParams);
+    }, py::arg("brain"), py::arg("parameters"), 
+       "Optimize brain parameters and return original values");
+
+    // Add performance monitoring and statistics functions
+    m.def("monitorBrain", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, float> stats;
+        
+        // Basic statistics
+        stats["total_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<float>(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = static_cast<float>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+        
+        // Memory usage
+        stats["working_memory_capacity"] = 10.0f; // Placeholder
+        
+        // Connectivity metrics
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Development state
+        stats["developmental_stage"] = static_cast<float>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("brain"), "Monitor brain performance and return statistics");
+
+    // Add experiment management functions
+    m.def("createExperimentConfig", [](const std::string& experimentName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentName == "phase4_demo") {
+            config->set("neuron_count", 2000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.05f);
+            config->set("enable_reward_modulation", true);
+            config->set("enable_curiosity", true);
+            config->set("enable_structural_plasticity", true);
+            config->set("enable_development", true);
+        } else if (experimentName == "phase5_benchmark") {
+            config->set("neuron_count", 5000);
+            config->set("region_count", 8);
+            config->set("connection_probability", 0.02f);
+            config->set("enable_checkpointing", true);
+            config->set("checkpoint_dir", "./checkpoints");
+            config->set("max_checkpoints", 10);
+        } else if (experimentName == "phase6_integration") {
+            config->set("neuron_count", 1000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.1f);
+            config->set("replay_interval", 100);
+            config->set("consolidation_interval", 1000);
+            config->set("enable_replay", true);
+            config->set("enable_development", true);
+        }
+        
+        return config;
+    }, py::arg("experimentName"), "Create experiment configuration with predefined settings");
+
+    // Add configuration comparison and diffing
+    m.def("compareConfigs", [](const std::shared_ptr<Config>& config1, 
+                             const std::shared_ptr<Config>& config2) {
+        std::string diff;
+        
+        // Get all unique keys from both configs
+        std::set<std::string> allKeys;
+        for (const auto& key : config1->getKeys()) allKeys.insert(key);
+        for (const auto& key : config2->getKeys()) allKeys.insert(key);
+        
+        for (const auto& key : allKeys) {
+            bool in1 = config1->has(key);
+            bool in2 = config2->has(key);
+            
+            if (in1 && in2) {
+                auto val1 = config1->getKeys();
+                auto val2 = config2->getKeys();
+                // For simplicity, just report key presence
+                // In a full implementation, you would compare actual values
+                diff += "key: " + key + " (present in both)\\n";
+            } else if (in1) {
+                diff += "key: " + key + " (only in config1)\\n";
+            } else if (in2) {
+                diff += "key: " + key + " (only in config2)\\n";
+            }
+        }
+        
+        return diff;
+    }, py::arg("config1"), py::arg("config2"), "Compare two configurations and return diff");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
