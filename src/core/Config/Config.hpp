@@ -31,16 +31,26 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
+// Configuration validation types
+struct ConfigValidationRule {
     std::string key;
-    ConfigValue value;
-    ConfigSource source;
+    std::string type; // "int", "int64_t", "double", "bool", "string"
+    std::string validation; // "positive", "non-negative", "range:min-max", "enum:value1,value2"
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigValidationRule(const std::string& k, const std::string& t, 
+                        const std::string& v = "", const std::string& d = "")
+        : key(k), type(t), validation(v), description(d) {}
+};
+
+// Configuration validation error
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    ConfigSource source;
+    
+    ConfigValidationError(const std::string& k, const std::string& msg, ConfigSource src)
+        : key(k), message(msg), source(src) {}
 };
 
 // Main configuration class
@@ -93,6 +103,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    void validate() const;
+    void addValidationRule(const ConfigValidationRule& rule);
+    const std::vector<ConfigValidationRule>& getValidationRules() const;
+    
+    // Set validation enabled/disabled
+    void setValidationEnabled(bool enabled) { validationEnabled = enabled; }
+    bool isValidationEnabled() const { return validationEnabled; }
+    
+    // Get validation errors
+    const std::vector<ConfigValidationError>& getValidationErrors() const { return validationErrors; }
+    
+    // Clear validation errors
+    void clearValidationErrors() { validationErrors.clear(); }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +125,21 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration validation helpers
+    bool validateValue(const ConfigEntry& entry) const;
+    bool validateType(const std::string& key, const ConfigValue& value) const;
+    bool validateRange(const std::string& key, const ConfigValue& value) const;
+    
+    // Validation system
+    std::vector<ConfigValidationRule> validationRules;
+    std::vector<ConfigValidationError> validationErrors;
+    bool validationEnabled{true};
+    
+    // Predefined validation rules
+    void initializeValidationRules();
 };
+
+} // namespace nlm
 
 } // namespace nlm
