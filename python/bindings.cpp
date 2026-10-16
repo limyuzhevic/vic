@@ -420,6 +420,154 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // ============================================================================
+    // Enhanced Python API Functions for Phase 6 Integration
+    // ============================================================================
+
+    // Memory System Functions
+    m.def("memory_stats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        if (brain->getWorkingMemory()) {
+            stats["working_memory_traces"] = brain->getWorkingMemory()->getActiveTraces();
+            stats["working_memory_capacity"] = brain->getWorkingMemory()->getCapacity();
+            stats["working_memory_neuron_count"] = brain->getWorkingMemory()->getMemoryNeurons().size();
+        }
+        if (brain->getEpisodicMemory()) {
+            stats["episodic_memory_episodes"] = brain->getEpisodicMemory()->getEpisodeCount();
+            stats["episodic_memory_capacity"] = brain->getEpisodicMemory()->getCapacity();
+        }
+        if (brain->getAssociativeMemory()) {
+            stats["associative_memory_strength"] = brain->getAssociativeMemory()->getStrength();
+        }
+        return stats;
+    }, py::arg("brain"), "Get detailed memory system statistics");
+
+    m.def("get_working_memory_traces", [](std::shared_ptr<Brain> brain) {
+        std::vector<float> traces;
+        if (brain->getWorkingMemory()) {
+            traces = brain->getWorkingMemory()->getActiveTraces();
+        }
+        return traces;
+    }, py::arg("brain"), "Get working memory activity traces");
+
+    m.def("get_episodic_memory_episodes", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::shared_ptr<EpisodicMemoryItem>> episodes;
+        if (brain->getEpisodicMemory()) {
+            // Convert episodic memory items to Python list (simplified)
+            size_t episode_count = brain->getEpisodicMemory()->getEpisodeCount();
+            for (size_t i = 0; i < episode_count && i < 10; ++i) {
+                episodes.push_back(nullptr);  // Placeholder for actual implementation
+            }
+        }
+        return episodes;
+    }, py::arg("brain"), "Get episodic memory episodes");
+
+    m.def("store_experience", [](std::shared_ptr<Brain> brain, const std::vector<float>& experience) {
+        if (brain->getEpisodicMemory() && !experience.empty()) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = static_cast<SimulationStep>(brain->getTotalSpikeCount());
+            episode.reward = brain->getNeuromodulationLevel();
+            episode.pattern = experience;
+            brain->getEpisodicMemory()->storeEpisode(episode);
+        }
+    }, py::arg("brain"), py::arg("experience"), "Store experience in episodic memory");
+
+    // Prediction System Functions
+    m.def("get_prediction_error", [](std::shared_ptr<Brain> brain) {
+        float error = 0.0f;
+        if (brain->getPredictionSystem()) {
+            error = brain->getPredictionSystem()->getPredictionError();
+        }
+        return error;
+    }, py::arg("brain"), "Get current prediction error");
+
+    m.def("get_prediction_confidence", [](std::shared_ptr<Brain> brain) {
+        float confidence = 0.0f;
+        if (brain->getPredictionSystem()) {
+            confidence = brain->getPredictionSystem()->getConfidence();
+        }
+        return confidence;
+    }, py::arg("brain"), "Get prediction confidence");
+
+    m.def("get_prediction_history", [](std::shared_ptr<Brain> brain) {
+        std::vector<float> history;
+        if (brain->getPredictionSystem()) {
+            history = brain->getPredictionSystem()->getErrorHistory();
+        }
+        return history;
+    }, py::arg("brain"), "Get prediction error history");
+
+    m.def("clear_prediction_history", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            brain->getPredictionSystem()->clearHistory();
+        }
+    }, py::arg("brain"), "Clear prediction error history");
+
+    // Neuromodulator Functions
+    m.def("get_neuromodulation_summary", [](std::shared_ptr<Brain> brain) {
+        py::dict summary;
+        if (brain->getDopamine()) {
+            summary["dopamine"] = brain->getDopamine()->getLevel();
+        }
+        if (brain->getCuriosity()) {
+            summary["curiosity"] = brain->getCuriosity()->getLevel();
+        }
+        if (brain->getNovelty()) {
+            summary["novelty"] = brain->getNovelty()->getLevel();
+        }
+        if (brain->getPredictionError()) {
+            summary["prediction_error"] = brain->getPredictionError()->getError();
+        }
+        if (brain->getAttention()) {
+            summary["attention_focus"] = brain->getAttention()->getFocus();
+        }
+        return summary;
+    }, py::arg("brain"), "Get neuromodulation system summary");
+
+    m.def("apply_external_stimulus", [](std::shared_ptr<Brain> brain, const std::vector<float>& stimulus) {
+        if (brain->getWorkingMemory() && !stimulus.empty()) {
+            brain->getWorkingMemory()->store(stimulus, 1.0f);
+        }
+        // Also inject into sensory neurons if available
+        brain->injectCurrentToNeurons(NeuronType::Sensory, stimulus.size() > 0 ? stimulus[0] * 10.0f : 5.0f);
+    }, py::arg("brain"), py::arg("stimulus"), "Apply external stimulus to the brain");
+
+    // Development System Functions
+    m.def("get_development_summary", [](std::shared_ptr<Brain> brain) {
+        py::dict summary;
+        summary["stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        summary["stage_name"] = brain->getDevelopmentalStageName();
+        summary["age"] = brain->getDevelopmentAge();
+        summary["plasticity_modifier"] = brain->getPlasticityModifier();
+        return summary;
+    }, py::arg("brain"), "Get development system summary");
+
+    m.def("trigger_development_event", [](std::shared_ptr<Brain> brain, const std::string& eventName) {
+        DevelopmentalEvent event = stringToDevelopmentalEvent(eventName);
+        if (brain->getDevelopmentSystem()) {
+            brain->getDevelopmentSystem()->triggerEvent(event, brain);
+        }
+    }, py::arg("brain"), py::arg("eventName"), "Trigger a development event");
+
+    // Performance and Monitoring Functions
+    m.def("get_system_status", [](std::shared_ptr<Brain> brain) {
+        py::dict status;
+        status["brain_initialized"] = true;
+        status["total_neurons"] = brain->getTotalNeuronCount();
+        status["total_synapses"] = brain->getTotalSynapseCount();
+        status["firing_neuron_count"] = brain->getFiringNeuronCount();
+        status["average_firing_rate"] = brain->getAverageFiringRate();
+        status["total_spikes"] = brain->getTotalSpikeCount();
+        status["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        status["neuromodulation_active"] = brain->getNeuromodulationLevel() > 0.0f;
+        return status;
+    }, py::arg("brain"), "Get comprehensive system status");
+
+    // Helper function to convert string to developmental event
+    m.def("string_to_developmental_event", [](const std::string& eventName) {
+        return stringToDevelopmentalEvent(eventName);
+    }, py::arg("eventName"), "Convert string to developmental event");
 }
 
 } // namespace nlm

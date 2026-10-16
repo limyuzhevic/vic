@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,18 +132,31 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Initialize cognition systems with brain reference
+        if (pImpl->planner) {
+            pImpl->planner->initialize(this);
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->initialize(this);
+        }
+        if (pImpl->attention) {
+            pImpl->attention->initialize(this);
+        }
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        // Initialize neuromodulation systems that require brain reference
+        if (pImpl->curiosity) {
+            pImpl->curiosity->initialize(this);
+        }
+        if (pImpl->novelty) {
+            pImpl->novelty->initialize(this);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->initialize(this);
+        }
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -510,9 +526,60 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create sensory input from the current activity of sensory neurons
+        // This represents what the brain "expects" to receive
+        SensoryInput predictedInput;
+        std::vector<float> predictedData;
+        
+        // Use the current membrane potentials of sensory neurons as prediction
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential);
+            predictedData.push_back(activation);
+        }
+        
+        predictedInput.setData(predictedData);
+        
+        // Predict next state (simplified version)
+        auto actualInput = predictedInput;  // For now, use the same input as actual
+        
+        // Update prediction system
+        pImpl->predictionSystem->updatePredictions(predictedInput, actualInput);
+        
+        // Use prediction error to modulate learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError > 0.1f) {  // Significant prediction error
+            // Apply prediction error to affect synaptic plasticity
+            // Higher prediction error -> more learning
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Modulate synaptic weight change based on prediction error
+                    if (syn->getPlasticityFlags().stdp) {
+                        const auto& preSpikes = syn->getPreSpikeHistory();
+                        const auto& postSpikes = syn->getPostSpikeHistory();
+                        
+                        if (!preSpikes.empty() && !postSpikes.empty()) {
+                            // Apply additional learning factor based on prediction error
+                            float learningFactor = std::min(predictionError * 2.0f, 1.0f);
+                            
+                            // Get current weight
+                            float currentWeight = syn->getWeight();
+                            
+                            // Apply additional change based on prediction error
+                            // This simulates how prediction errors can drive learning
+                            if (currentWeight > 0) {
+                                currentWeight += learningFactor * 0.001f * (1.0f - learningFactor);
+                            } else {
+                                currentWeight -= learningFactor * 0.001f * (1.0f - learningFactor);
+                            }
+                            
+                            syn->setWeight(currentWeight);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +595,77 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Convert current neural activity to feature vector
+        std::vector<float> currentFeatures;
+        
+        // Sample from active neurons to create feature vector
+        size_t sampleSize = std::min(static_cast<size_t>(10), pImpl->regions.size() * 2);
+        
+        // Collect neural activation patterns
+        for (size_t i = 0; i < sampleSize && i < pImpl->regions.size(); ++i) {
+            auto* region = pImpl->regions[i].get();
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentFeatures.push_back(activation);
+                }
+            }
+        }
+        
+        // Extract reward from neuromodulation
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation
+        if (!currentFeatures.empty()) {
+            pImpl->conceptFormation->presentExperience(currentFeatures, currentFeatures, reward, currentTime);
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Get current neural state for planning
+        std::vector<float> currentState;
+        
+        // Sample from active neurons to create planning state
+        size_t sampleSize = std::min(static_cast<size_t>(5), pImpl->regions.size());
+        
+        for (size_t i = 0; i < sampleSize && i < pImpl->regions.size(); ++i) {
+            auto* region = pImpl->regions[i].get();
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Get current reward for planning
+        float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Plan action based on current state and reward
+        if (!currentState.empty()) {
+            ActionType plannedAction = pImpl->planner->planAction(currentState, currentReward);
+            
+            // Store planned action in working memory if it's actionable
+            if (plannedAction != ActionType::Wait && plannedAction != ActionType::None) {
+                // Create a reward signal for the planned action
+                if (pImpl->workingMemory) {
+                    // Encode the planned action in working memory
+                    pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[0]->getId(), 0.5f);
+                }
+                
+                // Apply the planned action to motor neurons
+                if (plannedAction == ActionType::MoveForward) {
+                    pImpl->injectCurrentToNeurons(NeuronType::Motor, 5.0f);
+                } else if (plannedAction == ActionType::TurnLeft) {
+                    pImpl->injectCurrentToNeurons(NeuronType::Motor, 3.0f);
+                } else if (plannedAction == ActionType::TurnRight) {
+                    pImpl->injectCurrentToNeurons(NeuronType::Motor, -3.0f);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -583,9 +719,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
-    }
+    // Note: CheckpointManager automated checkpointing is commented out
+    // to avoid unintended saves during regular simulation.
+    // Use Brain::save() and Brain::load() for explicit checkpoint control.
+    // if (pImpl->checkpointManager) {
+    //     pImpl->checkpointManager->update(currentStep, currentTime);
+    // }
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -916,20 +1055,30 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    NLM_LOG_DEBUG("Getting region with ID: " + std::to_string(id));
+    
     for (auto& region : pImpl->regions) {
         if (region->getId() == id) {
+            NLM_LOG_DEBUG("Found region with ID: " + std::to_string(id));
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region with ID " + std::to_string(id) + " not found");
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    NLM_LOG_DEBUG("Getting region with ID: " + std::to_string(id));
+    
     for (const auto& region : pImpl->regions) {
         if (region->getId() == id) {
+            NLM_LOG_DEBUG("Found region with ID: " + std::to_string(id));
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region with ID " + std::to_string(id) + " not found");
     return nullptr;
 }
 
