@@ -256,6 +256,133 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
+### Using Improved Bindings
+
+The improved bindings provide enhanced user experience with high-level abstractions. They offer:
+
+#### Enhanced Configuration Builder
+
+```python
+import pynlm
+
+# Create configuration using fluent interface
+config = (pynlm.ConfigBuilder()
+          .setNeuronCount(1000)
+          .setRegionCount(2)
+          .setConnectionProbability(0.15)
+          .setSTDPParameters(0.01, 0.012, 20.0)
+          .setStructuralPlasticity(0.0001, 0.00001)
+          .setMemoryCapacity(1000, 500)
+          .enableNeuromodulation(True)
+          .setDopamineLevel(0.8)
+          .enableDevelopment(True)
+          .setSimulation(0.001, 1000)
+          .build())
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### High-level Simulation Manager
+
+```python
+import pynlm
+
+# Create simulation manager with high-level control
+sim = pynlm.SimulationManager(config)
+
+# Run simulation
+for step in range(500):
+    sim.runSteps(1)
+
+# Get detailed statistics
+stats = sim.getStatistics()
+print(f"Neurons: {stats['neuron_count']}")
+print(f"Synapses: {stats['synapse_count']}")
+print(f"Active neurons: {stats['active_neurons']}")
+print(f"Total spikes: {stats['total_spikes']}")
+```
+
+#### Agent Manager
+
+```python
+import pynlm
+
+# Create agent manager with high-level interface
+agent = pynlm.AgentManager()
+
+# Configure world and run episode
+agent.configureWorld(50, 50, 10, 10)
+agent.setAgentPosition(25.0, 25.0)
+agent.runEpisode(200)
+
+# Get episode results
+results = agent.getEpisodeResults()
+print(f"Episode completed: {results['total_steps']} steps")
+print(f"Final curiosity: {results['final_curiosity']:.3f}")
+```
+
+#### Convenience Utilities
+
+```python
+import pynlm
+
+# Create vision input
+data = [i % 255 for i in range(300)]
+vision = pynlm.createVisionInput(10, 10, 3, data)
+
+# Create audio input
+samples = [math.sin(i * 0.1) * 0.5 + 0.5 for i in range(1000)]
+audio = pynlm.createAudioInput(44100, samples)
+
+# Create custom action
+action = pynlm.createAction(pynlm.ActionType.Interact)
+
+# Calculate neural similarity
+similarity = pynlm.neuralSimilarity(pattern1, pattern2)
+```
+
+#### Preset Configurations
+
+```python
+import pynlm
+
+# Get different preset configurations
+configs = {
+    "default": pynlm.getPresetConfig("default"),
+    "performance": pynlm.getPresetConfig("performance"),
+    "research": pynlm.getPresetConfig("research")
+}
+
+# Use appropriate config based on use case
+for name, config in configs.items():
+    print(f"{name}: {config.getOr<int64_t>('neuron_count', 0)} neurons")
+```
+
+### Using CLI Tool
+
+The NLM Python CLI provides command-line access to common operations:
+
+```bash
+# Create a brain with configuration
+python nlm_cli.py create --neurons 1000 --regions 2
+
+# Run simulation
+python nlm_cli.py simulate --steps 500
+
+# Run agent simulation
+python nlm_cli.py agent --world-width 20 --world-height 20 --steps 200
+
+# Show statistics
+python nlm_cli.py stats
+
+# Save brain state
+python nlm_cli.py save --file brain_state.nlm
+
+# Load brain state
+python nlm_cli.py load --file brain_state.nlm
+```
+
 ### Key Classes and Methods
 
 #### Brain Class
