@@ -1,26 +1,6 @@
-# NLM — 熙然
-
-**An Experimental Artificial Developmental Brain**
-
-## What is NLM?
-
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
-
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
-
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
-
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION**  
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
@@ -75,12 +55,33 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2: Basic Neural Computation (nlm)
+```bash
+./nlm
+```
+
+This runs the Phase 2 demonstration of real spiking neural computation with LIF neurons, STDP and Hebbian plasticity, and structural plasticity.
+
+### Phase 3: World Interaction (nlm_phase3_demo)
+```bash
+./nlm_phase3_demo
+```
+
+This runs Phase 3 experiments with world interaction, sensory processing, and basic reward learning.
+
+### Phase 4: Cognitive Integration (nlm_phase4_demo)
+```bash
+./nlm_phase4_demo
+```
+
+This runs Phase 4 experiments demonstrating emergent cognition including working memory, episodic memory, prediction, and planning.
+
+### Phase 6: Final Integration Test (nlm_phase6_demo)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the comprehensive Phase 6 integration test verifying that all brain systems work together as a coherent artificial brain.
 
 ## Project Structure
 
@@ -101,15 +102,15 @@ NLM/
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```

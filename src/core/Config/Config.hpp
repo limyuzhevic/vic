@@ -43,7 +43,39 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration schema definition
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string type; // "int", "int64", "double", "bool", "string", "float", "vector_int", "vector_double", "vector_string"
+    ConfigSource source; // Required source for this field
+    std::string description;
+    bool required;
+    std::string defaultValue; // Default value if field is missing
+    
+    ConfigSchemaEntry() : key(), type(), source(ConfigSource::Default), description(), required(false), defaultValue() {}
+    ConfigSchemaEntry(const std::string& k, const std::string& t, ConfigSource s, const std::string& desc, bool req = false, const std::string& def = "")
+        : key(k), type(t), source(s), description(desc), required(req), defaultValue(def) {}
+};
+
+// Configuration validation result
+struct ConfigValidationResult {
+    bool valid;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    ConfigValidationResult() : valid(true), errors(), warnings() {}
+    
+    void addError(const std::string& error) {
+        valid = false;
+        errors.push_back(error);
+    }
+    
+    void addWarning(const std::string& warning) {
+        warnings.push_back(warning);
+    }
+};
+
+// Configuration class with validation
 class Config {
 public:
     Config();
@@ -93,6 +125,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    static const std::vector<ConfigSchemaEntry>& getDefaultSchema();
+    ConfigValidationResult validate(const std::vector<ConfigSchemaEntry>& schema = getDefaultSchema()) const;
+    bool validateField(const std::string& key, const std::string& expectedType) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +137,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Schema definition
+    static std::vector<ConfigSchemaEntry> defaultSchema;
+    
+    // Type checking helpers
+    static bool checkType(const ConfigValue& value, const std::string& typeName);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
