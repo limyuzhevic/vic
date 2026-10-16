@@ -2,22 +2,6 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
-
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
-
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
-
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
-
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
@@ -104,14 +88,197 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
+│   ├── cognition/     # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
+```
+
+## Python Bindings
+
+NLM includes Python bindings via pybind11. The Python API (`pynlm`) provides access to:
+
+- **Brain**: Central neural simulation with integrated systems
+- **Config**: Configuration management
+- **AgentBrain**: Interface between brain and world
+- **SimpleWorld**: 2D simulation environment
+- **SensoryInput**: Vision, audio, and internal signals
+- **Action**: Motor commands and behaviors
+
+### Python Installation
+
+```bash
+pip install scikit-build-core pybind11 pytest numpy
+cd /path/to/nlm
+pip install -e .
+```
+
+### Basic Python Usage
+
+```python
+import pynlm
+
+# Create brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run a simple simulation
+for step in range(1000):
+    brain.step(step)
+
+print(f"Simulation complete. Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Complete Agent Example
+
+```python
+import pynlm
+
+def run_complete_simulation():
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create and initialize brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 3. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 4. Initialize agent with world
+    agent.initialize(world)
+    
+    # 5. Enable advanced subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 6. Run simulation loop
+    for step in range(1000):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get and process sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command and apply action
+        motor_cmd = agent.decodeMotorCommand()
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print statistics periodically
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the complete simulation
+run_complete_simulation()
+```
+
+### Key Python Classes
+
+#### Brain Class
+```python
+brain = pynlm.createBrain(config)
+
+# Initialization
+brain.initialize()
+
+# Simulation
+brain.step(step_number)           # Run one simulation step
+brain.reset()                      # Reset brain state
+brain.save("checkpoint.bin")       # Save state
+brain.load("checkpoint.bin")       # Load state
+
+# Statistics
+brain.getTotalNeuronCount()       # Total neurons
+brain.getTotalSynapseCount()      # Total synapses
+brain.getFiringNeuronCount()      # Currently firing
+brain.getAverageFiringRate()      # Average firing rate
+brain.getExcitationInhibitionRatio()  # E/I balance
+brain.getTotalSpikeCount()        # Total spikes
+brain.getDevelopmentalStage()     # Current developmental stage
+```
+
+#### AgentBrain Class
+```python
+agent = pynlm.createAgentBrain(brain)
+
+# Initialization
+agent.initialize(world)
+
+# Sensory processing
+agent.processSensoryInput(percept)
+
+# Motor decoding
+motor_cmd = agent.decodeMotorCommand()
+
+# Neuromodulation
+agent.applyRewardModulation(reward, predicted_reward)
+agent.updateDevelopment(timestep)
+
+# Development information
+agent.getDevelopmentalStage()
+agent.getNeuromodulationLevel()
+agent.getCuriosityLevel()
+agent.getNoveltyLevel()
+agent.getPredictionError()
+
+# Subsystem enable/disable
+agent.enableRewardModulation(True/False)
+agent.enableStructuralPlasticity(True/False)
+agent.enableDevelopment(True/False)
+agent.enableCuriosity(True/False)
+```
+
+#### SimpleWorld Class
+```python
+world = pynlm.createSimpleWorld()
+
+# Configuration
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+
+# Control
+world.reset()
+world.update(timestep)
+world.setAgentStart(x, y)
+world.applyMotorCommand(motor_cmd, current_time)
+
+# State access
+percept = world.getSensoryPercept()
+body = world.getAgentBody()
+
+# Properties
+world.getWidth()
+world.getHeight()
+world.getSimulationTime()
+world.getMaxEnergy()
 ```
 
 ## Phase Summary
