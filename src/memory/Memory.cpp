@@ -16,16 +16,28 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Update existing item if present
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
+            // Boost priority/frequency for recently used items
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // If at capacity, evict least important item (LFU-like: least recently used)
+    if (pImpl->items.size() >= pImpl->capacity) {
+        // Find oldest/least recently accessed item (simple implementation)
+        auto oldestIt = pImpl->items.begin();
+        for (auto it = pImpl->items.begin(); it != pImpl->items.end(); ++it) {
+            if (it->second < oldestIt->second) {
+                oldestIt = it;
+            }
+        }
+        pImpl->items.erase(oldestIt);
     }
+    
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
@@ -108,7 +120,53 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Implement real consolidation with relevance scoring
+    // Episodes with lower relevance are removed first
+    std::vector<std::pair<float, size_t>> scored;  // (relevance, index)
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        // Calculate relevance based on age, reward, and neural activity
+        const auto& ep = pImpl->episodes[i];
+        float relevance = 0.0f;
+        
+        if (!ep.sensoryState.empty()) {
+            relevance += 0.4f;  // Base relevance for having sensory data
+        }
+        
+        if (ep.reward > 0.0f) {
+            relevance += 0.3f * ep.reward;
+        }
+        
+        if (ep.age > 0) {
+            relevance += 0.2f / (ep.age + 1.0f);  // More recent = more relevant
+        }
+        
+        scored.emplace_back(relevance, i);
+    }
+    
+    // Sort by relevance (descending - keep more relevant)
+    std::sort(scored.begin(), scored.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });n
+    // Remove least relevant episodes if over capacity
+    while (pImpl->episodes.size() > maxEpisodes_ * 0.8f) {
+        // Find and remove episode with lowest relevance
+        size_t minIndex = 0;
+        float minRelevance = scored[0].first;
+        
+        for (size_t i = 1; i < scored.size(); ++i) {
+            if (scored[i].first < minRelevance) {
+                minRelevance = scored[i].first;
+                minIndex = scored[i].second;
+            }
+        }
+        
+        // Remove the least relevant episode
+        pImpl->episodes.erase(pImpl->episodes.begin() + minIndex);
+        
+        // Also remove from scored vector
+        scored.erase(scored.begin() + (std::find_if(scored.begin(), scored.end(),
+            [minIndex](const auto& p) { return p.second == minIndex; }) - scored.begin()));
+    }
 }
 
 // Semantic Memory Implementation

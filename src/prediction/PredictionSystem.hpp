@@ -14,11 +14,16 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize prediction system with neural integration
+    // Connects to brain's neural substrate for real prediction
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Uses neural patterns instead of just copying sensory input
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
+    // Uses neural prediction error signals from neuromodulation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
@@ -31,9 +36,12 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model using neural plasticity
     void train(const SensoryInput& observation);
     
+    // Get neural prediction neurons
+    const std::vector<NeuronId>& getPredictionNeurons() const { return pImpl->predictionNeurons; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

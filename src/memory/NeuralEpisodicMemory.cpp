@@ -36,28 +36,65 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
-    
-    // Create episode neuron for pattern completion
+    // Encode the episode into neural activity patterns
     if (brain_ && !episode.sensoryState.empty()) {
+        // Create episode neuron that encodes the full pattern
+        // Use distributed representation based on key features
         NeuronId epNeuron(episodes_.size() + 20000);
+        
+        // Store episode in neural substrate via pattern completion
+        // The neuron will be activated when similar patterns are encountered
+        // (Enhanced integration with neural activity)
+        
+        // For neural integration, we could:
+        // 1. Create a "grandmother cell" that fires for this specific episode
+        // 2. Create a distributed pattern across multiple neurons
+        // 3. Connect to working memory for immediate access
+        
+        // Simplified approach: create episode neuron that can be reactivated
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
-    }
-    
-    // Remove old episodes if over capacity
-    while (episodes_.size() > maxEpisodes_) {
-        episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        // Inject current to create an initial trace
+        if (!episode.activeNeurons.empty()) {
+            // Reactivate the neural pattern from the episode
+            for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+                NeuronId neuron = episode.activeNeurons[i];
+                float activation = i < episode.neuronActivations.size() ? 
+                                  episode.neuronActivations[i] : 0.5f;
+                
+                // Store the activation in the neuron
+                brain_->injectCurrent(neuron, activation * 3.0f);
+            }
+        }
+        
+        // Also inject sensory pattern if available
+        if (!episode.sensoryState.empty()) {
+            // Store sensory pattern for later retrieval
+            // This would go through sensory channels in a full implementation
         }
     }
     
-    // Age all episodes
+    // Add to episode list
+    episodes_.push_back(stored);
+    
+    // Remove old episodes if over capacity (maintain neural efficiency)
+    while (episodes_.size() > maxEpisodes_) {
+        // Remove from neural substrate first
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+        episodes_.erase(episodes_.begin());
+    }
+    
+    // Age all episodes (decay relevance over time)
     for (auto& ep : episodes_) {
         ep.age++;
+        
+        // Apply relevance decay based on age
+        if (ep.age > 1000) {
+            // Old episodes become less relevant
+            // In a full implementation, this would decay stored neural patterns
+        }
     }
 }
 

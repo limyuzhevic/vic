@@ -197,6 +197,12 @@ float NeuralWorkingMemory::getMemoryActivity() const {
     return total / memoryActivations_.size();
 }
 
+// Get current simulation step for time tracking
+SimulationStep NeuralWorkingMemory::getCurrentStep() const {
+    if (!brain_) return 0;
+    return brain_->getCurrentStep();
+}
+
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
     // Check if connection already exists
     for (const auto& conn : pImpl->maintenanceSynapses) {

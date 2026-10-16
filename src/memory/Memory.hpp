@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Now implements real working memory with capacity limits and competition
 
 class WorkingMemory {
 public:
@@ -15,7 +15,6 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item

@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Implement real neuromodulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -47,6 +47,17 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Configuration for dopamine dynamics
+    void setBaseline(float baseline);
+    void setPeak(float peak);
+    void setDecayRate(float rate);
+    void setReleaseRate(float rate);
+    
+    // Advanced dopamine dynamics implementations
+    void updateWithHodgkinHuxley(TimestepDuration dt, float input);
+    void updateWithBurstPause(TimestepDuration dt, bool rewardReceived, float predictionError);
+    void updateWithConcentrationDynamics(TimestepDuration dt, float extracellularInput);
     
 private:
     struct Impl;

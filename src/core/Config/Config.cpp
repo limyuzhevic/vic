@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <cctype>
 
 namespace nlm {
 
@@ -18,10 +22,165 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Simple JSON parsing for key-value pairs
+    std::string line;
+    std::string currentKey;
+    bool inObject = false;
+    bool inArray = false;
+    
+    while (std::getline(file, line)) {
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t\r\n\"");
+        size_t end = line.find_last_not_of(" \t\r\n\"");
+        if (start == std::string::npos) continue;
+        
+        std::string trimmed = line.substr(start, end - start + 1);
+        
+        // Skip comments
+        if (trimmed.find("#") != std::string::npos) {
+            size_t commentPos = trimmed.find("#");
+            trimmed = trimmed.substr(0, commentPos);
+            start = trimmed.find_last_not_of(" \t\r\n\"");
+            if (start == std::string::npos) continue;
+            trimmed = trimmed.substr(0, start + 1);
+        }
+        
+        // Handle JSON structure
+        if (trimmed == "{") {
+            inObject = true;
+            continue;
+        } else if (trimmed == "}") {
+            inObject = false;
+            continue;
+        } else if (trimmed == "[") {
+            inArray = true;
+            continue;
+        } else if (trimmed == "]") {
+            inArray = false;
+            continue;
+        }
+        
+        // Parse key-value pairs (simplified for now)
+        if (inObject && trimmed.find(":") != std::string::npos) {
+            size_t colonPos = trimmed.find(":");
+            std::string key = trim(trimmed.substr(0, colonPos));
+            std::string value = trim(trimmed.substr(colonPos + 1));
+            
+            // Remove quotes from key and value
+            if (key.size() >= 2 && ((key.front() == '\"' && key.back() == '\"') ||
+                                   (key.front() == '\'' && key.back() == '\''))) {
+                key = key.substr(1, key.size() - 2);
+            }
+            
+            if (value.size() >= 2 && ((value.front() == '\"' && value.back() == '\"') ||
+                                     (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple YAML parsing for key-value pairs
+    std::string line;
+    bool inDocument = false;
+    
+    while (std::getline(file, line)) {
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t\r\n");
+        size_t end = line.find_last_not_of(" \t\r\n");
+        if (start == std::string::npos) continue;
+        
+        std::string trimmed = line.substr(start, end - start + 1);
+        
+        // Skip comments
+        if (trimmed.find("#") != std::string::npos) {
+            size_t commentPos = trimmed.find("#");
+            trimmed = trimmed.substr(0, commentPos);
+            start = trimmed.find_last_not_of(" \t\r\n");
+            if (start == std::string::npos) continue;
+            trimmed = trimmed.substr(0, start + 1);
+        }
+        
+        // Handle YAML document marker
+        if (trimmed == "---") {
+            inDocument = true;
+            continue;
+        }
+        
+        // Parse key: value pairs
+        if (inDocument && trimmed.find(":") != std::string::npos && !trimmed.empty()) {
+            size_t colonPos = trimmed.find(":");
+            std::string key = trim(trimmed.substr(0, colonPos));
+            std::string value = trim(trimmed.substr(colonPos + 1));
+            
+            // Handle quoted keys and values
+            if (key.size() >= 2 && ((key.front() == '\"' && key.back() == '\"') ||
+                                   (key.front() == '\'' && key.back() == '\''))) {
+                key = key.substr(1, key.size() - 2);
+            }
+            
+            if (!value.empty() && value[0] == '\"') {
+                size_t quoteEnd = value.find('\"', 1);
+                if (quoteEnd != std::string::npos) {
+                    value = value.substr(1, quoteEnd - 1);
+                }
+            } else if (!value.empty() && value[0] == '\'') {
+                size_t quoteEnd = value.find('\'', 1);
+                if (quoteEnd != std::string::npos) {
+                    value = value.substr(1, quoteEnd - 1);
+                }
+            }
+            
+            // Convert string to appropriate type based on content
+            if (!value.empty()) {
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                } else {
+                    try {
+                        size_t pos;
+                        int intVal = std::stoi(value, &pos);
+                        if (pos == value.size()) {
+                            set(key, intVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    try {
+                        size_t pos;
+                        double doubleVal = std::stod(value, &pos);
+                        if (pos == value.size()) {
+                            set(key, doubleVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    // Default to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +202,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
