@@ -82,6 +82,88 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Advanced CLI Tool
+```bash
+./nlm_tool [options]
+```
+
+The advanced CLI tool provides enhanced command-line interface for NLM operations:
+
+**Basic usage:**
+```bash
+./nlm_tool --mode demo --episodes 5 --steps 200 --config configs/default.cfg
+```
+
+**Available modes:**
+- `demo`: Run demonstration with world interaction simulation
+- `test`: Run comprehensive neural system tests (connectivity, learning, STDP)
+- `benchmark`: Benchmark brain performance
+
+**Key options:**
+- `--config <file>`: Configuration file path (default: configs/default.cfg)
+- `--mode <mode>`: Operation mode: demo, test, or benchmark (default: demo)
+- `--neuron-count <n>`: Number of neurons (default: 500)
+- `--region-count <n>`: Number of brain regions (default: 1)
+- `--episodes <n>`: Number of demo episodes (default: 5)
+- `--steps <n>`: Number of steps per demo (default: 200)
+- `--plasticity-mode <mode>`: Plasticity mode: stdp, hebbian, or both (default: stdp)
+- `--stdp-ltp <float>`: STDP LTP weight (default: 0.02)
+- `--stdp-ltd <float>`: STDP LTD weight (default: 0.015)
+- `--env-width <float>`: Environment width (default: 20)
+- `--env-height <float>`: Environment height (default: 20)
+- `--timestep <float>`: Simulation timestep (default: 0.001)
+- `--seed <int>`: Random seed for reproducibility (default: 42)
+
+**Examples:**
+```bash
+# Basic demo with custom settings
+./nlm_tool --mode demo --episodes 10 --steps 300 --neuron-count 1000 --seed 123
+
+# Run comprehensive tests
+./nlm_tool --mode test --neuron-count 500 --plasticity-mode both
+
+# Performance benchmark
+./nlm_tool --mode benchmark --steps 5000 --timestep 0.001
+
+# Custom configuration with CLI overrides
+./nlm_tool --config my_config.cfg --stdp-ltp 0.05 --stdp-ltd 0.03
+```
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── src/
+│   ├── core/           # Core utilities
+│   ├── brain/          # Neural components (integrated)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation # Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
+│   └── visualization/ # Visualization
+├── nlm_tool          # Advanced CLI tool (enhanced interface)
+├── nlm               # Main simulation (Phase 2)
+├── nlm_phase3_demo   # Phase 3: World interaction demo
+├── nlm_phase4_demo   # Phase 4: Emerging cognition demo
+└── nlm_phase6_demo   # Phase 6: Integration test
+```
+
 ## Project Structure
 
 ```
