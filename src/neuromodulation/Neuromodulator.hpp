@@ -54,14 +54,53 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Enhances attention, working memory, and memory consolidation
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // ACh affects attention - increases signal-to-noise ratio
+    void enhanceAttention(float duration);
+    
+    // ACh affects working memory - stabilizes memory traces
+    void strengthenMemoryTrace(const std::vector<NeuronId>& neuronIds, float strength);
+    
+    // ACh affects memory consolidation - promotes long-term storage
+    void promoteMemoryConsolidation();
+    
+    // ACh affects sensory processing - increases gain
+    void increaseSensoryGain(float enhancementFactor);
+    
+    // Reset ACh for learning phase
+    void resetForLearning();
+    
+    // Check if ACh is in learning mode
+    bool isInLearningMode() const { return learningMode_; }
+    
+    // Get attentional enhancement factor
+    float getAttentionalEnhancement() const { return attentionalEnhancement_; }
+    
+    // Get memory consolidation factor
+    float getMemoryConsolidationFactor() const { return memoryConsolidationFactor_; }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    
+    // Learning mode: ACh enhances memory encoding
+    bool learningMode_;
+    
+    // Current enhancement factors
+    float attentionalEnhancement_;
+    float memoryConsolidationFactor_;
+    float sensoryGain_;
 };
 
 // Norepinephrine: Arousal and vigilance
