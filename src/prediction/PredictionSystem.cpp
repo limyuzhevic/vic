@@ -57,4 +57,11 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
+// Initialize with brain reference
+void PredictionSystem::initialize(Brain* brain) {
+    // TODO PHASE 2: Store brain reference for integration
+    // PLACEHOLDER: Prediction system initialization
+    NLM_LOG_INFO("Prediction system initialized");
+}
+
 } // namespace nlm

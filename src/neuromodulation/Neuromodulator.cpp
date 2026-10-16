@@ -41,6 +41,12 @@ void Dopamine::update(TimestepDuration dt) {
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
+void Dopamine::initialize(Brain* brain) {
+    // TODO PHASE 2: Store brain reference for integration
+    // PLACEHOLDER: Initialization method
+    NLM_LOG_INFO("Dopamine system initialized");
+}
+
 void Dopamine::signalReward(float reward) {
     // TODO PHASE 2: Implement real reward signaling
     // PLACEHOLDER: Burst of dopamine on reward

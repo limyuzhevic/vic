@@ -27,6 +27,9 @@ public:
     // Get stage name
     const char* getStageName() const;
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Update development (simple version)
     void update(Brain* brain, SimulationStep currentStep);
     

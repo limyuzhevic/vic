@@ -34,6 +34,9 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
