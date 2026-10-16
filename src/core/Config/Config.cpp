@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -19,40 +21,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        return importFromJson(jsonData);
+    } catch (const std::exception& e) {
+        return false;
     }
-    
-    return true;
+}
+
+bool Config::loadFromJson(const std::string& jsonString) {
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(jsonString);
+        return importFromJson(jsonData);
+    } catch (const std::exception& e) {
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +73,8 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    nlohmann::json jsonData = exportToJson();
+    file << jsonData.dump(4); // Pretty print with 4-space indentation
     
     return true;
 }
@@ -184,6 +171,115 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+nlohmann::json Config::exportToJson() const {
+    nlohmann::json jsonArray = nlohmann::json::array();
+    for (const auto& entry : pImpl->entries) {
+        jsonArray.push_back(entry.toJson());
+    }
+    return jsonArray;
+}
+
+bool Config::importFromJson(const nlohmann::json& jsonData) {
+    clear();
+    
+    if (!jsonData.is_array()) {
+        return false;
+    }
+    
+    for (const auto& item : jsonData) {
+        ConfigEntry entry = ConfigEntry::fromJson(item);
+        pImpl->entries.push_back(entry);
+    }
+    
+    return true;
+}
+
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    std::unordered_set<std::string> seenKeys;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Check for duplicate keys
+        if (seenKeys.count(entry.key) > 0) {
+            errors.push_back("Duplicate configuration key: " + entry.key);
+        }
+        seenKeys.insert(entry.key);
+        
+        // Validate key format
+        if (!isValidKey(entry.key)) {
+            errors.push_back("Invalid configuration key format: " + entry.key);
+        }
+        
+        // Validate value
+        if (!isValidValue(entry.value)) {
+            errors.push_back("Invalid configuration value for key: " + entry.key);
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::apply(const std::string& filepath) {
+    // Try JSON first, then fallback to simple key=value
+    if (loadFromFile(filepath)) {
+        // Validate configuration
+        auto errors = validate();
+        if (!errors.empty()) {
+            for (const auto& error : errors) {
+                NLM_LOG_WARNING("Configuration validation warning: " + error);
+            }
+        }
+        return true;
+    }
+    
+    // Fallback to old format
+    return loadFromFile(filepath);
+}
+
+ConfigValue Config::jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_number_integer()) {
+        int64_t val = j.get<int64_t>();
+        if (val <= std::numeric_limits<int>::max() && val >= std::numeric_limits<int>::min()) {
+            return static_cast<int>(val);
+        }
+        return val;
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_array()) {
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                return j.get<std::vector<int>>();
+            } else if (j[0].is_number_float()) {
+                return j.get<std::vector<double>>();
+            } else if (j[0].is_string()) {
+                return j.get<std::vector<std::string>>();
+            }
+        }
+    }
+    return std::string(); // Default empty string
+}
+
+nlohmann::json Config::configValueToJson(const ConfigValue& value) {
+    return std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        return nlohmann::json(arg);
+    }, value);
+}
+
+bool Config::isValidKey(const std::string& key) {
+    // Key should be alphanumeric with underscores and dashes
+    return !key.empty() && std::all_of(key.begin(), key.end(),
+        [](char c) { return std::isalnum(c) || c == '_' || c == '-'; });
+}
+
+bool Config::isValidValue(const ConfigValue& value) {
+    return !std::holds_alternative<std::monostate>(value);
 }
 
 std::string Config::trim(const std::string& str) {
