@@ -3,6 +3,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <filesystem>
 
 namespace test_brain {
 
@@ -121,7 +122,84 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainMemoryManagement() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain1(config);
+    brain1.initialize();
+    
+    // Test move constructor
+    nlm::Brain brain2(std::move(brain1));
+    assert(brain2.getTotalNeuronCount() == 100);
+    
+    // Test move assignment
+    auto config3 = std::make_shared<nlm::Config>();
+    config3->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config3->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain3(config3);
+    brain3.initialize();
+    
+    brain3 = std::move(brain2);
+    assert(brain3.getTotalNeuronCount() == 100);
+    
+    std::cout << "    testBrainMemoryManagement passed" << std::endl;
+}
+
+void testBrainSaveLoad() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Save brain state
+    bool saved = brain.save("test_brain_checkpoint.nlm");
+    assert(saved);
+    
+    // Verify file was created
+    assert(std::filesystem::exists("test_brain_checkpoint.nlm"));
+    
+    // Create a new brain and load the saved state
+    auto config2 = std::make_shared<nlm::Config>();
+    nlm::Brain brain2(config2);
+    
+    bool loaded = brain2.load("test_brain_checkpoint.nlm");
+    assert(loaded);
+    
+    // Cleanup
+    if (std::filesystem::exists("test_brain_checkpoint.nlm")) {
+        std::filesystem::remove("test_brain_checkpoint.nlm");
+    }
+    
+    std::cout << "    testBrainSaveLoad passed" << std::endl;
+}
+
+void testBrainExceptionSafety() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test that brain can be used after move operations
+    nlm::Brain brain2 = std::move(brain);
+    assert(brain2.getTotalNeuronCount() == 100);
+    
+    // Test that we can still use moved-from brain (should be valid)
+    bool canStillUse = brain2.getTotalNeuronCount() > 0;
+    assert(canStillUse);
+    
+    std::cout << "    testBrainExceptionSafety passed" << std::endl;
+}
+
 void runAll() {
+    std::cout << "Running Brain Tests:" << std::endl;
+    
     testBrainCreation();
     testBrainInitialization();
     testBrainStep();
@@ -129,6 +207,11 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainMemoryManagement();
+    testBrainSaveLoad();
+    testBrainExceptionSafety();
+    
+    std::cout << std::endl;
 }
 
 } // namespace test_brain

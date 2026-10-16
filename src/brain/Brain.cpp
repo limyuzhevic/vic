@@ -161,12 +161,35 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Cleanup current resources before assignment
+        if (pImpl) {
+            // Ensure any pending operations complete before deletion
+            // This prevents resource leaks during exception scenarios
+            pImpl->checkpointManager.reset(); // Finalize any checkpoint operations
+            pImpl->workingMemory.reset();     // Clear working memory traces
+            pImpl->episodicMemory.reset();    // Clear episodic memory
+            pImpl->associativeMemory.reset(); // Clear associative memory
+            pImpl->predictionSystem.reset();  // Clear prediction system
+            pImpl->planner.reset();           // Clear planner
+            pImpl->conceptFormation.reset();  // Clear concept formation
+            pImpl->attention.reset();         // Clear attention system
+            pImpl->developmentSystem.reset();  // Clear development system
+            pImpl->dopamine.reset();          // Clear neuromodulation
+            pImpl->curiosity.reset();
+            pImpl->predictionError.reset();
+            pImpl->novelty.reset();
+            pImpl->spikeSystem.reset();       // Clear spike system
+            pImpl->stdp.reset();              // Clear STDP
+            pImpl->hebbian.reset();           // Clear Hebbian
+            pImpl->structuralPlasticity.reset(); // Clear structural plasticity
+        }
+        
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
@@ -765,9 +788,12 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Create temporary file first to ensure atomic save
+        std::string tempFile = filepath + ".tmp";
+        
         CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!writer.create(tempFile, CompressionLevel::Balanced)) {
+            NLM_LOG_ERROR("Failed to create checkpoint file: " + tempFile);
             return false;
         }
         
@@ -835,10 +861,21 @@ bool Brain::save(const std::string& filepath) const {
         }
         
         NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        
+        // Atomic write: rename temporary file to final destination
+        if (std::filesystem::exists(tempFile)) {
+            std::filesystem::rename(tempFile, filepath);
+        }
+        
         return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        // Cleanup temporary file if it exists
+        std::string tempFile = filepath + ".tmp";
+        if (std::filesystem::exists(tempFile)) {
+            std::filesystem::remove(tempFile);
+        }
         return false;
     }
 }
@@ -862,6 +899,14 @@ bool Brain::load(const std::string& filepath) {
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            return false;
+        }
+        
+        // Validate neuron data integrity
+        if (neuronData.membranePotential.size() != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Neuron data validation failed: Expected " + 
+                         std::to_string(getTotalNeuronCount()) + " neurons, " +
+                         "got " + std::to_string(neuronData.membranePotential.size()));
             return false;
         }
         
@@ -895,9 +940,25 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate synapse data
+        if (synapseData.sourceNeuron.size() != synapseData.destinationNeuron.size() ||
+            synapseData.weight.size() != synapseData.destinationNeuron.size() ||
+            synapseData.delay.size() != synapseData.destinationNeuron.size()) {
+            NLM_LOG_ERROR("Synapse data validation failed: Inconsistent array sizes");
+            return false;
+        }
+        
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // For now, just log the count and restore basic functionality
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Basic validation of synapse weights
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            if (synapseData.weight[i] < -10.0f || synapseData.weight[i] > 10.0f) {
+                NLM_LOG_WARNING("Synapse weight " + std::to_string(i) + 
+                              " outside expected range: " + std::to_string(synapseData.weight[i]));
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

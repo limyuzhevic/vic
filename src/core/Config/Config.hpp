@@ -1,16 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
 // Configuration value types
 using ConfigValue = std::variant<
     int,
@@ -55,13 +42,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (simple format for backward compatibility)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +87,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers
+    void parseJSONData(const nlohmann::json& jsonData, ConfigSource source);
+    void parseYAMLData(const YAML::Node& yamlData, ConfigSource source);
+    void setValueFromJSON(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    void setValueFromYAML(const std::string& key, const YAML::Node& value, ConfigSource source);
+    
+    // Configure default values for enhanced Config system
+    void configureDefaultValues();
 };
 
 } // namespace nlm

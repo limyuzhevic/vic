@@ -44,9 +44,9 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Phase 6: Integrated Artificial Brain (pImpl pattern)
+// The main Brain class is intentionally kept simple to maintain a clean interface
+// Core implementation details are hidden in the private Impl structure
 
 class Brain {
 public:
@@ -55,7 +55,7 @@ public:
     
     ~Brain();
     
-    // Disable copying, enable moving
+    // Disable copying, enable moving with exception safety
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
     Brain(Brain&&) noexcept;
@@ -67,7 +67,7 @@ public:
     // Main simulation step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step (with absolute time)
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
@@ -80,6 +80,8 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
+    // ========== NEURAL COMPUTATION SYSTEMS ==========
+    
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
@@ -89,31 +91,44 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
-    // Statistics
+    // ========== STATISTICS ==========
+    
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
+    // ========== MOTOR SYSTEM ==========
+    
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
+    
+    // ========== NEUROMODULATION ==========
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
+    // ========== PLASTICITY ==========
+    
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
+    
+    // ========== DEVELOPMENT ==========
     
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // ========== STATE MANAGEMENT ==========
+    
     // Reset brain state
     void reset();
     
-    // Save brain state to file (checkpointing)
+    // Save brain state to file (checkpointing) - atomic operation
     bool save(const std::string& filepath) const;
     
-    // Load brain state from file
+    // Load brain state from file - with validation
     bool load(const std::string& filepath);
+    
+    // ========== REGION MANAGEMENT ==========
     
     // Region management
     RegionId addRegion(const std::string& name = "");
@@ -130,7 +145,8 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
-    // Global statistics
+    // ========== GLOBAL STATISTICS ==========
+    
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;
     size_t getActiveNeuronCount() const;
@@ -184,6 +200,8 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== UTILITY SYSTEMS ==========
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
@@ -194,6 +212,7 @@ public:
     void logStatus() const;
     
 private:
+    // pImpl pattern: implementation details are hidden
     struct Impl;
     Impl* pImpl;
 };
