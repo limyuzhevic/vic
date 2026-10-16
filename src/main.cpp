@@ -1,5 +1,5 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
@@ -25,8 +25,55 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <filesystem>
 
 using namespace nlm;
+
+void printUsageAndExit() {
+    std::cout << R"(
+=== NLM Phase 6 Demo Usage ===
+
+Basic usage:
+  ./nlm_phase6_demo
+
+Options:
+  --config=file.cfg          Load configuration from file (default: configs/default.cfg)
+  --config file.cfg          Alternative syntax for loading config file
+  --max-steps N              Number of simulation steps (default: 2000)
+  --output-dir DIR           Directory for experiment output (default: ./experiments)
+  --verbose, -v              Enable verbose logging output
+  --save-brain               Save brain state at the end
+  --no-connectivity-test     Skip connectivity test
+  --no-plasticity-test       Skip plasticity learning experiment
+  --no-stdp-test             Skip STDP verification
+  --test-steps N             Number of steps for learning experiments (default: 1000)
+  --neuron-count N           Set number of neurons (overrides config)
+  --connection-prob P        Set connection probability (overrides config)
+  --random-seed N             Set random seed for reproducibility
+  --timestep T               Set simulation timestep (overrides config)
+  --help, -h                 Show this help message
+
+Examples:
+  ./nlm_phase6_demo --config=myconfig.cfg --max-steps 5000
+  ./nlm_phase6_demo --neuron-count 2000 --connection-prob 0.2 --verbose
+  ./nlm_phase6_demo --no-plasticity-test --test-steps 500
+
+Phase 6 demonstrates an integrated artificial brain with:
+- Working memory and episodic memory
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction and planning systems
+- Developmental stages
+- Memory replay and consolidation
+
+)" << std::endl;
+    exit(0);
+}
+
+void ensureOutputDirectory(const std::string& outputDir) {
+    std::filesystem::create_directories(outputDir);
+}
+    std::filesystem::create_directories(outputDir);
+}
 
 void printBanner() {
     std::cout << R"(
@@ -35,17 +82,20 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Integrated Artificial Brain                      ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - Real spiking neural computation                          ║
+    ║     - Integrated memory systems                               ║
+    ║     - Neuromodulation and learning                             ║
+    ║     - Developmental stages                                     ║
+    ║     - Memory replay and consolidation                          ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+    std::filesystem::create_directories(outputDir);
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -343,28 +393,127 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Enhanced command-line argument parsing
     std::string configFile = "configs/default.cfg";
+    int maxSteps = 2000;  // Default simulation steps
+    std::string outputDir = "./experiments";  // Default output directory
+    bool verboseMode = false;
+    bool saveBrain = false;
+    bool runConnectivityTest = true;
+    bool runPlasticityTest = true;
+    bool runSTDPTest = true;
+    size_t testStepCount = 1000;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        
+        if (arg.substr(0, 8) == "--config=") {
+            // --config=file.cfg
+            configFile = arg.substr(8);
+        } else if (arg.substr(0, 8) == "--config ") {
+            // --config file.cfg
+            if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printUsageAndExit();
+        } else if (arg == "--max-steps") {
+            if (i + 1 < argc) {
+                maxSteps = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--output-dir") {
+            if (i + 1 < argc) {
+                outputDir = argv[++i];
+            }
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--save-brain") {
+            saveBrain = true;
+        } else if (arg == "--no-connectivity-test") {
+            runConnectivityTest = false;
+        } else if (arg == "--no-plasticity-test") {
+            runPlasticityTest = false;
+        } else if (arg == "--no-stdp-test") {
+            runSTDPTest = false;
+        } else if (arg == "--test-steps") {
+            if (i + 1 < argc) {
+                testStepCount = static_cast<size_t>(std::stoi(argv[++i]));
+            }
+        } else if (arg.substr(0, 12) == "--neuron-count") {
+            if (arg.find('=') != std::string::npos) {
+                // --neuron-count=1000
+                // Extract value after equals sign
+                size_t pos = arg.find('=');
+                try {
+                    config->set("neuron_count", static_cast<int64_t>(std::stoi(arg.substr(pos + 1))), ConfigSource::CommandLine);
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid neuron-count value: " + arg.substr(pos + 1));
+                }
+            } else if (i + 1 < argc) {
+                // --neuron-count 1000
+                try {
+                    config->set("neuron_count", static_cast<int64_t>(std::stoi(argv[++i])), ConfigSource::CommandLine);
+                catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid neuron-count value: " + std::string(argv[i]));
+                }
+            }
+        } else if (arg.substr(0, 15) == "--connection-prob") {
+            if (arg.find('=') != std::string::npos) {
+                // --connection-prob=0.2
+                size_t pos = arg.find('=');
+                try {
+                    float prob = std::stof(arg.substr(pos + 1));
+                    config->set("connection_probability", prob, ConfigSource::CommandLine);
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid connection-prob value: " + arg.substr(pos + 1));
+                }
+            } else if (i + 1 < argc) {
+                // --connection-prob 0.2
+                try {
+                    float prob = std::stof(argv[++i]);
+                    config->set("connection_probability", prob, ConfigSource::CommandLine);
+                catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid connection-prob value: " + std::string(argv[i]));
+                }
+            }
+        } else if (arg.substr(0, 13) == "--random-seed") {
+            if (arg.find('=') != std::string::npos) {
+                // --random-seed=123
+                size_t pos = arg.find('=');
+                try {
+                    config->set("random_seed", static_cast<int64_t>(std::stol(arg.substr(pos + 1))), ConfigSource::CommandLine);
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid random-seed value: " + arg.substr(pos + 1));
+                }
+            } else if (i + 1 < argc) {
+                // --random-seed 123
+                try {
+                    config->set("random_seed", static_cast<int64_t>(std::stol(argv[++i])), ConfigSource::CommandLine);
+                catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid random-seed value: " + std::string(argv[i]));
+                }
+            }
+        } else if (arg.substr(0, 10) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                // --timestep=0.0005
+                size_t pos = arg.find('=');
+                try {
+                    double timestep = std::stod(arg.substr(pos + 1));
+                    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid timestep value: " + arg.substr(pos + 1));
+                }
+            } else if (i + 1 < argc) {
+                // --timestep 0.0005
+                try {
+                    double timestep = std::stod(argv[++i]);
+                    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                catch (const std::exception&) {
+                    NLM_LOG_WARNING("Invalid timestep value: " + std::string(argv[i]));
+                }
             }
         }
     }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
