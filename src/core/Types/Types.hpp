@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <cstddef>
+#include <functional>
 
 namespace nlm {
 
@@ -19,7 +21,22 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    NeuronId& operator++() { value++; return *this; }
+    // Postfix increment  
+    NeuronId operator++(int) { NeuronId temp = *this; ++value; return temp; }
 };
+
+// Hash specialization for NeuronId
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+}
 
 // Synapse identifier
 struct SynapseId {
@@ -35,6 +52,25 @@ struct SynapseId {
     constexpr uint64_t index() const { return value; }
 };
 
+// Synapse identifier
+struct SynapseId {
+    uint64_t value;
+    
+    constexpr SynapseId() : value(0) {}
+    explicit constexpr SynapseId(uint64_t v) : value(v) {}
+    
+    constexpr bool operator==(const SynapseId& other) const = default;
+    constexpr bool operator!=(const SynapseId& other) const = default;
+    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
+    
+    constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    SynapseId& operator++() { value++; return *this; }
+    // Postfix increment  
+    SynapseId operator++(int) { SynapseId temp = *this; ++value; return temp; }
+};
+
 // Region identifier
 struct RegionId {
     uint64_t value;
@@ -47,6 +83,11 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    RegionId& operator++() { value++; return *this; }
+    // Postfix increment  
+    RegionId operator++(int) { RegionId temp = *this; ++value; return temp; }
 };
 
 // Population identifier
@@ -61,6 +102,11 @@ struct PopulationId {
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    PopulationId& operator++() { value++; return *this; }
+    // Postfix increment  
+    PopulationId operator++(int) { PopulationId temp = *this; ++value; return temp; }
 };
 
 // Simulation step counter
@@ -190,3 +236,13 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Hash specialization for NeuronId - standard practice is to put in std namespace
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+}

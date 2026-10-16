@@ -55,13 +55,11 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
+    src/memory/Memory.cpp
+    src/memory/Memory.hpp
+    src/memory/NeuralAssociativeMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -78,14 +76,31 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationHelper.cpp
+    src/visualization/VisualizationIntegration.cpp
 )
+
+# Performance monitoring library
+add_library(nlm_monitoring STATIC
+    src/monitoring/PerformanceMonitor.cpp
+)
+
+# Benchmark library
+add_library(nlm_benchmarking STATIC
+    src/benchmarking/BenchmarkSuite.cpp
+)
+
+# Performance integration library
+add_library(nlm_integration STATIC
+    src/integration/PerformanceIntegration.cpp
+)
+target_link_libraries(nlm_integration PUBLIC nlm_core nlm_monitoring nlm_benchmarking)
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -138,6 +153,24 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Performance integration demo executable
+add_executable(nlm_perf_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_perf_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_monitoring nlm_benchmarking nlm_integration)
+
+# Performance benchmark executable
+add_executable(nlm_benchmark
+    src/benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlm_monitoring nlm_benchmarking)
+
+# Performance monitoring executable
+add_executable(nlm_monitor
+    src/monitoring/PerformanceMonitorMain.cpp
+)
+target_link_libraries(nlm_monitor PUBLIC nlm_core nlm_monitoring nlm_integration)
 
 # Testing
 enable_testing()

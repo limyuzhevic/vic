@@ -73,6 +73,16 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+**Important:** The build currently has compilation errors that need to be fixed:
+- Types.hpp missing proper includes for vector and std::hash
+- Random.hpp needs int uniformInt() overload
+- SimulationClock.hpp has incorrect include path
+- Brain.cpp needs Novelty.hpp include
+- NeuralRegion.cpp needs Random.hpp include
+- Types.hpp needs operator++ methods for ID structs
+
+See "Building" or "Development" sections for detailed build requirements.
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
@@ -97,14 +107,14 @@ NLM/
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
+│   ├── brain/          # Neural components (anatomy exists, integration incomplete)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── neuromodulation/ # Neuromodulators (partially integrated)
+│   ├── memory/        # Memory systems (defined but mostly disconnected)
+│   ├── prediction/     # Prediction systems (defined but disconnected)
+│   ├── cognition/      # Cognitive mechanisms (defined but disconnected)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
@@ -134,16 +144,16 @@ NLM/
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+### Phase 4 (DEFINITIONS COMPLETE, INTEGRATION INCOMPLETE)
+- Neural prediction system (defined, not integrated)
+- Working memory (defined, not integrated)
+- Episodic-like memory (defined, not integrated)
+- Concept formation (defined, not integrated)
+- Neural attention (NOT Transformer) (defined, not integrated)
+- Predictive planning (defined, not integrated)
+- Self-model (defined, not integrated)
+- Social learning (defined, not integrated)
+- Continual learning (defined, not integrated)
 
 ### Phase 5 (Complete)
 - Performance optimizations
@@ -152,15 +162,12 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (PARTIAL - INTEGRATION IN PROGRESS)
+- **Status:** Anatomy exists but integration incomplete
+- All cognitive systems defined but most are disconnected from brain loop
+- **What IS integrated:** Basic neural computation, sensory-motor loop, reward modulation
+- **What's disconnected:** Memory systems, prediction, higher cognition, development beyond basic stages
+- **Current score:** 43/120 (35.8%) - mostly neural core with disconnected systems
 
 ## Scientific Limitations
 

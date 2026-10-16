@@ -38,6 +38,17 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
+uint32_t RandomGenerator::uniformInt(int min, int max) {
+    if (min > max) {
+        throw std::invalid_argument("min must be <= max");
+    }
+    if (min == max) {
+        return static_cast<uint32_t>(min);
+    }
+    std::uniform_int_distribution<uint32_t> dist(min, max);
+    return dist(pImpl->gen);
+}
+
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
@@ -113,7 +124,7 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
     }
-    return uniformInt(0, n - 1);
+    return uniformInt(static_cast<uint64_t>(0), n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {

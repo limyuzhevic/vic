@@ -1,11 +1,13 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - Updated HOW TO USE
 
 ## Overview
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**IMPORTANT:** This documentation reflects the current **partially implemented** state of the system. Many components are defined but not integrated into the main brain loop.
+
 This document covers:
-1. Building the C++ project from source
+1. Building the C++ project from source (with current fixes needed)
 2. Installing the Python library
 3. Using the NLM Python API
 
@@ -35,10 +37,14 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # Build all targets
 make -j$(nproc)
-
-# Run tests (if built)
-ctest --output-on-failure
 ```
+
+**Note:** The build currently requires fixes for compilation errors including:
+- Types.hpp needs proper includes and operator++ methods
+- Random.hpp needs int uniformInt() overload
+- SimulationClock.hpp has incorrect include path
+- Brain.cpp needs Novelty.hpp include
+- NeuralRegion.cpp needs Random.hpp include
 
 ### Build Outputs
 
@@ -53,6 +59,7 @@ After successful compilation, you will have:
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | **NEW** - Phase 6 integration test (if built) |
 
 ### Build Options
 
@@ -220,7 +227,7 @@ def run_agent_simulation(num_steps=1000):
     # 7. Run simulation loop
     for step in range(num_steps):
         # Update world
-        world.update(timestep=0.1)
+        world.update(0.1)
         
         # Get sensory input from world
         percept = world.getSensoryPercept()
@@ -498,6 +505,39 @@ for _ in range(500):
 
 ---
 
+## Part 6: Phase 6 Integration Demo
+
+### Running the Phase 6 Integration Test
+
+```bash
+# Build the demo (requires fixing compilation errors)
+cd build
+make nlm_phase6_demo
+
+# Run the demo
+./nlm_phase6_demo
+```
+
+**What the Phase 6 demo tests:**
+
+1. **Integration Verification**: Checks if core systems (Working Memory, Episodic Memory, Neuromodulation, Prediction, Development) are connected to the brain
+2. **Memory Integration Test**: Verifies working memory and episodic memory systems
+3. **Neuromodulation Integration Test**: Checks dopamine, curiosity, and novelty systems
+4. **Checkpoint Persistence**: Tests save/load functionality
+5. **Memory Replay**: Tests replay mechanism for episodic memories
+
+**Expected Demo Output:**
+- Integration verification results (YES/NO for each system)
+- Memory integration metrics
+- Neuromodulation system status
+- Checkpoint save/load success
+- Replay system functionality
+- Final integration status summary
+
+**Current Demo Status:** The demo exists in `src/experiments/Phase6Demo.cpp` but may require build fixes for some compilation errors.
+
+---
+
 ## Troubleshooting
 
 ### Build Issues
@@ -512,6 +552,7 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Ensure C++20 compiler support
 - Check CMake version >= 3.16
 - Verify all source files are present
+- Fix compilation errors (e.g., Types.hpp needs operator++, Random.hpp needs int uniformInt())
 
 ### Runtime Issues
 
@@ -528,6 +569,15 @@ pip install --force-reinstall .
 
 ## Further Reading
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [Phase 6 Integration Demo Documentation](https://github.com/your-repo/NLM/blob/main/src/experiments/Phase6Demo.cpp) - Technical details of the integration test
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview (partially complete)
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+## Future Documentation
+
+The following documentation files are planned but currently incomplete:
+- `docs/CLI_REFERENCE.md` - Comprehensive CLI documentation
+- `docs/VISUALIZATION.md` - Visualization tools documentation
+- `docs/INTEGRATION_EXAMPLES.md` - Examples of integrated cognitive systems
+- `docs/CONFIGURATION.md` - Detailed configuration documentation
