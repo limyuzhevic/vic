@@ -173,14 +173,43 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+        if (std::holds_alternative<int>(entry.value)) {
+            oss << std::get<int>(entry.value);
+        } else if (std::holds_alternative<long>(entry.value)) {
+            oss << std::get<long>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            oss << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            oss << std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            oss << "\"" << std::get<std::string>(entry.value) << "\"";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            const auto& vec = std::get<std::vector<int>>(entry.value);
+            oss << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << vec[i];
             }
-        }, entry.value);
+            oss << "]";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            const auto& vec = std::get<std::vector<double>>(entry.value);
+            oss << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << vec[i];
+            }
+            oss << "]";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            const auto& vec = std::get<std::vector<std::string>>(entry.value);
+            oss << "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << vec[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            oss << "unknown type";
+        }
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();

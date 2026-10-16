@@ -1,144 +1,99 @@
-// Random Tests
+// Random Tests - GoogleTest Version
 #include "core/Random/Random.hpp"
-#include <cassert>
-#include <iostream>
-#include <cmath>
+#include <gtest/gtest.h>
+#include "GoogleTestHelper.hpp"
+#include "TestMatchers.hpp"
 
-namespace test_random {
-
-void testRandomGeneratorCreation() {
-    nlm::RandomGenerator rng1(42);
-    nlm::RandomGenerator rng2(42);
+// TEST SUITE
+class RandomTestSuite : public ::testing::Test {
+protected:
+    nlm::RandomGenerator rng1;
+    nlm::RandomGenerator rng2;
     
-    // Same seed should produce same sequence
+    void SetUp() override {
+        rng1.seed(42);
+        rng2.seed(42);
+    }
+};
+
+// RANDOM TESTS
+TEST_F(RandomTestSuite, RandomGeneratorCreation) {
     for (int i = 0; i < 10; ++i) {
-        assert(rng1.uniformInt(0, 100) == rng2.uniformInt(0, 100));
+        EXPECT_EQ(rng1.uniformInt(0, 100), rng2.uniformInt(0, 100));
     }
-    
-    std::cout << "    testRandomGeneratorCreation passed" << std::endl;
 }
 
-void testUniformInt() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, UniformInt) {
     for (int i = 0; i < 100; ++i) {
-        uint32_t val = rng.uniformInt(5, 10);
-        assert(val >= 5 && val <= 10);
+        uint32_t val = rng1.uniformInt(5, 10);
+        EXPECT_GE(val, 5u);
+        EXPECT_LE(val, 10u);
     }
-    
-    std::cout << "    testUniformInt passed" << std::endl;
 }
 
-void testUniformReal() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, UniformReal) {
     for (int i = 0; i < 100; ++i) {
-        double val = rng.uniformReal(0.0, 1.0);
-        assert(val >= 0.0 && val < 1.0);
+        double val = rng1.uniformReal(0.0, 1.0);
+        EXPECT_GE(val, 0.0);
+        EXPECT_LT(val, 1.0);
     }
-    
-    std::cout << "    testUniformReal passed" << std::endl;
 }
 
-void testNormal() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, Normal) {
     double sum = 0.0;
     int samples = 10000;
     for (int i = 0; i < samples; ++i) {
-        double val = rng.normal(0.0, 1.0);
+        double val = rng1.normal(0.0, 1.0);
         sum += val;
     }
     double mean = sum / samples;
-    
-    // Mean should be close to 0
-    assert(std::abs(mean) < 0.1);
-    
-    std::cout << "    testNormal passed" << std::endl;
+    EXPECT_NEAR(mean, 0.0, 0.1);
 }
 
-void testBernoulli() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, Bernoulli) {
     int trueCount = 0;
     int samples = 10000;
     for (int i = 0; i < samples; ++i) {
-        if (rng.bernoulli(0.3)) {
+        if (rng1.bernoulli(0.3)) {
             ++trueCount;
         }
     }
-    
-    // Should be roughly 30%
     double ratio = static_cast<double>(trueCount) / samples;
-    assert(ratio > 0.25 && ratio < 0.35);
-    
-    std::cout << "    testBernoulli passed" << std::endl;
+    EXPECT_GT(ratio, 0.25);
+    EXPECT_LT(ratio, 0.35);
 }
 
-void testRandomBool() {
-    nlm::RandomGenerator rng(42);
-    
-    bool val = rng.randomBool();
-    // Just check it doesn't crash
-    assert(true || false);  // Always true
-    
-    std::cout << "    testRandomBool passed" << std::endl;
+TEST_F(RandomTestSuite, RandomBool) {
+    bool val = rng1.randomBool();
+    EXPECT_TRUE(true || false);
 }
 
-void testPickRandomIndex() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, PickRandomIndex) {
     for (int i = 0; i < 100; ++i) {
-        uint64_t idx = rng.pickRandomIndex(10);
-        assert(idx < 10);
+        uint64_t idx = rng1.pickRandomIndex(10);
+        EXPECT_LT(idx, 10u);
     }
-    
-    std::cout << "    testPickRandomIndex passed" << std::endl;
 }
 
-void testShuffle() {
-    nlm::RandomGenerator rng(42);
-    
+TEST_F(RandomTestSuite, Shuffle) {
     std::vector<int> vec = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     auto vecCopy = vec;
     
-    rng.shuffle(vec);
+    rng1.shuffle(vec);
     
-    // Should have same elements but possibly different order
-    assert(vec.size() == vecCopy.size());
-    
-    // Sort and compare
+    EXPECT_EQ(vec.size(), vecCopy.size());
     std::sort(vec.begin(), vec.end());
     std::sort(vecCopy.begin(), vecCopy.end());
-    assert(vec == vecCopy);
-    
-    std::cout << "    testShuffle passed" << std::endl;
+    EXPECT_EQ(vec, vecCopy);
 }
 
-void testSeed() {
-    nlm::RandomGenerator rng;
+TEST_F(RandomTestSuite, Seed) {
+    nlm::RandomGenerator rng3;
+    rng3.seed(12345);
+    uint32_t val1 = rng3.uniformInt(0, 1000);
     
-    rng.seed(12345);
-    uint32_t val1 = rng.uniformInt(0, 1000);
+    rng3.seed(12345);
+    uint32_t val2 = rng3.uniformInt(0, 1000);
     
-    rng.seed(12345);
-    uint32_t val2 = rng.uniformInt(0, 1000);
-    
-    assert(val1 == val2);
-    
-    std::cout << "    testSeed passed" << std::endl;
+    EXPECT_EQ(val1, val2);
 }
-
-void runAll() {
-    testRandomGeneratorCreation();
-    testUniformInt();
-    testUniformReal();
-    testNormal();
-    testBernoulli();
-    testRandomBool();
-    testPickRandomIndex();
-    testShuffle();
-    testSeed();
-}
-
-} // namespace test_random

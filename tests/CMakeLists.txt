@@ -16,7 +16,7 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core GTest::GTest GTest::Main)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing

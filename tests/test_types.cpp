@@ -1,99 +1,76 @@
-// Types Tests
+// Types Tests - GoogleTest Version
 #include "core/Types/Types.hpp"
-#include <cassert>
-#include <iostream>
+#include <gtest/gtest.h>
+#include "GoogleTestHelper.hpp"
+#include "TestMatchers.hpp"
 
-namespace test_types {
+// TEST SUITE
+class TypesTestSuite : public ::testing::Test {
+protected:
+    nlm::NeuronId neuronId1;
+    nlm::NeuronId neuronId2;
+    nlm::SynapseId synapseId;
+    nlm::RegionId regionId;
+    nlm::PopulationId populationId;
+    
+    void SetUp() override {
+        neuronId1 = nlm::NeuronId(1);
+        neuronId2 = nlm::NeuronId(2);
+        synapseId = nlm::SynapseId(100);
+        regionId = nlm::RegionId(1);
+        populationId = nlm::PopulationId(1);
+    }
+};
 
-void testNeuronId() {
-    nlm::NeuronId id1(1);
-    nlm::NeuronId id2(2);
-    nlm::NeuronId id3(1);
-    
-    assert(id1 == id3);
-    assert(id1 != id2);
-    assert(id1 < id2);
-    assert(id2 > id1);
-    assert(id1.index() == 1);
-    
-    std::cout << "    testNeuronId passed" << std::endl;
+// TYPES TESTS
+TEST_F(TypesTestSuite, NeuronId) {
+    EXPECT_EQ(neuronId1, nlm::NeuronId(1));
+    EXPECT_NE(neuronId1, neuronId2);
+    EXPECT_LT(neuronId1, neuronId2);
+    EXPECT_GT(neuronId2, neuronId1);
+    EXPECT_EQ(neuronId1.index(), 1);
 }
 
-void testSynapseId() {
-    nlm::SynapseId id1(100);
-    nlm::SynapseId id2(200);
-    
-    assert(id1 != id2);
-    assert(id1 < id2);
-    
-    std::cout << "    testSynapseId passed" << std::endl;
+TEST_F(TypesTestSuite, SynapseId) {
+    EXPECT_NE(synapseId, nlm::SynapseId(200));
+    EXPECT_LT(synapseId, nlm::SynapseId(200));
+    EXPECT_GT(nlm::SynapseId(200), synapseId);
 }
 
-void testRegionId() {
-    nlm::RegionId id1(1);
-    nlm::RegionId id2(2);
-    
-    assert(id1 != id2);
-    
-    std::cout << "    testRegionId passed" << std::endl;
+TEST_F(TypesTestSuite, RegionId) {
+    EXPECT_NE(regionId, nlm::RegionId(2));
 }
 
-void testPopulationId() {
-    nlm::PopulationId id1(1);
-    nlm::PopulationId id2(2);
-    
-    assert(id1 != id2);
-    
-    std::cout << "    testPopulationId passed" << std::endl;
+TEST_F(TypesTestSuite, PopulationId) {
+    EXPECT_NE(populationId, nlm::PopulationId(2));
 }
 
-void testNeuronType() {
-    assert(nlm::NeuronType::Excitatory != nlm::NeuronType::Inhibitory);
-    assert(nlm::NeuronType::Sensory != nlm::NeuronType::Motor);
-    
-    std::cout << "    testNeuronType passed" << std::endl;
+TEST_F(TypesTestSuite, NeuronType) {
+    EXPECT_NE(nlm::NeuronType::Excitatory, nlm::NeuronType::Inhibitory);
+    EXPECT_NE(nlm::NeuronType::Sensory, nlm::NeuronType::Motor);
 }
 
-void testSynapseType() {
-    assert(nlm::SynapseType::Excitatory != nlm::SynapseType::Inhibitory);
-    
-    std::cout << "    testSynapseType passed" << std::endl;
+TEST_F(TypesTestSuite, SynapseType) {
+    EXPECT_NE(nlm::SynapseType::Excitatory, nlm::SynapseType::Inhibitory);
 }
 
-void testPlasticityFlags() {
+TEST_F(TypesTestSuite, PlasticityFlags) {
     nlm::PlasticityFlags flags;
-    assert(!flags.hebbian);
-    assert(!flags.stdp);
-    assert(!flags.reward_modulated);
+    EXPECT_FALSE(flags.hebbian);
+    EXPECT_FALSE(flags.stdp);
+    EXPECT_FALSE(flags.reward_modulated);
     
     flags.hebbian = true;
-    assert(flags.hebbian);
-    
-    std::cout << "    testPlasticityFlags passed" << std::endl;
+    EXPECT_TRUE(flags.hebbian);
 }
 
-void testSpikeEvent() {
+TEST_F(TypesTestSuite, SpikeEvent) {
     nlm::SpikeEvent event;
     event.source_neuron = nlm::NeuronId(1);
     event.timestamp = 0.5;
     event.step = 500;
     
-    assert(event.source_neuron.index() == 1);
-    assert(event.timestamp == 0.5);
-    assert(event.step == 500);
-    
-    std::cout << "    testSpikeEvent passed" << std::endl;
+    EXPECT_EQ(event.source_neuron.index(), 1);
+    EXPECT_DOUBLE_EQ(event.timestamp, 0.5);
+    EXPECT_EQ(event.step, 500);
 }
-
-void runAll() {
-    testNeuronId();
-    testSynapseId();
-    testRegionId();
-    testPopulationId();
-    testNeuronType();
-    testSynapseType();
-    testPlasticityFlags();
-    testSpikeEvent();
-}
-
-} // namespace test_types

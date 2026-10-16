@@ -1,0 +1,163 @@
+[
+    {
+        "key": "random_seed",
+        "value": 42,
+        "type": "int",
+        "source": 0,
+        "description": "Random seed for reproducible experiments"
+    },
+    {
+        "key": "simulation_timestep",
+        "value": 0.001,
+        "type": "double",
+        "source": 0,
+        "description": "Simulation timestep in seconds"
+    },
+    {
+        "key": "neuron_count",
+        "value": 1000,
+        "type": "int",
+        "source": 0,
+        "description": "Number of neurons in the brain"
+    },
+    {
+        "key": "region_count",
+        "value": 2,
+        "type": "int",
+        "source": 0,
+        "description": "Number of brain regions"
+    },
+    {
+        "key": "connection_probability",
+        "value": 0.1,
+        "type": "double",
+        "source": 0,
+        "description": "Connection probability for random connectivity"
+    },
+    {
+        "key": "plasticity_learning_rate",
+        "value": 0.01,
+        "type": "double",
+        "source": 0,
+        "description": "Plasticity learning rate"
+    },
+    {
+        "key": "stdp_ltp_weight",
+        "value": 0.01,
+        "type": "double",
+        "source": 0,
+        "description": "STDP LTP weight"
+    },
+    {
+        "key": "stdp_ltd_weight",
+        "value": 0.012,
+        "type": "double",
+        "source": 0,
+        "description": "STDP LTD weight"
+    },
+    {
+        "key": "stdp_time_constant",
+        "value": 20.0,
+        "type": "double",
+        "source": 0,
+        "description": "STDP time constant"
+    },
+    {
+        "key": "development_synaptogenesis_rate",
+        "value": 0.001,
+        "type": "double",
+        "source": 0,
+        "description": "Development synaptogenesis rate"
+    },
+    {
+        "key": "development_pruning_rate",
+        "value": 0.0001,
+        "type": "double",
+        "source": 0,
+        "description": "Development pruning rate"
+    },
+    {
+        "key": "dopamine_baseline",
+        "value": 0.1,
+        "type": "double",
+        "source": 0,
+        "description": "Reward settings dopamine baseline"
+    },
+    {
+        "key": "reward_discount_factor",
+        "value": 0.99,
+        "type": "double",
+        "source": 0,
+        "description": "Reward discount factor"
+    },
+    {
+        "key": "environment_name",
+        "value": "GridWorld",
+        "type": "string",
+        "source": 0,
+        "description": "Environment name"
+    },
+    {
+        "key": "environment_width",
+        "value": 10,
+        "type": "int",
+        "source": 0,
+        "description": "Environment width"
+    },
+    {
+        "key": "environment_height",
+        "value": 10,
+        "type": "int",
+        "source": 0,
+        "description": "Environment height"
+    },
+    {
+        "key": "log_level",
+        "value": "INFO",
+        "type": "string",
+        "source": 0,
+        "description": "Log level"
+    },
+    {
+        "key": "log_to_file",
+        "value": false,
+        "type": "bool",
+        "source": 0,
+        "description": "Log to file"
+    },
+    {
+        "key": "log_filename",
+        "value": "nlm.log",
+        "type": "string",
+        "source": 0,
+        "description": "Log filename"
+    },
+    {
+        "key": "max_simulation_steps",
+        "value": 10000,
+        "type": "int",
+        "source": 0,
+        "description": "Maximum simulation steps"
+    },
+    {
+        "key": "simulation_time_limit",
+        "value": 0.0,
+        "type": "double",
+        "source": 0,
+        "description": "Simulation time limit"
+    },
+    {
+        "key": "visualization_enabled",
+        "value": false,
+        "type": "bool",
+        "source": 0,
+        "description": "Visualization enabled"
+    },
+    {
+        "key": "visualization_update_rate",
+        "value": 30.0,
+        "type": "double",
+        "source": 0,
+        "description": "Visualization update rate"
+    }
+]

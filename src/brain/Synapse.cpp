@@ -242,13 +242,13 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
-        // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+    // Other types: small random weights
+    pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+    pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(1u, 5u));
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
