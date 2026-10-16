@@ -256,6 +256,12 @@ bool Brain::initialize() {
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
+    if (pImpl->dopamine) {
+        pImpl->dopamine->initialize(this);
+    }
+    if (pImpl->predictionError) {
+        pImpl->predictionError->initialize(this);
+    }
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
@@ -841,6 +847,15 @@ bool Brain::save(const std::string& filepath) const {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
         return false;
     }
+        }
+        
+        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        return false;
+    }
 }
 
 bool Brain::load(const std::string& filepath) {
@@ -857,6 +872,8 @@ bool Brain::load(const std::string& filepath) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
         }
+        
+        // ========== LOAD NEURAL COMPONENTS ==========
         
         // Read neurons
         NeuronCheckpointData neuronData;
@@ -898,6 +915,115 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // ========== LOAD MEMORY SYSTEMS ==========
+        
+        if (pImpl->workingMemory) {
+            // Working memory - clear current and load from checkpoint if available
+            pImpl->workingMemory->clear();
+            // Note: WorkingMemory doesn't currently have checkpoint data
+            // This is a placeholder for future implementation
+            NLM_LOG_INFO("Working memory loaded (empty state)");
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Episodic memory - clear current and load from checkpoint if available
+            pImpl->episodicMemory->clear();
+            // Note: EpisodicMemory doesn't currently have checkpoint data
+            // This is a placeholder for future implementation
+            NLM_LOG_INFO("Episodic memory loaded (empty state)");
+        }
+        
+        if (pImpl->associativeMemory) {
+            // Associative memory - clear current and load from checkpoint if available
+            pImpl->associativeMemory->clear();
+            // Note: AssociativeMemory doesn't currently have checkpoint data
+            // This is a placeholder for future implementation
+            NLM_LOG_INFO("Associative memory loaded (empty state)");
+        }
+        
+        // ========== LOAD COGNITION SYSTEMS ==========
+        
+        if (pImpl->planner) {
+            // Neural planner - reset to default state
+            pImpl->planner->reset();
+            NLM_LOG_INFO("Neural planner loaded (default state)");
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Concept formation - reset to default state
+            pImpl->conceptFormation->reset();
+            NLM_LOG_INFO("Concept formation loaded (default state)");
+        }
+        
+        if (pImpl->attention) {
+            // Attentional selection - reset to default state
+            pImpl->attention->reset();
+            NLM_LOG_INFO("Attentional selection loaded (default state)");
+        }
+        
+        // ========== LOAD DEVELOPMENT SYSTEM ==========
+        
+        if (pImpl->developmentSystem) {
+            // Development system - restore from checkpoint if available
+            // Note: DevelopmentSystem doesn't currently have checkpoint data
+            // Reset to initial stage
+            pImpl->developmentSystem->setStage(DevelopmentalStage::Initial);
+            pImpl->developmentSystem->setDevelopmentalAge(0.0);
+            NLM_LOG_INFO("Development system loaded (initial state)");
+        }
+        
+        // ========== LOAD NEUROMODULATION SYSTEMS ==========
+        
+        if (pImpl->dopamine) {
+            // Dopamine neuromodulator - restore from checkpoint if available
+            // Note: Dopamine doesn't currently have checkpoint data
+            // Reset to baseline level
+            pImpl->dopamine->setLevel(0.5f);  // Baseline dopamine level
+            NLM_LOG_INFO("Dopamine neuromodulator loaded (baseline state)");
+        }
+        
+        if (pImpl->predictionError) {
+            // Prediction error neuromodulator - restore from checkpoint if available
+            // Note: PredictionError doesn't currently have checkpoint data
+            // Reset to zero error
+            pImpl->predictionError->clearHistory();
+            NLM_LOG_INFO("Prediction error neuromodulator loaded (zero error state)");
+        }
+        
+        if (pImpl->novelty) {
+            // Novelty neuromodulator - restore from checkpoint if available
+            // Note: Novelty doesn't currently have checkpoint data
+            // Reset to baseline level
+            pImpl->novelty->setLevel(0.1f);  // Baseline novelty level
+            NLM_LOG_INFO("Novelty neuromodulator loaded (baseline state)");
+        }
+        
+        if (pImpl->curiosity) {
+            // Curiosity neuromodulator - restore from checkpoint if available
+            // Note: Curiosity doesn't currently have checkpoint data
+            // Reset to baseline level
+            pImpl->curiosity->setLevel(0.1f);  // Baseline curiosity level
+            NLM_LOG_INFO("Curiosity neuromodulator loaded (baseline state)");
+        }
+        
+        // ========== LOAD PREDICTION SYSTEM ==========
+        
+        if (pImpl->predictionSystem) {
+            // Prediction system - restore from checkpoint if available
+            // Note: PredictionSystem doesn't currently have checkpoint data
+            // Reset to initial state
+            pImpl->predictionSystem->clearHistory();
+            NLM_LOG_INFO("Prediction system loaded (empty state)");
+        }
+        
+        // ========== RESTORE INTEGRATION STATE ==========
+        
+        // Restore brain state from metadata
+        pImpl->currentStep = reader.getStepCount();
+        pImpl->currentTime = static_cast<Timestamp>(pImpl->currentStep) * pImpl->timestep;
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->totalSpikesTotal = static_cast<size_t>(pImpl->currentStep * 10); // Estimate based on steps
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
