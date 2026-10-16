@@ -194,6 +194,16 @@ public:
     void logStatus() const;
     
 private:
+    // Enhanced replay mechanism helper methods
+    void replayMemoryPattern(SimulationStep currentStep, Timestamp currentTime);
+    float calculateReplayPredictionError(SimulationStep currentStep);
+    void applyReplayPlasticityEffects(SimulationStep currentStep, Timestamp currentTime, float predictionError);
+    void updatePredictionFromReplay(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeuromodulationFromReplay(SimulationStep currentStep, Timestamp currentTime, float predictionError);
+    float calculateReplayImportance(const EpisodicMemoryItem* episode);
+    std::vector<const EpisodicMemoryItem*> selectEpisodesForReplay(SimulationStep currentStep, Timestamp currentTime);
+    void replaySingleEpisodePattern(const EpisodicMemoryItem* episode, SimulationStep currentStep, Timestamp currentTime, size_t pass);
+    
     struct Impl;
     Impl* pImpl;
 };

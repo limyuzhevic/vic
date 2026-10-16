@@ -36,6 +36,9 @@
 
 namespace nlm {
 
+// Forward declaration for Brain class
+class Brain;
+
 // Checkpoint version for compatibility
 constexpr uint32_t CHECKPOINT_VERSION_MAJOR = 1;
 constexpr uint32_t CHECKPOINT_VERSION_MINOR = 0;
@@ -318,9 +321,6 @@ private:
     std::vector<uint8_t> compressBuffer_;
 };
 
-/**
- * Checkpoint manager for automated checkpointing
- */
 class CheckpointManager {
 public:
     CheckpointManager();
@@ -359,6 +359,16 @@ public:
      * Load checkpoint
      */
     bool load(const std::string& name);
+    
+    /**
+     * Save entire brain state to checkpoint
+     */
+    bool saveBrain(Brain* brain);
+    
+    /**
+     * Load entire brain state from checkpoint
+     */
+    bool loadBrain(Brain* brain);
     
     /**
      * List available checkpoints

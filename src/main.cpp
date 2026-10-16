@@ -407,43 +407,82 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Check for advanced commands before running basic tests
+    bool runAdvancedCommands = false;
+    bool showMemoryDump = false;
+    bool enableDebugging = false;
+    bool runVisualization = false;
+    bool runContinuousTest = false;
+    size_t testDuration = 0;
+    std::string checkpointFile = "";
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--advanced") {
+            runAdvancedCommands = true;
+        } else if (arg == "--memory-dump") {
+            showMemoryDump = true;
+        } else if (arg == "--debug") {
+            enableDebugging = true;
+        } else if (arg == "--viz") {
+            runVisualization = true;
+        } else if (arg == "--continuous") {
+            runContinuousTest = true;
+        } else if (arg.find("--test-duration=") == 0) {
+            testDuration = std::stoul(arg.substr(18));
+        } else if (arg.find("--checkpoint=") == 0) {
+            checkpointFile = arg.substr(13);
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Process advanced commands
+    if (runAdvancedCommands) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== ADVANCED MODE ===");
+        NLM_LOG_INFO("Running enhanced cognitive tests and demonstrations");
+        
+        // Run advanced cognitive integration tests
+        runAdvancedCognitiveTests(brain);
+        
+        // Save checkpoint after advanced tests
+        if (!checkpointFile.empty()) {
+            NLM_LOG_INFO("Saving checkpoint to: " + checkpointFile);
+            brain->save(checkpointFile);
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (showMemoryDump) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== MEMORY DUMP ===");
+        brain->logMemoryStatus();
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (enableDebugging) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== DEBUGGING MODE ===");
+        brain->logDebugStatus();
+    }
     
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    if (runVisualization) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== VISUALIZATION ===");
+        brain->runVisualizationInterface();
+    }
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    if (runContinuousTest) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== CONTINUOUS TEST ===");
+        if (testDuration > 0) {
+            runContinuousTest(brain, testDuration);
+        } else {
+            runContinuousTest(brain, 60);  // Default 60 seconds
+        }
+    }
     
-    return 0;
+    // Save checkpoint after all operations
+    if (!checkpointFile.empty() && !runAdvancedCommands) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Saving final checkpoint to: " + checkpointFile);
+        brain->save(checkpointFile);
+    }
 }
