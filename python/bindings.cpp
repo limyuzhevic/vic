@@ -160,6 +160,48 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Pythonic convenience methods
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"), "Get configuration value as string (convenience method)")
+        .def("get_int", [](const Config& self, const std::string& key, int defaultValue = 0) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get integer value with default")
+        .def("get_float", [](const Config& self, const std::string& key, float defaultValue = 0.0f) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f, "Get float value with default")
+        .def("get_bool", [](const Config& self, const std::string& key, bool defaultValue = false) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get boolean value with default")
+        .def("set_int", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set integer value")
+        .def("set_float", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set float value")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set boolean value")
+        .def("set_string", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set string value")
+        .def("merge_from", [](Config& self, const Config& other) {
+            // This is a simplified merge - for a complete implementation, you'd need access to internal state
+            for (const auto& key : other.getKeys()) {
+                auto value = other.get<std::string>(key);
+                if (value.has_value()) {
+                    self.set(key, *value, nlm::ConfigSource::Runtime);
+                }
+            }
+        }, py::arg("other"), "Merge configuration from another Config object")
+        .def("validate", [](const Config& self, const std::vector<std::string>& requiredKeys) {
+            for (const auto& key : requiredKeys) {
+                if (!self.has(key)) {
+                    return false;
+                }
+            }
+            return true;
+        }, py::arg("requiredKeys"), "Validate that all required keys exist")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -207,7 +249,39 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Pythonic convenience methods
+        .def("to_dict", [](const Action& self) {
+            return py::dict(
+                "type", self.getType(),
+                "parameters", self.getParameters(),
+                "name", self.getName()
+            );
+        }, "Convert action to Python dictionary")
+        .def("set_param", [](Action& self, size_t index, float value) {
+            auto params = self.getParameters();
+            if (index < params.size()) {
+                params[index] = value;
+                self.setParameters(params);
+            }
+        }, py::arg("index"), py::arg("value"), "Set parameter at index")
+        .def("add_param", [](Action& self, float value) {
+            auto params = self.getParameters();
+            params.push_back(value);
+            self.setParameters(params);
+        }, py::arg("value"), "Add parameter to action")
+        .def("remove_param", [](Action& self, size_t index) {
+            auto params = self.getParameters();
+            if (index < params.size()) {
+                params.erase(params.begin() + index);
+                self.setParameters(params);
+            }
+        }, py::arg("index"), "Remove parameter at index")
+        .def("__repr__", [](const Action& self) {
+            std::stringstream ss;
+            ss << "<Action: " << self.getName() << " type=" << static_cast<int>(self.getType()) << ">";
+            return ss.str();
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -261,7 +335,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Pythonic convenience methods
+        .def("to_dict", [](const SensoryPercept& self) {
+            return py::dict(
+                "vision", self.getVision(),
+                "touch", self.getTouch(),
+                "internal", self.getInternal(),
+                "proprioception", self.getProprioception(),
+                "audio", self.getAudio(),
+                "timestamp", self.getTimestamp()
+            );
+        }, "Convert percept to Python dictionary")
+        .def("__repr__", [](const SensoryPercept& self) {
+            std::stringstream ss;
+            ss << "<SensoryPercept at " << self.getTimestamp() << ">";
+            return ss.str();
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -416,10 +506,188 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Module-level convenience functions
+    m.def("create_demo_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set some default demo values
+        config->set("brain.neuron_count", 1000, nlm::ConfigSource::Runtime);
+        config->set("brain.simulation_steps", 1000, nlm::ConfigSource::Runtime);
+        config->set("world.width", 100.0f, nlm::ConfigSource::Runtime);
+        config->set("world.height", 100.0f, nlm::ConfigSource::Runtime);
+        config->set("world.vision_width", 10, nlm::ConfigSource::Runtime);
+        config->set("world.vision_height", 10, nlm::ConfigSource::Runtime);
+        config->set("neuromodulation.reward_scale", 1.0f, nlm::ConfigSource::Runtime);
+        config->set("neuromodulation.curiosity_scale", 0.1f, nlm::ConfigSource::Runtime);
+        return config;
+    }, "Create a demo configuration with default values for testing");
+
+    m.def("create_simple_demo_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        // Add some default regions
+        brain->addRegion("sensory");
+        brain->addRegion("motor");
+        brain->addRegion("association");
+        return brain;
+    }, py::arg("config"), "Create a demo brain with default configuration");
+
+    m.def("create_simple_demo_world", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(100, 100, 10, 10);
+        world->setAgentStart(50.0f, 50.0f);
+        world->setRandomSeed(42);
+        return world;
+    }, "Create a demo world with default settings");
+
+    // Advanced simulation utilities
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                             size_t steps, float timestep = 0.01f) {
+        for (size_t i = 0; i < steps; ++i) {
+            if (world) {
+                auto percept = world->getSensoryPercept();
+                brain->receiveSensoryInput(percept);
+            }
+            brain->step(i, static_cast<Timestamp>(i * timestep * 1000.0f));
+        }
+        return py::dict(
+            "total_steps", steps,
+            "final_step", steps - 1,
+            "status", "completed"
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"), py::arg("timestep") = 0.01f,
+       "Run a complete simulation episode");
+
+    m.def("save_brain_state", [](const std::string& filepath, std::shared_ptr<Brain> brain) {
+        return brain->save(filepath);
+    }, py::arg("filepath"), py::arg("brain"), "Save brain state to file");
+
+    m.def("load_brain_state", [](const std::string& filepath, std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->load(filepath)) {
+            return brain;
+        }
+        throw std::runtime_error("Failed to load brain state from " + filepath);
+    }, py::arg("filepath"), py::arg("config"), "Load brain state from file");
+
+    m.def("create_agent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(world);
+        return agentBrain;
+    }, py::arg("brain"), py::arg("world"), "Create an agent brain connected to a world");
+
+    // Error and validation utilities
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        py::list errors;
+        // Check for required keys
+        const std::vector<std::string> requiredKeys = {
+            "brain.neuron_count",
+            "brain.simulation_steps"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                errors.append("Missing required key: " + key);
+            }
+        }
+        
+        // Check for valid ranges
+        if (config->has("brain.neuron_count")) {
+            auto neuronCount = config->getOr<int>("brain.neuron_count", 0);
+            if (neuronCount < 10) {
+                errors.append("Neuron count should be at least 10");
+            } else if (neuronCount > 100000) {
+                errors.append("Neuron count should not exceed 100,000");
+            }
+        }
+        
+        if (config->has("brain.simulation_steps")) {
+            auto steps = config->getOr<size_t>("brain.simulation_steps", 0);
+            if (steps == 0) {
+                errors.append("Simulation steps should be positive");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
+    // Performance and debugging utilities
+    m.def("profile_brain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        return py::dict(
+            "total_steps", steps,
+            "elapsed_time_ms", duration.count(),
+            "steps_per_second", static_cast<double>(steps) / (duration.count() / 1000.0),
+            "avg_time_per_step_ms", static_cast<double>(duration.count()) / steps
+        );
+    }, py::arg("brain"), py::arg("steps"), "Profile brain performance over specified steps");
+
+    // Constants and utilities
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add some useful constants
+    m.attr("DEFAULT_SIMULATION_DT") = py::cast(0.01f);
+    m.attr("DEFAULT_WORLD_SIZE") = py::cast(100.0f);
+    m.attr("DEFAULT_VISION_RANGE") = py::cast(10);
+
+    m.attr("DEVELOPMENTAL_STAGE_INITIAL") = py::cast(nlm::DevelopmentalStage::Initial);
+    m.attr("DEVELOPMENTAL_STAGE_CRITICAL_PERIOD") = py::cast(nlm::DevelopmentalStage::CriticalPeriod);
+    m.attr("DEVELOPMENTAL_STAGE_MATURATION") = py::cast(nlm::DevelopmentalStage::Maturation);
+    m.attr("DEVELOPMENTAL_STAGE_ADULT") = py::cast(nlm::DevelopmentalStage::Adult);
+    m.attr("DEVELOPMENTAL_STAGE_AGING") = py::cast(nlm::DevelopmentalStage::Aging);
+
+    m.attr("NEURON_TYPE_EXCITATORY") = py::cast(nlm::NeuronType::Excitatory);
+    m.attr("NEURON_TYPE_INHIBITORY") = py::cast(nlm::NeuronType::Inhibitory);
+    m.attr("NEURON_TYPE_MODULATORY") = py::cast(nlm::NeuronType::Modulatory);
+    m.attr("NEURON_TYPE_SENSORY") = py::cast(nlm::NeuronType::Sensory);
+    m.attr("NEURON_TYPE_MOTOR") = py::cast(nlm::NeuronType::Motor);
+    m.attr("NEURON_TYPE_INTERNAL") = py::cast(nlm::NeuronType::Internal);
+
+    m.attr("ACTION_TYPE_MOVE_FORWARD") = py::cast(nlm::ActionType::MoveForward);
+    m.attr("ACTION_TYPE_MOVE_BACKWARD") = py::cast(nlm::ActionType::MoveBackward);
+    m.attr("ACTION_TYPE_TURN_LEFT") = py::cast(nlm::ActionType::TurnLeft);
+    m.attr("ACTION_TYPE_TURN_RIGHT") = py::cast(nlm::ActionType::TurnRight);
+    m.attr("ACTION_TYPE_LOOK") = py::cast(nlm::ActionType::Look);
+    m.attr("ACTION_TYPE_INTERACT") = py::cast(nlm::ActionType::Interact);
+    m.attr("ACTION_TYPE_REST") = py::cast(nlm::ActionType::Rest);
+    m.attr("ACTION_TYPE_WAIT") = py::cast(nlm::ActionType::Wait);
+
+    m.attr("WORLD_OBJECT_EMPTY") = py::cast(nlm::WorldObjectType::Empty);
+    m.attr("WORLD_OBJECT_RESOURCE") = py::cast(nlm::WorldObjectType::Resource);
+    m.attr("WORLD_OBJECT_HAZARD") = py::cast(nlm::WorldObjectType::Hazard);
+    m.attr("WORLD_OBJECT_WALL") = py::cast(nlm::WorldObjectType::Wall);
+    m.attr("WORLD_OBJECT_MARKER") = py::cast(nlm::WorldObjectType::Marker);
 }
 
 } // namespace nlm
+
