@@ -2,11 +2,15 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace nlm {
+
+// Forward declaration to avoid circular dependency
+class Reward;
 
 // World object - represents an object in the world
 // Position and type only - no semantic labels
@@ -66,6 +70,9 @@ public:
     // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
     
+    // Compute reward based on current state
+    float computeReward();
+    
     // World dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
@@ -75,6 +82,10 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float gain) { resourceEnergyGain_ = gain; }
+    float getHazardEnergyLoss() const { return hazardEnergyLoss_; }
+    void setHazardEnergyLoss(float loss) { hazardEnergyLoss_ = loss; }
     
     // Time
     double getSimulationTime() const { return simTime_; }
@@ -92,6 +103,9 @@ private:
     
     // Interact with nearby objects
     ActionResult interact();
+    
+    // Compute reward based on agent position and world objects
+    void computeInternalReward();
     
     // World geometry
     float width_;
@@ -114,6 +128,10 @@ private:
     float maxEnergy_;
     float energyDecayRate_;
     float resourceEnergyGain_;
+    float hazardEnergyLoss_;
+    
+    // Current energy
+    float currentEnergy_;
     
     // Simulation time
     double simTime_;
@@ -124,6 +142,13 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Reward system
+    Reward reward_;
+    
+    // Internal reward state
+    float internalReward_;
+    double lastRewardTime_;
 };
 
 } // namespace nlm

@@ -9,24 +9,20 @@ struct NeuralPopulation::Impl {
     size_t size;
     std::vector<Neuron*> neurons;
     NeuronType neuronType;
-    std::vector<MembranePotential> membranePotentials;  // for statistics
+    std::vector<MembranePotential> membranePotentials;
     
     Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
 };
 
-NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
+NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(std::make_unique<Impl>(id, size)) {}
 
 NeuralPopulation::~NeuralPopulation() = default;
 
-NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -158,7 +154,7 @@ float NeuralPopulation::getMeanMembranePotential() const {
         return 0.0f;
     }
     float sum = std::accumulate(pImpl->membranePotentials.begin(), 
-                                 pImpl->membranePotentials.end(), 0.0f);
+                                pImpl->membranePotentials.end(), 0.0f);
     return sum / static_cast<float>(pImpl->membranePotentials.size());
 }
 

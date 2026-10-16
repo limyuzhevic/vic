@@ -3,11 +3,20 @@
 #include "Action.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
+// Action selection algorithm types
+enum class ActionSelectionAlgorithm {
+    WinnerTakeAll,
+    Stochastic,
+    Softmax,
+    ThompsonSampling
+};
+
 // Motor system: converts neural activity to actions
-// PLACEHOLDER - Phase 2 will implement real action selection
+// Enhanced implementation with neural activity-based selection and learning
 
 class MotorSystem {
 public:
@@ -15,7 +24,6 @@ public:
     ~MotorSystem();
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions
@@ -27,6 +35,32 @@ public:
     // Get action history
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
+    
+    // Enhanced action selection algorithms
+    void setActionSelectionAlgorithm(ActionSelectionAlgorithm algorithm);
+    ActionSelectionAlgorithm getActionSelectionAlgorithm() const;
+    
+    // Exploration and temperature control
+    void setExplorationNoise(float noise);
+    float getExplorationNoise() const;
+    
+    void setTemperature(float temp);
+    float getTemperature() const;
+    
+    // Learning and statistics
+    void recordActionOutcome(ActionType action, bool success);
+    
+    float getActionPreference(ActionType action) const;
+    int getActionSuccessCount(ActionType action) const;
+    int getActionTotalCount(ActionType action) const;
+    
+    std::vector<float> getActionNeuralCorrelations(ActionType action) const;
+    
+    // Update action selection based on current neural state
+    void updateActionSelection(const class NeuralRegion& motorRegion);
+    
+    // Reward prediction error for reinforcement learning
+    float calculateRewardPredictionError(ActionType action, bool outcome) const;
     
 private:
     struct Impl;

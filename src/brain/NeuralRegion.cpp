@@ -9,30 +9,26 @@ struct NeuralRegion::Impl {
     std::string name;
     std::vector<std::unique_ptr<NeuralPopulation>> populations;
     std::vector<std::unique_ptr<Synapse>> synapses;
-    std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
-    std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
+    std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;
+    std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;
     SynapseId nextSynapseId;
     
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
 
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
+NeuralRegion::NeuralRegion(RegionId id) : pImpl(std::make_unique<Impl>(id)) {}
 
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
+NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(std::make_unique<Impl>(id)) {
     pImpl->name = name;
 }
 
 NeuralRegion::~NeuralRegion() = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -94,10 +90,8 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
-    
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
-    
     pImpl->synapses.push_back(std::move(synapse));
     return synId;
 }
@@ -112,7 +106,7 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
+    for (const auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
         }
@@ -181,7 +175,6 @@ size_t NeuralRegion::getFiringNeuronCount() const {
 float NeuralRegion::getAverageFiringRate() const {
     size_t popCount = pImpl->populations.size();
     if (popCount == 0) return 0.0f;
-    
     float sum = 0.0f;
     for (const auto& pop : pImpl->populations) {
         sum += pop->getAverageFiringRate();
@@ -203,21 +196,15 @@ float NeuralRegion::getAverageSynapticWeight() const {
 float NeuralRegion::getSynapticDensity() const {
     size_t neuronCount = getTotalNeuronCount();
     if (neuronCount == 0) return 0.0f;
-    
-    // Maximum possible connections: N * (N-1) for directed graph
     size_t maxConnections = neuronCount * (neuronCount - 1);
     if (maxConnections == 0) return 0.0f;
-    
     return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
 }
 
 void NeuralRegion::step(Timestamp currentTime) {
-    // Step all populations
     for (auto& pop : pImpl->populations) {
         pop->step(currentTime);
     }
-    
-    // Step all synapses
     for (auto& syn : pImpl->synapses) {
         syn->step(currentTime);
     }
@@ -236,57 +223,34 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float connectionProbability,
                                                float meanWeight,
                                                float weightVariance) {
-    // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
-    
-    // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
-    
-    // Create random connections
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();
-        
-        // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
-        
         for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
-            
+            if (i == j) continue;
             Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
             if (!rng.bernoulli(connectionProbability)) continue;
-            
-            // Determine synapse type based on pre-synaptic neuron type
             SynapseType synType;
             float weight;
-            
             if (preType == NeuronType::Excitatory || 
                 preType == NeuronType::Sensory ||
                 preType == NeuronType::Motor ||
                 preType == NeuronType::Internal) {
-                // excitatory synapse
                 synType = SynapseType::Excitatory;
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
-                weight = std::max(0.01f, weight);  // Ensure positive
+                weight = std::max(0.01f, weight);
             } else if (preType == NeuronType::Inhibitory) {
-                // inhibitory synapse
                 synType = SynapseType::Inhibitory;
                 weight = -(meanWeight + rng.normal(0.0f, weightVariance));
-                weight = std::min(-0.01f, weight);  // Ensure negative
+                weight = std::min(-0.01f, weight);
             } else {
                 synType = SynapseType::Excitatory;
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
             }
-            
-            // Add synapse
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
-            
-            // Initialize random properties
             if (Synapse* syn = getSynapse(synId)) {
                 syn->setType(synType);
                 syn->initializeRandom(rng);

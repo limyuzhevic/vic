@@ -8,12 +8,12 @@ struct DevelopmentSystem::Impl {
     DevelopmentalStage stage;
     SimulationStep stageStartStep;
     SimulationStep stepsInCurrentStage;
-    double stageAge;  // Age since entering current stage
+    double stageAge;
     
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(std::make_unique<Impl>()), age_(0.0) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
@@ -41,7 +41,6 @@ void DevelopmentSystem::advanceStage() {
             pImpl->stage = DevelopmentalStage::Aging;
             break;
         case DevelopmentalStage::Aging:
-            // Already at final stage
             break;
     }
     pImpl->stepsInCurrentStage = 0;
@@ -62,11 +61,8 @@ const char* DevelopmentSystem::getStageName() const {
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     ++pImpl->stepsInCurrentStage;
-    age_ += 0.001;  // Approximate timestep
+    age_ += 0.001;
     pImpl->stageAge += 0.001;
-    
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
     if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
@@ -80,9 +76,6 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
-    
-    // Auto-advance stage based on developmental age
-    // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && age_ > 360.0) {
@@ -93,7 +86,6 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
 }
 
 float DevelopmentSystem::getPlasticityModifier() const {
-    // Higher plasticity in early stages, lower in later stages
     switch (pImpl->stage) {
         case DevelopmentalStage::Initial: return 1.0f;
         case DevelopmentalStage::CriticalPeriod: return 0.8f;
@@ -112,7 +104,6 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
         return 0.0f;
     }
-    // Progress through critical period (0 to 1)
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
 }
 

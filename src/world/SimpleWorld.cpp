@@ -392,12 +392,64 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
-void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
-    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+float SimpleWorld::computeReward() {
+    // Create an observation from the current world state
+    // We'll use the world::Observation which has a simple getData() interface
+    nlm::world::Observation worldObservation;
+    
+    // Extract observation data from the agent's state and world objects
+    std::vector<float> obsData;
+    
+    // Add agent state to observation
+    obsData.push_back(agent_.x / width_);      // Normalized X position
+    obsData.push_back(agent_.y / height_);     // Normalized Y position
+    obsData.push_back(agent_.energy / maxEnergy_);  // Energy level
+    obsData.push_back(agent_.health);           // Health
+    obsData.push_back(agent_.isMoving ? 1.0f : 0.0f);  // Moving state
+    
+    // Add nearby object information
+    const float sensorRange = 5.0f;
+    for (int dir = 0; dir < 8; ++dir) {
+        float angle = agent_.orientation + 2.0f * M_PI * dir / 8.0f;
+        float dx = std::cos(angle);
+        float dy = std::sin(angle);
+        
+        WorldObject* obj = getObjectAt(agent_.x + dx * sensorRange, 
+                                       agent_.y + dy * sensorRange);
+        if (obj != nullptr) {
+            obsData.push_back(obj->value);  // Object value
+            obsData.push_back(obj->radius);  // Object size
+            obsData.push_back(1.0f);  // Object detected
+        } else {
+            obsData.push_back(0.0f);  // No object
+            obsData.push_back(0.0f);
+            obsData.push_back(0.0f);
+        }
     }
+    
+    // Ensure we have a reasonable number of observation values
+    obsData.resize(16, 0.0f);
+    
+    // Set the observation data
+    worldObservation.setData(obsData);
+    
+    // Use the enhanced Reward class to compute reward
+    return reward_.computeReward(worldObservation);
+}
+
+void SimpleWorld::computeInternalReward() {
+    // Compute internal reward components based on agent's energy and health
+    float energyFactor = agent_.energy / maxEnergy_;
+    float healthFactor = agent_.health / 100.0f;  // Assuming max health of 100
+    
+    // Combine factors for internal reward
+    internalReward_ = (energyFactor * 0.6f) + (healthFactor * 0.4f);
+    
+    // Add to accumulated reward
+    reward_.add(internalReward_);
+    
+    // Update last reward time
+    lastRewardTime_ = simTime_;
 }
 
 } // namespace nlm

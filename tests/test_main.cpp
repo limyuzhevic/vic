@@ -1,6 +1,3 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
 #include <iostream>
 #include <cassert>
 
@@ -34,6 +31,10 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_reward {
     void runAll();
 }
 
@@ -104,6 +105,15 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Reward tests..." << std::endl;
+    try {
+        test_reward::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

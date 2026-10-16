@@ -6,17 +6,27 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <queue>
 
-namespace nlm {
+namespace nlm;
 
-// NeuralWorkingMemory: Implements working memory using neural dynamics
-// NOT a simple storage vector - uses persistent activity and recurrent connections
-//
-// Key mechanisms:
-// - Persistent neural activity (reverberating activity)
-// - Recurrent synaptic connections for maintaining information
-// - Activity-dependent short-term plasticity
-// - Neural competition for selective retention
+// Working memory trace for biologically realistic storage
+struct WorkingMemoryTrace {
+    NeuronId neuralId;                    // Primary encoding neuron
+    std::vector<NeuronId> population;      // Encoding neural population
+    std::vector<float> populationActivity; // Activity levels of population neurons
+    float persistentActivity;              // Maintained persistent firing rate
+    SimulationStep age;                    // Trace age in simulation steps
+    float noveltyScore;                     // Recency/familiarity measure
+    SimulationStep lastReactivation;        // Last time trace was reinforced
+    float consolidationWeight;              // Weight for trace integration
+    float traceStrength;                    // Current trace strength (0-1)
+    float synapticResource;                 // Synaptic resources allocated to this trace
+    bool isConsolidated;                    // Whether trace is fully consolidated
+    std::vector<float> spikeHistory;        // Recent spike patterns for pattern matching
+    
+    WorkingMemoryTrace();
+};
 
 class NeuralWorkingMemory {
 public:
@@ -30,7 +40,7 @@ public:
     // The information is encoded as neural activity pattern
     void store(const std::vector<float>& pattern, float strength = 1.0f);
 
-    // Store specific neuron activation
+    // Store specific neuron activation with biological dynamics
     void storeToNeuron(NeuronId neuron, float activation);
 
     // Retrieve current working memory content as activity levels
@@ -49,7 +59,7 @@ public:
     void clear();
 
     // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
+    size_t getActiveTraces() const { return pImpl->traces.size(); }
 
     // Get capacity
     size_t getCapacity() const { return capacity_; }
@@ -74,15 +84,39 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Get current memory load and capacity statistics
+    float getMemoryLoad() const { return pImpl->currentLoad; }
+    float getMaximumCapacity() const { return pImpl->maximumCapacity; }
+
+    // Novelty detection and forgetting mechanisms
+    std::vector<NeuronId> getNovelNeurons() const;
+    void forgetWeakTraces();
+
+    // Trace consolidation and decay mechanisms
+    void consolidateTraces();
+    void decayTraces(TimestepDuration dt);
+
+    // Neural resource management
+    void allocateNeuralResources(size_t count);
+    void releaseNeuralResources(const std::vector<NeuronId>& neurons);
+
 private:
-    // Create recurrent connection for maintenance
+    // Create recurrent connections for maintenance
+    void createRecurrentConnections(const std::vector<NeuronId>& neurons, float strength);
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
 
-    // Decay weak memory traces
-    void decayWeakTraces();
+    // Trace management and dynamics
+    void updateTraceStatistics(WorkingMemoryTrace& trace);
+    void reactivateTrace(WorkingMemoryTrace& trace);
+    void selectEncodingPopulation(const WorkingMemoryTrace& trace);
+
+    // Competition and attention mechanisms
+    void runWinnerTakeAllCompetition();
+    void applyLateralInhibition();
+    void applyGlobalInhibition();
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -91,13 +125,13 @@ private:
     size_t capacity_;
     float decayRate_;
     
-    // Memory content
+    // Legacy memory content (for backward compatibility)
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
     
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
+    // Active memory traces (new biologically realistic system)
+    std::vector<size_t> activeTraces_;  // Indices into pImpl->traces
     
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;

@@ -14,19 +14,15 @@ struct SimulationClock::Impl {
         : step(0), time(0.0), timestep(dt), realStartSet(false) {}
 };
 
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
+SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(std::make_unique<Impl>(timestep)) {}
 
 SimulationClock::~SimulationClock() = default;
 
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
