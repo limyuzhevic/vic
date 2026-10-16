@@ -143,8 +143,32 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Phase 7 launcher (unified interface for all phases)
+add_executable(nlm_launcher
+    src/launcher/nlm_launcher.cpp
+)
+target_link_libraries(nlm_launcher PUBLIC nlm_core)
+
+# Phase 7 configuration management
+add_executable(nlm_config
+    src/schema/ConfigSchema.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+# Testing framework
+add_executable(nlm_test_framework
+    src/core/Logger/Logger.cpp
+)
+target_link_libraries(nlm_test_framework PUBLIC nlm_core)
+
+# Phase 7 additional executables
+add_executable(nlm_config_validator
+    src/launcher/config_validator.cpp
+)
+target_link_libraries(nlm_config_validator PUBLIC nlm_core)
+
+# Installation targets (future)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_launcher nlm_config nlm_config_validator
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
