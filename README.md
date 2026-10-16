@@ -82,6 +82,8 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+*Note: Phase 6 demo is now included in the build system and can be compiled.*
+
 ## Project Structure
 
 ```
