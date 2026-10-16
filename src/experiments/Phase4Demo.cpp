@@ -13,7 +13,6 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 

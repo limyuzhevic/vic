@@ -110,6 +110,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase3Demo.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
@@ -117,11 +118,52 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase4Demo.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase3Demo.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase4Demo.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 6 experiment with unified runner and runtime inspector
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+    src/experiments/UnifiedExperimentRunner.cpp
+    src/runtime/RuntimeInspector.cpp
+    src/visualization/VisualizationSystem.cpp
+)
+target_include_directories(nlm_phase6_demo PUBLIC src)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Runtime inspector library
+add_library(nlm_runtime STATIC
+    src/runtime/RuntimeInspector.cpp
+)
+target_include_directories(nlm_runtime PUBLIC src)
+target_link_libraries(nlm_runtime PUBLIC nlm_core)
+
+# Visualization system library
+add_library(nlm_visualization STATIC
+    src/visualization/VisualizationSystem.cpp
+)
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core nlm_runtime)
+
+# Main executable with enhanced command-line interface
 add_executable(nlm
     src/main.cpp
 )
@@ -144,7 +186,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6_demo nlm_runtime nlm_visualization
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
