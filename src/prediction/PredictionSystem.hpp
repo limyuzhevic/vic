@@ -34,6 +34,15 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Train prediction from pattern vector (neural substrate input)
+    void trainFromPattern(const std::vector<float>& pattern);
+    
+    // Apply neuromodulation to prediction system
+    void applyNeuromodulation(float dopamineLevel, float acetylcholineLevel);
+    
+    // Pattern completion (retrieve similar stored patterns)
+    std::vector<float> completePattern(const std::vector<float>& partialPattern) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
