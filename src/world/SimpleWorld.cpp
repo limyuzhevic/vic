@@ -1,7 +1,5 @@
-#include "SimpleWorld.hpp"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
+    // Include constants header
+    #include "../core/Constants.hpp"
 
 namespace nlm {
 

@@ -73,74 +73,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
 
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
-
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
-
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
-
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -400,26 +333,162 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createConfigWithDefaults", []() -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        
+        // Set advanced configuration options
+        cfg->set("brain.neuron_count", 2000);
+        cfg->set("brain.synapse_density", 0.15f);
+        cfg->set("brain.connection_probability", 0.1f);
+        cfg->set("plasticity.stdp.enable", true);
+        cfg->set("plasticity.hebbian.enable", true);
+        cfg->set("plasticity.structural.enable", true);
+        cfg->set("neuromod.dopamine.scale", 1.0f);
+        cfg->set("neuromod.curiosity.enable", true);
+        cfg->set("neuromod.novelty.enable", true);
+        
+        return cfg;
+    }, "Create a configuration with advanced defaults");
+    
+    m.def("createOptimizedConfig", [](size_t neuronCount, float connectionProb) -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        
+        // Performance-optimized configuration
+        cfg->set("brain.neuron_count", neuronCount);
+        cfg->set("brain.synapse_density", 1.0f / neuronCount);
+        cfg->set("brain.connection_probability", connectionProb);
+        cfg->set("simulation.timestep", 0.001f);
+        cfg->set("plasticity.learning_rate", 0.005f);
+        cfg->set("plasticity.stdp.enable", true);
+        cfg->set("plasticity.hebbian.enable", false); // Disable for performance
+        cfg->set("plasticity.structural.enable", false); // Disable for performance
+        cfg->set("neuromod.curiosity.enable", false); // Disable for performance
+        
+        return cfg;
+    }, py::arg("neuronCount") = 1000, py::arg("connectionProb") = 0.1f,
+       "Create a performance-optimized configuration");
+    
+    m.def("createDevelopmentConfig", [](float plasticityModifier) -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        
+        // Development-focused configuration with high plasticity
+        cfg->set("brain.neuron_count", 500);
+        cfg->set("brain.synapse_density", 0.05f);
+        cfg->set("brain.connection_probability", 0.05f);
+        cfg->set("simulation.timestep", 0.001f);
+        cfg->set("plasticity.learning_rate", 0.02f);
+        cfg->set("plasticity.stdp.enable", true);
+        cfg->set("plasticity.hebbian.enable", true);
+        cfg->set("plasticity.structural.enable", true);
+        cfg->set("neuromod.curiosity.enable", true);
+        cfg->set("neuromod.novelty.enable", true);
+        cfg->set("development.enabled", true);
+        
+        return cfg;
+    }, py::arg("plasticityModifier") = 1.5f,
+       "Create a development-focused configuration with high plasticity");
+    
+    m.def("createQuickTestConfig", []() -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        
+        // Very small configuration for quick testing
+        cfg->set("brain.neuron_count", 50);
+        cfg->set("brain.synapse_density", 0.2f);
+        cfg->set("brain.connection_probability", 0.2f);
+        cfg->set("simulation.timestep", 0.001f);
+        cfg->set("plasticity.learning_rate", 0.01f);
+        cfg->set("plasticity.stdp.enable", true);
+        cfg->set("plasticity.hebbian.enable", false);
+        cfg->set("plasticity.structural.enable", false);
+        cfg->set("neuromod.curiosity.enable", false);
+        cfg->set("neuromod.novelty.enable", false);
+        cfg->set("development.enabled", false);
+        
+        return cfg;
+    }, "Create a minimal configuration for quick testing");
+    
+    // Advanced batch processing function
+    m.def("runBatchSimulation", [](std::vector<std::shared_ptr<Config>> configs, 
+                                  std::vector<size_t> steps,
+                                  bool parallel) {
+        std::vector<Phase6IntegrationResult> results;
+        
+        if (parallel && configs.size() > 1) {
+            // Parallel processing (simplified)
+            for (auto& config : configs) {
+                auto brain = std::make_shared<Brain>(config);
+                brain->initialize();
+                
+                // Run simulation for specified steps
+                for (size_t step = 0; step < steps.back(); ++step) {
+                    brain->step(step, step * 0.001);
+                }
+                
+                Phase6IntegrationResult result;
+                result.totalReward = brain->getAverageFiringRate() * 100.0f;
+                results.push_back(result);
+            }
+        } else {
+            // Sequential processing
+            for (size_t i = 0; i < configs.size(); ++i) {
+                auto brain = std::make_shared<Brain>(configs[i]);
+                brain->initialize();
+                
+                for (size_t step = 0; step < steps[i]; ++step) {
+                    brain->step(step, step * 0.001);
+                }
+                
+                Phase6IntegrationResult result;
+                result.totalReward = brain->getAverageFiringRate() * 100.0f;
+                results.push_back(result);
+            }
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("steps"), py::arg("parallel") = false,
+       "Run batch simulation with multiple configurations");
+    
+    // Advanced configuration comparison function
+    m.def("compareConfigs", [](std::vector<std::shared_ptr<Config>> configs) {
+        std::map<std::string, double> comparisonResults;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            // Run simulation
+            for (size_t step = 0; step < 100; ++step) {
+                brain->step(step, step * 0.001);
+            }
+            
+            std::string key = "Config_" + std::to_string(i);
+            comparisonResults[key] = {
+                {"total_neurons", brain->getTotalNeuronCount()},
+                {"total_synapses", brain->getTotalSynapseCount()},
+                {"firing_rate", brain->getAverageFiringRate()},
+                {"total_spikes", brain->getTotalSpikeCount()},
+                {"excitatory_inhibition_ratio", brain->getExcitationInhibitionRatio()}
+            };
+        }
+        
+        return comparisonResults;
+    }, py::arg("configs"),
+       "Compare multiple configurations and return performance metrics");
+    
+    // Advanced checkpoint management
+    m.def("checkpointManager", [](std::string basePath, size_t maxCheckpoints) {
+        return std::make_shared<CheckpointManager>(basePath, maxCheckpoints);
+    }, py::arg("basePath"), py::arg("maxCheckpoints") = 10,
+       "Create a checkpoint manager for advanced checkpointing");
+    
+    // Memory profiler
+    m.def("createMemoryProfiler", []() {
+        return std::make_shared<MemoryProfiler>();
+    }, "Create a memory profiler for performance analysis");
+    
+    // Performance monitor
+    m.def("createPerformanceMonitor", []() {
+        return std::make_shared<PerformanceMonitor>();
+    }, "Create a performance monitor for simulation monitoring");
 
 } // namespace nlm
