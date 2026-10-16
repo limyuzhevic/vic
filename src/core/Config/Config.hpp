@@ -93,6 +93,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(std::vector<std::string>& errors) const;
+    bool isValid() const;
+    std::string validationErrorMessage() const;
+    
+    // Validation helper functions
+    static bool validateNeuronCount(int count);
+    static bool validateRegionCount(int count);
+    static bool validateConnectionProbability(float prob);
+    static bool validatePlasticityRate(float rate);
+    static bool validateDopamineBaseline(float baseline);
+    static bool validateNoveltyThreshold(float threshold);
+    
+    // Get validation status
+    bool hasValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

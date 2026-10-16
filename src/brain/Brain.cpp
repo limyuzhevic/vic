@@ -65,6 +65,12 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Performance monitoring
+    double simulationStartTime;
+    double totalSimulationTime;
+    double totalWallClockTime;
+    size_t stepsCompleted;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
@@ -88,6 +94,10 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , simulationStartTime(0.0)
+        , totalSimulationTime(0.0)
+        , totalWallClockTime(0.0)
+        , stepsCompleted(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
@@ -1112,6 +1122,145 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+// Brain status logging (enhanced with performance stats)
+void Brain::logStatus() const {
+    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Memory system status
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Neuromodulation status
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    // Development status
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
+    for (const auto& region : pImpl->regions) {
+        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
+                    " (" + region->getName() + "): " +
+                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                    std::to_string(region->getSynapseCount()) + " synapses, " +
+                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+    
+    // Performance statistics
+    NLM_LOG_INFO("=== Performance Statistics ===");
+    PerformanceStats stats = getPerformanceStats();
+    NLM_LOG_INFO("Steps completed: " + std::to_string(stats.stepsCompleted));
+    NLM_LOG_INFO("Simulation time: " + std::to_string(stats.simulationTime) + "s");
+    NLM_LOG_INFO("Wall clock time: " + std::to_string(stats.wallClockTime) + "s");
+    NLM_LOG_INFO("Average step time: " + std::to_string(stats.avgStepTime) + "s");
+    NLM_LOG_INFO("Steps per second: " + std::to_string(stats.stepsPerSecond));
+    NLM_LOG_INFO("Efficiency score: " + std::to_string(stats.efficiencyScore));
+    NLM_LOG_INFO("Memory usage: " + std::to_string(stats.memoryUsage) + " bytes");
+}
+
+// Performance monitoring method implementations
+PerformanceStats Brain::getPerformanceStats() const {
+    PerformanceStats stats;
+    
+    // Basic statistics
+    stats.stepsCompleted = pImpl->stepsCompleted;
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.activeNeurons = getActiveNeuronCount();
+    stats.firingNeurons = getFiringNeuronCount();
+    stats.averageFiringRate = getAverageFiringRate();
+    stats.totalSpikes = getTotalSpikeCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    
+    // Calculate derived metrics
+    if (pImpl->stepsCompleted > 0) {
+        stats.avgStepTime = pImpl->totalSimulationTime / pImpl->stepsCompleted;
+        stats.stepsPerSecond = pImpl->stepsCompleted / pImpl->totalWallClockTime;
+    }
+    
+    // Calculate efficiency score (simplified metric)
+    stats.efficiencyScore = std::min(1.0, static_cast<double>(pImpl->stepsCompleted) / 10000.0);
+    
+    // Estimate memory usage (simplified)
+    stats.memoryUsage = pImpl->regions.size() * 1000 + // Regions
+                        pImpl->totalNeurons * 100 +     // Neurons
+                        pImpl->totalSynapses * 50;      // Synapses
+    
+    return stats;
+}
+
+void Brain::resetPerformanceStats() {
+    pImpl->simulationStartTime = 0.0;
+    pImpl->totalSimulationTime = 0.0;
+    pImpl->totalWallClockTime = 0.0;
+    pImpl->stepsCompleted = 0;
+}
+
+void Brain::logPerformanceStats() {
+    PerformanceStats stats = getPerformanceStats();
+    
+    NLM_LOG_INFO("=== Performance Report ===");
+    NLM_LOG_INFO("Simulation Sessions: " + std::to_string(stats.stepsCompleted));
+    NLM_LOG_INFO("Total Simulation Time: " + std::to_string(stats.simulationTime) + "s");
+    NLM_LOG_INFO("Total Wall Clock Time: " + std::to_string(stats.wallClockTime) + "s");
+    NLM_LOG_INFO("Average Step Time: " + std::to_string(stats.avgStepTime) + "s");
+    NLM_LOG_INFO("Processing Speed: " + std::to_string(stats.stepsPerSecond) + " steps/s");
+    NLM_LOG_INFO("Efficiency Score: " + std::to_string(stats.efficiencyScore));
+    NLM_LOG_INFO("Memory Usage: " + std::to_string(stats.memoryUsage) + " bytes");
+    NLM_LOG_INFO("=== End Performance Report ===");
+}
+
+// Static performance monitoring methods
+void Brain::benchmarkBrain(std::shared_ptr<Brain> brain, size_t steps) {
+    auto startWall = std::chrono::high_resolution_clock::now();
+    
+    for (size_t i = 0; i < steps; ++i) {
+        brain->step(i, i * 0.001f);
+    }
+    
+    auto endWall = std::chrono::high_resolution_clock::now();
+    double wallTime = std::chrono::duration<double>(endWall - startWall).count();
+    
+    PerformanceStats stats = brain->getPerformanceStats();
+    
+    NLM_LOG_INFO("=== Brain Benchmarking Results ===");
+    NLM_LOG_INFO("Benchmarked " + std::to_string(steps) + " steps");
+    NLM_LOG_INFO("Wall clock time: " + std::to_string(wallTime) + "s");
+    NLM_LOG_INFO("Steps per second: " + std::to_string(steps / wallTime));
+    NLM_LOG_INFO("Average step time: " + std::to_string(wallTime / steps) + "s");
+    NLM_LOG_INFO("=== End Benchmark ===");
+}
+
+double Brain::calculateStepsPerSecond(const PerformanceStats& stats) {
+    return stats.stepsPerSecond;
+}
+
+double Brain::calculateEfficiencyScore(const PerformanceStats& stats) {
+    return stats.efficiencyScore;
+}
+
+// System information
+std::string Brain::getSystemInfo() {
+    std::ostringstream oss;
+    oss << "NLM Brain Performance Monitor" << std::endl;
+    oss << "Version: Phase 6 - Final Integration" << std::endl;
+    oss << "Build: Release" << std::endl;
+    oss << "Architecture: x64" << std::endl;
+    oss << "C++ Standard: C++20" << std::endl;
+    oss << "Features: Memory Systems, Neuromodulation, Prediction, Cognition" << std::endl;
+    return oss.str();
 }
 
 } // namespace nlm

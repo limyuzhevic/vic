@@ -74,15 +74,41 @@ struct Phase6IntegrationResult {
 
 /**
  * Configuration for Phase 6 integration experiment
+ * 
+ * Includes all configuration parameters needed for comprehensive brain integration testing,
+ * including plasticity settings, developmental parameters, and optimization controls.
  */
 struct Phase6Config {
+    // Simulation parameters
     uint64_t maxSteps;
     size_t neuronCount;
     size_t regionCount;
     float connectionProbability;
+    
+    // Plasticity configuration (optimization controls)
+    float stdpLtpWeight;         // STDP Long-Term Potentiation weight
+    float stdpLtdWeight;         // STDP Long-Term Depression weight
+    float synaptogenesisRate;    // Rate of new synapse formation during development
+    float pruningRate;          // Rate of synapse elimination during development
+    float plasticityLearningRate; // General plasticity learning rate
+    
+    // Development and maturation
+    bool enableDevelopment;
+    float developmentSynaptogenesisRate;
+    float developmentPruningRate;
+    
+    // Neuromodulation
+    float dopamineBaseline;
+    float noveltyThreshold;
+    float curiosityLevel;
+    
+    // Feature flags
     bool enableCheckpointing;
     bool enableReplay;
-    bool enableDevelopment;
+    bool enableCuriosity;
+    bool enableNovelty;
+    
+    // Persistence
     std::string checkpointPath;
     
     Phase6Config()
@@ -90,9 +116,26 @@ struct Phase6Config {
         , neuronCount(1000)
         , regionCount(1)
         , connectionProbability(0.1f)
+        // Plasticity defaults
+        , stdpLtpWeight(0.01f)
+        , stdpLtdWeight(0.012f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
+        , plasticityLearningRate(0.01f)
+        // Development defaults
+        , enableDevelopment(true)
+        , developmentSynaptogenesisRate(0.001f)
+        , developmentPruningRate(0.0001f)
+        // Neuromodulation defaults
+        , dopamineBaseline(0.1f)
+        , noveltyThreshold(0.1f)
+        , curiosityLevel(1.0f)
+        // Feature flags
         , enableCheckpointing(true)
         , enableReplay(true)
-        , enableDevelopment(true)
+        , enableCuriosity(true)
+        , enableNovelty(true)
+        // Persistence
         , checkpointPath("./checkpoint_test.bin") {}
 };
 

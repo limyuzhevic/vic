@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,6 +13,9 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
@@ -19,15 +23,205 @@
 namespace py = pybind11;
 namespace nlm {
 
-PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
+// Enhanced Python exceptions for better error handling
+class NLMException : public std::runtime_error {
+public:
+    explicit NLMException(const std::string& msg) : std::runtime_error(msg) {}
+};
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+class NLMConfigurationError : public NLMException {
+public:
+    explicit NLMConfigurationError(const std::string& msg) : NLMException("Configuration Error: " + msg) {}
+};
+
+class NLMPythonIntegrationError : public NLMException {
+public:
+    explicit NLMPythonIntegrationError(const std::string& msg) : NLMException("Python Integration Error: " + msg) {}
+};
+
+// Custom exception for Python bindings
+void registerNLMExceptions(py::module_& m) {
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMException& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
+    
+    m.def("raise_NLMException", [](const std::string& msg) {
+        throw NLMException(msg);
+    }, "Raise NLM exception");
+    
+    m.def("raise_NLMConfigurationError", [](const std::string& msg) {
+        throw NLMConfigurationError(msg);
+    }, "Raise NLM configuration exception");
+    
+    m.def("raise_NLMPythonIntegrationError", [](const std::string& msg) {
+        throw NLMPythonIntegrationError(msg);
+    }, "Raise NLM Python integration exception");
+}
+
+// Enhanced configuration presets for different use cases
+void addConfigurationPresets(py::class_<Config>& config_class) {
+    // Preset configurations
+    config_class.def_static("create_baby_brain", []() {
+        auto cfg = std::make_shared<Config>();
+        // Baby brain configuration - small, developing
+        cfg->set("neuron_count", 200);
+        cfg->set("region_count", 1);
+        cfg->set("connection_probability", 0.05f);
+        cfg->set("stdp_ltp_weight", 0.005f);
+        cfg->set("stdp_ltd_weight", 0.006f);
+        cfg->set("synaptogenesis_rate", 0.005f);
+        cfg->set("pruning_rate", 0.0005f);
+        cfg->set("plasticity_learning_rate", 0.005f);
+        cfg->set("dopamine_baseline", 0.0f);
+        cfg->set("novelty_threshold", 0.2f);
+        cfg->set("curiosity_level", 0.5f);
+        return cfg;
+    }, "Create a baby brain configuration");
+    
+    config_class.def_static("create_adult_brain", []() {
+        auto cfg = std::make_shared<Config>();
+        // Adult brain configuration - optimized, experienced
+        cfg->set("neuron_count", 2000);
+        cfg->set("region_count", 4);
+        cfg->set("connection_probability", 0.15f);
+        cfg->set("stdp_ltp_weight", 0.02f);
+        cfg->set("stdp_ltd_weight", 0.025f);
+        cfg->set("synaptogenesis_rate", 0.00001f);
+        cfg->set("pruning_rate", 0.002f);
+        cfg->set("plasticity_learning_rate", 0.02f);
+        cfg->set("dopamine_baseline", 0.5f);
+        cfg->set("novelty_threshold", 0.05f);
+        cfg->set("curiosity_level", 2.0f);
+        return cfg;
+    }, "Create an adult brain configuration");
+    
+    config_class.def_static("create_research_brain", []() {
+        auto cfg = std::make_shared<Config>();
+        // Research brain configuration - maximum plasticity for exploration
+        cfg->set("neuron_count", 1500);
+        cfg->set("region_count", 3);
+        cfg->set("connection_probability", 0.2f);
+        cfg->set("stdp_ltp_weight", 0.03f);
+        cfg->set("stdp_ltd_weight", 0.035f);
+        cfg->set("synaptogenesis_rate", 0.01f);
+        cfg->set("pruning_rate", 0.001f);
+        cfg->set("plasticity_learning_rate", 0.05f);
+        cfg->set("dopamine_baseline", 0.2f);
+        cfg->set("novelty_threshold", 0.15f);
+        cfg->set("curiosity_level", 1.5f);
+        return cfg;
+    }, "Create a research brain configuration");
+    
+    config_class.def_static("create_performance_brain", []() {
+        auto cfg = std::make_shared<Config>();
+        // Performance brain configuration - optimized for stability
+        cfg->set("neuron_count", 1000);
+        cfg->set("region_count", 2);
+        cfg->set("connection_probability", 0.1f);
+        cfg->set("stdp_ltp_weight", 0.01f);
+        cfg->set("stdp_ltd_weight", 0.012f);
+        cfg->set("synaptogenesis_rate", 0.00005f);
+        cfg->set("pruning_rate", 0.00002f);
+        cfg->set("plasticity_learning_rate", 0.01f);
+        cfg->set("dopamine_baseline", 0.3f);
+        cfg->set("novelty_threshold", 0.1f);
+        cfg->set("curiosity_level", 1.0f);
+        return cfg;
+    }, "Create a performance-optimized brain configuration");
+}
+
+// Enhanced convenience functions
+void addConvenienceFunctions(py::module_& m) {
+    // Quick setup helper
+    m.def("setup_brain_world_agent", [](const std::string& config_preset = "default", 
+                                     int world_size = 20, 
+                                     bool enable_learning = true) {
+        auto config = std::make_shared<Config>();
+        
+        if (config_preset == "baby") {
+            config = Config::create_baby_brain();
+        } else if (config_preset == "adult") {
+            config = Config::create_adult_brain();
+        } else if (config_preset == "research") {
+            config = Config::create_research_brain();
+        } else if (config_preset == "performance") {
+            config = Config::create_performance_brain();
+        } else {
+            // Default config
+            config->set("neuron_count", 1000);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.1f);
+        }
+            
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(world_size, world_size, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        if (enable_learning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config_preset") = "default", 
+          py::arg("world_size") = 20,
+          py::arg("enable_learning") = true,
+          "Quick setup helper for brain, world, and agent");
+    
+    // Simulation runner
+    m.def("run_agent_simulation", [](std::shared_ptr<AgentBrain> agent,
+                                    std::shared_ptr<SimpleWorld> world,
+                                    int num_steps) {
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            auto brain = agent->getBrain();
+            brain->step(step, step * 0.1f);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward based on position
+            auto body = world->getAgentBody();
+            float reward = 1.0f / (1.0f + body->x + body->y);
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return std::make_tuple(agent->getBrain(), world, agent);
+    }, "Run a complete agent simulation");
+    
+    // Data export utilities
+    m.def("export_brain_data", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        brain->save(filepath);
+        return true;
+    }, "Export brain data to file");
+    
+    m.def("export_brain_stats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> stats;
+        stats["neuron_count"] = std::to_string(brain->getTotalNeuronCount());
+        stats["synapse_count"] = std::to_string(brain->getTotalSynapseCount());
+        stats["firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["exc_inh_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        return stats;
+    }, "Export brain statistics as dictionary");
+}
+
+PYBIND11_MODULE(pynlm, m) {
+    // Register enhanced exceptions
+    registerNLMExceptions(m);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())

@@ -137,16 +137,53 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+// ========== PERFORMANCE MONITORING ==========
+
+// Performance statistics
+struct PerformanceStats {
+    // Timing
+    double simulationTime;        // Simulation time (seconds)
+    double wallClockTime;         // Wall clock time (seconds)
+    double avgStepTime;           // Average step time (seconds)
+    size_t stepsCompleted;        // Number of steps completed
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Neuron statistics
+    size_t totalNeurons;          // Total number of neurons
+    size_t activeNeurons;         // Number of active neurons
+    size_t firingNeurons;         // Number of firing neurons
+    float averageFiringRate;      // Average firing rate
+    size_t totalSpikes;           // Total spike count
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Synapse statistics
+    size_t totalSynapses;         // Total number of synapses
+    float avgSynapticWeight;      // Average synaptic weight
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Memory usage
+    size_t memoryUsage;           // Memory usage in bytes
+    
+    // Performance metrics
+    float stepsPerSecond;         // Processing speed
+    float efficiencyScore;        // Efficiency metric (0.0 - 1.0)
+    
+    PerformanceStats()
+        : simulationTime(0.0), wallClockTime(0.0), avgStepTime(0.0), stepsCompleted(0)
+        , totalNeurons(0), activeNeurons(0), firingNeurons(0), averageFiringRate(0.0), totalSpikes(0)
+        , totalSynapses(0), avgSynapticWeight(0.0), memoryUsage(0), stepsPerSecond(0.0), efficiencyScore(0.0) {}
+};
+
+// Performance monitoring methods
+PerformanceStats getPerformanceStats() const;
+void resetPerformanceStats();
+void logPerformanceStats();
+
+// Benchmarking
+static void benchmarkBrain(std::shared_ptr<Brain> brain, size_t steps);
+static double calculateStepsPerSecond(const PerformanceStats& stats);
+static double calculateEfficiencyScore(const PerformanceStats& stats);
+
+// Resource monitoring
+static size_t getMemoryUsage();
+static std::string getSystemInfo();
     
     // ========== PREDICTION SYSTEM ==========
     

@@ -35,6 +35,10 @@ dev = [
     "numpy>=1.20",
 ]
 
+enhanced = [
+    "pybind11>=2.11.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"

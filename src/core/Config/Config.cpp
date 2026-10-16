@@ -212,4 +212,100 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Validation method implementations
+bool Config::validate(std::vector<std::string>& errors) const {
+    errors.clear();
+    
+    for (const auto& entry : pImpl->entries) {
+        bool isValid = true;
+        std::string errorMsg;
+        
+        if (entry.key == "neuron_count") {
+            if (!validateNeuronCount(std::get<int>(entry.value))) {
+                isValid = false;
+                errorMsg = "neuron_count must be between 1 and 100,000";
+            }
+        } else if (entry.key == "region_count") {
+            if (!validateRegionCount(std::get<int>(entry.value))) {
+                isValid = false;
+                errorMsg = "region_count must be between 1 and 10";
+            }
+        } else if (entry.key == "connection_probability") {
+            if (!validateConnectionProbability(std::get<double>(entry.value))) {
+                isValid = false;
+                errorMsg = "connection_probability must be between 0.0 and 1.0";
+            }
+        } else if (entry.key == "plasticity_learning_rate") {
+            if (!validatePlasticityRate(std::get<double>(entry.value))) {
+                isValid = false;
+                errorMsg = "plasticity_learning_rate must be between 0.0 and 1.0";
+            }
+        } else if (entry.key == "dopamine_baseline") {
+            if (!validateDopamineBaseline(std::get<double>(entry.value))) {
+                isValid = false;
+                errorMsg = "dopamine_baseline must be between 0.0 and 1.0";
+            }
+        } else if (entry.key == "novelty_threshold") {
+            if (!validateNoveltyThreshold(std::get<double>(entry.value))) {
+                isValid = false;
+                errorMsg = "novelty_threshold must be between 0.0 and 1.0";
+            }
+        }
+        
+        if (!isValid) {
+            errors.push_back(entry.key + ": " + errorMsg);
+        }
+    }
+    
+    return errors.empty();
+}
+
+bool Config::isValid() const {
+    std::vector<std::string> errors;
+    return validate(errors);
+}
+
+std::string Config::validationErrorMessage() const {
+    std::vector<std::string> errors;
+    if (validate(errors)) {
+        return "Configuration is valid";
+    }
+    
+    std::ostringstream oss;
+    oss << "Configuration validation errors:\n";
+    for (const auto& error : errors) {
+        oss << "  - " << error << "\n";
+    }
+    return oss.str();
+}
+
+bool Config::validateNeuronCount(int count) {
+    return count > 0 && count <= 100000;
+}
+
+bool Config::validateRegionCount(int count) {
+    return count > 0 && count <= 10;
+}
+
+bool Config::validateConnectionProbability(float prob) {
+    return prob >= 0.0f && prob <= 1.0f;
+}
+
+bool Config::validatePlasticityRate(float rate) {
+    return rate >= 0.0f && rate <= 1.0f;
+}
+
+bool Config::validateDopamineBaseline(float baseline) {
+    return baseline >= 0.0f && baseline <= 1.0f;
+}
+
+bool Config::validateNoveltyThreshold(float threshold) {
+    return threshold >= 0.0f && threshold <= 1.0f;
+}
+
+bool Config::hasValidationErrors() const {
+    std::vector<std::string> errors;
+    return !validate(errors);
+}
+
 } // namespace nlm
