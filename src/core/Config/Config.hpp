@@ -55,14 +55,20 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML or simple key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file with explicit format detection
+    bool loadFromFile(const std::string& filepath, const std::string& format);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (supports JSON, YAML, or simple formats)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to file with explicit format
+    bool saveToFile(const std::string& filepath, const std::string& format) const;
     
     // Get values
     template<typename T>

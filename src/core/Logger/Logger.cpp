@@ -182,9 +182,13 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    globalLogger = logger;
 }
+
+std::shared_ptr<Logger> Logger::getGlobalPtr() {
+    return globalLogger ? globalLogger : std::make_shared<Logger>(Logger::getGlobal());
+}
+
 
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)

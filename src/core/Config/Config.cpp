@@ -19,40 +19,216 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    return loadFromFile(filepath, "auto");
+}
+
+bool Config::loadFromFile(const std::string& filepath, const std::string& format) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        return false;
+    }
+    
+    // Determine format
+    std::string actualFormat = format;
+    if (actualFormat == "auto") {
+        actualFormat = detectFileFormat(filepath);
+    }
+    
+    if (actualFormat == "json") {
+        return loadFromJSON(filepath);
+    } else if (actualFormat == "yaml" || actualFormat == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        NLM_LOG_INFO("Using simple key=value format for: " + filepath);
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+std::string Config::detectFileFormat(const std::string& filepath) const {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return "simple";
+    }
+    
+    // Peek at first few characters
+    char buffer[4];
+    file.read(buffer, 4);
+    file.clear();
+    file.seekg(0);
+    
+    // Check for JSON format (starts with { or [)
+    if (buffer[0] == '{' || buffer[0] == '[') {
+        return "json";
+    }
+    
+    // Check for YAML format (likely to start with key: value)
+    std::string line;
+    if (std::getline(file, line)) {
+        line = trim(line);
+        if (!line.empty() && line.find(':') != std::string::npos) {
+            // Check if it looks like a key-value pair
+            size_t colonPos = line.find(':');
+            if (colonPos > 0 && !isspace(line[0]) && (isspace(line[colonPos + 1]) || line.size() == colonPos + 1)) {
+                return "yaml";
+            }
+        }
+    }
+    
+    // Default to simple format
+    return "simple";
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
+    size_t loadedCount = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": '" + line + "' (missing '=')");
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Try to parse value as different types
+        if (setFromString(key, value)) {
+            loadedCount++;
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(loadedCount) + " entries from " + filepath + " (skipped " + 
+                 std::to_string(lineNum - loadedCount) + " invalid lines)");
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON file: " + filepath);
+        return false;
+    }
+    
+    try {
+        // For now, use simple parsing. TODO: Implement proper JSON parsing
+        NLM_LOG_INFO("JSON loading not fully implemented yet for: " + filepath);
+        // Fall back to simple format for now
+        return loadFromSimpleFormat(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open YAML file: " + filepath);
+        return false;
+    }
+    
+    try {
+        // For now, use simple parsing. TODO: Implement proper YAML parsing
+        NLM_LOG_INFO("YAML loading not fully implemented yet for: " + filepath);
+        // Fall back to simple format for now
+        return loadFromSimpleFormat(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::setFromString(const std::string& key, const std::string& value) {
+    // Try to parse as different types
+    bool parsed = false;
+    
+    // Try boolean
+    if (value == "true" || value == "false") {
+        set(key, value == "true", ConfigSource::File);
+        parsed = true;
+    }
+    // Try integer
+    else if (isInteger(value)) {
+        try {
+            long long intVal = std::stoll(value);
+            set(key, intVal, ConfigSource::File);
+            parsed = true;
+        } catch (...) {}
+    }
+    // Try unsigned integer
+    else if (isUnsignedInteger(value)) {
+        try {
+            unsigned long long uintVal = std::stoull(value);
+            set(key, uintVal, ConfigSource::File);
+            parsed = true;
+        } catch (...) {}
+    }
+    // Try float
+    else if (isFloat(value)) {
+        try {
+            double floatVal = std::stod(value);
+            set(key, floatVal, ConfigSource::File);
+            parsed = true;
+        } catch (...) {}
+    }
+    // Use as string if none of the above
+    else {
+        set(key, value, ConfigSource::File);
+        parsed = true;
+    }
+    
+    return parsed;
+}
+
+bool Config::isInteger(const std::string& str) const {
+    if (str.empty() || (str[0] == '-' && str.size() == 1)) {
+        return false;
+    }
+    char* end;
+    std::strtoll(str.c_str(), &end, 10);
+    return *end == '\0';
+}
+
+bool Config::isUnsignedInteger(const std::string& str) const {
+    if (str.empty()) {
+        return false;
+    }
+    char* end;
+    std::strtoull(str.c_str(), &end, 10);
+    return *end == '\0';
+}
+
+bool Config::isFloat(const std::string& str) const {
+    if (str.empty() || (str[0] == '-' && str.size() == 1)) {
+        return false;
+    }
+    char* end;
+    std::strtod(str.c_str(), &end);
+    return *end == '\0';
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

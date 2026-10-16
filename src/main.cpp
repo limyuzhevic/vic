@@ -159,7 +159,100 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+// Helper functions for experiment parsing
+std::vector<std::string> parseExperimentArgs(int argc, char** argv) {
+    std::vector<std::string> experiments;
+    
+    // Parse command line arguments for experiment selection
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --experiments=connectivity,plasticity,stdp
+        if (arg.substr(0, 15) == "--experiments=") {
+            std::string experimentsStr = arg.substr(15);
+            size_t pos = 0;
+            while (pos < experimentsStr.size()) {
+                size_t commaPos = experimentsStr.find(',', pos);
+                if (commaPos == std::string::npos) {
+                    commaPos = experimentsStr.size();
+                }
+                
+                std::string exp = trim(experimentsStr.substr(pos, commaPos - pos));
+                if (!exp.empty()) {
+                    experiments.push_back(exp);
+                }
+                
+                pos = commaPos + 1;
+            }
+        }
+        
+        // Handle -e connectivity,plasticity,stdp
+        else if (arg.substr(0, 3) == "-e ") {
+            std::string experimentsStr = arg.substr(3);
+            size_t pos = 0;
+            while (pos < experimentsStr.size()) {
+                size_t commaPos = experimentsStr.find(',', pos);
+                if (commaPos == std::string::npos) {
+                    commaPos = experimentsStr.size();
+                }
+                
+                std::string exp = trim(experimentsStr.substr(pos, commaPos - pos));
+                if (!exp.empty()) {
+                    experiments.push_back(exp);
+                }
+                
+                pos = commaPos + 1;
+            }
+        }
+        
+        // Handle -help or --help
+        else if (arg == "-help" || arg == "--help") {
+            printUsage();
+            exit(0);
+        }
+        
+        // Handle -version or --version
+        else if (arg == "-version" || arg == "--version") {
+            printVersion();
+            exit(0);
+        }
+    }
+    
+    return experiments;
+}
+
+void printUsage() {
+    std::cout << "Usage: ./nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help                Show this help message" << std::endl;
+    std::cout << "  -v, --version             Show version information" << std::endl;
+    std::cout << "  -e, --experiments LIST    Specify experiments to run (comma-separated):" << std::endl;
+    std::cout << "                            connectivity  Basic neural connectivity test" << std::endl;
+    std::cout << "                            plasticity    Plasticity learning experiment" << std::endl;
+    std::cout << "                            stdp          STDP verification test" << std::endl;
+    std::cout << "  --config FILE             Load configuration from file" << std::endl;
+    std::cout << "  --log-level LEVEL         Set log level (debug, info, warning, error, critical)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example: ./nlm -e connectivity,plasticity" << std::endl;
+    std::cout << "Example: ./nlm --experiments=plasticity,stdp --config myconfig.cfg" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version 0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "C++20" << std::endl;
+    std::cout << "MIT License" << std::endl;
+}
+
+std::string trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -409,20 +502,42 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Parse and validate experiments
+    std::vector<std::string> experimentsToRun = parseExperimentArgs(argc, argv);
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // If no experiments specified, run all default tests
+    if (experimentsToRun.empty()) {
+        experimentsToRun = {"connectivity", "plasticity", "stdp"};
+        NLM_LOG_INFO("No experiments specified - running all default tests: connectivity, plasticity, stdp");
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Run each experiment
+    for (const auto& expName : experimentsToRun) {
+        if (expName == "connectivity") {
+            NLM_LOG_INFO("=== Running Test 1: Basic Neural Connectivity ===");
+            runBasicConnectivityTest(brain);
+        } else if (expName == "plasticity") {
+            NLM_LOG_INFO("=== Running Test 2: Plasticity Learning Experiment ===");
+            runPlasticityExperiment(brain);
+        } else if (expName == "stdp") {
+            NLM_LOG_INFO("=== Running Test 3: STDP Verification ===");
+            runStdpVerification(brain);
+        } else {
+            NLM_LOG_WARNING("Unknown experiment: " + expName + ". Skipping.");
+        }
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Show experiment configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Experiment Summary ===");
+    NLM_LOG_INFO("Experiments run: ");
+    bool first = true;
+    for (const auto& expName : experimentsToRun) {
+        if (!first) NLM_LOG_INFO(", ");
+        NLM_LOG_INFO(expName);
+        first = false;
+    }
+    NLM_LOG_INFO("")
     
     // Final brain status
     NLM_LOG_INFO("");
