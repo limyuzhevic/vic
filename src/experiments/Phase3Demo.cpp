@@ -1,13 +1,6 @@
-#include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <sstream>
+// This file has been removed - Phase 3 demo is redundant and has been replaced by Phase 6 integration tests.
+// All Phase 3 functionality is integrated into the Phase 6 system.
+// See Phase6Demo.cpp and Phase6IntegratedExperiment.* for the comprehensive integration tests.
 
 namespace nlm {
 

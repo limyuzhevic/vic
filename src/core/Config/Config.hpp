@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -21,6 +22,17 @@ using ConfigValue = std::variant<
     std::vector<int>,
     std::vector<double>,
     std::vector<std::string>
+>;
+
+// JSON value types (for internal use)
+using JsonValue = std::variant<
+    int,
+    int64_t,
+    double,
+    bool,
+    std::string,
+    std::vector<JsonValue>,
+    std::map<std::string, JsonValue>
 >;
 
 // Configuration source
@@ -55,13 +67,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and legacy key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (tries JSON first, falls back to legacy format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,9 +105,36 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and error handling
+    bool validate() const;
+    bool validateParameter(const std::string& key, const ConfigValue& value);
+    std::vector<std::pair<std::string, bool>> validateAllParameters() const;
+    
+    // Safe value getters with validation
+    template<typename T>
+    T getWithValidation(const std::string& key, const T& defaultValue) const;
+    
+    bool tryGet(const std::string& key, ConfigValue& outValue) const;
+    ConfigValue getSafe(const std::string& key) const;
+    
+    // Error handling helper
+    static std::string getErrorMessage(const std::string& operation, const std::string& details);
+    
+    // Helper functions for safe configuration parsing
+    static bool parseConfigFileSafely(const std::string& filepath, Config& config);
+    static bool parseArgsSafely(int argc, char** argv, Config& config);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Convert to JSON value
+    void convertToJson(JsonValue& jsonValue) const;
+    
+    // Helpers for JSON conversion
+    static void convertToJson(const ConfigEntry& entry, JsonValue& jsonValue);
+    static void convertToJson(const ConfigValue& value, JsonValue& jsonValue);
+    static std::string jsonValueToString(const JsonValue& value);
     
     // Internal helpers
     static std::string trim(const std::string& str);
