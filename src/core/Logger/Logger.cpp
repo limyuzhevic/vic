@@ -7,17 +7,42 @@
 
 namespace nlm {
 
+#include "Logger.hpp"
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <mutex>
+#include <chrono>
+#include <atomic>
+#include <thread>
+
+namespace nlm {
+
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    // Performance tracking
+    std::atomic<uint64_t> logCount{0};
+    std::chrono::system_clock::time_point lastLogTime;
+    // Structured logging support
+    bool structuredLogging = false;
+    // Maximum log entries for memory management
+    size_t maxEntries = 10000;
+    // Performance monitoring
+    std::chrono::microseconds averageLogTime{0};
+    size_t logTimeCount = 0;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->lastLogTime = std::chrono::system_clock::now();
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    pImpl->lastLogTime = std::chrono::system_clock::now();
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
@@ -27,30 +52,75 @@ void ConsoleLogger::log(const LogEntry& entry) {
         return;
     }
     
+    // Performance monitoring
+    pImpl->logCount++;
+    auto now = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - pImpl->lastLogTime);
+    pImpl->lastLogTime = now;
+    
+    // Update average log time
+    if (pImpl->logTimeCount < 100) {
+        pImpl->logTimeCount++;
+        pImpl->averageLogTime = duration;
+    } else {
+        pImpl->averageLogTime = (pImpl->averageLogTime * 99 + duration) / 100;
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+    // Structured logging format
+    if (pImpl->structuredLogging) {
+        oss << "{\"timestamp\": \"" << formatTimestamp(entry.timestamp) << "\", ";
+        oss << "\"level\": \"" << levelToString(entry.level) << "\", ";
+        oss << "\"message\": \"" << escapeString(entry.message) << "\", ";
+        oss << "\"file\": \"" << entry.file << "\", ";
+        oss << "\"line\": " << entry.line << "}";
+        
+        std::string output = oss.str();
+        
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+        
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        }
     } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        // Traditional logging format
+        oss << "[" << levelToString(entry.level) << "] ";
+        
+        // Add timestamp with milliseconds
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            entry.timestamp.time_since_epoch()) % 1000;
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+            << "." << std::setfill('0') << std::setw(3) << ms.count();
+        
+        // Add performance context
+        if (entry.level == LogLevel::Warning || entry.level == LogLevel::Error) {
+            oss << " (log count: " << pImpl->logCount << ", avg time: " 
+                << pImpl->averageLogTime.count() << "us)";
+        }
+        
+        oss << " " << entry.message;
+        
+        std::string output = oss.str();
+        
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+        
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        }
     }
 }
 
@@ -101,6 +171,34 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
         default: return "\033[0m";
     }
 }
+
+std::string ConsoleLogger::formatTimestamp(const std::chrono::system_clock::time_point& tp) const {
+    auto time = std::chrono::system_clock::to_time_t(tp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        tp.time_since_epoch()) % 1000;
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+       << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
+}
+
+std::string ConsoleLogger::escapeString(const std::string& str) const {
+    std::string escaped;
+    escaped.reserve(str.size());
+    for (char c : str) {
+        switch (c) {
+            case '"': escaped += "\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default: escaped += c;
+        }
+    }
+    return escaped;
+}
+
+} // namespace nlm
 
 // Logger class implementation
 struct Logger::Impl {
