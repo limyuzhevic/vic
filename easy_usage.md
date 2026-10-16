@@ -287,11 +287,216 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Features
+
+For more sophisticated usage, check out the `advanced_api.py` module which provides:
+
+- **AdvancedBrain**: Enhanced brain interface with Pythonic features
+- **InteractiveAgent**: Interactive agent with experience tracking
+- **NLMConfigurator**: Configuration manager with presets
+- **NLMExperiment**: Experiment management system
+- **Utility functions**: Brain validation, benchmarking, and research helpers
+
+```python
+# Advanced usage example
+import pynlm
+from advanced_api import create_advanced_brain, NLMConfigurator
+
+# Create advanced brain with preset configuration
+brain = create_advanced_brain(NLMConfigurator.create_config('research'))
+
+# Run simulation with detailed statistics
+for step in range(1000):
+    brain.simulate(1, lambda s, stats: print(f"Step {s}: {stats['firing_neurons']} neurons firing"))
+```
+
+---
+
+## Advanced Tutorials
+
+### Tutorial 1: Building a Learning Agent
+
+This tutorial shows how to create an agent that learns from experience using NLM's advanced features.
+
+```python
+import pynlm
+from advanced_api import AdvancedBrain, InteractiveAgent, NLMConfigurator
+
+# 1. Configure the brain for learning
+config = NLMConfigurator.create_config('research')
+brain = AdvancedBrain(config)
+
+# 2. Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+world.reset()
+agent = InteractiveAgent(brain, world)
+
+# 3. Enable learning subsystems
+agent.enable_reward_modulation(True)
+agent.enable_curiosity(True)
+
+# 4. Run learning episode
+for step in range(500):
+    # Environment update
+    world.update(0.1)
+    
+    # Agent perceives world
+    percept = world.getSensoryPercept()
+    
+    # Brain processes input and decides action
+    action = agent.step(percept)
+    
+    # Learn from experience
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.apply_reward(reward)
+
+print("Learning episode complete!")
+print(f"Final statistics: {brain.get_stats()}")
+```
+
+### Tutorial 2: Research Experiment Framework
+
+Set up systematic research experiments with reproducible results.
+
+```python
+from advanced_api import NLMExperiment, NLMConfigurator
+
+# Create experiment configuration
+config = NLMConfigurator.create_config('research', 
+                                      brain.neuron_count=2000,
+                                      plasticity.stdp.learning_rate=0.005)
+
+# Initialize experiment components
+brain = AdvancedBrain(config)
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50)
+agent = InteractiveAgent(brain, world)
+
+# Create and run experiment
+experiment = NLMExperiment(brain, world, agent)
+results = experiment.run_experiment(episodes=20, steps_per_episode=100)
+
+print(f"Experiment results: {results}")
+```
+
+### Tutorial 3: Brain Configuration Presets
+
+Use built-in configuration presets or create custom ones.
+
+```python
+from advanced_api import NLMConfigurator
+
+# Access all available presets
+presets = NLMConfigurator.get_presets()
+print("Available presets:", list(presets.keys()))
+
+# Create brain with custom configuration
+custom_config = NLMConfigurator.create_config(
+    brain.neuron_count=750,
+    plasticity.stdp.enable=True,
+    plasticity.stdp.learning_rate=0.02,
+    neuromod.curiosity.enable=True
+)
+
+brain = AdvancedBrain(custom_config)
+```
+
+## What Each Part Does
+
+### `advanced_api.py` Module
+
+The `advanced_api.py` module provides enhanced interfaces:
+
+- **AdvancedBrain**: Wraps the basic brain with Pythonic features
+- **InteractiveAgent**: Enhanced agent with history tracking and experience management
+- **NLMConfigurator**: Configuration manager with validation and presets
+- **NLMExperiment**: Experiment runner with systematic testing
+- **Utility functions**: Brain validation, benchmarking, and research helpers
+
+### Integration with Basic NLM
+
+The advanced API integrates seamlessly with the existing NLM system:
+
+1. **Backward compatible**: All existing code continues to work
+2. **Enhanced features**: New Pythonic interfaces for better usability
+3. **Research tools**: Built-in support for systematic experiments
+4. **Configuration management**: Presets and validation
+5. **Performance monitoring**: Benchmarking and statistics
+
+## Quick Reference - Advanced API
+
+| What you want | Advanced API |
+|--------------|--------------|
+| Create brain | `create_advanced_brain(config)` |
+| Run simulation | `brain.simulate(steps, callback)` |
+| Get stats | `brain.get_stats()` |
+| Create agent | `InteractiveAgent(brain, world)` |
+| Run experiment | `NLMExperiment(brain, world, agent).run_experiment(episodes, steps)` |
+| Use preset | `NLMConfigurator.create_config('research')` |
+
+---
+
+## Advanced Features and Extensions
+
+### 1. Plugin Architecture (Future Enhancement)
+
+The NLM framework is designed for future plugin support:
+
+- **Pluggable plasticity rules**: Custom learning mechanisms
+- **Custom neuron models**: Alternative neuron dynamics
+- **External memory systems**: Integration with databases
+- **Visualization plugins**: Custom output formats
+
+### 2. Performance Monitoring
+
+Built-in monitoring and debugging tools:
+
+```python
+# Monitor brain performance
+benchmark = benchmark_brain(brain, 1000)
+print(f"Performance: {benchmark['steps_per_second']:.1f} steps/sec")
+
+# Validate brain state
+issues = validate_brain_state(brain)
+if issues:
+    print("Issues found:", issues)
+```
+
+### 3. Research Tools
+
+Tools for systematic research:
+
+- **Experiment tracking**: Automated result collection
+- **Parameter sweeps**: Grid search for hyperparameter optimization
+- **Reproducibility**: Built-in checkpointing and configuration management
+- **Statistical analysis**: Built-in metrics and aggregation
+
+## Troubleshooting
+
+**"Advanced API not working"**
+- Ensure you're using the latest version
+- Check that all dependencies are installed
+- Try using the basic API first, then upgrade
+
+**"Configuration presets not found"**
+- Check that you're importing from the correct module
+- Verify configuration file is accessible
+
+**"Performance issues"**
+- Use smaller configurations for development
+- Monitor benchmarks to identify bottlenecks
+- Consider parallelization for large simulations
+
+---
+
 ## Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the `advanced_api.py` module for enhanced features
+5. Explore the example scripts in `examples/` directory
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM at both basic and advanced levels.
