@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "setuptools>=42", "wheel"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -12,10 +12,11 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "neuroscience", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,14 +26,22 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: Pytest",
 ]
 
-dependencies = []
+# Dependencies
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scikit-build-core>=0.5.0",
+    "pybind11>=2.11.0",
+    "build",
 ]
 
 [project.urls]
@@ -40,9 +49,11 @@ Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
 
+# scikit-build-core configuration
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
 cmake.build-type = "Release"
+build-type = "editable"  # Enable editable installs for development
 cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
@@ -52,6 +63,32 @@ cmake.args = [
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
 
+# For development builds
+[tool.scikit-build.cmake-define]
+CMAKE_BUILD_TYPE = "Debug"
+
+# Pytest configuration
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--disable-warnings",
+]
+
+# Additional build options
+[tool.cibuildwheel]
+build = "cp38-* cp39-* cp310-* cp311-* cp312-*"
+skiplist = ["*-manylinux_i686", "*-musllinux_*"]
+test-command = "pytest {project}/tests"
+test-requires = ["pytest", "numpy"]
+test-extras = ["dev"]
+
+# Scripting for development
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+packages = ["pynlm"]
