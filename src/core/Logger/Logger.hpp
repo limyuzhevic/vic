@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <filesystem>
 
 namespace nlm {
 
@@ -35,6 +37,29 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Optional features
+    virtual void setUseColors(bool useColors) {}
+    virtual bool getUseColors() const { return false; }
+    
+    virtual void setUseTimestamps(bool useTimestamps) {}
+    virtual bool getUseTimestamps() const { return false; }
+    
+    virtual void setIncludeThreadId(bool includeThreadId) {}
+    virtual bool getIncludeThreadId() const { return false; }
+    
+    virtual void setLogFormat(const std::string& format) {}
+    virtual std::string getLogFormat() const { return "[%LEVEL%] %TIMESTAMP% %MESSAGE%"; }
+    
+    virtual void setOutputFile(const std::string& filepath) {}
+    virtual void closeOutputFile() {}
+    
+    virtual void setFileRotation(size_t maxSizeMB, size_t rotationCount) {}
+    virtual void setEnablePerformanceTiming(bool enable) {}
+    
+    virtual void startTimer(const std::string& name) {}
+    virtual void stopTimer(const std::string& name) {}
+    virtual void logPerformanceData() {}
 };
 
 // Console logger implementation
@@ -49,12 +74,29 @@ public:
     LogLevel getLevel() const override;
     
     // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    void setUseColors(bool useColors) override;
+    bool getUseColors() const override;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
+    void setOutputFile(const std::string& filepath) override;
+    void closeOutputFile() override;
+    
+    // Advanced features
+    void setUseTimestamps(bool useTimestamps) override;
+    bool getUseTimestamps() const override;
+    
+    void setIncludeThreadId(bool includeThreadId) override;
+    bool getIncludeThreadId() const override;
+    
+    void setLogFormat(const std::string& format) override;
+    std::string getLogFormat() const override;
+    
+    void setFileRotation(size_t maxSizeMB, size_t rotationCount) override;
+    void setEnablePerformanceTiming(bool enable) override;
+    
+    void startTimer(const std::string& name) override;
+    void stopTimer(const std::string& name) override;
+    void logPerformanceData() override;
     
 private:
     struct Impl;
@@ -62,6 +104,10 @@ private:
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    
+    std::string formatMessage(const LogEntry& entry) const;
+    void rotateLogFile();
+    std::string extractFileIndex(const std::string& filepath) const;
 };
 
 // Main Logger class
@@ -103,6 +149,25 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Console logger convenience methods
+    void setConsoleLevel(LogLevel level);
+    void enableConsoleColors(bool enable);
+    void enableConsoleTimestamps(bool enable);
+    void enableThreadIds(bool enable);
+    void setConsoleLogFormat(const std::string& format);
+    void setConsoleFileOutput(const std::string& filepath);
+    void setConsoleFileRotation(size_t maxSizeMB, size_t rotationCount);
+    void enableConsolePerformanceTiming(bool enable);
+    void startTimer(const std::string& name);
+    void stopTimer(const std::string& name);
+    void logConsolePerformanceData();
+    
+    // Log format constants
+    static const std::string DEFAULT_LOG_FORMAT;
+    static const std::string SIMPLE_LOG_FORMAT;
+    static const std::string DETAILED_LOG_FORMAT;
+    static const std::string COLOR_LOG_FORMAT;
 
 private:
     struct Impl;
@@ -125,6 +190,12 @@ public:
     template<typename T>
     LogStream& operator<<(const T& value) {
         oss_ << value;
+        return *this;
+    }
+    
+    // Add newline to complete the log entry
+    LogStream& endl() {
+        oss_ << std::endl;
         return *this;
     }
     

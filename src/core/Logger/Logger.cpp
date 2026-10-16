@@ -4,23 +4,42 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <ctime>
+#include <thread>
+#include <iomanip>
 
 namespace nlm {
 
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
+    bool useTimestamps = true;
+    bool includeThreadId = false;
+    std::string logFormat = "[%LEVEL] %TIMESTAMP% %MESSAGE%";
     std::ofstream fileOut;
     std::mutex mutex;
+    std::chrono::steady_clock::time_point sessionStart;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10MB
+    size_t fileRotationCount = 5;
+    size_t currentFileSize = 0;
+    size_t fileIndex = 0;
+    bool enablePerformanceTiming = false;
+    std::unordered_map<std::string, std::chrono::steady_clock::time_point> timers;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->sessionStart = std::chrono::steady_clock::now();
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    pImpl->sessionStart = std::chrono::steady_clock::now();
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -29,28 +48,22 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
+    // Format the log message
+    std::string formattedMessage = formatMessage(entry);
     
     // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
+    std::cout << formattedMessage;
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
+        pImpl->fileOut << formattedMessage;
         pImpl->fileOut.flush();
+        pImpl->currentFileSize += formattedMessage.size();
+        
+        // Check file rotation
+        if (pImpl->currentFileSize >= pImpl->maxFileSize) {
+            rotateLogFile();
+        }
     }
 }
 
@@ -70,14 +83,183 @@ bool ConsoleLogger::getUseColors() const {
     return pImpl->useColors;
 }
 
+void ConsoleLogger::setUseTimestamps(bool useTimestamps) {
+    pImpl->useTimestamps = useTimestamps;
+}
+
+bool ConsoleLogger::getUseTimestamps() const {
+    return pImpl->useTimestamps;
+}
+
+void ConsoleLogger::setIncludeThreadId(bool includeThreadId) {
+    pImpl->includeThreadId = includeThreadId;
+}
+
+bool ConsoleLogger::getIncludeThreadId() const {
+    return pImpl->includeThreadId;
+}
+
+void ConsoleLogger::setLogFormat(const std::string& format) {
+    pImpl->logFormat = format;
+}
+
+std::string ConsoleLogger::getLogFormat() const {
+    return pImpl->logFormat;
+}
+
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    closeOutputFile();
     pImpl->fileOut.open(filepath, std::ios::app);
+    pImpl->currentFileSize = pImpl->fileOut.tellp();
+    pImpl->fileIndex = extractFileIndex(filepath);
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
+}
+
+void ConsoleLogger::setFileRotation(size_t maxSizeMB, size_t rotationCount) {
+    pImpl->maxFileSize = maxSizeMB * 1024 * 1024;
+    pImpl->fileRotationCount = rotationCount;
+}
+
+void ConsoleLogger::setEnablePerformanceTiming(bool enable) {
+    pImpl->enablePerformanceTiming = enable;
+}
+
+void ConsoleLogger::startTimer(const std::string& name) {
+    if (pImpl->enablePerformanceTiming) {
+        pImpl->timers[name] = std::chrono::steady_clock::now();
+    }
+}
+
+void ConsoleLogger::stopTimer(const std::string& name) {
+    if (pImpl->enablePerformanceTiming && pImpl->timers.find(name) != pImpl->timers.end()) {
+        auto start = pImpl->timers[name];
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        log(LogEntry(LogLevel::Debug, "Performance: Timer '" + name + "' took " + 
+                    std::to_string(duration.count()) + "ms"));
+        
+        pImpl->timers.erase(name);
+    }
+}
+
+void ConsoleLogger::logPerformanceData() {
+    if (!pImpl->enablePerformanceTiming) return;
+    
+    size_t totalTimers = pImpl->timers.size();
+    size_t activeTimers = 0;
+    
+    for (const auto& pair : pImpl->timers) {
+        auto start = pair.second;
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        log(LogEntry(LogLevel::Debug, "Performance: Active timer '" + pair.first + 
+                    "' running for " + std::to_string(duration.count()) + "ms"));
+        
+        activeTimers++;
+    }
+}
+
+std::string ConsoleLogger::formatMessage(const LogEntry& entry) const {
+    std::string result;
+    
+    // Replace placeholders in the log format
+    result = pImpl->logFormat;
+    
+    // Replace %LEVEL%
+    std::string levelStr = levelToString(entry.level);
+    size_t pos = result.find("%LEVEL%");
+    while (pos != std::string::npos) {
+        result.replace(pos, 8, levelStr);
+        pos = result.find("%LEVEL%", pos + levelStr.size());
+    }
+    
+    // Replace %MESSAGE%
+    pos = result.find("%MESSAGE%");
+    while (pos != std::string::npos) {
+        result.replace(pos, 10, entry.message);
+        pos = result.find("%MESSAGE%", pos + entry.message.size());
+    }
+    
+    // Replace %TIMESTAMP%
+    if (pImpl->useTimestamps) {
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        std::string timestamp = std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        pos = result.find("%TIMESTAMP%");
+        while (pos != std::string::npos) {
+            result.replace(pos, 12, timestamp);
+            pos = result.find("%TIMESTAMP%", pos + timestamp.size());
+        }
+    }
+    
+    // Replace %THREAD_ID%
+    if (pImpl->includeThreadId) {
+        std::thread::id threadId = std::this_thread::get_id();
+        std::string threadStr = std::to_string(reinterpret_cast<size_t>(threadId));
+        pos = result.find("%THREAD_ID%");
+        while (pos != std::string::npos) {
+            result.replace(pos, 12, threadStr);
+            pos = result.find("%THREAD_ID%", pos + threadStr.size());
+        }
+    }
+    
+    // Add color if enabled
+    if (pImpl->useColors && entry.level != LogLevel::Debug) {
+        result = levelToColor(entry.level) + result + "\033[0m";
+    }
+    
+    // Add newline
+    result += "\n";
+    
+    return result;
+}
+
+void ConsoleLogger::rotateLogFile() {
+    if (!pImpl->fileOut.is_open()) return;
+    
+    pImpl->fileOut.close();
+    
+    // Close current file
+    std::string basePath = pImpl->fileOut._file.__file;
+    for (size_t i = pImpl->fileRotationCount - 1; i > 0; --i) {
+        std::string source = basePath + "." + std::to_string(i - 1);
+        std::string dest = basePath + "." + std::to_string(i);
+        if (std::filesystem::exists(source)) {
+            std::filesystem::rename(source, dest);
+        }
+    }
+    
+    // Move current file to backup
+    std::filesystem::rename(basePath, basePath + ".1");
+    
+    // Reopen current file
+    pImpl->fileOut.open(basePath, std::ios::app);
+    pImpl->currentFileSize = 0;
+    pImpl->fileIndex++;
+}
+
+std::string ConsoleLogger::extractFileIndex(const std::string& filepath) const {
+    std::string filename = filepath;
+    size_t dotPos = filename.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        std::string ext = filename.substr(dotPos);
+        filename = filename.substr(0, dotPos);
+        
+        // Look for .1, .2, etc. suffix
+        for (size_t i = 1; i <= 100; ++i) {
+            std::string indexStr = "." + std::to_string(i);
+            if (filename.ends_with(indexStr)) {
+                return filename.substr(0, filename.size() - indexStr.size());
+            }
+        }
+    }
+    return filepath;
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
@@ -92,106 +274,16 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
 }
 
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
+    if (!pImpl->useColors) return "";
+    
     switch (level) {
         case LogLevel::Debug: return "\033[36m";    // Cyan
         case LogLevel::Info: return "\033[32m";      // Green
         case LogLevel::Warning: return "\033[33m";   // Yellow
         case LogLevel::Error: return "\033[31m";     // Red
         case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
+        default: return "";
     }
-}
-
-// Logger class implementation
-struct Logger::Impl {
-    std::vector<std::shared_ptr<ILogger>> loggers;
-    std::mutex mutex;
-};
-
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
-
-Logger::~Logger() = default;
-
-void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
-}
-
-void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
-}
-
-void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
-    }
-}
-
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
-    }
-}
-
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
-}
-
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
-}
-
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
-}
-
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
-}
-
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
-}
-
-bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
-    }
-    return false;
-}
-
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
-}
-
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm
