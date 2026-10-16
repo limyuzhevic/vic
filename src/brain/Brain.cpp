@@ -329,6 +329,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    // Check if brain should enter sleep/rest cycle
+    // Rest occurs when system is idle (low activity) for extended periods
+    if (!pImpl->isResting) {
+        // Calculate current activity level
+        float activityLevel = getAverageFiringRate();
+        size_t spikeCount = getTotalSpikeCount() - pImpl->totalSpikesTotal;
+        
+        // Enter resting state if activity is low for extended period
+        if (activityLevel < 0.01f && spikeCount < 5 && currentStep > 1000) {
+            pImpl->isResting = true;
+            pImpl->stepsSinceLastEpisode = 0;
+            NLM_LOG_INFO("Brain entering sleep/rest cycle (low activity)");
+        }
+    }
+    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
@@ -440,35 +455,114 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate enhanced neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
+    
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        // Get dopamine level for plasticity modulation
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Enhanced dopamine effects on plasticity:
+        // 1. Phasic dopamine (prediction error) strongly modulates learning
+        // 2. Tonic dopamine sets baseline plasticity rate
+        // 3. Negative dopamine suppresses learning, positive enhances it
+        
+        // Phase 1: Reward prediction error component
+        float rpe = dopamineLevel;  // RPE-like signal from dopamine
+        
+        // Phase 2: Learning rate modulation
+        // Stronger for prediction errors, centered around 0
+        float learningRate = 0.5f + 0.5f * std::abs(rpe);
+        
+        // Phase 3: State-dependent plasticity
+        // Activity-dependent plasticity: more dopamine during high activity
+        float activityLevel = getAverageFiringRate();
+        float activityMod = 1.0f + activityLevel * 0.5f;  // Up to 1.5x enhancement
+        
+        // Phase 4: Integration with eligibility traces
+        // Dopamine interacts with synaptic eligibility traces for credit assignment
+        float eligibilityMod = 1.0f;
+        if (std::abs(rpe) > 0.1f) {
+            // Strong prediction error resets/competes eligibility traces
+            eligibilityMod = 1.0f - 0.3f * std::abs(rpe);
+        }
+        
+        // Combine all modulation factors
+        plasticityMod = learningRate * activityMod * eligibilityMod;
+        
+        // Clamp to reasonable range
+        plasticityMod = std::clamp(plasticityMod, 0.1f, 3.0f);
+        
+        // Apply dopamine effects on neural excitability
+        // Enhanced version: dopamine modulates both synaptic strength and neural excitability
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopaminergic modulation of neural excitability
+                    // Phasic dopamine bursts increase neural gain
+                    float gainMod = 1.0f + 0.3f * std::abs(rpe);
+                    
+                    // Tonic dopamine sets baseline excitability
+                    float baselineMod = 1.0f + 0.2f * (dopamineLevel + 1.0f) / 2.0f;
+                    
+                    // Combined modulation
+                    float totalMod = gainMod * baselineMod;
+                    
+                    // Inject modulated current to enhance learning
+                    float modulatedCurrent = totalMod * 0.5f;
+                    if (modulatedCurrent > 0.0f) {
+                        neuron->injectCurrent(modulatedCurrent);
+                    }
+                }
+            }
+        }
     }
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
+            // Apply STDP with enhanced neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Enhance STDP with dopamine-modulated learning rate
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    
+                    // Additional dopamine-dependent weight change
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    float weightChange = (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    
+                    // Dopamine sign matters: positive RPE potentiates, negative weakens
+                    if (dopamineLevel > 0.0f) {
+                        // Positive prediction error (reward): strengthen connections
+                        weight += weightChange * 1.5f;
+                    } else {
+                        // Negative prediction error (punishment): weaken connections
+                        weight -= weightChange * 0.5f;
+                    }
+                    
+                    syn->setWeight(std::clamp(weight, 0.0f, 2.0f));
                 }
             }
             
-            // Apply Hebbian learning
+            // Apply Hebbian learning with enhanced neuromodulation
             if (syn->getPlasticityFlags().hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    // Enhanced Hebbian learning with dopamine
+                    float weight = syn->getWeight();
+                    
+                    // Co-activation strengthened by dopamine
+                    float hebbianChange = 0.01f * plasticityMod;
+                    
+                    // Activity-dependent component
+                    hebbianChange *= (activityLevel + 0.1f);
+                    
+                    weight += hebbianChange;
+                    syn->setWeight(std::clamp(weight, 0.0f, 2.0f));
                 }
             }
             
@@ -528,8 +622,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Encode current brain state for concept formation
+        std::vector<float> currentState;
+        currentState.reserve(getTotalNeuronCount());
+        
+        // Sample neural activity across the network
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Encode as membrane potential deviation from rest
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Form concepts from current experience - create features vector
+        std::vector<float> features = currentState;  // Use neural activity as features
+        features.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);  // Include neuromodulation
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(currentState, features, 
+                                                  pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                  currentTime);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,12 +654,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 12: REPLAY IMPORTANT MEMORIES (SLEEP/REST CYCLE) ==========
+    if (pImpl->isResting || currentStep % pImpl->replayInterval == 0) {
+        if (pImpl->episodicMemory) {
+            // Get episodes for replay - prioritize recent and important ones
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            
+            // During sleep, enhance consolidation by longer replay sequences
+            if (pImpl->isResting) {
+                pImpl->episodicMemory->replaySequence({0, 1, 2, 3, 4});  // First 5 episodes
+            }
+        }
+        
+        // If we were resting and have finished replaying, wake up
+        if (pImpl->isResting) {
+            // Check if we have enough recent activity
+            float activityLevel = getAverageFiringRate();
+            size_t spikeCount = getTotalSpikeCount() - pImpl->totalSpikesTotal;
+            
+            // Wake up after 200 rest steps or if activity increases
+            if (pImpl->stepsSinceLastEpisode >= 200 || activityLevel > 0.1f) {
+                pImpl->isResting = false;
+                NLM_LOG_INFO("Brain waking up from sleep/rest cycle");
+            }
         }
     }
     
@@ -579,7 +717,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // During rest, use more aggressive consolidation
+        float consolidationThreshold = pImpl->isResting ? 0.2f : 0.3f;
+        pImpl->episodicMemory->consolidate(consolidationThreshold);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -819,7 +959,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().toUint8());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
