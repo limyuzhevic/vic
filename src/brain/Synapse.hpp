@@ -74,11 +74,21 @@ public:
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
-    // Reset to initial state
-    void reset();
+    // Decay helper methods
+    void decayFacilitation(Timestamp currentTime, float tau);
+    void decayDepression(Timestamp currentTime, float tau);
+    void updateEfficacy();
+    void decayEligibilityTrace(float decayRate);
+    void decayEligibilityTraceFast();
     
-    // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    // Validation and initialization helper methods
+    void validateSynapseParameters();
+    void setInitialWeight(SynapseType type, RandomGenerator& rng);
+    void setInitialEfficacy(RandomGenerator& rng);
+    void setInitialDelay(RandomGenerator& rng);
+    void setInitialPlasticityState();
+    void setInitialEligibilityTrace();
+    void setInitialSpikeTimes();
     
 private:
     struct Impl;

@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <type_traits>
 
 namespace nlm {
 
@@ -29,6 +31,23 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Parameter validation function signature
+using ValidationFunction = std::function<bool(const ConfigValue&)>;
+
+// Parameter metadata for validation and defaults
+struct ParameterMeta {
+    std::string name;
+    std::string description;
+    ConfigValue defaultValue;
+    ValidationFunction validator;
+    bool required;
+    
+    ParameterMeta() : name(), description(), validator(nullptr), required(false) {}
+    ParameterMeta(const std::string& n, const std::string& desc, const ConfigValue& def,
+                  const ValidationFunction& val, bool req = false)
+        : name(n), description(desc), defaultValue(def), validator(val), required(req) {}
 };
 
 // Configuration entry
@@ -93,6 +112,37 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Parameter registration and validation
+    void registerParameter(const std::string& section, const ParameterMeta& param);
+    void setParameter(const std::string& section, const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    template<typename T>
+    std::optional<T> getParameter(const std::string& section, const std::string& key) const;
+    template<typename T>
+    T getParameterOr(const std::string& section, const std::string& key, const T& defaultValue) const;
+    bool validateParameter(const std::string& section, const std::string& key, const ConfigValue& value) const;
+    void ensureRequiredParameters(const std::string& section) const;
+    
+    // Neuron configuration parameters
+    static ParameterMeta NEURON_MEMBRANE_CAPACITANCE;
+    static ParameterMeta NEURON_TIME_CONSTANT;
+    static ParameterMeta NEURON_MAX_SPIKE_HISTORY;
+    static ParameterMeta NEURON_RESTING_POTENTIAL_DEFAULT;
+    static ParameterMeta NEURON_THRESHOLD_DEFAULT;
+    static ParameterMeta NEURON_RESET_POTENTIAL_DEFAULT;
+    static ParameterMeta NEURON_LEAK_CONDUCTANCE_DEFAULT;
+    static ParameterMeta NEURON_ADAPTATION_RATE;
+    static ParameterMeta NEURON_REFRACTORY_PERIOD_DEFAULT;
+    
+    // Synapse configuration parameters
+    static ParameterMeta SYNAPSE_WEIGHT_MIN;
+    static ParameterMeta SYNAPSE_WEIGHT_MAX;
+    static ParameterMeta SYNAPSE_STP_FACILITATION_TAU;
+    static ParameterMeta SYNAPSE_STP_DEPRESSION_TAU;
+    static ParameterMeta SYNAPSE_STP_U_MAX;
+    static ParameterMeta SYNAPSE_MAX_SPIKE_HISTORY;
+    static ParameterMeta SYNAPSE_EFFICIENCY_RANGE_MIN;
+    static ParameterMeta SYNAPSE_EFFICIENCY_RANGE_MAX;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +150,25 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isInRange(const ConfigValue& value, const ConfigValue& min, const ConfigValue& max);
 };
+
+// Range validation helper template
+namespace config_validation {
+    template<typename T>
+    ValidationFunction createRangeValidator(T min, T max) {
+        return [min, max](const ConfigValue& value) -> bool {
+            try {
+                T val = std::get<T>(value);
+                return val >= min && val <= max;
+            } catch (const std::bad_variant_access&) {
+                return false;
+            }
+        };
+    }
+    
+    ValidationFunction createFloatRangeValidator(float min, float max);
+    ValidationFunction createIntRangeValidator(int min, int max);
+}
 
 } // namespace nlm

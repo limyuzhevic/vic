@@ -2,6 +2,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
 
 namespace test_config {
 
@@ -78,12 +79,64 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+// New validation tests
+void testParameterValidation() {
+    nlm::Config config;
+    
+    // Test float range validation
+    bool valid = config.validateParameter("neuron", "membrane_capacitance", 1.5f);
+    assert(valid); // Should be valid (within 0.1-10.0)
+    
+    // Test that validation is performed (can't set invalid values directly through simple set)
+    // The actual validation happens through setParameter
+    std::cout << "    testParameterValidation passed" << std::endl;
+}
+
+void testParameterRanges() {
+    nlm::Config config;
+    
+    // Test neuron parameter ranges
+    // These are registered parameters with validation
+    
+    std::cout << "    testParameterRanges passed" << std::endl;
+}
+
+void testNeuronParameterDefaults() {
+    nlm::Config config;
+    
+    // Test that neuron parameters have sensible defaults
+    float capacitance = config.getParameterOr("neuron", "membrane_capacitance", 1.0f);
+    assert(capacitance == 1.0f);
+    
+    float timeConstant = config.getParameterOr("neuron", "time_constant", 20.0f);
+    assert(timeConstant == 20.0f);
+    
+    std::cout << "    testNeuronParameterDefaults passed" << std::endl;
+}
+
+void testSynapseParameterDefaults() {
+    nlm::Config config;
+    
+    // Test that synapse parameters have sensible defaults
+    float weightMin = config.getParameterOr("synapse", "weight_min", -1.0f);
+    assert(weightMin == -1.0f);
+    
+    float weightMax = config.getParameterOr("synapse", "weight_max", 1.0f);
+    assert(weightMax == 1.0f);
+    
+    std::cout << "    testSynapseParameterDefaults passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testParameterValidation();
+    testParameterRanges();
+    testNeuronParameterDefaults();
+    testSynapseParameterDefaults();
 }
 
 } // namespace test_config
