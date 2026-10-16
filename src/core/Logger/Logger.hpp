@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/Types/Types.hpp"
+#include "../core/Error/Error.hpp"
 #include <string>
 #include <memory>
 #include <sstream>

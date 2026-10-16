@@ -1,5 +1,7 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Performance/Profiler.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -33,6 +35,11 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Performance monitoring for neuron creation
+    Profiler::getInstance().startComponent("Neuron::constructor");
+    Profiler::getInstance().recordMemoryAllocation("Neuron::constructor", sizeof(Neuron::Impl));
+    Profiler::getInstance().endComponent("Neuron::constructor");
 }
 
 Neuron::~Neuron() = default;
@@ -269,6 +276,11 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Performance monitoring for neuron reset
+    Profiler::getInstance().startComponent("Neuron::reset");
+    Profiler::getInstance().recordMemoryAllocation("Neuron::reset", sizeof(NeuronState));
+    Profiler::getInstance().endComponent("Neuron::reset");
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -299,4 +311,70 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+// Performance monitoring integration for Neuron
+void Neuron::stepWithPerformanceMonitoring(const std::string& componentName, Timestamp currentTime) {
+    // Record component start time
+    Profiler::getInstance().startComponent(componentName + "::step");
+    
+    // Record memory allocation for spike history
+    if (pImpl->spikeHistory.size() == pImpl->spikeHistory.capacity()) {
+        Profiler::getInstance().recordMemoryAllocation(componentName + "::spikeHistory", sizeof(Timestamp) * pImpl->spikeHistory.size());
+    }
+    
+    try {
+        // Original step logic
+        step(currentTime);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error in neuron step: " + std::string(e.what()));
+        throw;
+    }
+    
+    // Record component end time
+    Profiler::getInstance().endComponent(componentName + "::step");
+}
+
+void Neuron::recordPerformanceMetrics(const std::string& componentName, size_t spikeCount, float firingRate, float membranePotential) {
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Record spike processing performance
+    Profiler::getInstance().recordNeuralNetworkPerformance(
+        componentName + "::neuron", "spikeProcessing",
+        std::chrono::nanoseconds(0), // Will be calculated by timer
+        std::chrono::nanoseconds(0), // Forward pass
+        std::chrono::nanoseconds(0), // Backward pass
+        firingRate, 100, 10 // inputSize, outputSize
+    );
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+    
+    // Record performance metrics
+    Profiler::getInstance().recordComponentStart(componentName + "::metrics");
+    Profiler::getInstance().recordComponentEnd(componentName + "::metrics");
+}
+
+void Neuron::initializeWithPerformanceTracking(const std::string& componentName, RandomGenerator& rng) {
+    Profiler::getInstance().startComponent(componentName + "::initialization");
+    
+    try {
+        // Record memory allocation for initialization
+        Profiler::getInstance().recordMemoryAllocation(componentName + "::random", sizeof(float) * 10);
+        
+        // Call the original initialization
+        initializeRandom(rng);
+        
+        // Record initialization performance
+        Profiler::getInstance().recordNeuralNetworkPerformance(
+            componentName + "::neuron", "initialization",
+            std::chrono::nanoseconds(0), // Will be calculated by timer
+            std::chrono::nanoseconds(0), // Forward pass
+            std::chrono::nanoseconds(0), // Backward pass
+            0.0f, 0, 0 // accuracy, inputSize, outputSize
+        );
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error in neuron initialization with performance tracking: " + std::string(e.what()));
+        throw;
+    }
+    
+    Profiler::getInstance().endComponent(componentName + "::initialization");
+}

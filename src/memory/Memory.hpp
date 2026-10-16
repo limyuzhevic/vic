@@ -1,22 +1,26 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Error/Error.hpp"
 #include <vector>
 #include <functional>
 
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Enhanced Phase 2 implementation with LRU eviction, statistics, and compression
 
 class WorkingMemory {
 public:
-    WorkingMemory();
+    WorkingMemory(size_t capacity = 100);
+    WorkingMemory(const WorkingMemory& other);
+    WorkingMemory& operator=(const WorkingMemory& other);
+    WorkingMemory(WorkingMemory&& other) noexcept;
+    WorkingMemory& operator=(WorkingMemory&& other) noexcept;
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Store item with priority
+    void store(NeuronId neuron, float value, int priority = 0);
     
     // Retrieve item
     float retrieve(NeuronId neuron) const;
@@ -34,13 +38,45 @@ public:
     // Decay all items
     void decay(float decayRate);
     
+    // LRU management
+    void access(NeuronId neuron); // Mark as recently used
+    void setEvictionPolicy(bool useLRU); // Enable/disable LRU
+    
+    // Statistics
+    struct Statistics {
+        size_t totalAccesses = 0;
+        size_t cacheHits = 0;
+        size_t cacheMisses = 0;
+        double hitRate() const { return totalAccesses > 0 ? static_cast<double>(cacheHits) / totalAccesses : 0.0; }
+    };
+    Statistics getStatistics() const { return stats; }
+    
+    // Priority management
+    void adjustPriority(NeuronId neuron, int delta);
+    int getPriority(NeuronId neuron) const;
+    
+    // Compression support
+    void enableCompression(bool enable);
+    bool isCompressed() const { return compressionEnabled; }
+    void compress(); // Compress storage
+    void decompress(); // Decompress storage
+    
+    // Thread safety
+    void lock() const;
+    void unlock() const;
+    bool tryLock() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    mutable Statistics stats;
+    bool compressionEnabled;
+    bool useLRU;
+    mutable bool locked;
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Enhanced Phase 2 implementation with consolidation, replay, and quality scoring
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -48,15 +84,36 @@ struct EpisodicMemoryItem {
     std::vector<float> values;
     std::string metadata;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    // Enhanced fields for consolidation
+    float relevanceScore;      // 0.0 to 1.0, how important this episode is
+    float consolidationQuality; // 0.0 to 1.0, how well consolidated this episode is
+    SimulationStep age;        // Time since episode occurred
+    bool isConsolidated;       // Whether this episode has been consolidated to long-term
+    
+    // Replay functionality
+    size_t replayCount;        // How many times this episode has been replayed
+    float replayEffectiveness; // How effective the replay was (0.0 to 1.0)
+    
+    // Integration with prediction system
+    float predictionError;    // Prediction error associated with this episode
+    float predictionConfidence; // Confidence in prediction associated with this episode
+    
+    EpisodicMemoryItem()
+        : timestamp(0), relevanceScore(0.0f), consolidationQuality(0.0f)
+        , age(0), isConsolidated(false), replayCount(0), replayEffectiveness(0.0f)
+        , predictionError(0.0f), predictionConfidence(0.0f) {}
 };
 
 class EpisodicMemory {
 public:
-    EpisodicMemory();
+    EpisodicMemory(size_t maxEpisodes = 1000);
+    EpisodicMemory(const EpisodicMemory& other);
+    EpisodicMemory& operator=(const EpisodicMemory& other);
+    EpisodicMemory(EpisodicMemory&& other) noexcept;
+    EpisodicMemory& operator=(EpisodicMemory&& other) noexcept;
     ~EpisodicMemory();
     
-    // Store episode
+    // Store episode with automatic quality scoring
     void storeEpisode(const EpisodicMemoryItem& episode);
     
     // Retrieve episode
@@ -72,11 +129,38 @@ public:
     void clear();
     
     // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    void consolidate(float relevanceThreshold = 0.5f);
+    
+    // Memory replay functionality
+    void replayEpisode(size_t index);
+    void replayRecentEpisodes(size_t count);
+    void replaySequence(const std::vector<size_t>& episodeIndices);
+    
+    // Integration with prediction system
+    // Integration with prediction system
+    void updateWithPrediction(const NeuralPrediction& prediction);
+    float computeConsolidationScore(size_t episodeIndex) const;
+    
+    // Consolidation scheduling and prioritization
+    void scheduleConsolidation(SimulationStep timestep);
+    bool isConsolidationDue(size_t episodeIndex) const;
+    
+    // Integration with neural working memory
+    void synchronizeWithWorkingMemory(const WorkingMemory& workingMemory);
+    
+    // Integration with other brain systems
+    void updateWithSensoryInput(const std::vector<float>& sensoryState);
+    void updateWithAction(const ActionType& action, float reward);
+    
+    // Thread safety
+    void lock() const;
+    void unlock() const;
+    bool tryLock() const;
     
 private:
     struct Impl;
     Impl* pImpl;
+    mutable bool locked;
 };
 
 // Semantic memory: gradually acquired knowledge
