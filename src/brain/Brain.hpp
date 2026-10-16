@@ -45,43 +45,222 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+/**
+ * @class Brain
+ * @brief The core neural simulation engine implementing real spiking computation
+ * 
+ * The Brain class serves as the central coordinator of the NLM neural system,
+ * implementing real spiking neural computation with event-driven dynamics and
+ * integrated memory, prediction, cognition, and neuromodulation systems.
+ * 
+ * It manages:
+ * - Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation
+ * - Synaptic connections with STDP, Hebbian, and structural plasticity
+ * - Sensory input processing and motor output generation
+ * - Memory systems (working, episodic, semantic, procedural, associative)
+ * - Cognitive functions (planning, attention, concept formation)
+ * - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+ * - Developmental processes (synaptogenesis, pruning, maturation)
+ * 
+ * The brain operates in discrete time steps and can be initialized with
+ * configuration parameters via the Config system.
+ * 
+ * @see Config
+ * @see ConfigValue
+ * @see LogLevel
+ * @see SimulationClock
+ */
+// Brain: The central coordinator of the neural system
+/**
+ * @class Brain
+ * @brief The core neural simulation engine implementing real spiking computation
+ * 
+ * The Brain class serves as the central coordinator of the NLM neural system,
+ * implementing real spiking neural computation with event-driven dynamics and
+ * integrated memory, prediction, cognition, and neuromodulation systems.
+ * 
+ * It manages:
+ * - Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation
+ * - Synaptic connections with STDP, Hebbian, and structural plasticity
+ * - Sensory input processing and motor output generation
+ * - Memory systems (working, episodic, semantic, procedural, associative)
+ * - Cognitive functions (planning, attention, concept formation)
+ * - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+ * - Developmental processes (synaptogenesis, pruning, maturation)
+ * 
+ * The brain operates in discrete time steps and can be initialized with
+ * configuration parameters via the Config system.
+ * 
+ * @see Config
+ * @see ConfigValue
+ * @see LogLevel
+ * @see SimulationClock
+ */
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Constructor - creates brain with configuration
+     * 
+     * @param config Shared pointer to configuration object containing brain parameters
+     *        such as neuron count, synaptic properties, and simulation settings.
+     *        Must not be null.
+     * 
+     * @note Configuration can be modified after brain creation using the set()
+     *       method before calling initialize().
+     * 
+     * @see Config::set()
+     * @see Brain::initialize()
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destructor
+     * 
+     * Cleans up brain resources including neurons, synapses, and all integrated
+     * memory, prediction, cognition, and neuromodulation systems.
+     */
     ~Brain();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Copy constructor is deleted (non-copyable)
+     * 
+     * The Brain class manages dynamic resources and cannot be safely copied.
+     * Use move operations or create new brain instances instead.
+     */
     Brain(const Brain&) = delete;
+    
+    /**
+     * @brief Copy assignment operator is deleted (non-assignable)
+     * 
+     * The Brain class manages dynamic resources and cannot be safely assigned.
+     * Use move operations or create new brain instances instead.
+     */
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor
+     * 
+     * @param other The brain instance to move from (will be left in valid but empty state)
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator
+     * 
+     * @param other The brain instance to move from (will be left in valid but empty state)
+     * @return Reference to this brain instance
+     */
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initialize brain with configuration and start neural computation
+     * 
+     * This method sets up the brain's internal systems including neurons, synapses,
+     * memory systems, and all plasticity mechanisms. After initialization, the brain
+     * can process sensory input, maintain internal state, and generate motor output.
+     * 
+     * @return bool True if initialization succeeded, false otherwise
+     * 
+     * @note Initialize must be called before any simulation steps or input processing.
+     * @note Multiple calls to initialize() will reset the brain to its initial state.
+     * 
+     * @see Brain::reset()
+     * @see Brain::step()
+     * @see Config
+     */
     bool initialize();
     
-    // Main simulation step
+    /**
+     * @brief Perform one simulation time step
+     * 
+     * @param currentStep Current simulation step number (monotonically increasing)
+     * 
+     * @note This method should be called regularly to advance the neural computation.
+     * Each call processes all neurons, updates synaptic connections, and advances
+     * the brain's internal state according to the current configuration and input.
+     * 
+     * @see Brain::step(SimulationStep, Timestamp)
+     * @see Brain::receiveSensoryInput()
+     * @see Brain::produceAction()
+     */
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    /**
+     * @brief Perform one simulation time step with precise timing
+     * 
+     * @param currentStep Current simulation step number (monotonically increasing)
+     * @param currentTime Current simulation time in seconds (more precise than step)
+     * 
+     * @note This method provides more accurate timing control than the step() method,
+     * allowing for non-uniform time steps and precise synchronization with external
+     * events or real-time systems.
+     * 
+     * @see Brain::step(SimulationStep)
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    /**
+     * @brief Receive and process sensory input from environment
+     * 
+     * This method injects the given sensory input into the brain's sensory neurons,
+     * activating the appropriate neural pathways for perception and processing.
+     * 
+     * @param input Sensory input data containing visual, auditory, tactile, or other
+     *             sensory modalities. The input format depends on the specific
+     *             sensory system implementation.
+     * 
+     * @note Received input will affect neural firing rates in the next simulation steps.
+     * @note Input should be received before calling step() to ensure it affects computation.
+     * 
+     * @see Brain::step()
+     * @see SensoryInput
+     */
     void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inject current directly into a specific neuron
+    /**
+     * @brief Inject current directly into a specific neuron
+     * 
+     * This method directly excites or inhibits a specific neuron by injecting
+     * membrane current, bypassing the normal sensory processing pathway.
+     * 
+     * @param neuron ID of the target neuron
+     * @param current Amount of current to inject (positive for excitation, negative for inhibition)
+     * 
+     * @note Can be used for testing, debugging, or providing external control signals.
+     * @note Injection takes effect immediately in the next processing cycle.
+     */
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
-    // Inject current into all neurons of a specific type
+    /**
+     * @brief Inject current into all neurons of a specific type
+     * 
+     * This method provides broad control over neural population activity by
+     * applying current to all neurons of a given type (e.g., all excitatory neurons).
+     * 
+     * @param type Type of neurons to receive current (Excitatory, Inhibitory, etc.)
+     * @param current Amount of current to inject (positive for excitation, negative for inhibition)
+     * 
+     * @note Useful for global neuromodulation or testing network responses.
+     */
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
+    /**
+     * @brief Get access to the spike system for spike-related operations
+     * 
+     * @return Pointer to the spike system implementation
+     * 
+     * @note The spike system manages LIF neuron dynamics, spike generation,
+     *       and spike propagation through synaptic connections.
+     * 
+     * @see SpikeSystem
+     */
     SpikeSystem* getSpikeSystem();
+    
+    /**
+     * @brief Get constant access to the spike system for spike-related operations
+     * 
+     * @return Constant pointer to the spike system implementation
+     */
     const SpikeSystem* getSpikeSystem() const;
     
     // Plasticity system access

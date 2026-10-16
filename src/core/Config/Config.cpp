@@ -3,32 +3,488 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <cctype>
+#include <stack>
+#include <queue>
 
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
+// Helper functions for JSON parsing
+namespace {
+    
+    // Remove comments from JSON string (simple line comment removal)
+    std::string removeJsonComments(const std::string& input) {
+        std::string result;
+        bool inString = false;
+        bool escaped = false;
+        
+        for (size_t i = 0; i < input.size(); ++i) {
+            char c = input[i];
+            
+            if (!inString && c == '/') {
+                // Check if it's a comment start
+                if (i + 1 < input.size()) {
+                    if (input[i + 1] == '/' || input[i + 1] == '*') {
+                        // Skip comment
+                        while (i + 1 < input.size() && !(input[i + 1] == '\n' && input[i] == '/')) {
+                            i++;
+                        }
+                        if (i + 1 < input.size() && input[i + 1] == '*') {
+                            // Skip block comment
+                            while (i + 1 < input.size() && !(input[i + 1] == '*' && input[i] == '/')) {
+                                i++;
+                            }
+                            if (i + 1 < input.size()) {
+                                i++; // Skip closing */
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+            
+            // Handle string escaping
+            if (c == '\\' && inString) {
+                escaped = true;
+                result += c;
+                continue;
+            }
+            
+            if (c == '"' && !escaped) {
+                inString = !inString;
+                result += c;
+            } else {
+                result += c;
+            }
+            
+            escaped = false;
+        }
+        
+        return result;
+    }
+    
+    // Check if string is a JSON number (integer or float)
+    bool isJsonNumber(const std::string& str) {
+        if (str.empty() || (str[0] == '-' && str.size() == 1)) {
+            return false;
+        }
+        
+        bool hasDecimal = false;
+        bool hasExponent = false;
+        bool hasSign = false;
+        
+        for (size_t i = 0; i < str.size(); ++i) {
+            char c = str[i];
+            if (c == '-' || c == '+') {
+                if (i != 0) return false;
+                hasSign = true;
+            } else if (c == '.') {
+                if (hasDecimal || hasExponent) return false;
+                hasDecimal = true;
+            } else if (c == 'e' || c == 'E') {
+                if (hasExponent) return false;
+                hasExponent = true;
+                hasDecimal = true; // Allow scientific notation without decimal
+            } else if (!std::isdigit(static_cast<unsigned char>(c))) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // Parse JSON value from string (simple implementation)
+    std::string parseJsonValue(const std::string& str, size_t& pos) {
+        // Skip whitespace
+        while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+            pos++;
+        }
+        
+        if (pos >= str.size()) {
+            throw std::runtime_error("Unexpected end of JSON input");
+        }
+        
+        char c = str[pos];
+        
+        if (c == '"') {
+            // String value
+            pos++; // Skip opening quote
+            size_t start = pos;
+            while (pos < str.size() && str[pos] != '"') {
+                if (str[pos] == '\\' && pos + 1 < str.size()) {
+                    pos += 2; // Skip escaped character
+                    continue;
+                }
+                pos++;
+            }
+            if (pos >= str.size()) {
+                throw std::runtime_error("Unterminated string in JSON");
+            }
+            std::string result = str.substr(start, pos - start);
+            pos++; // Skip closing quote
+            return result;
+        } else if (c == 't' || c == 'f') {
+            // Boolean value
+            if (str.substr(pos, 4) == "true") {
+                pos += 4;
+                return "true";
+            } else if (str.substr(pos, 5) == "false") {
+                pos += 5;
+                return "false";
+            } else {
+                throw std::runtime_error("Invalid JSON boolean value");
+            }
+        } else if (c == 'n') {
+            // Null value
+            if (str.substr(pos, 4) == "null") {
+                pos += 4;
+                return "null";
+            } else {
+                throw std::runtime_error("Invalid JSON null value");
+            }
+        } else if (c == '[') {
+            // Array - for now, treat as string for compatibility
+            pos++; // Skip opening bracket
+            size_t start = pos;
+            while (pos < str.size() && str[pos] != ']') {
+                if (str[pos] == ',' || str[pos] == ' ') {
+                    // Skip elements and commas
+                    while (pos < str.size() && (str[pos] == ',' || str[pos] == ' ')) {
+                        pos++;
+                    }
+                    start = pos;
+                }
+                pos++;
+            }
+            if (pos >= str.size()) {
+                throw std::runtime_error("Unterminated array in JSON");
+            }
+            std::string result = str.substr(start, pos - start);
+            pos++; // Skip closing bracket
+            return result;
+        } else if (c == '{') {
+            // Object - parse as key-value pairs
+            pos++; // Skip opening brace
+            std::string result;
+            bool first = true;
+            
+            while (pos < str.size() && str[pos] != '}') {
+                // Skip whitespace
+                while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+                    pos++;
+                }
+                
+                if (pos >= str.size() || str[pos] == '}') {
+                    break;
+                }
+                
+                if (!first) {
+                    if (str[pos] == ',') {
+                        pos++;
+                        // Skip whitespace after comma
+                        while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+                            pos++;
+                        }
+                    } else {
+                        throw std::runtime_error("Expected comma between JSON object members");
+                    }
+                }
+                first = false;
+                
+                // Parse key
+                if (str[pos] != '"') {
+                    throw std::runtime_error("Expected quoted string as JSON object key");
+                }
+                pos++; // Skip opening quote
+                size_t keyStart = pos;
+                while (pos < str.size() && str[pos] != '"') {
+                    if (str[pos] == '\\' && pos + 1 < str.size()) {
+                        pos += 2;
+                        continue;
+                    }
+                    pos++;
+                }
+                if (pos >= str.size()) {
+                    throw std::runtime_error("Unterminated string in JSON object key");
+                }
+                std::string key = str.substr(keyStart, pos - keyStart);
+                pos++; // Skip closing quote
+                
+                // Skip whitespace after key
+                while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+                    pos++;
+                }
+                
+                if (pos >= str.size() || str[pos] != ':') {
+                    throw std::runtime_error("Expected colon after JSON object key");
+                }
+                pos++; // Skip colon
+                
+                // Skip whitespace before value
+                while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+                    pos++;
+                }
+                
+                // Parse value
+                std::string value = parseJsonValue(str, pos);
+                
+                // Add to result
+                if (!result.empty()) result += ',';
+                result += '"' + key + '":' + value;
+                
+                // Skip whitespace after value
+                while (pos < str.size() && std::isspace(static_cast<unsigned char>(str[pos]))) {
+                    pos++;
+                }
+            }
+            
+            if (pos >= str.size()) {
+                throw std::runtime_error("Unterminated JSON object");
+            }
+            
+            pos++; // Skip closing brace
+            return "{" + result + "}";
+        } else if (std::isdigit(static_cast<unsigned char>(c)) || c == '-') {
+            // Number value
+            size_t start = pos;
+            while (pos < str.size() && (std::isdigit(static_cast<unsigned char>(str[pos])) || 
+                                        str[pos] == '.' || str[pos] == 'e' || 
+                                        str[pos] == 'E' || str[pos] == '+' || str[pos] == '-')) {
+                pos++;
+            }
+            return str.substr(start, pos - start);
+        } else {
+            throw std::runtime_error("Invalid JSON value type");
+        }
+    }
+    
+    // Convert JSON value string to ConfigValue
+    ConfigValue parseJsonToConfigValue(const std::string& jsonValue) {
+        if (jsonValue == "null") {
+            return std::string("null");
+        } else if (jsonValue == "true") {
+            return true;
+        } else if (jsonValue == "false") {
+            return false;
+        } else if (jsonValue.empty()) {
+            return std::string("");
+        } else if (jsonValue[0] == '"' && jsonValue.back() == '"') {
+            // String
+            std::string str = jsonValue.substr(1, jsonValue.size() - 2);
+            // Unescape string
+            std::string result;
+            bool escaped = false;
+            for (char c : str) {
+                if (c == '\\' && !escaped) {
+                    escaped = true;
+                    continue;
+                }
+                if (escaped) {
+                    // Handle escape sequences
+                    switch (c) {
+                        case 'n': result += '\n'; break;
+                        case 't': result += '\t'; break;
+                        case 'r': result += '\r'; break;
+                        case '"': result += '"'; break;
+                        case '\\': result += '\\'; break;
+                        default: result += c; break;
+                    }
+                    escaped = false;
+                } else {
+                    result += c;
+                }
+            }
+            return result;
+        } else if (isJsonNumber(jsonValue)) {
+            // Try to parse as integer first
+            try {
+                size_t pos;
+                long long_val = std::stoll(jsonValue, &pos);
+                if (pos == jsonValue.size()) {
+                    return long_val;
+                }
+            } catch (...) {}
+            
+            // Try to parse as double
+            try {
+                size_t pos;
+                double double_val = std::stod(jsonValue, &pos);
+                if (pos == jsonValue.size()) {
+                    return double_val;
+                }
+            } catch (...) {}
+            
+            // If all else fails, return as string
+            return jsonValue;
+        } else {
+            // Try to parse as array
+            if (jsonValue[0] == '[' && jsonValue.back() == ']') {
+                // Simple array parsing - for now treat as string
+                return jsonValue;
+            }
+            return jsonValue;
+        }
+    }
+    
+    // Parse JSON configuration string
+    bool parseJsonConfig(const std::string& jsonStr, std::vector<ConfigEntry>& entries) {
+        try {
+            std::string cleanedStr = removeJsonComments(jsonStr);
+            
+            if (cleanedStr.empty() || (cleanedStr.size() > 1 && cleanedStr[0] == '{' && cleanedStr.back() == '}')) {
+                // Handle empty object or complete object
+                if (cleanedStr.size() <= 2) {
+                    return true; // Empty JSON object
+                }
+                
+                // Remove outer braces
+                std::string inner = cleanedStr.substr(1, cleanedStr.size() - 2);
+                
+                if (inner.empty()) {
+                    return true;
+                }
+                
+                // Simple parsing for key-value pairs
+                size_t pos = 0;
+                bool first = true;
+                
+                while (pos < inner.size()) {
+                    // Skip whitespace
+                    while (pos < inner.size() && std::isspace(static_cast<unsigned char>(inner[pos]))) {
+                        pos++;
+                    }
+                    
+                    if (pos >= inner.size()) {
+                        break;
+                    }
+                    
+                    if (!first) {
+                        if (inner[pos] == ',') {
+                            pos++;
+                            // Skip whitespace after comma
+                            while (pos < inner.size() && std::isspace(static_cast<unsigned char>(inner[pos]))) {
+                                pos++;
+                            }
+                        } else {
+                            throw std::runtime_error("Expected comma between JSON object members");
+                        }
+                    }
+                    first = false;
+                    
+                    // Find next key
+                    size_t keyStart = pos;
+                    while (pos < inner.size() && inner[pos] != '"') {
+                        pos++;
+                    }
+                    
+                    if (pos >= inner.size() || inner[pos] != '"') {
+                        throw std::runtime_error("Expected quoted string as JSON key");
+                    }
+                    
+                    pos++; // Skip opening quote
+                    size_t keyEnd = pos;
+                    while (pos < inner.size() && inner[pos] != '"') {
+                        if (inner[pos] == '\\' && pos + 1 < inner.size()) {
+                            pos += 2;
+                            continue;
+                        }
+                        pos++;
+                    }
+                    
+                    if (pos >= inner.size()) {
+                        throw std::runtime_error("Unterminated string in JSON key");
+                    }
+                    
+                    std::string key = inner.substr(keyEnd, pos - keyEnd);
+                    pos++; // Skip closing quote
+                    
+                    // Skip whitespace after key
+                    while (pos < inner.size() && std::isspace(static_cast<unsigned char>(inner[pos]))) {
+                        pos++;
+                    }
+                    
+                    if (pos >= inner.size() || inner[pos] != ':') {
+                        throw std::runtime_error("Expected colon after JSON key");
+                    }
+                    
+                    pos++; // Skip colon
+                    
+                    // Skip whitespace before value
+                    while (pos < inner.size() && std::isspace(static_cast<unsigned char>(inner[pos]))) {
+                        pos++;
+                    }
+                    
+                    // Find value end (next comma or end of object)
+                    size_t valueStart = pos;
+                    while (pos < inner.size() && inner[pos] != ',' && inner[pos] != '}') {
+                        pos++;
+                    }
+                    
+                    std::string valueStr = inner.substr(valueStart, pos - valueStart);
+                    
+                    // Parse value
+                    ConfigValue value = parseJsonToConfigValue(valueStr);
+                    
+                    // Add entry
+                    entries.emplace_back(key, value, ConfigSource::File);
+                }
+                
+                return true;
+            }
+            
+            throw std::runtime_error("Invalid JSON format - expected object at root level");
+            
+        } catch (const std::exception& e) {
+            std::cerr << "JSON parsing error: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+} // namespace
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    if (content.empty()) {
+        return true; // Empty file is valid
+    }
+    
+    // Try to parse as JSON first
+    bool isJson = false;
+    std::string trimmed = trim(content);
+    
+    if ((trimmed.size() >= 2 && 
+         ((trimmed[0] == '{' && trimmed.back() == '}') || 
+          (trimmed[0] == '[' && trimmed.back() == ']'))) ||
+        trimmed.find('{') != std::string::npos) {
+        isJson = true;
+    }
+    
+    if (isJson) {
+        // Parse as JSON
+        return parseJsonConfig(content, pImpl->entries);
+    } else {
+        // Parse as simple key=value format (backward compatibility)
+        return parseKeyValueConfig(content);
+    }
+}
+
+// Parse simple key=value configuration
+bool Config::parseKeyValueConfig(const std::string& content) {
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    size_t lineNumber = 0;
+    
+    while (std::getline(stream, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +505,10 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Invalid format, log warning but continue
+            std::cerr << "Warning: Invalid config line " << lineNumber 
+                     << ": missing '=' operator in line: " << line << std::endl;
         }
     }
     
@@ -84,10 +544,33 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n"; // Start JSON object
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Convert ConfigValue to JSON string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double>) {
+                file << arg;
+            } else {
+                file << "\"" << arg << "\""; // Fallback for unknown types
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
+    file << "}\n"; // End JSON object
     
     return true;
 }

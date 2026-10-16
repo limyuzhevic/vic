@@ -58,9 +58,18 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        if (!brain) {
+            throw std::runtime_error("LearningExperiment initialized with null brain pointer");
+        }
+    }
     
     void recordInitialState() {
+        if (!brain) {
+            NLM_LOG_ERROR("ERROR: Cannot record initial state - brain is null");
+            return;
+        }
+        
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
@@ -69,6 +78,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("WARNING: No region found for initial weight recording");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -77,10 +88,17 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("WARNING: No weights recorded for initial state");
         }
     }
     
     void recordFinalState() {
+        if (!brain) {
+            NLM_LOG_ERROR("ERROR: Cannot record final state - brain is null");
+            return;
+        }
+        
         finalWeights.clear();
         
         // Record final weights from first region
@@ -88,6 +106,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("WARNING: No region found for final weight recording");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -98,6 +118,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("WARNING: No weights recorded for final state");
         }
     }
     
@@ -402,14 +424,22 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object!");
+        return 1;
+    }
+    
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        brain->logStatus(); // Log partial status for debugging
         return 1;
     }
     
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Test Suite ===");
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
@@ -417,6 +447,7 @@ int main(int argc, char** argv) {
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
+    NLM_LOG_INFO("");
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification

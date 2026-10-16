@@ -22,9 +22,249 @@ namespace nlm {
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        ================================================
+
+        A comprehensive Python interface for the NLM (Neural Learning Machine) 
+        framework - an experimental artificial neural simulation system.
+
+        This module provides Python access to advanced neural computation features
+        including:
+        
+        - **Real spiking neural networks** using Leaky Integrate-and-Fire (LIF) neurons
+        - **Event-driven simulation** with synaptic delays and plasticity
+        - **Integrated cognitive systems** (memory, planning, attention, prediction)
+        - **Neuromodulation** (dopamine, curiosity, novelty, prediction error)
+        - **Developmental processes** (synaptogenesis, pruning, maturation)
+        - **Sensory-motor integration** for agent-environment interaction
+        
+        ## Core Classes
+        
+        ### `createBrain(config)`
+        Creates a new neural brain with the specified configuration.
+        
+        ### `createSimpleWorld()`
+        Creates a simple simulated environment for the brain to interact with.
+        
+        ### `createAgentBrain(brain)`
+        Creates an agent that bridges brain processing with world interaction.
+        
+        ### `createDefaultConfig()`
+        Creates a configuration with sensible default values for simulation.
+        
+        ## Key Features
+        
+        ### Neural Computation
+        - **LIF neurons** with realistic biophysical dynamics
+        - **Event-driven spiking** with precise timing
+        - **STDP and Hebbian plasticity** for learning
+        - **Structural plasticity** for connection formation/removal
+        
+        ### Cognitive Architecture
+        - **Working memory** for transient information storage
+        - **Episodic memory** for experience recording
+        - **Semantic memory** for knowledge representation
+        - **Procedural memory** for learned behaviors
+        - **Concept formation** for abstract reasoning
+        - **Neural planning** for goal-directed behavior
+        - **Attentional selection** for feature prioritization
+        
+        ### Neuromodulation
+        - **Dopamine** for reward prediction and learning
+        - **Curiosity** for exploration and novelty detection
+        - **Novelty** for surprise-based adaptation
+        - **Prediction error** for model-based learning
+        
+        ### Developmental Systems
+        - **Synaptogenesis** for initial connection formation
+        - **Pruning** for eliminating weak connections
+        - **Maturation** for ongoing development
+        
+        ## Usage Examples
+        
+        ### Example 1: Simple Neural Network
+        ```python
+        import pynlm
+        
+        # Create a brain with default configuration
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Run simulation for 100 steps
+        for i in range(100):
+            brain.step(i)
+        
+        print(f"Brain processed {brain.getTotalSpikeCount()} spikes")
+        print(f"Firing rate: {brain.getAverageFiringRate():.3f} Hz")
+        ```
+        
+        ### Example 2: Complete Agent Simulation
+        ```python
+        import pynlm
+        
+        # Setup: create brain and world
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(
+            width=20, 
+            height=20, 
+            visionWidth=8, 
+            visionHeight=8,
+            maxObjects=50
+        )
+        world.reset()
+        
+        # Create agent that connects brain to world
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning capabilities
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        
+        # Run simulation loop
+        for step in range(500):
+            world.update(0.1)  # Advance world by 100ms
+            
+            # Get what agent sees
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Brain thinks/decides
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            
+            # Execute action in world
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Provide feedback for learning
+            reward = world.getReward()
+            prediction = agent.getCurrentPrediction()
+            agent.applyRewardModulation(reward, prediction)
+            
+            if step % 50 == 0:
+                print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        ```
+        
+        ### Example 3: Custom Configuration
+        ```python
+        import pynlm
+        import json
+        
+        # Create configuration with custom parameters
+        config = pynlm.createDefaultConfig()
+        
+        # Modify configuration settings
+        config.set("neuron_count", 1000)
+        config.set("region_count", 3)
+        config.set("simulation_timestep", 0.0001)
+        config.set("connection_probability", 0.2)
+        
+        # Set plasticity parameters
+        config.set("stdp_ltp_weight", 0.03)
+        config.set("stdp_ltd_weight", 0.015)
+        config.set("synaptogenesis_rate", 0.0005)
+        config.set("pruning_rate", 0.00005)
+        
+        # Create brain with custom configuration
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        ```
+        
+        ## Advanced Features
+        
+        ### Developmental Stages
+        The brain goes through several developmental stages:
+        
+        - **Initial**: Brain formation, basic connectivity
+        - **CriticalPeriod**: Enhanced plasticity, rapid learning
+        - **Maturation**: Stabilization, refined connections
+        - **Adult**: Optimized performance, maintenance
+        - **Aging**: Declining performance, increased plasticity
+        
+        ### Learning Mechanisms
+        The system supports multiple learning mechanisms:
+        
+        - **Hebbian Learning**: "Fire together, wire together"
+        - **STDP**: Spike-Timing Dependent Plasticity
+        - **Structural Plasticity**: Physical rewiring of connections
+        - **Reward Modulation**: Dopamine-based credit assignment
+        - **Curiosity-Driven Learning**: Exploration of novel states
+        
+        ### Memory Systems
+        The brain implements multiple memory systems:
+        
+        - **Working Memory**: Short-term, active information storage
+        - **Episodic Memory**: Recording of experiences and events
+        - **Semantic Memory**: Abstract knowledge and concepts
+        - **Procedural Memory**: Learned behaviors and skills
+        - **Associative Memory**: Pattern completion and recall
+        
+        ## Error Handling
+        
+        The Python bindings include comprehensive error handling:
+        
+        - **RuntimeError**: Thrown for invalid operations or malformed configurations
+        - **ValueError**: Thrown for invalid parameter values
+        - **FileNotFoundError**: Thrown when configuration files cannot be loaded
+        - **TypeError**: Thrown for type mismatches in method calls
+        
+        All errors include detailed error messages to aid debugging.
+        
+        ## Performance Considerations
+        
+        ### Memory Usage
+        - Brain memory scales approximately with neuron_count^2
+        - Use efficient configuration to balance performance and capability
+        - Consider using compression for checkpoint/restart scenarios
+        
+        ### Computational Complexity
+        - Each simulation step: O(neuron_count * average_connections_per_neuron)
+        - Consider using SIMD optimizations for large networks
+        - Enable parallel processing for multi-core systems
+        
+        ## Further Reading
+        
+        - **NLM Documentation**: Read the comprehensive NLM documentation for more
+          advanced usage patterns and system details.
+        - **Phase Demos**: Check out the NLM demo executables for real-world
+          simulation examples and benchmarks.
+        - **Performance Guidelines**: Review performance documentation for
+          optimization recommendations and scaling considerations.
+        
+        ## Notes
+        
+        1. **Simulation Time**: NLM uses discrete simulation steps with
+           configurable time steps. Real-time performance depends on
+           step duration and system load.
+        
+        2. **Memory Management**: The Python bindings use reference counting
+           and automatic garbage collection. Be mindful of memory usage
+           in long-running simulations.
+        
+        3. **Threading**: NLM is not thread-safe. All operations should be
+           performed from a single thread to ensure consistency.
+        
+        4. **Configuration**: Configuration changes may require re-initialization
+           of the brain to take full effect.
+        
+        ## Getting Help
+        
+        - **Documentation**: Comprehensive documentation is available in the
+          NLM repository and online documentation.
+        - **Examples**: Multiple example scripts are available in the examples
+          directory.
+        - **Community**: Join the NLM community for discussions and support.
+        - **Bug Reports**: Report issues through the NLM issue tracker.
+        
+        This module provides a powerful and flexible interface to the NLM
+        neural simulation framework, enabling both research and practical
+        applications of artificial neural computation.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
