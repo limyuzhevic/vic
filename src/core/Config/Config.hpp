@@ -63,6 +63,11 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+#ifdef YAML_CPP_AVAILABLE
+    bool saveToYAML(const std::string& filepath) const;
+#endif
+    bool saveToSimpleFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>

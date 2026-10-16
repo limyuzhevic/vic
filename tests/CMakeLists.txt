@@ -8,13 +8,27 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_improved.cpp
+    test_config_improved_main.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_brain_integration.cpp
+    demo_improvements.cpp
 )
+
+# Add Python bindings test if available
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../python_bindings/CMakeLists.txt)
+    add_subdirectory(python_bindings)
+endif()
+
+# Add Python bindings test if available
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../python_bindings/CMakeLists.txt)
+    add_subdirectory(python_bindings)
+endif()
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,24 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to detect file format and load appropriately
+    // Check file extension to determine format
+    std::string extension = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    if (extension == ".json") {
+        return loadFromJSON(filepath);
+    } else if (extension == ".yaml" || extension == ".yml") {
+#ifdef YAML_CPP_AVAILABLE
+        return loadFromYAML(filepath);
+#else
+        NLM_LOG_ERROR("YAML support not available. Install yaml-cpp to use YAML config files.");
         return false;
+#endif
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFile(filepath);
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +71,39 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Output actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -211,5 +228,134 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+    // Save configuration to JSON file format
+    bool Config::saveToJSON(const std::string& filepath) const {
+        try {
+            nlohmann::json root;
+            
+            for (const auto& entry : pImpl->entries) {
+                // Convert value to appropriate JSON type
+                std::visit([&root, &entry](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        root[entry.key] = arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                        root[entry.key] = arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                        root[entry.key] = arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        root[entry.key] = arg;
+                    } else {
+                        root[entry.key] = arg;
+                    }
+                }, entry.value);
+            }
+            
+            std::ofstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            file << root.dump(2); // Pretty print with indentation
+            return true;
+        } catch (const nlohmann::json::exception& e) {
+            NLM_LOG_ERROR("Error saving JSON config file '" + filepath + "': " + e.what());
+            return false;
+        }
+    }
+
+#ifdef YAML_CPP_AVAILABLE
+    // Save configuration to YAML file format
+    bool Config::saveToYAML(const std::string& filepath) const {
+        try {
+            YAML::Emitter emitter;
+            emitter << YAML::BeginMap;
+            
+            for (const auto& entry : pImpl->entries) {
+                emitter << YAML::Key << entry.key;
+                std::visit([&emitter](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        emitter << arg;
+                    } else if constexpr (std::is_same_v<T, int> || 
+                                         std::is_same_v<T, int64_t> ||
+                                         std::is_same_v<T, double> ||
+                                         std::is_same_v<T, bool>) {
+                        emitter << arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                        emitter << YAML::Flow << arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                        emitter << YAML::Flow << arg;
+                    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        emitter << YAML::Flow << arg;
+                    } else {
+                        emitter << arg;
+                    }
+                }, entry.value);
+            }
+            
+            emitter << YAML::EndMap;
+            
+            std::ofstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            file << emitter.c_str();
+            return true;
+        } catch (const YAML::Exception& e) {
+            NLM_LOG_ERROR("Error saving YAML config file '" + filepath + "': " + e.what());
+            return false;
+        }
+    }
+#endif
+
+    // Save configuration to simple key=value file format
+    bool Config::saveToSimpleFile(const std::string& filepath) const {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            // Output actual value based on type
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    }
+                    file << "]";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            file << "\n\n";
+        }
+        
+        return true;
+    }
 
 } // namespace nlm
