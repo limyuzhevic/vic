@@ -42,7 +42,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Phase 6)
 
 ```python
 import pynlm
@@ -71,9 +71,120 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Phase 6 Integration Demo (Complete Brain System)
+
+```python
+import pynlm
+
+def run_phase6_demo():
+    """Run the complete Phase 6 integration demo with all brain systems."""
+    
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)
+    config.set("brain.region_count", 2)
+    config.set("connection_probability", 0.1f)
+    config.set("random_seed", 42)
+    config.set("simulation_timestep", 0.001)
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    # Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable ALL Phase 6 systems for integration testing
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    agent.enablePrediction(True)
+    agent.enableWorkingMemory(True)
+    agent.enableEpisodicMemory(True)
+    agent.enableConceptFormation(True)
+    agent.enablePlanning(True)
+    agent.enableAttention(True)
+    
+    print("=== NLM Phase 6 Integration Demo ===")
+    print(f"Neurons: {brain.getTotalNeuronCount()}")
+    print(f"Synapses: {brain.getTotalSynapseCount()}")
+    print(f"Sensory input: {agent.getSensoryInputSize()}")
+    print(f"Motor output: {agent.getMotorOutputSize()}")
+    print()
+    
+    # Run simulation
+    for step in range(100):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 20 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development stage: {agent.getDevelopmentalStage()}")
+            print(f"  Working memory: {agent.getWorkingMemoryCount()}")
+            print(f"  Episodic memory: {agent.getEpisodicMemoryCount()}")
+    
+    print()
+    print("=== Integration Results ===")
+    print(f"Total reward: {world.getAgentBody().energy}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Average firing rate: {brain.getAverageFiringRate():.3f}")
+    print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Novelty level: {agent.getNoveltyLevel():.3f}")
+    print(f"Episodic episodes stored: {agent.getEpisodicMemoryCount()}")
+
+# Run the demo
+run_phase6_demo()
+```
+
 ---
 
-## Simple Analogy
+## Phase 6 Features
+
+The Phase 6 integration demo demonstrates all the advanced features of NLM:
+
+### 1. Advanced Neuromodulation
+- **Reward modulation**: Learn from rewards and predictions
+- **Curiosity**: Explore novel and interesting situations
+- **Novelty detection**: Recognize unexpected patterns
+- **Dopamine system**: Modulates learning and attention
+
+### 2. Integrated Memory Systems
+- **Working memory**: Maintain active information for short periods
+- **Episodic memory**: Store experiences as interconnected events
+- **Associative memory**: Create links between related patterns
+- **Semantic memory**: Abstract knowledge and concepts
+
+### 3. Cognitive Processing
+- **Concept formation**: Discover patterns from experience
+- **Neural planning**: Evaluate multiple action sequences
+- **Attention**: Selectively process important information
+- **Prediction**: Anticipate future states and outcomes
+
+### 4. Advanced Learning
+- **STDP (Spike-Timing-Dependent Plasticity)**: Learning based on precise timing
+- **Hebbian learning**: Strengthen connections for co-activated neurons
+- **Structural plasticity**: Create and eliminate synapses
+- **Development**: Brain maturation across lifespan stages
+
+### 5. Real-world Interaction
+- **Sensory processing**: Visual, auditory, and other sensory inputs
+- **Motor control**: Smooth, coordinated actions
+- **Environment dynamics**: Realistic physics and constraints
+- **Reward prediction**: Learn expected outcomes
 
 | Real World | NLM Code |
 |------------|----------|

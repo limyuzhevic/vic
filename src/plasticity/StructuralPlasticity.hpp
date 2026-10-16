@@ -13,6 +13,12 @@ public:
     StructuralPlasticity();
     ~StructuralPlasticity();
     
+    // Disable copying, enable moving
+    StructuralPlasticity(const StructuralPlasticity&) = delete;
+    StructuralPlasticity& operator=(const StructuralPlasticity&) = delete;
+    StructuralPlasticity(StructuralPlasticity&&) noexcept;
+    StructuralPlasticity& operator=(StructuralPlasticity&&) noexcept;
+    
     // Create new synapse
     // TODO PHASE 2: Implement real synapse creation
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
