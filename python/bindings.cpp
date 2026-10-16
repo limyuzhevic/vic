@@ -351,7 +351,67 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulation system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulation system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulation system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulation system")
+        
+        // Performance systems
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -416,10 +476,203 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced Python helpers and utilities
+    
+    // Run a complete integrated experiment with convenient parameters
+    m.def("run_integration_experiment", [](int neuronCount, int maxSteps) {
+        Phase6IntegratedExperiment experiment;
+        Phase6Config config;
+        config.neuronCount = neuronCount;
+        config.maxSteps = maxSteps;
+        return experiment.run(config);
+    }, py::arg("neuronCount") = 500, py::arg("maxSteps") = 2000,
+        "Run a complete Phase 6 integration experiment");
+    
+    // Quick verification of system integration
+    m.def("verify_integration", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.verifyIntegration();
+    }, "Verify that all systems are properly integrated");
+    
+    // Run memory system tests
+    m.def("test_memory_integration", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testMemoryIntegration();
+    }, "Test memory system integration");
+    
+    // Run neuromodulation tests
+    m.def("test_neuromodulation_integration", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testNeuromodulationIntegration();
+    }, "Test neuromodulation system integration");
+    
+    // Run checkpoint tests
+    m.def("test_checkpointing", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testCheckpointing();
+    }, "Test checkpoint save/load functionality");
+    
+    // Run replay tests
+    m.def("test_replay_system", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testReplay();
+    }, "Test memory replay functionality");
+    
+    // Configuration presets for different use cases
+    m.def("create_config_for_simulation", [](bool enableLearning, bool enableDevelopment, 
+                                 bool enableCuriosity, bool enableCheckpointing) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        
+        if (enableLearning) {
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+        }
+        
+        if (enableDevelopment) {
+            config->set("development.enabled", true);
+        }
+        
+        if (enableCuriosity) {
+            config->set("neuromod.curiosity.enable", true);
+        }
+        
+        if (enableCheckpointing) {
+            config->set("checkpoint_dir", "./checkpoints");
+            config->set("checkpoint_interval", 1000);
+        }
+        
+        return config;
+    }, py::arg("enableLearning") = true, py::arg("enableDevelopment") = true,
+        py::arg("enableCuriosity") = true, py::arg("enableCheckpointing") = false,
+        "Create a configuration preset for simulation scenarios");
+    
+    // Get configuration help/info
+    m.def("get_config_info", []() {
+        auto config = std::make_shared<Config>();
+        return config->summary();
+    }, "Get configuration template and help information");
+    
+    // Standard configuration presets
+    m.def("create_research_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 2000);
+        config->set("region_count", 3);
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.015f);
+        config->set("stdp_ltd_weight", 0.013f);
+        config->set("synaptogenesis_rate", 0.0002f);
+        config->set("pruning_rate", 0.00002f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("development.enabled", true);
+        config->set("replay_interval", 500);
+        config->set("consolidation_interval", 2000);
+        return config;
+    }, "Create a research-grade configuration with advanced features");
+    
+    m.def("create_demo_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("development.enabled", true);
+        return config;
+    }, "Create a demo configuration suitable for demonstrations");
+    
+    m.def("create_minimal_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.05f);
+        config->set("plasticity.stdp.enable", false);  // Disable to save computation
+        config->set("plasticity.hebbian.enable", false);
+        config->set("neuromod.curiosity.enable", false);
+        config->set("development.enabled", false);
+        return config;
+    }, "Create a minimal configuration for fast testing");
+    
+    // Performance and diagnostics
+    m.def("get_brain_summary", [](std::shared_ptr<Brain> brain) {
+        std::stringstream ss;
+        ss << "Brain Summary:" << std::endl;
+        ss << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        ss << "  Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        ss << "  Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        ss << "  Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        ss << "  Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+        ss << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        ss << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        ss << "  Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        if (brain->getWorkingMemory()) {
+            ss << "  Working memory traces: " << brain->getWorkingMemory()->getActiveTraces() << std::endl;
+        }
+        
+        if (brain->getEpisodicMemory()) {
+            ss << "  Episodic memory episodes: " << brain->getEpisodicMemory()->getEpisodeCount() << std::endl;
+        }
+        
+        return ss.str();
+    }, py::arg("brain"), "Get a formatted summary of brain state and statistics");
+    
+    // System health check
+    m.def("check_system_health", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.verifyIntegration();
+    }, "Check overall system health and integration");
+    
+    // Quick demo helper
+    m.def("run_demo_simulation", [](int steps) {
+        Phase6IntegratedExperiment experiment;
+        Phase6Config config;
+        config.neuronCount = 200;
+        config.maxSteps = steps;
+        config.enableDevelopment = true;
+        config.enableCuriosity = true;
+        
+        auto result = experiment.run(config);
+        
+        return std::make_tuple(
+            result.totalReward,
+            result.avgFiringRate,
+            result.memoryEpisodesStored,
+            result.dopamineLevel,
+            result.curiosityLevel,
+            result.totalWallClockTime
+        );
+    }, py::arg("steps") = 1000,
+        "Run a quick demo simulation and return key metrics");
 
 } // namespace nlm
