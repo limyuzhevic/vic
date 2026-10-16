@@ -142,27 +142,196 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Enhanced Configuration methods
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced configuration class)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("jsonString"), py::arg("validate") = false,
+             "Load configuration from a JSON string")
+        .def("saveToJSON", [](Config& self, std::string& jsonString) {
+            // Use existing saveToFile for now - saveToJSON needs implementation
+            std::string temp = "/tmp/temp_config.json";
+            self.saveToFile(temp);
+            std::ifstream file(temp);
+            if (file.is_open()) {
+                jsonString.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            }
+        }, py::arg("jsonString"), "Save configuration to JSON string")
+        .def("validateConfig", [](Config& self, std::string& errorMessage) {
+            return self.validate(errorMessage);
+        }, py::arg("errorMessage"), "Validate configuration")
+        .def("setWithSource", &Config::set, py::arg("key"), py::arg("value"), py::arg("source"),
+             "Set configuration value with source tracking")
+        .def("getValidationReport", &Config::getValidationReport,
+             "Get detailed validation report");
+
+    // Advanced STDP
+    py::class_<AdvancedSTDP, std::shared_ptr<AdvancedSTDP>>(m, "AdvancedSTDP", R"pbdoc(Advanced STDP with triplet and reward modulation)pbdoc")
+        .def("enableTripletSTDP", &AdvancedSTDP::enableTripletSTDP, py::arg("enable"), "Enable/disable triplet STDP")
+        .def("isTripletSTDP", &AdvancedSTDP::isTripletSTDP, "Check if triplet STDP is enabled")
+        .def("enableRewardModulatedSTDP", &AdvancedSTDP::enableRewardModulatedSTDP, py::arg("enable"), "Enable/disable reward-modulated STDP")
+        .def("isRewardModulatedSTDP", &AdvancedSTDP::isRewardModulatedSTDP, "Check if reward-modulated STDP is enabled")
+        .def("setTripletWeights", &AdvancedSTDP::setTripletWeights, py::arg("A1"), py::arg("A2"), py::arg("B1"), py::arg("B2"), "Set triplet STDP weights")
+        .def("setRewardScale", &AdvancedSTDP::setRewardScale, py::arg("scale"), "Set reward modulation scale");
+
+    // Visualization Interface
+    py::class_<VisualizationInterface, std::shared_ptr<VisualizationInterface>>(m, "VisualizationInterface", R"pbdoc(Advanced visualization and analysis interface)pbdoc")
+        .def("initialize", &VisualizationInterface::initialize, "Initialize visualization")
+        .def("update", &VisualizationInterface::update, "Update visualization data")
+        .def("render", &VisualizationInterface::render, "Render current state")
+        .def("close", &VisualizationInterface::close, "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive, "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate, py::arg("hz"), "Set update rate (Hz)")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate, "Get update rate (Hz)")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork, py::arg("brain"), "Create network visualization")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity, py::arg("brain"), "Create activity visualization")
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes, py::arg("spikes"), "Create spike raster visualization")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights, py::arg("brain"), "Create weight matrix visualization")
+        .def("exportVisualization", &VisualizationInterface::exportVisualization, py::arg("filepath"), py::arg("format") = "png", "Export visualization to file")
+        .def("getStatistics", &VisualizationInterface::getStatistics, "Get visualization statistics")
+        .def("saveState", &VisualizationInterface::saveState, py::arg("filepath"), "Save visualization state")
+        .def("loadState", &VisualizationInterface::loadState, py::arg("filepath"), "Load visualization state");
+
+    // Profiler
+    py::class_<Profiler, std::shared_ptr<Profiler>>(m, "Profiler", R"pbdoc(Performance profiler for timing operations)pbdoc")
+        .def("start", &Profiler::start, py::arg("name"), "Start profiling a named operation")
+        .def("stop", &Profiler::stop, py::arg("name"), "Stop profiling and return duration")
+        .def("getTotalDuration", &Profiler::getTotalDuration, py::arg("name"), "Get total duration for operation")
+        .def("getAverageDuration", &Profiler::getAverageDuration, py::arg("name"), "Get average duration for operation")
+        .def("getMeasurementCount", &Profiler::getMeasurementCount, py::arg("name"), "Get number of measurements")
+        .def("getOperationNames", &Profiler::getOperationNames, "Get all profiled operation names")
+        .def("clear", &Profiler::clear, "Clear all recorded data")
+        .def("getTotalTime", &Profiler::getTotalTime, "Get total profiling time")
+        .def("getReport", &Profiler::getReport, "Get detailed profiling report")
+        .def("setVerbose", &Profiler::setVerbose, py::arg("enable"), "Enable/disable verbose output")
+        .def("setThreshold", &Profiler::setThreshold, py::arg("threshold"), "Set minimum threshold for reporting (seconds)")
+        .def("profile", py::overload_cast<const std::string&, std::function<double(void)>>(&Profiler::profile),
+             py::arg("name"), py::arg("func"), "Profile a function using RAII");
+
+    // Error Analyzer
+    py::class_<ErrorAnalyzer, std::shared_ptr<ErrorAnalyzer>>(m, "ErrorAnalyzer", R"pbdoc(Systematic error analysis and reporting)pbdoc")
+        .def("recordError", &ErrorAnalyzer::recordError, py::arg("errorType"), py::arg("errorMessage"), py::arg("context") = "", py::arg("stackTrace") = "",
+             "Record an error occurrence")
+        .def("getErrorCount", &ErrorAnalyzer::getErrorCount, py::arg("errorType"), "Get error count by type")
+        .def("getErrorTypes", &ErrorAnalyzer::getErrorTypes, "Get all error types")
+        .def("analyzePatterns", &ErrorAnalyzer::analyzePatterns, "Analyze error patterns and return recommendations")
+        .def("getRecentErrors", &ErrorAnalyzer::getRecentErrors, py::arg("limit") = 10, "Get recent errors")
+        .def("clear", &ErrorAnalyzer::clear, "Clear all recorded errors")
+        .def("getReport", &ErrorAnalyzer::getReport, "Get error analysis report")
+        .def("setAutoReport", &ErrorAnalyzer::setAutoReport, py::arg("enable"), "Enable/disable automatic error reporting")
+        .def("setErrorThreshold", &ErrorAnalyzer::setErrorThreshold, py::arg("threshold"), "Set error threshold for reporting")
+        .def("shouldReportError", &ErrorAnalyzer::shouldReportError, py::arg("errorType"), "Check if error should be reported")
+        .def("exportErrors", &ErrorAnalyzer::exportErrors, py::arg("filepath"), "Export errors to file")
+        .def("importErrors", &ErrorAnalyzer::importErrors, py::arg("filepath"), "Import errors from file");
+
+    // Batch Processor
+    py::class_<BatchProcessor, std::shared_ptr<BatchProcessor>>(m, "BatchProcessor", R"pbdoc(Batch processing and automation)pbdoc")
+        .def("addConfiguration", &BatchProcessor::addConfiguration, py::arg("config"), py::arg("name") = "",
+             "Add a configuration to the batch")
+        .def("getConfigurations", &BatchProcessor::getConfigurations, "Get all configurations")
+        .def("clearConfigurations", &BatchProcessor::clearConfigurations, "Clear all configurations")
+        .def("runSimulationBatch", &BatchProcessor::runSimulationBatch, py::arg("environmentTemplate"), py::arg("maxStepsPerSimulation"), py::arg("progressCallback") = nullptr,
+             "Run multiple simulations with different parameters")
+        .def("runHyperparameterSearch", &BatchProcessor::runHyperparameterSearch, py::arg("hyperparameterNames"), py::arg("hyperparameterValues"), py::arg("environmentTemplate"), py::arg("maxSteps"), py::arg("progressCallback") = nullptr,
+             "Run automated hyperparameter optimization")
+        .def("runCrossValidation", &BatchProcessor::runCrossValidation, py::arg("configs"), py::arg("environmentTemplate"), py::arg("maxSteps"), py::arg("trainTestRatio") = 0.8, py::arg("progressCallback") = nullptr,
+             "Run model validation across different conditions")
+        .def("saveSimulationState", &BatchProcessor::saveResults, py::arg("filepath"), "Save batch results to file")
+        .def("loadSimulationState", &BatchProcessor::loadResults, py::arg("filepath"), "Load batch results from file")
+        .def("getStatistics", &BatchProcessor::getStatistics, "Get batch processing statistics")
+        .def("setVerbose", &BatchProcessor::setVerbose, py::arg("enable"), "Enable/disable verbose output")
+        .def("setMaxConcurrent", &BatchProcessor::setMaxConcurrent, py::arg("maxConcurrent"), "Set maximum concurrent simulations");
+
+    // Network Analysis namespace
+    m.def("analyzeConnectivity", &NetworkAnalysis::analyzeConnectivity, py::arg("brain"), py::arg("report"),
+          "Analyze connectivity patterns in a brain")
+        .def("computeGraphMetrics", &NetworkAnalysis::computeGraphMetrics, py::arg("brain"), py::arg("metrics"),
+             "Compute graph metrics for neural connectivity")
+        .def("identifyCommunities", &NetworkAnalysis::identifyCommunities, py::arg("brain"), py::arg("communities"),
+             "Identify communities/modules in the network")
+        .def("computeCentrality", &NetworkAnalysis::computeCentrality, py::arg("brain"), py::arg("centrality"),
+             "Compute centrality measures")
+        .def("detectHubs", &NetworkAnalysis::detectHubs, py::arg("brain"), py::arg("hubs"), py::arg("threshold") = 0.8f,
+             "Detect network hubs");
+
+    // Embedding namespace
+    m.def("createEmbedding", &Embedding::createEmbedding, py::arg("brain"), py::arg("dimensions"), py::arg("embedding"),
+          "Create embedding for neural activity patterns")
+        .def("createSpikeEmbedding", &Embedding::createSpikeEmbedding, py::arg("spikeTrains"), py::arg("dimensions"), py::arg("embedding"),
+             "Create embedding from spike trains")
+        .def("computeSimilarity", &Embedding::computeSimilarity, py::arg("embedding1"), py::arg("embedding2"), py::arg("similarity"),
+             "Compute similarity between embeddings")
+        .def("clusterEmbeddings", &Embedding::clusterEmbeddings, py::arg("embeddings"), py::arg("clusters"),
+             "Cluster embeddings");
+
+    // Advanced Brain methods
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class with advanced features)pbdoc")
+        .def("enableRewardModulatedSTDP", &Brain::enableRewardModulatedSTDP, py::arg("enable"),
+             "Enable/disable reward-modulated STDP")
+        .def("enableTripletSTDP", &Brain::enableTripletSTDP, py::arg("enable"),
+             "Enable/disable triplet-based STDP")
+        .def("configureHebbianMode", &Brain::configureHebbianMode, py::arg("mode"),
+             "Configure Hebbian learning modes")
+        .def("setCuriosityParameters", &Brain::setCuriosityParameters, py::arg("noveltyWeight"), py::arg("predictionErrorWeight"),
+             "Set curiosity-driven exploration parameters")
+        .def("createVisualizationPipeline", &Brain::createVisualizationPipeline, "Create multi-modal visualization pipeline")
+        .def("analyzeConnectivity", &Brain::analyzeConnectivity, "Analyze network connectivity")
+        .def("computeGraphMetrics", &Brain::computeGraphMetrics, "Compute network graph metrics")
+        .def("createEmbedding", &Brain::createEmbedding, py::arg("dimensions"), py::arg("embedding"), "Create embedding for dimensionality reduction")
+        .def("loadFromJSON", &Brain::loadFromJSON, py::arg("jsonString"), py::arg("validate") = false,
+             "Load configuration from JSON string")
+        .def("saveToJSON", &Brain::saveToJSON, py::arg("jsonString"), "Save configuration to JSON string")
+        .def("validateConfig", &Brain::validateConfig, py::arg("errorMessage"), "Validate configuration")
+        .def("createCustomAgent", &Brain::createCustomAgent, py::arg("neuronTypes"), py::arg("connections"), py::arg("customConfig"),
+             "Create agent with custom architecture")
+        .def("enableMultiAgentSystem", &Brain::enableMultiAgentSystem, py::arg("agentCount"), py::arg("templateConfig"),
+             "Create agent society")
+        .def("createHierarchicalAgent", &Brain::createHierarchicalAgent, py::arg("layerNeuronCounts"), py::arg("layerTypes"), py::arg("hierarchicalConfig"),
+             "Create layered agent structure")
+        .def("setVerboseLogging", &Brain::setVerboseLogging, py::arg("enable"),
+             "Enable/disable detailed logging")
+        .def("createProfiler", &Brain::createProfiler, py::arg("name") = "default", "Create performance profiler")
+        .def("createErrorAnalyzer", &Brain::createErrorAnalyzer, "Create systematic error analyzer")
+        .def("logDetailedStatus", &Brain::logDetailedStatus, "Log detailed brain status")
+        .def("getSystemHealthReport", &Brain::getSystemHealthReport, "Get system health report")
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics, "Get performance metrics")
+        .def("exportModel", &Brain::exportModel, py::arg("filepath"), py::arg("format") = "binary",
+             "Export model to file")
+        .def("importModel", &Brain::importModel, py::arg("filepath"), py::arg("format") = "binary",
+             "Import model from file")
+        .def("getAdvancedSTDP", &Brain::getAdvancedSTDP, "Get advanced STDP instance")
+        .def("getVisualizationInterface", &Brain::getVisualizationInterface, "Get visualization interface")
+        .def("getSystemProfiler", &Brain::getSystemProfiler, "Get system profiler")
+        .def("getErrorAnalyzer", &Brain::getErrorAnalyzer, "Get error analyzer");
+
+    // Enhanced AgentBrain methods
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface with advanced capabilities)pbdoc")
+        .def("setCuriosityParameters", &AgentBrain::setCuriosityParameters, py::arg("noveltyWeight"), py::arg("predictionErrorWeight"),
+             "Set curiosity-driven exploration parameters")
+        .def("createCustomAgent", &AgentBrain::createCustomAgent, py::arg("neuronTypes"), py::arg("connections"), py::arg("customConfig"),
+             "Create agent with custom architecture")
+        .def("enableMultiAgentSystem", &AgentBrain::enableMultiAgentSystem, py::arg("agentCount"), py::arg("templateConfig"),
+             "Create agent society")
+        .def("createHierarchicalAgent", &AgentBrain::createHierarchicalAgent, py::arg("layerNeuronCounts"), py::arg("layerTypes"), py::arg("hierarchicalConfig"),
+             "Create layered agent structure");
+
+    // Factory functions for advanced features
+    m.def("createBatchProcessor", []() -> std::shared_ptr<BatchProcessor> {
+        return std::make_shared<BatchProcessor>();
+    }, "Create batch processor for simulation automation")
+        .def("createVisualizationPipeline", []() -> std::shared_ptr<VisualizationPipeline> {
+        return std::make_shared<VisualizationPipeline>();
+    }, "Create multi-modal visualization pipeline")
+        .def("createProfiler", [](const std::string& name) -> std::shared_ptr<Profiler> {
+        auto profiler = std::make_shared<Profiler>();
+        profiler->setVerbose(true);
+        return profiler;
+    }, py::arg("name") = "default", "Create performance profiler")
+        .def("createErrorAnalyzer", []() -> std::shared_ptr<ErrorAnalyzer> {
+        return std::make_shared<ErrorAnalyzer>();
+    }, "Create systematic error analyzer");
+
+    // Constants
+    m.attr("ConfigSource") = py::module::import("config").attr("ConfigSource");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

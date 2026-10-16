@@ -106,6 +106,71 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // Advanced plasticity control
+    void enableRewardModulatedSTDP(bool enable);
+    void enableTripletSTDP(bool enable);
+    void configureHebbianMode(const std::string& mode);
+    void setCuriosityParameters(float noveltyWeight, float predictionErrorWeight);
+    
+    // Advanced configuration methods
+    void loadFromJSON(const std::string& jsonString, bool validate = false);
+    void setWithSource(const std::string& key, const ConfigValue& value, ConfigSource source);
+    void saveToJSON(std::string& jsonString) const;
+    bool validateConfig(std::string& errorMessage) const;
+    
+    // Visualization and analysis methods
+    void createVisualizationPipeline();
+    void analyzeConnectivity() const;
+    void computeGraphMetrics() const;
+    void createEmbedding(size_t dimensions, std::vector<float>& embedding) const;
+    
+    // Batch processing methods
+    std::vector<std::shared_ptr<Experiment>> runSimulationBatch(const std::vector<std::shared_ptr<Config>>& configs,
+                                                                const std::shared_ptr<Environment>& environmentTemplate,
+                                                                SimulationStep maxStepsPerSimulation);
+    std::shared_ptr<Config> runHyperparameterSearch(const std::vector<std::string>& hyperparameterNames,
+                                                  const std::vector<std::vector<ConfigValue>>& hyperparameterValues,
+                                                  const std::shared_ptr<Environment>& environmentTemplate,
+                                                  SimulationStep maxSteps);
+    std::vector<std::shared_ptr<Experiment>> runCrossValidation(const std::vector<std::shared_ptr<Config>>& configs,
+                                                                const std::shared_ptr<Environment>& environmentTemplate,
+                                                                SimulationStep maxSteps,
+                                                                double trainTestRatio = 0.8);
+    
+    // State management
+    void saveSimulationState(const std::string& filepath, const std::string& metadata = "") const;
+    bool loadSimulationState(const std::string& filepath);
+    
+    // Advanced agent capabilities
+    std::shared_ptr<Brain> createCustomAgent(const std::vector<NeuronType>& neuronTypes,
+                                            const std::vector<std::pair<RegionId, RegionId>>& connections,
+                                            const std::shared_ptr<Config>& customConfig);
+    std::vector<std::shared_ptr<Brain>> enableMultiAgentSystem(size_t agentCount,
+                                                              const std::shared_ptr<Config>& templateConfig);
+    std::shared_ptr<Brain> createHierarchicalAgent(const std::vector<size_t>& layerNeuronCounts,
+                                                  const std::vector<std::string>& layerTypes,
+                                                  const std::shared_ptr<Config>& hierarchicalConfig);
+    
+    // Advanced error handling and debugging
+    void setVerboseLogging(bool enable);
+    std::shared_ptr<Profiler> createProfiler(const std::string& name = "default");
+    std::shared_ptr<ErrorAnalyzer> createErrorAnalyzer();
+    
+    // Status and monitoring
+    void logDetailedStatus() const;
+    std::string getSystemHealthReport() const;
+    std::vector<std::string> getPerformanceMetrics() const;
+    
+    // Export/import
+    bool exportModel(const std::string& filepath, const std::string& format = "binary") const;
+    bool importModel(const std::string& filepath, const std::string& format = "binary");
+    
+    // Advanced features access
+    std::shared_ptr<AdvancedSTDP> getAdvancedSTDP() const;
+    std::shared_ptr<VisualizationInterface> getVisualizationInterface() const;
+    std::shared_ptr<Profiler> getSystemProfiler() const;
+    std::shared_ptr<ErrorAnalyzer> getErrorAnalyzer() const;
+    
     // Reset brain state
     void reset();
     
