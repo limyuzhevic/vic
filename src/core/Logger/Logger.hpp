@@ -6,6 +6,10 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
 
 namespace nlm {
 
@@ -18,7 +22,7 @@ enum class LogLevel {
     Critical = 4
 };
 
-// Log entry structure
+// Log entry structure for structured logging
 struct LogEntry {
     LogLevel level;
     std::string message;
@@ -26,18 +30,87 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    // Structured data for JSON logging
+    nlohmann::json structuredData;
+    
+    // Performance timing
+    std::chrono::duration<double> duration; // 0 if not timing
+    bool isTimed; // Whether this log entry includes timing
+    
+    LogEntry() 
+        : level(LogLevel::Info), line(0), isTimed(false), duration(0.0) {}
+    
+    LogEntry(LogLevel lvl, const std::string& msg, 
+             const std::string& file = "", int line = 0, 
+             const std::string& function = "")
+        : level(lvl), message(msg), file(file), line(line), 
+          function(function), timestamp(std::chrono::system_clock::now()),
+          isTimed(false), duration(0.0) {}
 };
 
-// Logger interface
+// Performance metrics structure
+struct PerformanceMetrics {
+    std::string operation;
+    std::chrono::duration<double> duration;
+    size_t memoryUsage; // in bytes
+    std::chrono::system_clock::time_point timestamp;
+    std::unordered_map<std::string, std::string> metadata;
+    
+    PerformanceMetrics(const std::string& op, std::chrono::duration<double> dur)
+        : operation(op), duration(dur), memoryUsage(0), 
+          timestamp(std::chrono::system_clock::now()) {}
+};
+
+// Enhanced logger interface
 class ILogger {
 public:
     virtual ~ILogger() = default;
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Structured logging methods
+    virtual void logStructured(LogLevel level, const std::string& message,
+                               const nlohmann::json& data,
+                               const std::string& file = "", int line = 0,
+                               const std::string& function = "");
+    
+    // Performance logging
+    virtual void logPerformance(const PerformanceMetrics& metrics);
+    
+    // Performance timing
+    virtual std::unique_ptr<class ScopedTimer> startTiming(const std::string& operation);
 };
 
-// Console logger implementation
+// Performance timer for automatic timing
+class ScopedTimer {
+public:
+    ScopedTimer(const std::string& operation, ILogger* logger = nullptr)
+        : operation(operation), logger(logger), start(std::chrono::high_resolution_clock::now()) {}
+    
+    ~ScopedTimer() {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start).count();
+        
+        if (logger) {
+            PerformanceMetrics metrics(operation, std::chrono::duration<double>(duration));
+            logger->logPerformance(metrics);
+        }
+    }
+    
+    double getElapsed() const {
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration<double>(end - start).count();
+    }
+    
+private:
+    std::string operation;
+    ILogger* logger;
+    std::chrono::high_resolution_clock::time_point start;
+};
+
+// Enhanced console logger implementation
 class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
@@ -56,12 +129,25 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Structured logging
+    void logStructured(LogLevel level, const std::string& message,
+                      const nlohmann::json& data,
+                      const std::string& file = "", int line = 0,
+                      const std::string& function = "") override;
+    
+    // Performance logging
+    void logPerformance(const PerformanceMetrics& metrics) override;
+    
+    // Performance timing
+    std::unique_ptr<ScopedTimer> startTiming(const std::string& operation) override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatStructuredLog(const LogEntry& entry) const;
 };
 
 // Main Logger class
@@ -95,6 +181,18 @@ public:
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
+    // Structured logging convenience methods
+    void logStructured(LogLevel level, const std::string& message,
+                      const nlohmann::json& data,
+                      const std::string& file = "", int line = 0,
+                      const std::string& function = "");
+    
+    // Performance logging
+    void logPerformance(const PerformanceMetrics& metrics);
+    
+    // Performance timing
+    std::unique_ptr<ScopedTimer> startTiming(const std::string& operation);
+    
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
@@ -103,7 +201,11 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Performance monitoring helpers
+    static double getSystemMemoryUsage();
+    static std::string getCurrentTimestamp();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -128,9 +230,16 @@ public:
         return *this;
     }
     
+    // Structured data support
+    LogStream& operator<<(const nlohmann::json& json) {
+        structuredData_ = json;
+        return *this;
+    }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
+    nlohmann::json structuredData_;
     std::string file_;
     int line_;
     std::string function_;
