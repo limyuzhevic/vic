@@ -21,6 +21,7 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced version with better error handling and type detection
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +29,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +51,18 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                // Log error but continue processing
+                // TODO: Use actual logger when available
+                std::cerr << "Warning: Failed to parse config line " << lineNumber 
+                         << " in file " << filepath << ": " << e.what() << std::endl;
+            }
+        } else {
+            // Log warning about malformed line
+            std::cerr << "Warning: Malformed config line " << lineNumber 
+                     << " in file " << filepath << ": " << line << std::endl;
         }
     }
     

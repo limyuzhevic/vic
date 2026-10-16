@@ -48,6 +48,38 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file        Specify configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --help              Show this help message" << std::endl;
+    std::cout << "  --version           Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced options:" << std::endl;
+    std::cout << "  --neuron-count=N    Set number of neurons" << std::endl;
+    std::cout << "  --region-count=N    Set number of regions" << std::endl;
+    std::cout << "  --simulation-timestep=T  Set simulation timestep (seconds)" << std::endl;
+    std::cout << "  --random-seed=N     Set random seed for reproducibility" << std::endl;
+    std::cout << "  --connection-prob=P  Set connection probability" << std::endl;
+    std::cout << "  --enable-plasticity   Enable plasticity (default: true)" << std::endl;
+    std::cout << "  --enable-structural   Enable structural plasticity" << std::endl;
+    std::cout << "  --enable-neuromod   Enable neuromodulation" << std::endl;
+    std::cout << "  --enable-memory     Enable memory systems" << std::endl;
+    std::cout << "  --enable-visualization  Enable visualization" << std::endl;
+    std::cout << "  --log-level=L       Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --log-file=file     Set log file" << std::endl;
+    std::cout << "  --debug-output      Enable debug output to file" << std::endl;
+    std::cout << "  --steps=N           Number of simulation steps" << std::endl;
+    std::cout << "  --time-limit=T      Simulation time limit (seconds)" << std::endl;
+    std::cout << "  --enable-simulation  Run full simulation (default: true)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --config=myconfig.cfg --neuron-count=2000" << std::endl;
+    std::cout << "  " << programName << " --simulation-timestep=0.0005 --steps=5000" << std::endl;
+    std::cout << "  " << programName << " --log-level=DEBUG --debug-output" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
