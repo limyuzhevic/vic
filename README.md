@@ -96,20 +96,24 @@ NLM/
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── agent/              # Agent-brain interface
+│   ├── brain/              # Neural components (integrated)
+│   ├── benchmark.cpp       # Performance benchmarking
+│   ├── cognition/          # Cognitive mechanisms (integrated)
+│   ├── core/               # Core utilities
+│   ├── development/        # Developmental system
+│   ├── dynamics/           # Neural dynamics
+│   ├── environment/        # Environment interface
+│   ├── experiments/        # Experiment framework (Phase 6)
+│   ├── motor/              # Motor system
+│   ├── memory/             # Memory systems (integrated)
+│   ├── neuromodulation/     # Neuromodulators (integrated)
+│   ├── performance/        # Performance optimizations
+│   ├── plasticity/          # Plasticity rules
+│   ├── prediction/          # Prediction systems (integrated)
+│   ├── sensory/            # Sensory processing
+│   ├── visualization/       # Visualization
+│   └── world/              # World system (SimpleWorld)
 ├── tests/
 └── configs/
 ```

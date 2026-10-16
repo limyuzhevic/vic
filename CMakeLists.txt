@@ -38,10 +38,12 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
-    # Plasticity
+# Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/TripletSTDP.cpp
     src/plasticity/StructuralPlasticity.cpp
     # Development
     src/development/DevelopmentSystem.cpp
@@ -138,6 +140,31 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiment library
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
+
+# Phase 6 enhanced demo executable
+add_executable(nlm_phase6_enhanced_demo
+    src/experiments/Phase6EnhancedDemo.cpp
+)
+target_link_libraries(nlm_phase6_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()

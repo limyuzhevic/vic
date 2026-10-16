@@ -121,11 +121,30 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Observation**: Sensory observation wrapper
 - **Action**: Action wrapper
 
-### 13. Experiments Layer
+### 13. Agent-Brain Interface Layer
+- **AgentBrain**: Connects brain to world
+- **SensoryTransduction**: Converts world percepts to neural input
+- **MotorDecoding**: Converts neural activity to motor commands
+- **Neuromodulation**: Applies reward signals to plasticity
+- **Development**: Updates developmental stage
+- **Attention**: Selective processing through competition
+- **Planning**: Uses predictions to select actions
+
+### 14. World Layer
+- **SimpleWorld**: Interactive environment for agent
+
+### 15. Performance Layer
+- **MemoryPool**: Optimized memory allocation
+- **EventQueue**: Event-driven processing
+- **ParallelProcessing**: Multi-core support
+- **SIMDVectorization**: Vectorized computations
+
+### 16. Experiments Layer
 - **Experiment**: Single experiment recording
 - **ExperimentRunner**: Experiment execution
 - **Metrics**: Data analysis
 - **Phase4Experiment**: Phase 4 cognitive experiments
+- **Phase6Experiment**: Phase 6 integration experiments
 
 ## Data Flow
 
@@ -215,17 +234,6 @@ PLASTICITY
       ↓
 SOCIAL LEARNING (observation/imitation)
 ```
-
-## Agent-Brain Interface
-
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
-
-- **SensoryTransduction**: Converts world percepts to neural input
-- **MotorDecoding**: Converts neural activity to motor commands
-- **Neuromodulation**: Applies reward signals to plasticity
-- **Development**: Updates developmental stage
-- **Attention**: Selective processing through competition
-- **Planning**: Uses predictions to select actions
 
 ## Key Design Principles
 
