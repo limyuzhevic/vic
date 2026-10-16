@@ -1,141 +1,130 @@
 #pragma once
 
 #include <string>
-#include <memory>
-#include <sstream>
-#include <functional>
 #include <vector>
+#include <memory>
 #include <chrono>
+#include <iostream>
 
 namespace nlm {
 
-// Log severity levels
+// Enhanced logging levels
 enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
+    Quiet = 0,      // No output
+    Error = 1,      // Error messages only
+    Warning = 2,    // Warnings and errors
+    Info = 3,       // Information (default)
+    Debug = 4,      // Debug information
+    Verbose = 5     // Detailed output
 };
 
-// Log entry structure
-struct LogEntry {
+// Output formatter for consistent styling
+class OutputFormatter {
+public:
+    static void printBanner(const std::string& title, const std::string& subtitle = "");
+    static void printSection(const std::string& title);
+    static void printSubsection(const std::string& title);
+    static void printStatus(const std::string& label, const std::string& value);
+    static void printSuccess(const std::string& message);
+    static void printError(const std::string& message);
+    static void printWarning(const std::string& message);
+    static void printProgress(const std::string& message);
+    static void printDivider();
+    static void printTimestamped(const std::string& message);
+    static void printFormatted(const std::string& format, ...);
+    static void printProgressBar(int current, int total, const std::string& label = "");
+};
+
+// Progress indicator for long-running operations
+class ProgressIndicator {
+public:
+    ProgressIndicator(const std::string& label = "Processing", int total = 100);
+    ~ProgressIndicator();
+    
+    void update(int current, const std::string& message = "");
+    void increment();
+    void setLabel(const std::string& label);
+    void complete();
+    
+private:
+    std::string label;
+    int total;
+    int current;
+    std::chrono::steady_clock::time_point startTime;
+    bool active;
+    void drawProgressBar();
+};
+
+// Enhanced console logger with formatting
+class ConsoleLogger {
+public:
+    explicit ConsoleLogger(LogLevel level = LogLevel::Info);
+    virtual ~ConsoleLogger();
+    
+    virtual void log(LogLevel level, const std::string& message);
+    virtual LogLevel getLevel() const;
+    virtual void setLevel(LogLevel level);
+    
+protected:
     LogLevel level;
+    virtual std::string formatMessage(LogLevel level, const std::string& message) const;
+};
+
+// Multi-output logger (file + console)
+class MultiLogger {
+public:
+    MultiLogger();
+    ~MultiLogger();
+    
+    void addLogger(std::shared_ptr<ConsoleLogger> logger);
+    void log(LogLevel level, const std::string& message);
+    void setGlobalLevel(LogLevel level);
+    
+private:
+    std::vector<std::shared_ptr<ConsoleLogger>> loggers;
+    LogLevel globalLevel;
+};
+
+// Performance timer for benchmarking
+class PerformanceTimer {
+public:
+    PerformanceTimer(const std::string& label);
+    ~PerformanceTimer();
+    
+    void start();
+    void stop();
+    double getElapsedSeconds() const;
+    double getElapsedMilliseconds() const;
+    const std::string& getLabel() const;
+    
+private:
+    std::string label;
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point endTime;
+    bool running;
+};
+
+// Result summary for operations
+struct OperationResult {
+    bool success;
     std::string message;
-    std::string file;
-    int line;
-    std::string function;
-    std::chrono::system_clock::time_point timestamp;
+    std::chrono::duration<double> elapsedTime;
+    std::string details;
+    
+    OperationResult(bool success, const std::string& message);
+    void printSummary() const;
 };
 
-// Logger interface
-class ILogger {
-public:
-    virtual ~ILogger() = default;
-    virtual void log(const LogEntry& entry) = 0;
-    virtual void setLevel(LogLevel level) = 0;
-    virtual LogLevel getLevel() const = 0;
-};
-
-// Console logger implementation
-class ConsoleLogger : public ILogger {
-public:
-    ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
-    
-    void log(const LogEntry& entry) override;
-    void setLevel(LogLevel level) override;
-    LogLevel getLevel() const override;
-    
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
-    
-    // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
-};
-
-// Main Logger class
-class Logger {
-public:
-    Logger();
-    ~Logger();
-    
-    // Disable copying
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
-    
-    // Add logger sink
-    void addLogger(std::shared_ptr<ILogger> logger);
-    
-    // Remove all loggers
-    void clearLoggers();
-    
-    // Set minimum level for all loggers
-    void setLevel(LogLevel level);
-    
-    // Global logging functions
-    void log(LogLevel level, const std::string& message, 
-             const std::string& file = "", int line = 0, 
-             const std::string& function = "");
-    
-    // Convenience methods
-    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    
-    // Check if level is enabled
-    bool isEnabled(LogLevel level) const;
-    
-    // Get global logger instance
-    static Logger& getGlobal();
-    
-    // Set global logger
-    static void setGlobal(std::shared_ptr<Logger> logger);
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
-
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
-
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
-    }
-    
-private:
-    LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
-};
-
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// Measurement utilities
+namespace Metrics {
+    std::string formatBytes(size_t bytes);
+    std::string formatDuration(double seconds);
+    std::string formatTime(double seconds);
+    std::string capitalize(const std::string& str);
+    std::string toLower(const std::string& str);
+    std::string toUpper(const std::string& str);
+    bool startsWith(const std::string& str, const std::string& prefix);
+    bool endsWith(const std::string& str, const std::string& suffix);
+}
 
 } // namespace nlm
