@@ -311,40 +311,78 @@ config.loadFromFile("config.json")
 config.saveToFile("config.json")
 ```
 
-#### AgentBrain Class
+### Enhanced AgentBrain Class
 
 ```python
 # Creation
 agent = pynlm.createAgentBrain(brain)
 
+# Enhanced initialization with world
+agent = pynlm.createAgent(brain, world)
+
 # Initialization
 agent.initialize(world)
 
-# Sensory processing
+# Enhanced sensory processing
 agent.processSensoryInput(percept)
+agent.processVision(vision_data)           # Convenience method
+agent.processAudio(audio_data)             # Convenience method
 
-# Motor decoding
+# Enhanced motor decoding
 motor_cmd = agent.decodeMotorCommand()
+action = agent.decodeAction()              # Alias for convenience
 
-# Neuromodulation
+# Enhanced neuromodulation
 agent.applyRewardModulation(reward, predicted_reward)
+agent.applyReinforcement(reward, predicted_reward)  # Alias for convenience
 
-# Development
+# Enhanced development
 agent.updateDevelopment(timestep)
+agent.advanceDevelopment(timestep)         # Alias for convenience
+
+# Enhanced developmental stage access
 agent.getDevelopmentalStage()
+agent.setDevelopmentalStage("Adult")       # String-based setting
 
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
+# Enhanced neuromodulation levels
 agent.getNeuromodulationLevel()
+agent.getDopamineLevel()                   # Alias
+agent.getCuriosityLevel()                  # Alias
+agent.getExplorationDrive()                # Alias
+agent.getNoveltyLevel()                    # Alias
+agent.getSurpriseLevel()                   # Alias
+agent.getPredictionError()                 # Alias
+agent.getLearningError()                   # Alias
+
+# Enhanced subsystem control
+agent.enableRewardModulation(True/False)
+agent.disableRewardModulation()            # Convenience method
+agent.enableStructuralPlasticity(True/False)
+agent.disableStructuralPlasticity()        # Convenience method
+agent.enableDevelopment(True/False)
+agent.disableDevelopment()                  # Convenience method
+agent.enableCuriosity(True/False)
+agent.disableCuriosity()                    # Convenience method
+
+# Enhanced status checking
+if agent.isRewardModulationEnabled():
+    print("Reward modulation is enabled")
+if agent.isDevelopmentEnabled():
+    print("Development is enabled")
+
+# Enhanced agent operations
+agent.reset()
+agent.restart()                            # Alias
+agent.think(percept)                       # Agent thinks based on sensory input
+agent.act()                                # Agent produces action
+agent.learn(reward, predicted_reward)      # Agent learns from experience
+agent.update(timestep)                     # Agent updates development system
+
+# Enhanced brain access
+brain = agent.getBrain()
 ```
+
+---
 
 #### SimpleWorld Class
 
@@ -414,11 +452,69 @@ pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
 ```
 
+### Enhanced Configuration Management
+
+#### Configuration from Python Dictionaries
+
+```python
+import pynlm
+
+# Create configuration from Python dictionary
+config_dict = {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "plasticity.stdp.enable": True,
+    "plasticity.hebbian.enable": True,
+    "neuromod.curiosity.enable": True,
+    "neuromod.novelty.enable": True
+}
+
+config = pynlm.createConfig(config_dict)
+brain = pynlm.createBrain(config)
+```
+
+#### Configuration Presets
+
+```python
+import pynlm
+
+# Create simple configuration
+default_config = pynlm.createSimpleConfig(500, 1)
+brain = pynlm.createBrain(default_config)
+
+# Create demonstration configuration for learning examples
+demo_config = pynlm.createDemoConfig()
+brain = pynlm.createBrain(demo_config)
+```
+
+#### Configuration Validation and Properties
+
+```python
+import pynlm
+
+config = pynlm.createDemoConfig()
+
+# Validate configuration
+if config.validate():
+    print("Configuration is valid!")
+
+# Check configuration properties
+print(f"Number of entries: {config.getSize()}")
+print(f"Configuration keys: {config.getKeys()}")
+
+# Convert configuration to Python dictionary
+config_dict = config.toDict()
+print(f"Configuration as dict: {config_dict}")
+
+# Configuration source information
+source_summary = config.getSourceSummary()
+print(f"Configuration sources: {source_summary}")
+```
+
 ---
 
-## Part 4: Configuration Options
-
-### Brain Configuration
+#### Configuration Options
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -433,7 +529,7 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+#### Plasticity Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -444,7 +540,7 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+#### Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -496,9 +592,143 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Enhanced Configuration Management
+
+#### Configuration from Python Dictionaries
+
+```python
+import pynlm
+
+# Create configuration from Python dictionary
+config_dict = {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "plasticity.stdp.enable": True,
+    "plasticity.hebbian.enable": True,
+    "neuromod.curiosity.enable": True,
+    "neuromod.novelty.enable": True
+}
+
+config = pynlm.createConfig(config_dict)
+brain = pynlm.createBrain(config)
+```
+
+#### Configuration Presets
+
+```python
+import pynlm
+
+# Create simple configuration
+default_config = pynlm.createSimpleConfig(500, 1)
+brain = pynlm.createBrain(default_config)
+
+# Create demonstration configuration for learning examples
+demo_config = pynlm.createDemoConfig()
+brain = pynlm.createBrain(demo_config)
+```
+
+#### Configuration Validation and Properties
+
+```python
+import pynlm
+
+config = pynlm.createDemoConfig()
+
+# Validate configuration
+if config.validate():
+    print("Configuration is valid!")
+
+# Check configuration properties
+print(f"Number of entries: {config.getSize()}")
+print(f"Configuration keys: {config.getKeys()}")
+
+# Convert configuration to Python dictionary
+config_dict = config.toDict()
+print(f"Configuration as dict: {config_dict}")
+
+# Configuration source information
+source_summary = config.getSourceSummary()
+print(f"Configuration sources: {source_summary}")
+```
+
 ---
 
-## Troubleshooting
+### Enhanced Simulation Features
+
+#### Complete Agent Example
+
+```python
+import pynlm
+
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_agent_simulation(1000)
+```
+
+---
 
 ### Build Issues
 
