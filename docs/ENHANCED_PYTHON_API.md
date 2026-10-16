@@ -1,0 +1,1 @@
+The user wants me to improve the NLM codebase. I've already updated the Python bindings with enhanced features. Now I need to create comprehensive documentation. Let me create a proper documentation file with the correct path.

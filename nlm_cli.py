@@ -1,0 +1,1 @@
+The user wants me to create a command line interface script for NLM. I need to create a CLI script that can be used for running simulations and managing configurations.
