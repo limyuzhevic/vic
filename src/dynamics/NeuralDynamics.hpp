@@ -13,6 +13,8 @@ class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Update neuron state for one step
     // TODO PHASE 2: Implement real dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;

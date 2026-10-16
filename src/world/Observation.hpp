@@ -15,6 +15,8 @@ public:
     Observation();
     ~Observation() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Get data
     const std::vector<float>& getData() const;
     size_t getDimensions() const;

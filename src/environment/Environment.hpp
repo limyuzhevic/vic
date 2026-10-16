@@ -30,6 +30,8 @@ public:
     Environment();
     virtual ~Environment() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Reset environment to initial state
     virtual std::unique_ptr<SensoryInput> reset() = 0;
     

@@ -32,6 +32,8 @@ struct LogEntry {
 class ILogger {
 public:
     virtual ~ILogger() = default;
+    
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;

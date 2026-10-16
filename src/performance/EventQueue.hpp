@@ -297,6 +297,8 @@ inline SpikeRingBuffer::SpikeRingBuffer(size_t capacity)
 
 inline SpikeRingBuffer::~SpikeRingBuffer() = default;
 
+// Default destructor - uses = default for simple cleanup as no explicit resources managed
+
 inline bool SpikeRingBuffer::push(const QueuedSpikeEvent& event) {
     size_t tail = tail_.load(std::memory_order_relaxed);
     size_t nextTail = (tail + 1) & mask_;
@@ -354,6 +356,8 @@ inline DelayedSpikeQueue::DelayedSpikeQueue(size_t numBuckets, size_t maxDelaySt
 }
 
 inline DelayedSpikeQueue::~DelayedSpikeQueue() = default;
+
+// Default destructor - uses = default for simple cleanup as no explicit resources managed
 
 inline void DelayedSpikeQueue::schedule(uint64_t sourceNeuron, uint64_t destNeuron, 
                                         uint64_t synapseId, float weight, 

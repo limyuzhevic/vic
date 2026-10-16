@@ -11,6 +11,8 @@ Action::Action(ActionType type, const std::vector<float>& params)
 
 Action::~Action() = default;
 
+// Default destructor - uses = default for simple cleanup as no explicit resources managed
+
 ActionType Action::getType() const {
     return type_;
 }

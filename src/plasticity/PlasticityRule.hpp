@@ -12,6 +12,8 @@ class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Update synaptic weights based on pre/post synaptic activity
     // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 

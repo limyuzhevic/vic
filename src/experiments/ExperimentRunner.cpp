@@ -73,9 +73,17 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     std::shared_ptr<Environment> environmentTemplate,
     SimulationStep maxSteps) {
     
+    if (!brainTemplate || !environmentTemplate) {
+        return {};
+    }
+    
     std::vector<std::shared_ptr<Experiment>> results;
     
     for (auto& exp : experiments) {
+        if (!exp) {
+            continue; // Skip null experiments
+        }
+        
         // Create fresh brain and environment for each experiment
         // PLACEHOLDER: In real implementation, would clone from template
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
@@ -114,6 +122,8 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
     // TODO PHASE 2: Implement results saving
+    // For now, log that the feature is not yet implemented
+    std::cerr << "Warning: Results saving is not yet implemented. File: " << filepath << std::endl;
     return false;
 }
 

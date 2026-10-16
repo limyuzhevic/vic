@@ -13,6 +13,8 @@ class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Get modulator name
     virtual const char* getName() const = 0;
     
@@ -29,6 +31,8 @@ public:
     
 protected:
     Neuromodulator() = default;
+    
+    // Default constructor - uses = default for empty initialization
 };
 
 // Dopamine: Reward and reinforcement learning signal

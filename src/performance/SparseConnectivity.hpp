@@ -207,6 +207,8 @@ inline SparseConnectivity::SparseConnectivity()
 
 inline SparseConnectivity::~SparseConnectivity() = default;
 
+// Default destructor - uses = default for simple cleanup as no explicit resources managed
+
 inline SparseConnectivity::SparseConnectivity(SparseConnectivity&& other) noexcept
     : outgoing_(std::move(other.outgoing_))
     , incoming_(std::move(other.incoming_))

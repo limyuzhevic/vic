@@ -453,6 +453,8 @@ inline ParallelNeuralProcessor::ParallelNeuralProcessor(size_t numThreads)
 
 inline ParallelNeuralProcessor::~ParallelNeuralProcessor() = default;
 
+// Default destructor - uses = default for simple cleanup as no explicit resources managed
+
 inline void ParallelNeuralProcessor::processNeurons(
         size_t numNeurons,
         std::function<void(size_t, ThreadLocalState&)>& processFunc,

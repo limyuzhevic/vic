@@ -14,6 +14,8 @@ public:
     SensoryPercept();
     ~SensoryPercept() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Vision: simple grayscale intensity grid (no RGB, no object labels)
     // Format: row-major, values 0.0-1.0
     const std::vector<float>& getVision() const { return vision_; }

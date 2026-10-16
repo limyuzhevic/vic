@@ -12,6 +12,8 @@ public:
     SensoryInput();
     virtual ~SensoryInput() = default;
     
+    // Default destructor - uses = default for simple cleanup as no explicit resources managed
+    
     // Get input type
     virtual const char* getType() const = 0;
     
