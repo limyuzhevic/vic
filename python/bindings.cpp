@@ -23,13 +23,114 @@ PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        A Python binding for the NLM C++ neural simulation framework. Provides
+        classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        NLM simulates a brain-inspired spiking neural network with event-driven
+        dynamics, multiple plasticity mechanisms, and cognitive capabilities.
+        
+        Key Features:
+        - Real spiking neural computation (Leaky Integrate-and-Fire neurons)
+        - Event-driven spike propagation with synaptic delays
+        - Multiple plasticity rules (STDP, Hebbian, structural)
+        - Memory systems (working, episodic, associative, procedural)
+        - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+        - Cognitive systems (planning, prediction, attention, concept formation)
+        - Developmental stages affecting plasticity and learning
+        - Sensorimotor loop connecting brain to environment
+        
+        Python API:
+        ---------
+        
+        Basic Usage:
+        ```python
+        import pynlm
+        
+        # Create configuration and brain
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(1000):
+            brain.step(step)
+            
+        # Get statistics
+        print(f"Neurons: {brain.getTotalNeuronCount()}")
+        print(f"Spikes: {brain.getTotalSpikeCount()}")
+        print(f"Firing rate: {brain.getAverageFiringRate()}")
+        ```
+        
+        Agent-based Simulation:
+        ```python
+        import pynlm
+        
+        # Setup brain and world
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning subsystems
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableDevelopment(True)
+        
+        # Run episode
+        for step in range(100):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+        ```
+        
+        Configuration Management:
+        ```python
+        import pynlm
+        
+        # Create and configure
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 2000)
+        config.set("brain.synapse_density", 0.15)
+        
+        # Save to JSON file
+        config.saveToFile("my_config.json")
+        
+        # Load from JSON file
+        config.loadFromFile("my_config.json")
+        ```
     )pbdoc";
 
+    // Register custom exceptions for better error handling
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(
+        Unique identifier for a neuron in the brain.
+        
+        NeuronId is a strongly-typed identifier that ensures type safety
+        when referencing neurons. Each neuron in the brain has a unique ID.
+        
+        Attributes:
+            value (int): Internal numeric identifier
+        
+        Examples:
+            ```python
+            # Create neuron ID
+            nid = NeuronId(42)
+            print(f"Neuron ID value: {nid.value}")
+            print(f"Neuron index: {nid.index()}")
+            ```
+    )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
@@ -39,6 +140,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return "NeuronId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -289,16 +393,75 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+        Central neural simulation brain class.
+        
+        The Brain class implements a complete spiking neural network simulation
+        with event-driven dynamics, plasticity, memory systems, and cognitive
+        capabilities. It serves as the core computational engine for NLM.
+        
+        The brain operates through a closed-loop system:
+        1. Sensory input → Neural processing → Motor output → World interaction
+        2. Learning through plasticity rules (STDP, Hebbian, structural)
+        3. Memory formation and consolidation
+        4. Development through multiple stages
+        
+        Key Components:
+        - Neural regions with LIF neurons and synapses
+        - Spike systems for event-driven computation
+        - Plasticity systems (STDP, Hebbian, structural)
+        - Memory systems (working, episodic, associative, procedural)
+        - Prediction system for forward modeling
+        - Cognitive systems (planning, attention, concept formation)
+        - Neuromodulation (reward, curiosity, novelty, prediction error)
+        - Development system with stage-based changes
+        
+        Typical Usage:
+        ```python
+        import pynlm
+        
+        # Create and configure brain
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 1000)
+        config.set("plasticity.stdp.enable", True)
+        config.set("neuromod.dopamine.scale", 1.0)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation loop
+        for step in range(1000):
+            # Process sensory input (if in agent context)
+            # brain.receiveSensoryInput(sensory_input)
+            
+            # Step brain dynamics
+            brain.step(step, step * 0.001)
+            
+            # Monitor activity
+            if step % 100 == 0:
+                print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        ```
+        
+        The brain maintains internal state through:
+        - Neural populations and their connections
+        - Synaptic weights and plasticity states
+        - Spike history and timing
+        - Memory traces
+        - Development parameters
+        
+        Thread Safety:
+        - Not thread-safe for concurrent modification
+        - Consider external synchronization for multi-threaded usage
+    )pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             "Perform a simulation step with default timestep")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with specific timestamp")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -311,13 +474,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
-             "Reset brain state")
+             "Reset brain state to initial conditions")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to file (checkpointing)")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+             "Add a new neural region with optional name")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
              "Get a region by ID")
@@ -351,9 +514,107 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status and statistics");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(
+        Agent brain interface connecting NLM brain to world.
+        
+        The AgentBrain class provides the essential interface for connecting
+        a NLM brain to an environment/world. It handles the sensorimotor loop:
+        
+        ```
+        Sensory Input → Brain Processing → Motor Output → World Action
+                              ↑                                ↓
+                          Reward/Prediction            New Experience
+        ```
+        
+        The agent brain manages:
+        - Processing sensory percepts and injecting them into the brain
+        - Decoding neural activity into motor commands
+        - Applying neuromodulation based on rewards and prediction errors
+        - Managing development stages
+        - Tracking curiosity and novelty signals
+        
+        Key Features:
+        - Integration with SimpleWorld environment
+        - Support for reward-based learning
+        - Curiosity-driven exploration
+        - Structural plasticity for growth
+        - Developmental trajectory tracking
+        
+        Typical Usage:
+        ```python
+        import pynlm
+        
+        # Create brain and agent
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning subsystems
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableDevelopment(True)
+        
+        # Run episode
+        for step in range(1000):
+            # Update world environment
+            world.update(0.1)
+            
+            # Get sensory percept from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            agent.processSensoryInput(percept)
+            
+            # Run brain dynamics
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation (from world feedback)
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+        ```
+        
+        State Tracking:
+        ```python
+        # Monitor agent state
+        print(f"Developmental Stage: {agent.getDevelopmentalStage()}")
+        print(f"Curiosity Level: {agent.getCuriosityLevel():.3f}")
+        print(f"Novelty Level: {agent.getNoveltyLevel():.3f}")
+        print(f"Prediction Error: {agent.getPredictionError():.3f}")
+        print(f"Neuromodulation Level: {agent.getNeuromodulationLevel():.3f}")
+        ```
+        
+        Subsystem Management:
+        ```python
+        # Enable/disable subsystems based on requirements
+        agent.enableRewardModulation(True)      # Learn from rewards
+        agent.enableStructuralPlasticity(True)  # Grow new connections
+        agent.enableDevelopment(True)           # Brain matures over time
+        agent.enableCuriosity(True)             # Explore new things
+        ```
+        
+        Thread Safety:
+        - Not thread-safe for concurrent modification
+        - The world.update(), agent.processSensoryInput(), brain.step(),
+          and world.applyMotorCommand() should be called in sequence
+          for consistent episode execution.
+    )pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")

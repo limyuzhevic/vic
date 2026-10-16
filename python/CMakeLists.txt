@@ -11,6 +11,7 @@ endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 

@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, falls back to simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +100,29 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON processing helpers
+    void processJsonObject(const nlohmann::json& json, ConfigSource source, const std::string& prefix = "");
+    void processJsonValue(const nlohmann::json& json, const std::string& key, ConfigSource source);
+    static ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    
+    friend class ConfigReader;
+    friend class ConfigMerger;
+};
+
+// Helper classes for advanced configuration processing
+class ConfigReader {
+public:
+    static bool loadFromJsonFile(const std::string& filepath, Config& config);
+    static bool loadFromIniFile(const std::string& filepath, Config& config);
+    static bool loadFromXmlFile(const std::string& filepath, Config& config);
+};
+
+class ConfigMerger {
+public:
+    static void mergeConfigs(const Config& source, Config& target, bool override = true);
+    static Config mergeConfigs(const Config& config1, const Config& config2);
 };
 
 } // namespace nlm
