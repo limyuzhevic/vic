@@ -19,9 +19,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,7 +45,35 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse boolean values
+            if (value == "true" || value == "True" || value == "TRUE") {
+                set(key, true, ConfigSource::File);
+            } else if (value == "false" || value == "False" || value == "FALSE") {
+                set(key, false, ConfigSource::File);
+            } else if (value.find('.') != std::string::npos) {
+                // Try to parse as double
+                try {
+                    double doubleVal = std::stod(value);
+                    set(key, doubleVal, ConfigSource::File);
+                } catch (...) {
+                    // Fallback to string
+                    set(key, value, ConfigSource::File);
+                }
+            } else {
+                // Try to parse as int
+                try {
+                    // Check if it's int64_t range
+                    size_t pos;
+                    int64_t intVal = std::stoll(value, &pos);
+                    if (pos == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {
+                }
+                // Fallback to string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,7 +111,50 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        try {
+            // Handle different value types
+            if (std::holds_alternative<int>(entry.value)) {
+                file << std::get<int>(entry.value);
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                file << std::get<int64_t>(entry.value);
+            } else if (std::holds_alternative<double>(entry.value)) {
+                file << std::get<double>(entry.value);
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                file << (std::get<bool>(entry.value) ? "true" : "false");
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                file << "\"" << std::get<std::string>(entry.value) << "\"";
+            } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                file << "[";
+                const auto& vec = std::get<std::vector<int>>(entry.value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << vec[i];
+                }
+                file << "]";
+            } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                file << "[";
+                const auto& vec = std::get<std::vector<double>>(entry.value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << vec[i];
+                }
+                file << "]";
+            } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                file << "[";
+                const auto& vec = std::get<std::vector<std::string>>(entry.value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << vec[i] << "\"";
+                }
+                file << "]";
+            }
+        } catch (const std::exception&) {
+            file << "<invalid>";
+        }
+        
+        file << "\n";
     }
     
     return true;
