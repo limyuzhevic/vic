@@ -5,6 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
+#include <unordered_map>
+#include <stdexcept>
+
+// JSON library support
+#include "nlohmann/json.hpp"
+
+// YAML library support
+#include "yaml-cpp/yaml.h"
 
 namespace nlm {
 
@@ -55,7 +64,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -63,6 +72,33 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlStr);
+    
+    // Save to JSON string
+    std::string saveToJSON() const;
+    
+    // Save to YAML string
+    std::string saveToYAML() const;
+    
+    // Get configuration value with type conversion
+    template<typename T>
+    bool getAs(const std::string& key, T& value) const;
+    
+    // Set configuration value with automatic type detection
+    bool setFromString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type conversion utilities
+    static std::string toString(const ConfigValue& value);
+    static bool fromString(const std::string& str, ConfigValue& value);
+    static std::string toJSON(const ConfigValue& value);
+    static bool fromJSON(const nlohmann::json& j, ConfigValue& value);
+    static std::string toYAML(const ConfigValue& value);
+    static bool fromYAML(const YAML::Node& node, ConfigValue& value);
     
     // Get values
     template<typename T>
@@ -93,13 +129,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Configuration validation and schema checking
+    void setValidationEnabled(bool enabled);
+    bool isValidationEnabled() const;
+    std::string getValidationErrors() const;
+    bool validate() const;
     
+private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm

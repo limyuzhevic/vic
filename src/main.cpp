@@ -366,6 +366,31 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Parse additional command-line options
+    bool enableVisualization = false;
+    bool enableDebugLogging = false;
+    bool runIntegrationTest = false;
+    bool enablePhase4 = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--visualization" || arg == "--viz") {
+            enableVisualization = true;
+            config->set("visualization_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--debug" || arg == "--debug-logging") {
+            enableDebugLogging = true;
+            config->set("log_level", "DEBUG", ConfigSource::CommandLine);
+        } else if (arg == "--integration" || arg == "--phase6-test") {
+            runIntegrationTest = true;
+        } else if (arg == "--phase4") {
+            enablePhase4 = true;
+        } else if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+            return 0;
+        }
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -382,6 +407,12 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Visualization settings
+    if (enableVisualization) {
+        config->set("visualization_enabled", true, ConfigSource::CommandLine);
+        config->set("visualization_update_rate", 30.0, ConfigSource::CommandLine);
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +421,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  visualization_enabled: " + std::to_string(config->getOr<bool>("visualization_enabled", false)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

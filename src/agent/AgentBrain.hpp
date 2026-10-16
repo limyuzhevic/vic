@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class MotorCommand;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -34,8 +37,17 @@ public:
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
     
+    // Apply enhanced reward modulation with advanced features
+    void applyAdvancedRewardModulation(float reward, float predictedReward);
+    
     // Update development system
     void updateDevelopment(double timestep);
+    
+    // Update development with advanced features
+    void updateAdvancedDevelopment(double timestep);
+    
+    // Update cognitive state based on multiple factors
+    void updateCognitiveState();
     
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
@@ -64,6 +76,11 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Enable all advanced features with fine-grained control
+    void enableAdvancedFeatures(bool enableHebbian, bool enableSTDP, 
+                                 bool enableReward, bool enableCuriosity, 
+                                 bool enableDevelopment, bool enableStructural);
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
@@ -71,7 +88,7 @@ public:
     
 private:
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    MotorCommand decodeMotorCommand();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
@@ -112,6 +129,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive state
+    float cognitiveLoad_;
+    double lastLearningUpdate_;
 };
 
 } // namespace nlm

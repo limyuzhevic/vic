@@ -235,7 +235,107 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+MotorCommand AgentBrain::decodeMotorCommand() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // Apply curiosity-based exploration
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        decoded = selectWithCuriosity(decoded);
+    }
+    
+    return decoded;
+}
+
+MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Calculate average activity in each motor group
+    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+        if (neurons.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (Neuron* n : neurons) {
+            // Use membrane potential deviation from rest as activity measure
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        return sum / neurons.size();
+    };
+    
+    float forwardAct = calcActivity(motorForward_);
+    float backwardAct = calcActivity(motorBackward_);
+    float leftAct = calcActivity(motorTurnLeft_);
+    float rightAct = calcActivity(motorTurnRight_);
+    float interactAct = calcActivity(motorInteract_);
+    float waitAct = calcActivity(motorWait_);
+    
+    // Find maximum activity
+    struct { MotorCommand cmd; float activity; } commands[] = {
+        {MotorCommand::MoveForward, forwardAct},
+        {MotorCommand::MoveBackward, backwardAct},
+        {MotorCommand::TurnLeft, leftAct},
+        {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::Interact, interactAct},
+        {MotorCommand::Wait, waitAct}
+    };
+    
+    MotorCommand best = MotorCommand::Wait;
+    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    
+    for (const auto& c : commands) {
+        if (c.activity > bestActivity) {
+            bestActivity = c.activity;
+            best = c.cmd;
+        }
+    }
+    
+    // Only act if there's meaningful activity
+    if (bestActivity < 0.5f) {
+        return MotorCommand::Wait;
+    }
+    
+    return best;
+}
+
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Exploration: occasionally choose random action when curiosity is high
+    if (curiosityLevel_ > 0.5f) {
+        // Higher curiosity = more exploration
+        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            // Random motor command with more options for advanced behavior
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 11);
+            switch (choice) {
+                case 0: return MotorCommand::MoveForward;
+                case 1: return MotorCommand::MoveBackward;
+                case 2: return MotorCommand::TurnLeft;
+                case 3: return MotorCommand::TurnRight;
+                case 4: return MotorCommand::LookLeft;
+                case 5: return MotorCommand::LookRight;
+                case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
+                case 8: return MotorCommand::LookForward;
+                case 9: return MotorCommand::LookUp;
+                default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    // Advanced action selection based on prediction error
+    if (std::abs(predictionError_) > 0.5f) {
+        // High prediction error -> more exploratory behavior
+        // Bias towards novel actions
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < 0.3f) {
+            // Explore new action
+            return MotorCommand::Interact; // Example novel action
+        }
+    }
+    
+    return defaultCmd;
+}
+
+void AgentBrain::applyAdvancedRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
@@ -244,107 +344,192 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Enhanced dopamine-like signal (based on prediction error with adaptive sensitivity)
+    float adaptiveSensitivity = 1.0f + std::abs(predictionError_) * 2.0f;  // Higher error = more sensitivity
+    dopamineLevel_ = predictionError_ * adaptiveSensitivity;
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Clamp to reasonable range with adaptive bounds
+    float maxDopamine = 2.0f + curiosityLevel_ * 2.0f;  // Higher curiosity = higher bounds
+    float minDopamine = -2.0f - curiosityLevel_ * 2.0f;
+    dopamineLevel_ = std::clamp(dopamineLevel_, minDopamine, maxDopamine);
     
-    // Apply to all synapses with eligibility traces
+    // Apply to all synapses with eligibility traces and enhanced plasticity
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Enhanced reward-modulated weight change
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 
+                             (1.0f + noveltyLevel_ * 0.5f);  // Novelty enhances learning
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // Adaptive eligibility trace decay based on neuromodulation
+                float decayRate = 0.1f + dopamineLevel_ * 0.05f;  // Reward affects decay
+                syn->decayEligibilityTrace(decayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Enhanced plasticity modulation based on dopamine
+    // More sophisticated: combine multiple factors
+    float plasticityFactor = 1.0f;
     
-    // Apply to STDP
+    // Positive dopamine increases plasticity
+    if (dopamineLevel_ > 0.0f) {
+        plasticityFactor *= (1.0f + dopamineLevel_ * 0.5f);
+    }
+    
+    // Novelty also increases plasticity
+    if (noveltyLevel_ > 0.3f) {
+        plasticityFactor *= (1.0f + (noveltyLevel_ - 0.3f) * 2.0f);
+    }
+    
+    // Curiosity maintains intermediate plasticity
+    if (curiosityLevel_ > 0.5f) {
+        plasticityFactor *= (0.8f + curiosityLevel_ * 0.4f);
+    }
+    
+    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 3.0f);
+    
+    // Apply to STDP with enhanced parameters
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        float baseLTP = 0.01f * plasticityFactor;
+        float baseLTD = 0.012f * plasticityFactor;
+        
+        // Novelty can bias STDP direction
+        if (noveltyLevel_ > 0.5f) {
+            // High novelty promotes LTP (learning new things)
+            baseLTP *= (1.0f + (noveltyLevel_ - 0.5f) * 2.0f);
+        } else if (noveltyLevel_ < 0.2f) {
+            // Low novelty promotes LTD (consolidating known patterns)
+            baseLTD *= (1.0f + (0.2f - noveltyLevel_) * 2.0f);
+        }
+        
+        stdp->setLTPWeight(baseLTP);
+        stdp->setLTDWeight(baseLTD);
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
+void AgentBrain::updateAdvancedDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
     
+    // More sophisticated developmental stages based on multiple factors
+    // Not just time, but also learning progress and environmental interaction
+    
+    float learningProgress = std::min(1.0f, (float)brain_->getTotalSpikeCount() / 1000.0f);
+    float environmentComplexity = curiosityLevel_ + noveltyLevel_;
+    
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
     if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
+        plasticityModifier_ = 1.2f + learningProgress * 0.3f;  // High plasticity, learning-enhanced
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
     } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
+        // Critical period with environmental sensitivity
+        float envSensitivity = 1.0f + environmentComplexity * 0.5f;
+        plasticityModifier_ = 0.8f * envSensitivity;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
     } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
+        // Maturation with refined capabilities
+        float refinement = 0.5f + learningProgress * 0.5f;
+        plasticityModifier_ = 0.5f * refinement;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
+        // Adult - more stable but still capable of learning
+        plasticityModifier_ = 0.2f * (1.0f - learningProgress * 0.5f);  // Less plastic with experience
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
     
-    // Structural plasticity changes with development
+    // Structural plasticity changes with development and learning
     if (structuralPlasticityEnabled_) {
         auto* sp = brain_->getStructuralPlasticity();
         if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+            // Synaptogenesis rate depends on developmental stage and learning
+            float baseSynaptogenesis = 0.0001f * plasticityModifier_;
+            float learningBonus = learningProgress * 0.00005f;
+            float curiosityBonus = curiosityLevel_ * 0.00003f;
+            
+            float synRate = baseSynaptogenesis + learningBonus + curiosityBonus;
+            
+            // Pruning rate decreases with development
+            float basePruning = 0.00001f * (2.0f - plasticityModifier_);
+            float consolidationBonus = (1.0f - learningProgress) * 0.000005f;
+            
+            float pruneRate = basePruning + consolidationBonus;
+            
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
         }
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::updateCognitiveState() {
+    if (!brain_) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Update cognitive state based on multiple factors
+    float cognitiveLoad = 0.0f;
+    
+    // Memory-related factors
+    auto* workingMem = brain_->getWorkingMemory();
+    if (workingMem) {
+        float memUsage = workingMem->getUtilization() / workingMem->getCapacity();
+        cognitiveLoad += memUsage * 0.3f;
+    }
+    
+    auto* episodicMem = brain_->getEpisodicMemory();
+    if (episodicMem) {
+        float recentActivity = episodicMem->getRecentActivity() / 10.0f;  // Normalized
+        cognitiveLoad += recentActivity * 0.2f;
+    }
+    
+    // Neuromodulation factors
+    cognitiveLoad += (1.0f - std::abs(dopamineLevel_) / 2.0f) * 0.2f;  // Lower dopamine = higher load
+    cognitiveLoad += curiosityLevel_ * 0.1f;  // High curiosity = higher processing
+    
+    // Current neural activity
+    float firingRate = brain_->getFiringNeuronCount() / (float)brain_->getTotalNeuronCount();
+    cognitiveLoad += firingRate * 0.2f;
+    
+    // Clamp cognitive load
+    cognitiveLoad = std::clamp(cognitiveLoad, 0.0f, 1.0f);
+    
+    // Update brain development based on cognitive load
+    if (cognitiveLoad > 0.8f) {
+        // High cognitive load promotes synaptic strengthening
+        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+    } else if (cognitiveLoad < 0.2f) {
+        // Low cognitive load allows consolidation
+        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    }
+}
+
+void AgentBrain::enableAdvancedFeatures(bool enableHebbian, bool enableSTDP, 
+                                         bool enableReward, bool enableCuriosity, 
+                                         bool enableDevelopment, bool enableStructural) {
+    // Enable/disable advanced features based on user preference
+    // This provides fine-grained control for advanced users
+    
+    rewardModulationEnabled_ = enableReward;
+    structuralPlasticityEnabled_ = enableStructural;
+    developmentEnabled_ = enableDevelopment;
+    curiosityEnabled_ = enableCuriosity;
+    
+    // Note: Hebbian and STDP are controlled at the synapse level
+    // but we can log when advanced features are enabled
+    
+    if (enableAdvancedFeatures) {
+        NLM_LOG_INFO("Advanced agent features enabled:");
+        NLM_LOG_INFO("  Hebbian learning: " + std::string(enableHebbian ? "✓" : "✗"));
+        NLM_LOG_INFO("  STDP learning: " + std::string(enableSTDP ? "✓" : "✗"));
+        NLM_LOG_INFO("  Reward modulation: " + std::string(enableReward ? "✓" : "✗"));
+        NLM_LOG_INFO("  Curiosity-driven exploration: " + std::string(enableCuriosity ? "✓" : "✗"));
+        NLM_LOG_INFO("  Developmental plasticity: " + std::string(enableDevelopment ? "✓" : "✗"));
+        NLM_LOG_INFO("  Structural plasticity: " + std::string(enableStructural ? "✓" : "✗"));
+    }
 }
 
 } // namespace nlm
