@@ -48,20 +48,49 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
         return;
     }
     
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
+    // Compute difference between patterns using multiple metrics
+    float totalDifference = 0.0f;
+    float magnitudeDifference = 0.0f;
+    float patternDifference = 0.0f;
     size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
     
     for (size_t i = 0; i < compareLen; ++i) {
         float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
+        totalDifference += diff;
+        
+        // Magnitude difference (energy difference)
+        magnitudeDifference += std::abs(currentPattern[i]) - std::abs(previousPattern[i]);
+        
+        // Pattern difference (change in correlations)
+        if (i > 0) {
+            patternDifference += std::abs(currentPattern[i] - currentPattern[i-1]) - 
+                               std::abs(previousPattern[i] - previousPattern[i-1]);
+        }
     }
     
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
+    // Normalize differences
+    float avgDifference = totalDifference / compareLen;
+    float avgMagnitudeDiff = magnitudeDifference / compareLen;
+    float avgPatternDiff = patternDifference / compareLen;
     
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    // Combine metrics with different weights
+    float noveltyScore = avgDifference * 0.5f + 
+                        std::abs(avgMagnitudeDiff) * 0.3f + 
+                        std::abs(avgPatternDiff) * 0.2f;
+    
+    // Apply nonlinear scaling for sensitivity
+    noveltyScore = 1.0f - std::exp(-noveltyScore * 5.0f); // Compresses to [0, 1)
+    
+    // Update novelty level with adaptive response
+    float learningRate = 0.2f; // Faster adaptation for novelty
+    pImpl->level += (noveltyScore - pImpl->level) * learningRate;
+    
+    // Novelty detection influences neural gain and exploration
+    if (pImpl->brain && pImpl->level > noveltyScore * 0.5f) {
+        // Strong novelty drives increased exploration and learning
+        pImpl->brain->injectCurrentToNeurons(NeuronType::Internal, pImpl->level * 3.0f);
+    }
+    
     pImpl->history.push_back(pImpl->level);
     
     // Store current pattern for next comparison

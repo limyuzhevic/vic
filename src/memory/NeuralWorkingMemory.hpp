@@ -78,6 +78,10 @@ private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
+    // Create neural circuit for persistent activity maintenance
+    // Forms a small recurrent network to sustain activation over time
+    void createMaintenanceCircuit(NeuronId neuron, float activation);
+
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
 

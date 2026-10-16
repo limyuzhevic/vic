@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Integrated Artificial Brain Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +37,23 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Tests ===" << std::endl;
+    std::cout << "Testing Integrated Artificial Brain:" << std::endl;
+    std::cout << "  - Real LIF neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Working and episodic memory systems" << std::endl;
+    std::cout << "  - Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "  - Cognitive systems (planning, attention, concepts)" << std::endl;
+    std::cout << "  - Prediction system with error signaling" << std::endl;
+    std::cout << "  - Developmental progression" << std::endl;
+    std::cout << "  - Integration between all systems" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +124,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

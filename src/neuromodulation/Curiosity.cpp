@@ -32,15 +32,27 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
+    // Real curiosity computation
+    // Curiosity increases with both novelty and prediction error (prediction surprises)
+    // but decays over time
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Smooth update with memory of previous curiosity levels
+    float learningRate = 0.1f;
+    pImpl->level += (target - pImpl->level) * learningRate;
     
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay over time - curiosity fades if not sustained
+    float decayFactor = std::exp(-pImpl->decayRate * static_cast<float>(dt));
+    pImpl->level *= decayFactor;
+    
+    // Curiosity drives exploration by affecting neural gain
+    // Higher curiosity increases neural variability and exploration
+    if (pImpl->brain && pImpl->level > 0.5f) {
+        // Apply exploration drive to all neurons
+        // This increases spontaneous activity and trial-and-error learning
+        pImpl->brain->injectCurrentToNeurons(NeuronType::Internal, pImpl->level * 2.0f);
+    }
 }
 
 float Curiosity::getExplorationDrive() const {

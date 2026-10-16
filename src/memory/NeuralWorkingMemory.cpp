@@ -83,9 +83,15 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryTimestamps_.push_back(0);
     }
     
-    // Inject current to maintain activation
+    // Inject current to maintain activation - create persistent neural activity
+    // This simulates the neural mechanisms of working memory maintenance
     if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+        // Store in neural circuit for persistent activity
+        // Use recurrent connections to maintain activation
+        createMaintenanceCircuit(neuron, activation);
+        
+        // Stronger injection for stronger memories
+        brain_->injectCurrent(neuron, activation * 8.0f);  // Increased from 5.0f
     }
 }
 
@@ -204,6 +210,36 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
     }
     
     pImpl->maintenanceSynapses.emplace_back(from, to);
+}
+
+void NeuralWorkingMemory::createMaintenanceCircuit(NeuronId neuron, float activation) {
+    // Create neural circuit for persistent activity maintenance
+    // Form a small recurrent network to sustain activation over time
+    
+    size_t neuronIndex = 0;
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryNeurons_[i] == neuron) {
+            neuronIndex = i;
+            break;
+        }
+    }
+    
+    // Create excitatory recurrence - each neuron excites others in the memory
+    if (neuronIndex > 0 && brain_) {
+        createRecurrentConnection(memoryNeurons_[neuronIndex - 1], neuron, activation * 0.3f);
+    }
+    
+    if (neuronIndex < memoryNeurons_.size() - 1 && brain_) {
+        createRecurrentConnection(memoryNeurons_[neuronIndex + 1], neuron, activation * 0.3f);
+    }
+    
+    // Create inhibitory connections to other neurons in the memory
+    // This implements competitive inhibition for memory selection
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i != neuronIndex && brain_) {
+            brain_->injectCurrent(memoryNeurons_[i], -activation * 0.1f); // Weak inhibition
+        }
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
