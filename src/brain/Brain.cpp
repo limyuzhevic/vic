@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -129,6 +132,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulators for Phase 6 integration
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +266,11 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Initialize additional neuromodulators for Phase 6 integration
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -690,6 +703,39 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
+    // Use NeuralPlanner for sophisticated action planning
+    if (!pImpl->planner) {
+        // Fallback to simple action selection if no planner
+        return produceActionSimple();
+    }
+    
+    // Extract current brain state for planning
+    std::vector<float> currentState = extractStateForPlanning();
+    
+    // Get current reward prediction from dopamine system
+    float currentReward = 0.0f;
+    if (pImpl->dopamine) {
+        currentReward = pImpl->dopamine->getLevel() * 2.0f - 1.0f; // Normalize to [-1, 1]
+    }
+    
+    // Plan action using NeuralPlanner
+    ActionType plannedAction = pImpl->planner->planAction(currentState, currentReward);
+    
+    // Create action with planned type
+    auto action = std::make_unique<Action>(plannedAction);
+    
+    // Update planner with action outcome (for learning)
+    if (action) {
+        pImpl->planner->updatePlanQuality(std::vector<ActionType>{plannedAction}, 
+                                         std::vector<ActionType>{plannedAction}, 
+                                         currentReward);
+    }
+    
+    return action;
+}
+
+// Simple fallback action selection (original implementation)
+std::unique_ptr<class Action> Brain::produceActionSimple() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
@@ -714,6 +760,71 @@ std::unique_ptr<class Action> Brain::produceAction() {
     auto action = std::make_unique<Action>(type);
     
     return action;
+}
+
+std::vector<float> Brain::extractStateForPlanning() {
+    std::vector<float> state;
+    
+    // Add working memory state
+    if (pImpl->workingMemory) {
+        auto wmState = pImpl->workingMemory->retrieve();
+        state.insert(state.end(), wmState.begin(), wmState.end());
+    }
+    
+    // Add sensory input history (simplified)
+    if (!pImpl->sensoryNeurons.empty()) {
+        for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                state.push_back(neuron->getMembranePotential());
+            }
+        }
+    }
+    
+    // Add neuromodulator levels
+    if (pImpl->dopamine) {
+        state.push_back(pImpl->dopamine->getLevel());
+    }
+    if (pImpl->acetylcholine) {
+        state.push_back(pImpl->acetylcholine->getLevel());
+    }
+    if (pImpl->norepinephrine) {
+        state.push_back(pImpl->norepinephrine->getLevel());
+    }
+    if (pImpl->serotonin) {
+        state.push_back(pImpl->serotonin->getLevel());
+    }
+    
+    // Add curiosity level
+    if (pImpl->curiosity) {
+        state.push_back(pImpl->curiosity->getLevel());
+    }
+    
+    // Add prediction error
+    if (pImpl->predictionError) {
+        state.push_back(pImpl->predictionError->getLevel());
+    }
+    
+    // Add novelty level
+    if (pImpl->novelty) {
+        state.push_back(pImpl->novelty->getLevel());
+    }
+    
+    // Add attention state
+    if (pImpl->attention) {
+        auto attendedRegions = pImpl->attention->getAttendedRegions();
+        state.push_back(static_cast<float>(attendedRegions.size()) / 3.0f);
+    }
+    
+    // Ensure minimum state size for NeuralPlanner
+    if (state.empty()) {
+        state = std::vector<float>(10, 0.5f); // Default neutral state
+    } else if (state.size() > 50) {
+        // Limit state size to prevent exploding sequences
+        state.resize(50);
+    }
+    
+    return state;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
@@ -1053,21 +1164,33 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
-
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
-
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
-
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
+    
+    Acetylcholine* Brain::getAcetylcholine() {
+        return pImpl->acetylcholine.get();
+    }
+    
+    Norepinephrine* Brain::getNorepinephrine() {
+        return pImpl->norepinephrine.get();
+    }
+    
+    Serotonin* Brain::getSerotonin() {
+        return pImpl->serotonin.get();
+    }
+    
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+    
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+    
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
