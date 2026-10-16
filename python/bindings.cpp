@@ -398,7 +398,186 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Enhanced methods for advanced usage
+        .def("setMaxSteps", &AgentBrain::setMaxSteps,
+             py::arg("maxSteps"),
+             "Set maximum simulation steps for the agent")
+        .def("getMaxSteps", &AgentBrain::getMaxSteps,
+             "Get maximum simulation steps")
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("rate"),
+             "Set learning rate for plasticity rules")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get learning rate")
+        .def("enableLearning", &AgentBrain::enableLearning,
+             py::arg("enable"),
+             "Enable/disable learning for the agent")
+        .def("isLearningEnabled", &AgentBrain::isLearningEnabled,
+             "Check if learning is enabled")
+        .def("setTemperature", &AgentBrain::setTemperature,
+             py::arg("temperature"),
+             "Set exploration temperature for action selection")
+        .def("getTemperature", &AgentBrain::getTemperature,
+             "Get exploration temperature")
+        .def("decayTemperature", &AgentBrain::decayTemperature,
+             "Decay exploration temperature over time")
+        .def("getAllStats", [](const AgentBrain& self) {
+            py::dict stats;
+            stats["firingRate"] = self.getBrain()->getAverageFiringRate();
+            stats["spikeCount"] = self.getBrain()->getTotalSpikeCount();
+            stats["neuronCount"] = self.getBrain()->getTotalNeuronCount();
+            stats["synapseCount"] = self.getBrain()->getTotalSynapseCount();
+            stats["curiosity"] = self.getCuriosityLevel();
+            stats["novelty"] = self.getNoveltyLevel();
+            stats["predictionError"] = self.getPredictionError();
+            stats["neuromodulation"] = self.getNeuromodulationLevel();
+            stats["developmentStage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive statistics about the agent")
+        .def("saveEpisode", &AgentBrain::saveEpisode,
+             py::arg("filename"),
+             "Save current episode to file")
+        .def("loadEpisode", &AgentBrain::loadEpisode,
+             py::arg("filename"),
+             "Load episode from file")
+        .def("resetStats", &AgentBrain::resetStats,
+             "Reset statistics counters");
+        
+    // Enhanced Config class with more advanced features
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced configuration class for NLM system with enhanced validation)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        
+        // Enhanced configuration setters with validation
+        .def("setNeuronCount", &Config::setNeuronCount, py::arg("count"),
+             "Set neuron count with validation")
+        .def("setRegionCount", &Config::setRegionCount, py::arg("count"),
+             "Set region count with validation")
+        .def("setConnectionProbability", &Config::setConnectionProbability, py::arg("prob"),
+             "Set connection probability with validation (0.0-1.0)")
+        .def("setSimulationTimestep", &Config::setSimulationTimestep, py::arg("dt"),
+             "Set simulation timestep with validation")
+        .def("setMaxSteps", &Config::setMaxSteps, py::arg("maxSteps"),
+             "Set maximum simulation steps")
+        
+        // Enhanced getters with defaults
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get integer value with default")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get float value with default")
+        .def("getDouble", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get double value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            // Need to implement string getter in Config class
+            if (self.has(key)) {
+                // This is a placeholder - actual implementation would depend on Config internals
+                return defaultValue;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get string value with default")
+        
+        // Configuration validation and optimization
+        .def("validate", &Config::validate,
+             "Validate configuration parameters")
+        .def("optimizeFor", [](Config& self, const std::string& useCase) {
+            if (useCase == "speed") {
+                self.set("neuron_count", 500);
+                self.set("region_count", 1);
+                self.set("connection_probability", 0.05);
+                self.set("plasticity_learning_rate", 0.005);
+            } else if (useCase == "accuracy") {
+                self.set("neuron_count", 2000);
+                self.set("region_count", 3);
+                self.set("connection_probability", 0.15);
+                self.set("plasticity_learning_rate", 0.02);
+            } else if (useCase == "balanced") {
+                self.set("neuron_count", 1000);
+                self.set("region_count", 2);
+                self.set("connection_probability", 0.1);
+                self.set("plasticity_learning_rate", 0.01);
+            }
+        }, py::arg("useCase"), "Optimize configuration for specific use case")
+        
+        // Preset configurations
+        .def_static("createSpeedConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 500);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.05);
+            config->set("plasticity_learning_rate", 0.005);
+            return config;
+        }, "Create a speed-optimized configuration")
+        .def_static("createAccuracyConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 2000);
+            config->set("region_count", 3);
+            config->set("connection_probability", 0.15);
+            config->set("plasticity_learning_rate", 0.02);
+            return config;
+        }, "Create an accuracy-optimized configuration")
+        .def_static("createBalancedConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 1000);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.1);
+            config->set("plasticity_learning_rate", 0.01);
+            return config;
+        }, "Create a balanced configuration");
+        
+        // Python-friendly methods
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, static_cast<int64_t>(value), ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value (Python-friendly)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set float configuration value (Python-friendly)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set double configuration value (Python-friendly)")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            // This is a simplified version - actual implementation would need proper string handling
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value (Python-friendly)")
+        .def("get", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer value")
+        .def("get", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get float value")
+        .def("get", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get double value")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

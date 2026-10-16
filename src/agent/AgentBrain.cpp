@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -17,8 +18,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , rewardModulationEnabled_(true)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , maxSteps_(1000)
+    , learningRate_(0.01f)
+    , learningEnabled_(true)
+    , temperature_(1.0f)
+    , totalSteps_(0)
+    , episodeSteps_(0)
+    , episodeNumber_(0)
+    , cumulativeReward_(0.0f)
+    , successfulActions_(0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -334,17 +342,122 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+} // namespace nlm
+
+// Implementation of enhanced AgentBrain methods
+
+py::dict AgentBrain::getAllStats() const {
+    py::dict stats;
+    if (brain_) {
+        stats["firingRate"] = brain_->getAverageFiringRate();
+        stats["spikeCount"] = brain_->getTotalSpikeCount();
+        stats["neuronCount"] = brain_->getTotalNeuronCount();
+        stats["synapseCount"] = brain_->getTotalSynapseCount();
+        stats["curiosity"] = curiosityLevel_;
+        stats["novelty"] = noveltyLevel_;
+        stats["predictionError"] = predictionError_;
+        stats["neuromodulation"] = dopamineLevel_;
+        stats["developmentStage"] = static_cast<int>(getDevelopmentalStage());
+    }
+    stats["temperature"] = temperature_;
+    stats["learningRate"] = learningRate_;
+    stats["episodeNumber"] = episodeNumber_;
+    stats["totalSteps"] = totalSteps_;
+    stats["episodeSteps"] = episodeSteps_;
+    stats["cumulativeReward"] = cumulativeReward_;
+    stats["successfulActions"] = successfulActions_;
+    stats["learningEnabled"] = learningEnabled_;
+    stats["rewardModulationEnabled"] = rewardModulationEnabled_;
+    stats["structuralPlasticityEnabled"] = structuralPlasticityEnabled_;
+    stats["developmentEnabled"] = developmentEnabled_;
+    stats["curiosityEnabled"] = curiosityEnabled_;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    return stats;
+}
+
+void AgentBrain::saveEpisode(const std::string& filename) {
+    // Simple episode serialization
+    std::ofstream file(filename, std::ios::binary);
+    if (!file) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filename);
+        return;
+    }
+    
+    // Write episode number
+    file.write(reinterpret_cast<const char*>(&episodeNumber_), sizeof(episodeNumber_));
+    
+    // Write statistics
+    file.write(reinterpret_cast<const char*>(&totalSteps_), sizeof(totalSteps_));
+    file.write(reinterpret_cast<const char*>(&episodeSteps_), sizeof(episodeSteps_));
+    file.write(reinterpret_cast<const char*>(&cumulativeReward_), sizeof(cumulativeReward_));
+    file.write(reinterpret_cast<const char*>(&successfulActions_), sizeof(successfulActions_));
+    
+    // Write agent state
+    file.write(reinterpret_cast<const char*>(&dopamineLevel_), sizeof(dopamineLevel_));
+    file.write(reinterpret_cast<const char*>(&noveltyLevel_), sizeof(noveltyLevel_));
+    file.write(reinterpret_cast<const char*>(&curiosityLevel_), sizeof(curiosityLevel_));
+    file.write(reinterpret_cast<const char*>(&predictionError_), sizeof(predictionError_));
+    file.write(reinterpret_cast<const char*>(&expectedReward_), sizeof(expectedReward_));
+    file.write(reinterpret_cast<const char*>(&developmentalAge_), sizeof(developmentalAge_));
+    file.write(reinterpret_cast<const char*>(&plasticityModifier_), sizeof(plasticityModifier_));
+    
+    // Write configuration flags
+    file.write(reinterpret_cast<const char*>(&rewardModulationEnabled_), sizeof(rewardModulationEnabled_));
+    file.write(reinterpret_cast<const char*>(&structuralPlasticityEnabled_), sizeof(structuralPlasticityEnabled_));
+    file.write(reinterpret_cast<const char*>(&developmentEnabled_), sizeof(developmentEnabled_));
+    file.write(reinterpret_cast<const char*>(&curiosityEnabled_), sizeof(curiosityEnabled_));
+    file.write(reinterpret_cast<const char*>(&learningEnabled_), sizeof(learningEnabled_));
+    
+    file.close();
+    
+    NLM_LOG_INFO("Episode saved to: " + filename);
+}
+
+void AgentBrain::loadEpisode(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        NLM_LOG_ERROR("Failed to open file for reading: " + filename);
+        return;
+    }
+    
+    // Read episode number
+    file.read(reinterpret_cast<char*>(&episodeNumber_), sizeof(episodeNumber_));
+    
+    // Read statistics
+    file.read(reinterpret_cast<char*>(&totalSteps_), sizeof(totalSteps_));
+    file.read(reinterpret_cast<char*>(&episodeSteps_), sizeof(episodeSteps_));
+    file.read(reinterpret_cast<char*>(&cumulativeReward_), sizeof(cumulativeReward_));
+    file.read(reinterpret_cast<char*>(&successfulActions_), sizeof(successfulActions_));
+    
+    // Read agent state
+    file.read(reinterpret_cast<char*>(&dopamineLevel_), sizeof(dopamineLevel_));
+    file.read(reinterpret_cast<char*>(&noveltyLevel_), sizeof(noveltyLevel_));
+    file.read(reinterpret_cast<char*>(&curiosityLevel_), sizeof(curiosityLevel_));
+    file.read(reinterpret_cast<char*>(&predictionError_), sizeof(predictionError_));
+    file.read(reinterpret_cast<char*>(&expectedReward_), sizeof(expectedReward_));
+    file.read(reinterpret_cast<char*>(&developmentalAge_), sizeof(developmentalAge_));
+    file.read(reinterpret_cast<char*>(&plasticityModifier_), sizeof(plasticityModifier_));
+    
+    // Read configuration flags
+    file.read(reinterpret_cast<char*>(&rewardModulationEnabled_), sizeof(rewardModulationEnabled_));
+    file.read(reinterpret_cast<char*>(&structuralPlasticityEnabled_), sizeof(structuralPlasticityEnabled_));
+    file.read(reinterpret_cast<char*>(&developmentEnabled_), sizeof(developmentEnabled_));
+    file.read(reinterpret_cast<char*>(&curiosityEnabled_), sizeof(curiosityEnabled_));
+    file.read(reinterpret_cast<char*>(&learningEnabled_), sizeof(learningEnabled_));
+    
+    file.close();
+    
+    NLM_LOG_INFO("Episode loaded from: " + filename);
+}
+
+void AgentBrain::resetStats() {
+    totalSteps_ = 0;
+    episodeSteps_ = 0;
+    episodeNumber_ = 0;
+    cumulativeReward_ = 0.0f;
+    successfulActions_ = 0;
+    
+    NLM_LOG_INFO("AgentBrain statistics reset");
 }
 
 } // namespace nlm

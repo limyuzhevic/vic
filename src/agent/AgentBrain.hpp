@@ -69,6 +69,28 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced agent configuration
+    void setMaxSteps(size_t maxSteps) { maxSteps_ = maxSteps; }
+    size_t getMaxSteps() const { return maxSteps_; }
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    float getLearningRate() const { return learningRate_; }
+    void enableLearning(bool enable) { learningEnabled_ = enable; }
+    bool isLearningEnabled() const { return learningEnabled_; }
+    void setTemperature(float temp) { temperature_ = temp; }
+    float getTemperature() const { return temperature_; }
+    void decayTemperature() { temperature_ = std::max(0.1f, temperature_ * 0.95f); }
+    
+    // Enhanced statistics and state
+    py::dict getAllStats() const;  // Returns comprehensive statistics
+    void saveEpisode(const std::string& filename);
+    void loadEpisode(const std::string& filename);
+    void resetStats();
+    
+    // Convenience methods for common agent behaviors
+    void explore() { enableCuriosity(true); }
+    void exploit() { enableCuriosity(false); }
+    float getExplorationRatio() const { return curiosityEnabled_ ? curiosityLevel_ : 0.0f; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
