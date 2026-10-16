@@ -27,11 +27,57 @@ MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
     // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
-    if (!pImpl->availableActions.empty()) {
-        return std::make_unique<Action>(pImpl->availableActions[0]);
+    // PHASE 2: Implement neural action selection based on motor region activity
+    std::vector<float> actionPreferences(pImpl->availableActions.size(), 0.0f);
+    
+    // Sample neural activity from motor region
+    size_t actionCount = motorRegion.getPopulationCount() * 0.75; // Use 75% of populations
+    size_t populationIndex = 0;
+    for (size_t i = 0; i < actionCount && populationIndex < pImpl->availableActions.size(); ++i) {
+        const NeuralPopulation* population = motorRegion.getPopulation(populationIndex);
+        if (population) {
+            // Get average firing rate of this population
+            float avgFiringRate = population->getAverageFiringRate();
+            actionPreferences[populationIndex] = avgFiringRate;
+        }
+        ++populationIndex;
     }
-    return std::make_unique<Action>(ActionType::Wait);
+    
+    // Normalize preferences to sum to 1
+    float totalPref = 0.0f;
+    for (float pref : actionPreferences) {
+        totalPref += pref;
+    }
+    
+    if (totalPref > 0.0f) {
+        for (float& pref : actionPreferences) {
+            pref /= totalPref;
+        }
+    } else {
+        // Uniform distribution if no activity
+        float uniform = 1.0f / actionPreferences.size();
+        for (float& pref : actionPreferences) {
+            pref = uniform;
+        }
+    }
+    
+    // Select action based on preferences (roulette wheel selection)
+    float selectionValue = 0.0f;
+    float randomValue = static_cast<float>(rand()) / RAND_MAX;
+    
+    for (size_t i = 0; i < actionPreferences.size(); ++i) {
+        selectionValue += actionPreferences[i];
+        if (randomValue <= selectionValue) {
+            // Found action to execute
+            pImpl->actionHistory.push_back(new Action(pImpl->availableActions[i]));
+            return std::make_unique<Action>(pImpl->availableActions[i]);
+        }
+    }
+    
+    // Fallback to last action if selection fails
+    ActionType selectedAction = pImpl->availableActions.empty() ? ActionType::Wait : pImpl->availableActions.back();
+    pImpl->actionHistory.push_back(new Action(selectedAction));
+    return std::make_unique<Action>(selectedAction);
 }
 
 const std::vector<ActionType>& MotorSystem::getAvailableActions() const {

@@ -26,6 +26,8 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/ConfigManager/ConfigManager.cpp
+    src/core/CommandLineParser/CommandLineParser.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -62,6 +64,10 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    # Performance monitoring
+    src/core/PerformanceMetrics/PerformanceMetrics.cpp
+)
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -121,31 +127,56 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Phase 6 demo executable - this is the new default main.cpp
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+// Use existing Phase 6 libraries that provide all necessary systems
+// The Phase 6 demo requires all major systems:
+// - Core neural computation (brain, dynamics, plasticity)
+// - Memory systems (working, episodic)
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Cognition (planning, concept formation)
+// - Development (synaptogenesis, pruning)
+// - World interaction (environment, agent)
+// - All integrated through Experiment framework
 
-# Phase 3 demo executable
+target_link_libraries(nlm PUBLIC 
+    nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+)
+
+# Validation demo executable
+add_executable(demo_validation demo_validation.cpp)
+
+# Legacy Phase 3 demo executable (still available for backward compatibility)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
+# Legacy Phase 4 demo executable (still available for backward compatibility)
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Legacy Phase 6 demo executable (still available for backward compatibility)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Note: Enhanced VisualizationInterface (src/visualization/VisualizationInterface.cpp)
+# provides comprehensive visualization and monitoring capabilities for debugging
+# and integrating disconnected systems in Phase 6.

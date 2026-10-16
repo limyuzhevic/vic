@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ConfigSchema.hpp"
 
 namespace nlm {
 
@@ -92,6 +93,34 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation API
+    bool validate(const ConfigSchema& schema, bool isStrict = true) const;
+    bool validateKey(const std::string& key, const ConfigSchema& schema, bool isStrict = true) const;
+    bool isValid(const ConfigSchema& schema, bool isStrict = true) const;
+    std::vector<ValidationError> getValidationErrors(const ConfigSchema& schema, bool isStrict = true) const;
+    void clearValidationCache();
+    void invalidateValidationCache();
+    
+    // Configuration merging and inheritance
+    void merge(const Config& other, bool override = true);
+    
+    // Sanitization and normalization
+    void sanitize(const ConfigSchema& schema);
+    
+    // Advanced features
+    void setSchema(const ConfigSchema& schema);
+    const ConfigSchema& getSchema() const;
+    
+    // Validation modes
+    enum class ValidationMode {
+        Strict,    // All violations are errors
+        Lenient,   // Only critical violations are errors
+        Warnings   // Only warnings, no blocking
+    };
+    
+    void setValidationMode(ValidationMode mode);
+    ValidationMode getValidationMode() const;
     
 private:
     struct Impl;

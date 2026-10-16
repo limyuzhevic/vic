@@ -73,14 +73,71 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### NLM Application CLI
+
+The NLM application includes comprehensive command-line options for configuring experiments, simulations, and output:
+
+#### Experiment Selection
+- `--phase P` or `-p P`: Select Phase (1-6) to control which experiment to run
+- `--experiment-type TYPE` or `-e TYPE`: Specify experiment type (learning, connectivity, plasticity, stdp, structural, integrated)
+- `--demo-mode` or `-d`: Enable demo mode for quick testing
+- `--benchmark`: Run benchmark mode
+- `--analyze`: Trigger analysis mode
+
+#### Simulation Parameters
+- `--steps S` or `-s S`: Set number of simulation steps
+- `--timestep T` or `-t T`: Set simulation timestep (seconds)
+- `--neuron-count N` or `-n N`: Set neuron count
+- `--region-count R` or `-r R`: Set region count
+
+#### Output Control
+- `--verbose` or `-v`: Enable verbose logging
+- `--quiet` or `-q`: Suppress most output
+- `--output-file FILE`: Write output to file
+- `--no-banner`: Suppress banner at startup
+
+#### Checkpoint Management
+- `--load-checkpoint`: Load from checkpoint
+- `--save-checkpoint`: Save checkpoint
+- `--checkpoint-path PATH`: Specify checkpoint path
+
+#### Debug and Analysis
+- `--debug`: Enable debug mode
+- `--benchmark`: Run benchmark
+- `--analyze`: Trigger analysis mode
+
+#### Configuration
+- `--config FILE`: Load configuration from file (legacy support)
+- `--set KEY=VALUE`: Set individual config option
+
+### Examples
+
+```bash
+# Run a specific phase with custom parameters
+./nlm --phase 3 --steps 5000 --neuron-count 1000
+
+# Quick demo mode
+./nlm -d
+
+# Benchmark with output file
+./nlm --benchmark --output-file benchmark_results.txt
+
+# Analysis mode
+./nlm --analyze
+
+# Set configuration options
+./nlm --set random_seed=42 --set simulation_timestep=0.01
+
+# Enable debug with verbose output
+./nlm --debug -v
+```
 
 ## Project Structure
 
@@ -96,20 +153,76 @@ NLM/
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── core/                     # Core utilities
+│   │   ├── Types/Types.cpp
+│   │   ├── Config/Config.cpp
+│   │   ├── Random/Random.cpp
+│   │   ├── Logger/Logger.cpp
+│   │   └── SimulationClock/SimulationClock.cpp
+│   ├── brain/                    # Neural components (integrated)
+│   │   ├── Neuron.cpp
+│   │   ├── Synapse.cpp
+│   │   ├── NeuralPopulation.cpp
+│   │   ├── NeuralRegion.cpp
+│   │   └── Brain.cpp
+│   ├── dynamics/                 # Neural dynamics
+│   │   ├── NeuralDynamics.cpp
+│   │   └── SpikeSystem.cpp
+│   ├── plasticity/               # Plasticity rules
+│   │   ├── PlasticityRule.cpp
+│   │   ├── Hebbian.cpp
+│   │   ├── STDP.cpp
+│   │   └── StructuralPlasticity.cpp
+│   ├── development/              # Developmental system
+│   │   ├── DevelopmentSystem.cpp
+│   │   ├── Synaptogenesis.cpp
+│   │   ├── Pruning.cpp
+│   │   └── Maturation.cpp
+│   ├── neuromodulation/          # Neuromodulators (integrated)
+│   │   ├── Neuromodulator.cpp
+│   │   ├── Reward.cpp
+│   │   ├── PredictionError.cpp
+│   │   ├── Novelty.cpp
+│   │   └── Curiosity.cpp
+│   ├── memory/                   # Memory systems (integrated)
+│   │   ├── WorkingMemory.cpp
+│   │   ├── EpisodicMemory.cpp
+│   │   ├── SemanticMemory.cpp
+│   │   ├── ProceduralMemory.cpp
+│   │   ├── AssociativeMemory.cpp
+│   │   ├── NeuralWorkingMemory.cpp
+│   │   └── NeuralEpisodicMemory.cpp
+│   ├── cognition/                # Cognitive mechanisms (integrated)
+│   │   ├── ConceptFormation.cpp
+│   │   └── NeuralPlanner.cpp
+│   ├── sensory/                  # Sensory processing
+│   │   ├── SensoryInput.cpp
+│   │   ├── Vision.cpp
+│   │   ├── Audio.cpp
+│   │   └── InternalSignals.cpp
+│   ├── motor/                    # Motor system
+│   │   └── MotorSystem.cpp
+│   ├── environment/              # Environment interface
+│   │   ├── Environment.cpp
+│   │   └── Observation.cpp
+│   ├── experiments/              # Experiment framework (Phase 6)
+│   │   ├── Experiment.cpp
+│   │   ├── ExperimentRunner.cpp
+│   │   ├── Metrics.cpp
+│   │   ├── Phase3Experiment.cpp
+│   │   ├── Phase3Demo.cpp
+│   │   ├── Phase4Experiment.cpp
+│   │   ├── Phase4Demo.cpp
+│   │   ├── Phase5Experiment.cpp
+│   │   ├── Phase6IntegratedExperiment.cpp
+│   │   └── Phase6Demo.cpp
+│   ├── agent/                    # Agent system
+│   │   ├── SensoryPercept.cpp
+│   │   └── AgentBrain.cpp
+│   ├── visualization/            # Visualization
+│   │   └── VisualizationInterface.cpp
+│   └── world/                    # World system
+│       └── SimpleWorld.cpp
 ├── tests/
 └── configs/
 ```

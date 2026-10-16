@@ -3,20 +3,134 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_set>
+#include <memory>
+#include <chrono>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationError> validationCache;
+    bool invalidValidationCache = true;
+    Config::ValidationMode validationMode = ValidationMode::Strict;
+    ConfigSchema currentSchema;
+    std::unique_ptr<ConfigValidator> validator;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()), invalidValidationCache(true) {
+    initValidator();
+}
 
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
+
+// Validation methods implementation
+void Config::initValidator() {
+    pImpl->validator = std::make_unique<ConfigValidator>();
+}
+
+bool Config::validate(const ConfigSchema& schema, bool isStrict) const {
+    if (invalidValidationCache && !pImpl->validationCache.empty()) {
+        pImpl->validationCache = pImpl->validator->validate(*this, schema, isStrict);
+        invalidValidationCache = false;
+    } else if (invalidValidationCache) {
+        pImpl->validationCache.clear();
+        invalidValidationCache = false;
+    }
+    
+    switch (validationMode) {
+        case ValidationMode::Strict:
+            return pImpl->validationCache.empty();
+        case ValidationMode::Lenient:
+            return !pImpl->validationCache.hasCriticalErrors();
+        case ValidationMode::Warnings:
+            return !pImpl->validationCache.hasErrors();
+        default:
+            return pImpl->validationCache.empty();
+    }
+}
+
+bool Config::validateKey(const std::string& key, const ConfigSchema& schema, bool isStrict) const {
+    if (invalidValidationCache && !pImpl->validationCache.empty()) {
+        pImpl->validationCache = pImpl->validator->validate(*this, schema, isStrict);
+        invalidValidationCache = false;
+    } else if (invalidValidationCache) {
+        pImpl->validationCache.clear();
+        invalidValidationCache = false;
+    }
+    
+    return !pImpl->validationCache.hasCriticalErrors();
+}
+
+bool Config::isValid(const ConfigSchema& schema, bool isStrict) const {
+    return validate(schema, isStrict);
+}
+
+std::vector<ValidationError> Config::getValidationErrors(const ConfigSchema& schema, bool isStrict) const {
+    if (invalidValidationCache && !pImpl->validationCache.empty()) {
+        pImpl->validationCache = pImpl->validator->validate(*this, schema, isStrict);
+        invalidValidationCache = false;
+    } else if (invalidValidationCache) {
+        pImpl->validationCache.clear();
+        invalidValidationCache = false;
+    }
+    
+    return pImpl->validationCache;
+}
+
+void Config::clearValidationCache() {
+    pImpl->validationCache.clear();
+    invalidValidationCache = true;
+}
+
+void Config::invalidateValidationCache() {
+    invalidValidationCache = true;
+}
+
+// Configuration merging and inheritance
+void Config::merge(const Config& other, bool override) {
+    auto keys = other.getKeys();
+    for (const auto& key : keys) {
+        auto valueOpt = other.get<std::string>(key);
+        if (valueOpt.has_value()) {
+            set(key, valueOpt.value(), ConfigSource::Runtime);
+        }
+    }
+}
+
+// Sanitization and normalization
+void Config::sanitize(const ConfigSchema& schema) {
+    auto errors = getValidationErrors(schema, true);
+    for (const auto& error : errors) {
+        if (error.severity == ValidationSeverity::Error || error.severity == ValidationSeverity::Critical) {
+            // Apply default values or remove invalid fields
+            // Implementation depends on schema rules
+        }
+    }
+}
+
+// Advanced features
+void Config::setSchema(const ConfigSchema& schema) {
+    currentSchema = schema;
+}
+
+const ConfigSchema& Config::getSchema() const {
+    return currentSchema;
+}
+
+// Validation modes
+void Config::setValidationMode(ValidationMode mode) {
+    validationMode = mode;
+}
+
+Config::ValidationMode Config::getValidationMode() const {
+    return validationMode;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser

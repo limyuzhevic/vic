@@ -109,6 +109,60 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // PHASE 2: Implement memory consolidation with relevance-based filtering
+    if (pImpl->episodes.empty()) return;
+    
+    // Calculate relevance of each episode based on various factors
+    std::vector<std::pair<size_t, float>> episodeRelevance;
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Calculate episode relevance score (0.0 to 1.0)
+        float relevanceScore = 0.0f;
+        
+        // Factor 1: Recency (more recent episodes are more relevant)
+        float recencyWeight = 0.4f;
+        float recency = 1.0f - (static_cast<float>(i) / static_cast<float>(pImpl->episodes.size()));
+        
+        // Factor 2: Neural activation (if episode was reactivated, it's more relevant)
+        float neuralWeight = 0.3f;
+        float neuralActivation = 0.0f; // In real implementation, this would track retrieval frequency
+        // For now, assume all episodes have equal neural activation
+        
+        // Factor 3: Emotional/valence significance (dummy implementation)
+        float valenceWeight = 0.2f;
+        float valence = 0.0f; // Would be computed from episode metadata
+        
+        // Factor 4: Reward association (dummy implementation)
+        float rewardWeight = 0.1f;
+        float rewardAssociation = 0.0f; // Would be computed from reward signals
+        
+        relevanceScore = recencyWeight * recency + 
+                         neuralWeight * neuralActivation + 
+                         valenceWeight * valence + 
+                         rewardWeight * rewardAssociation;
+        
+        episodeRelevance.emplace_back(i, relevanceScore);
+    }
+    
+    // Sort episodes by relevance (highest first)
+    std::sort(episodeRelevance.begin(), episodeRelevance.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Keep only top N relevant episodes (based on threshold)
+    std::vector<EpisodicMemoryItem> consolidatedEpisodes;
+    int maxKeep = static_cast<int>(static_cast<float>(pImpl->maxEpisodes) * relevanceThreshold);
+    if (maxKeep <= 0) return;
+    
+    size_t keepCount = std::min(static_cast<size_t>(maxKeep), pImpl->episodes.size());
+    
+    for (size_t i = 0; i < keepCount; ++i) {
+        consolidatedEpisodes.push_back(pImpl->episodes[episodeRelevance[i].first]);
+    }
+    
+    // Replace current episodes with consolidated set
+    pImpl->episodes = std::move(consolidatedEpisodes);
 }
 
 // Semantic Memory Implementation

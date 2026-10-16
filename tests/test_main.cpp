@@ -33,7 +33,7 @@ namespace test_stdp {
     void runAll();
 }
 
-namespace test_brain {
+namespace test_command_line_parser {
     void runAll();
 }
 
@@ -56,7 +56,16 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Config tests..." << std::endl;
+    std::cout << "Running CommandLineParser tests..." << std::endl;
+    try {
+        test_command_line_parser::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+
+    std::cout << "Running ConfigManager tests..." << std::endl;
     try {
         test_config::runAll();
         std::cout << "  PASSED" << std::endl;
@@ -110,9 +119,9 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running ConfigManager tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_config_manager::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

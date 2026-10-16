@@ -78,12 +78,128 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidationRange() {
+    nlm::Config config;
+    nlm::ConfigSchema schema;
+    
+    // Add range validation
+    schema.addRangeRule("temperature", 0.0, 100.0, nlm::ValidationSeverity::Error, "Temperature must be between 0 and 100");
+    
+    // Test valid values
+    config.set("temperature", 50.0, nlm::ConfigSource::Runtime);
+    assert(config.validate(schema));
+    assert(config.isValid(schema));
+    
+    // Test invalid values
+    config.set("temperature", 150.0, nlm::ConfigSource::Runtime);
+    assert(!config.validate(schema));
+    assert(!config.isValid(schema));
+    
+    auto errors = config.getValidationErrors(schema);
+    assert(!errors.empty());
+    assert(errors[0].severity == nlm::ValidationSeverity::Error);
+    
+    std::cout << "    testConfigValidationRange passed" << std::endl;
+}
+
+void testConfigValidationEnum() {
+    nlm::Config config;
+    nlm::ConfigSchema schema;
+    
+    // Add enum validation
+    schema.addEnumRule("status", {"active", "inactive", "pending"}, nlm::ValidationSeverity::Error, "Status must be one of active, inactive, or pending");
+    
+    // Test valid values
+    config.set("status", std::string("active"), nlm::ConfigSource::Runtime);
+    assert(config.validate(schema));
+    
+    // Test invalid values
+    config.set("status", std::string("unknown"), nlm::ConfigSource::Runtime);
+    assert(!config.validate(schema));
+    
+    auto errors = config.getValidationErrors(schema);
+    assert(!errors.empty());
+    
+    std::cout << "    testConfigValidationEnum passed" << std::endl;
+}
+
+void testConfigValidationRequired() {
+    nlm::Config config;
+    nlm::ConfigSchema schema;
+    
+    // Add required validation
+    schema.addCustomRule("name", [](const nlm::ConfigValue& val, const std::string& key, const nlm::Config& cfg) {
+        auto nameVal = cfg.get<std::string>(key);
+        return nameVal.has_value() && !nameVal.value().empty();
+    }, nlm::ValidationSeverity::Error, "Name is required and must not be empty");
+    
+    // Test missing field
+    assert(!config.validate(schema));
+    
+    // Test empty field
+    config.set("name", std::string(""), nlm::ConfigSource::Runtime);
+    assert(!config.validate(schema));
+    
+    // Test valid field
+    config.set("name", std::string("John Doe"), nlm::ConfigSource::Runtime);
+    assert(config.validate(schema));
+    
+    std::cout << "    testConfigValidationRequired passed" << std::endl;
+}
+
+void testConfigValidationCache() {
+    nlm::Config config;
+    nlm::ConfigSchema schema;
+    
+    schema.addRangeRule("value", 0, 100);
+    
+    // Set a value and validate
+    config.set("value", 50, nlm::ConfigSource::Runtime);
+    assert(config.validate(schema));
+    
+    // Clear validation cache and set a new value
+    config.clearValidationCache();
+    config.set("value", 150, nlm::ConfigSource::Runtime);
+    assert(!config.validate(schema));
+    
+    std::cout << "    testConfigValidationCache passed" << std::endl;
+}
+
+void testConfigValidationModes() {
+    nlm::Config config;
+    nlm::ConfigSchema schema;
+    
+    // Add a rule that would be a warning
+    schema.addRangeRule("value", 0, 100, nlm::ValidationSeverity::Warning, "Value out of recommended range");
+    
+    config.set("value", 150, nlm::ConfigSource::Runtime);
+    
+    // Test strict mode (should be invalid due to error)
+    config.setValidationMode(nlm::Config::ValidationMode::Strict);
+    assert(!config.validate(schema));
+    
+    // Test lenient mode (only critical errors)
+    config.setValidationMode(nlm::Config::ValidationMode::Lenient);
+    assert(config.validate(schema)); // Warning is not critical
+    
+    // Test warnings mode (only warnings)
+    config.setValidationMode(nlm::Config::ValidationMode::Warnings);
+    assert(config.validate(schema)); // This should pass since we only check warnings
+    
+    std::cout << "    testConfigValidationModes passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidationRange();
+    testConfigValidationEnum();
+    testConfigValidationRequired();
+    testConfigValidationCache();
+    testConfigValidationModes();
 }
 
 } // namespace test_config
