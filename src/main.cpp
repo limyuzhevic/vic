@@ -423,12 +423,18 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
-    
+
+    // Save brain state for resumption
+    std::string checkpointFile = "brain_checkpoint.nlm";
+    if (brain->save(checkpointFile)) {
+        NLM_LOG_INFO("Brain state saved to: " + checkpointFile);
+    }
+
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
-    
+
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
@@ -444,6 +450,6 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
+
     return 0;
 }
