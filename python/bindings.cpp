@@ -237,13 +237,36 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
         .def("reset", &AgentBody::reset);
 
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Leaky Integrate-and-Fire (LIF) neuron)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"))
+        .def("getId", &Neuron::getId)
+        .def("getType", &Neuron::getType)
+        .def("setType", &Neuron::setType, py::arg("type"))
+        .def("getMembranePotential", &Neuron::getMembranePotential)
+        .def("getThreshold", &Neuron::getThreshold)
+        .def("getRestingPotential", &Neuron::getRestingPotential)
+        .def("getResetPotential", &Neuron::getResetPotential)
+        .def("getFiringRate", &Neuron::getFiringRate)
+        .def("getFiringState", &Neuron::getFiringState)
+        .def("getRefractoryRemaining", &Neuron::getRefractoryRemaining)
+        .def("isActive", &Neuron::isActive)
+        .def("isFiring", &Neuron::isFiring)
+        .def("isRefractory", &Neuron::isRefractory)
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"))
+        .def("getSynapticInput", &Neuron::getSynapticInput)
+        .def("getTotalSynapticInput", &Neuron::getTotalSynapticInput)
+        .def("getSpikes", &Neuron::getSpikes)
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime)
+        .def("reset", &Neuron::reset)
+        .def("step", &Neuron::step, py::arg("timestep"))
+        .def("isSpikeThresholdCrossed", &Neuron::isSpikeThresholdCrossed)
+        .def("hasSpiked", &Neuron::hasSpiked)
+        .def("getState", &Neuron::getState)
+        .def("setState", &Neuron::setState, py::arg("state"))
+        .def("__repr__", [](const Neuron& neuron) {
+            return "<Neuron id=" + std::to_string(neuron.getId().value) + 
+                   " type=" + std::to_string(static_cast<int>(neuron.getType())) + ">";
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
@@ -400,26 +423,119 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Error handling utilities
+    m.def("getErrorMessage", &getErrorMessage,
+          "Get a formatted error message");
+    
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::string errors;
+        bool isValid = config->validate();
+        if (!isValid) {
+            errors = "Configuration validation failed\n";
+            for (const auto& key : config->getInvalidKeys()) {
+                errors += "  - Invalid key: " + key + "\n";
+            }
+        }
+        return errors;
+    }, py::arg("config"), "Validate configuration and return error messages");
+    
+    m.def("createRandomSeed", [](uint64_t seed) {
+        auto randomGenerator = std::make_shared<RandomGenerator>(seed);
+        return randomGenerator;
+    }, py::arg("seed"), "Create a random number generator with a specific seed");
+    
+    m.def("createDefaultRandomGenerator", []() {
+        auto randomGenerator = std::make_shared<RandomGenerator>();
+        return randomGenerator;
+    }, "Create a random number generator with a random seed");
+    
+    m.def("currentTimestamp", []() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+    }, "Get current timestamp in milliseconds");
+    
+    m.def("timeSince", [](uint64_t startTime) {
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+        return now - startTime;
+    }, py::arg("startTime"), "Get time elapsed since a given timestamp");
+    
+    // Version and information
+    m.attr("VERSION_MAJOR") = 2;
+    m.attr("VERSION_MINOR") = 0;
+    m.attr("VERSION_PATCH") = 0;
+    m.attr("VERSION_STRING") = "2.0.0";
+    m.attr("PROJECT_NAME") = "NLM (Neural Learning Machine)";
+    m.attr("PROJECT_PHASE") = "Phase 2: Real Neural Computation";
+    
+    // Python module documentation
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ================================================
+        
+        This module provides Python bindings for the NLM C++ neural simulation framework.
+        NLM implements real spiking neural computation with event-driven dynamics and
+        integrated memory, prediction, cognition, and neuromodulation systems.
+        
+        Key Features:
+        - Real LIF neuron dynamics with event-driven spike propagation
+        - Multiple plasticity rules (STDP, Hebbian, Structural plasticity)
+        - Neuromodulation systems (Dopamine, Curiosity, Novelty, PredictionError)
+        - Memory systems (Working, Episodic, Associative memory)
+        - Prediction system for sensory prediction and error computation
+        - Phase 2: Real neural computation with measurable learning
+        - Phase 6: Full brain integration
+        
+        Usage Examples:
+        ```python
+        import pynlm
+        
+        # Create a brain with default configuration
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Run a simple simulation
+        for step in range(100):
+            brain.step(step, step * 0.001)
+        
+        # Get statistics
+        print(f"Spikes: {brain.getTotalSpikeCount()}")
+        print(f"Active neurons: {brain.getActiveNeuronCount()}")
+        ```
+    
+        Classes:
+        - Config: Configuration for NLM system
+        - Brain: Central neural simulation brain class
+        - AgentBrain: Interface connecting NLM brain to world
+        - SimpleWorld: Simple 2D world for NLM simulation
+        - SensoryInput: Base class for sensory input
+        - Vision: Vision sensory input
+        - Action: Action representation for motor output
+        - WorldObject: World object representation
+        - AgentBody: Agent body state
+        - ActionResult: Action result from world
+        - SensoryPercept: Sensory percept data
+        
+        Enumerations:
+        - NeuronType: Excitatory, Inhibitory, Modulatory, Sensory, Motor, Internal
+        - SynapseType: Excitatory, Inhibitory, Modulatory, Electrical, GapJunction
+        - DevelopmentalStage: Initial, CriticalPeriod, Maturation, Adult, Aging
+        - FiringState: Resting, Active, Refractory, Inhibited
+        - ActionType: Various motor actions
+        - MotorCommand: Low-level motor commands
+        - WorldObjectType: Empty, Resource, Hazard, Wall, Marker
+        
+        Functions:
+        - createDefaultConfig(): Create a default configuration
+        - createBrain(config): Create a new brain with configuration
+        - createSimpleWorld(): Create a new simple world
+        - createAgentBrain(brain): Create a new agent brain interface
+    
+        See the documentation for detailed usage information.
+    
+    )pbdoc";
 }
 
 } // namespace nlm

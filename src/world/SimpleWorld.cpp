@@ -94,9 +94,7 @@ void SimpleWorld::update(double timestep) {
     
     // Boundary collision
     if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
-    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    if (agent_.x > width_) { agent_.x = width_; agent_.velocityX = 0.0f; }
     
     // Energy decay
     agent_.energy -= energyDecayRate_;
@@ -317,7 +315,9 @@ void SimpleWorld::generateVision() {
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < maxRange) {
+        int steps = static_cast<int>(maxRange / 0.1f);  // Pre-calculate steps
+        
+        for (int step = 0; step <= steps; ++step) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
@@ -351,21 +351,24 @@ void SimpleWorld::generateVision() {
     
     // Generate touch sensors (proximity to obstacles in 8 directions)
     std::vector<float> touch(8, 0.0f);
+    const float touchMaxRange = 1.5f;
+    const int touchSteps = static_cast<int>(touchMaxRange / 0.1f);
+    
     for (int i = 0; i < 8; ++i) {
         float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
-        float t = 0.0f;
-        while (t < 1.5f) {
+        // Check for obstacles in each direction
+        for (int step = 0; step <= touchSteps; ++step) {
+            float t = step * 0.1f;
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
             if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
+                touch[i] = 1.0f - t / touchMaxRange;  // Closer = stronger signal
                 break;
             }
-            t += 0.1f;
         }
     }
     sensory_.setTouch(touch);

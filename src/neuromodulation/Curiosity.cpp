@@ -18,7 +18,7 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity() : pImpl(std::make_unique<Impl>()) {}
 
 Curiosity::~Curiosity() = default;
 

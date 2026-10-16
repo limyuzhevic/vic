@@ -24,15 +24,11 @@ NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Imp
 
 NeuralRegion::~NeuralRegion() = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }

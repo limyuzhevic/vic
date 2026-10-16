@@ -10,6 +10,43 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
+// Helper function to parse boolean values from string
+bool parseBool(const std::string& str) {
+    std::string normalized = str;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ::tolower);
+    
+    if (normalized == "true" || normalized == "1" || normalized == "yes" || normalized == "on") {
+        return true;
+    } else if (normalized == "false" || normalized == "0" || normalized == "no" || normalized == "off") {
+        return false;
+    }
+    return false; // Default to false for invalid values
+}
+
+// Helper function to parse integer values from string
+template<typename T>
+T parseNumber(const std::string& str) {
+    std::stringstream ss(str);
+    T value;
+    ss >> value;
+    return value;
+}
+
+// Helper function to parse float values from string
+float parseFloat(const std::string& str) {
+    std::stringstream ss(str);
+    float value;
+    ss >> value;
+    return value;
+}
+
+bool Config::parseJSON(const std::string& jsonStr) {
+    // TODO: Implement proper JSON parser
+    // For now, just return false to indicate JSON parsing is not supported
+    NLM_LOG_ERROR("JSON parsing is not yet implemented");
+    return false;
+}
+
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
@@ -19,40 +56,87 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension
+    std::string extension = std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (extension == ".json") {
+        // Try to parse JSON file
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return parseJSON(buffer.str());
+    } else {
+        // Original enhanced key=value format
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = Config::trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse as JSON line (single key=value)
+            if (line.find('{') != std::string::npos || line.find('[') != std::string::npos) {
+                // Try to parse as JSON
+                return parseJSON(line);
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to parse as boolean
+                if (value == "true" || value == "false") {
+                    set(key, parseBool(value), ConfigSource::File);
+                } else {
+                    // Try to parse as integer
+                    try {
+                        size_t posEnd;
+                        int64_t intVal = std::stoll(value, &posEnd);
+                        if (posEnd == value.size()) {
+                            set(key, intVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    // Try to parse as float
+                    try {
+                        size_t posEnd;
+                        double floatVal = std::stod(value, &posEnd);
+                        if (posEnd == value.size()) {
+                            set(key, floatVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    // Default to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
+        
+        return true;
     }
-    
-    return true;
+}
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
