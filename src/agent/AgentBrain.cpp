@@ -5,20 +5,20 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, const AgentBrainConfig& config)
+    // Add new member variables to the constructor
+    , explorationLevel_(0.0f)
+    , lastExplorationTime_(0.0)
+    , currentTime_(0.0)
+    , timeStep_(0.001)
+    , socialBehaviorPattern_()
+    , socialModels_()
+    , learningHistory_()
+    , patterns_()
+    , explorationLevel_(0.0f)
+    , lastExplorationTime_(0.0)
+    , currentTime_(0.0)
+    , timeStep_(0.001)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -347,4 +347,307 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+// Extract features for pattern recognition and memory integration
+    std::vector<float> AgentBrain::extractFeatures(const std::vector<float>& vision) const {
+        std::vector<float> features;
+        
+        if (vision.empty()) return features;
+        
+        // Apply simple feature extraction: downsampling and basic statistics
+        size_t sampleStep = std::max<size_t>(1, vision.size() / 32);
+        for (size_t i = 0; i < vision.size(); i += sampleStep) {
+            if (i < vision.size()) {
+                features.push_back(vision[i]);
+            }
+        }
+        
+        // Add statistical features for better pattern recognition
+        if (!vision.empty()) {
+            float sum = std::accumulate(vision.begin(), vision.end(), 0.0f);
+            float mean = sum / vision.size();
+            
+            float variance = 0.0f;
+            for (float val : vision) {
+                variance += (val - mean) * (val - mean);
+            }
+            variance /= vision.size();
+            
+            features.push_back(mean);
+            features.push_back(std::sqrt(variance));
+            
+            // Add edge detection features
+            float maxVal = *std::max_element(vision.begin(), vision.end());
+            float minVal = *std::min_element(vision.begin(), vision.end());
+            features.push_back(maxVal - minVal);  // contrast
+        }
+        
+        return features;
+    }
+    
+    // Record patterns for long-term memory and prediction
+    void AgentBrain::recordPattern(const std::vector<float>& features) {
+        if (features.empty() || features.size() < 8) return;
+        
+        // Check for similar existing patterns
+        float bestSimilarity = 0.0f;
+        int bestIndex = -1;
+        
+        for (size_t i = 0; i < patterns_.size(); ++i) {
+            float similarity = computePatternSimilarity(features, patterns_[i].features);
+            if (similarity > bestSimilarity) {
+                bestSimilarity = similarity;
+                bestIndex = i;
+            }
+        }
+        
+        if (bestSimilarity > 0.6f && bestIndex >= 0) {
+            // Update existing pattern with new experience
+            patterns_[bestIndex].strength = patterns_[bestIndex].strength * 0.7f + bestSimilarity * 0.3f;
+            patterns_[bestIndex].lastSeen = currentTime_;
+            
+            // Add to learning history
+            LearningEpisode episode;
+            episode.timestamp = currentTime_;
+            episode.curiosity = curiosityLevel_;
+            episode.novelty = noveltyLevel_;
+            episode.action = MotorCommand::Wait; // Will be updated when action is taken
+            episode.predictionError = predictionError_;
+            episode.dopamineLevel = dopamineLevel_;
+            learningHistory_.push_back(episode);
+            
+            // Keep learning history limited
+            if (learningHistory_.size() > 1000) {
+                learningHistory_.erase(learningHistory_.begin());
+            }
+        } else {
+            // Create new pattern
+            Pattern newPattern;
+            newPattern.features = features;
+            newPattern.strength = bestSimilarity;
+            newPattern.lastSeen = currentTime_;
+            patterns_.push_back(newPattern);
+            
+            // Keep patterns limited to top performers
+            if (patterns_.size() > 100) {
+                std::sort(patterns_.begin(), patterns_.end(),
+                         [](const Pattern& a, const Pattern& b) {
+                             return a.strength > b.strength;
+                         });
+                patterns_.resize(100);
+            }
+        }
+    }
+    
+    float AgentBrain::computePatternSimilarity(const std::vector<float>& a, const std::vector<float>& b) const {
+        if (a.empty() || b.empty()) return 0.0f;
+        
+        size_t minSize = std::min(a.size(), b.size());
+        if (minSize == 0) return 0.0f;
+        
+        float similarity = 0.0f;
+        for (size_t i = 0; i < minSize; ++i) {
+            similarity += 1.0f - std::abs(a[i] - b[i]);  // Cosine-like similarity
+        }
+        
+        return similarity / minSize;
+    }
+    
+    // Update social learning models based on observed behaviors
+    void AgentBrain::updateSocialModels(const std::vector<float>& behavior) {
+        if (behavior.empty()) return;
+        
+        // Update social behavior pattern for future imitation
+        socialBehaviorPattern_ = behavior;
+        
+        // Update reliability of observed behaviors based on prediction accuracy
+        for (auto& model : socialModels_) {
+            float predictedReliability = 0.0f;
+            
+            if (!socialBehaviorPattern_.empty() && !model.behaviorPattern.empty()) {
+                float similarity = computePatternSimilarity(socialBehaviorPattern_, model.behaviorPattern);
+                predictedReliability = similarity * model.reliability;
+            }
+            
+            // Decay reliability and add prediction accuracy
+            model.reliability = model.reliability * 0.8f + predictedReliability * 0.2f;
+            model.reliability = std::clamp(model.reliability, 0.1f, 1.0f);
+            
+            // Update observation time if pattern changed
+            double timeSinceLastUpdate = currentTime_ - model.lastObserved;
+            if (timeSinceLastUpdate > config_.socialObservationWindow) {
+                model.lastObserved = currentTime_;
+                model.behaviorPattern = socialBehaviorPattern_;
+            }
+        }
+    }
+    
+    // Observe and learn from other agents' behaviors
+    void AgentBrain::observeSocialBehavior(const std::string& modelId, const std::vector<float>& behavior) {
+        // Check if we already have a model for this agent
+        for (auto& model : socialModels_) {
+            if (model.id == modelId) {
+                // Update existing model with new observation
+                model.behaviorPattern = behavior;
+                model.lastObserved = currentTime_;
+                model.reliability = std::min(1.0f, model.reliability + 0.15f);  // Boost reliability
+                return;
+            }
+        }
+        
+        // Create new social model
+        SocialModel newModel;
+        newModel.id = modelId;
+        newModel.behaviorPattern = behavior;
+        newModel.reliability = 0.6f;  // Start with medium-high reliability for observed behaviors
+        newModel.lastObserved = currentTime_;
+        socialModels_.push_back(newModel);
+    }
+    
+    // Use learned social behaviors to guide our own actions
+    MotorCommand AgentBrain::imitateSocialBehavior() {
+        if (socialModels_.empty()) return MotorCommand::Wait;
+        
+        // Find most reliable and recently observed model
+        SocialModel* bestModel = nullptr;
+        float bestScore = 0.0f;
+        
+        for (auto& model : socialModels_) {
+            // Calculate score based on reliability and recency
+            double recencyScore = 1.0;  // Higher score for recent observations
+            double timeSinceObservation = currentTime_ - model.lastObserved;
+            if (timeSinceObservation > config_.socialObservationWindow) {
+                recencyScore *= std::pow(0.5, timeSinceObservation / config_.socialObservationWindow);
+            }
+            
+            float totalScore = model.reliability * recencyScore;
+            
+            if (totalScore > bestScore && model.reliability > config_.socialModelConfidenceThreshold) {
+                bestScore = totalScore;
+                bestModel = &model;
+            }
+        }
+        
+        if (!bestModel) return MotorCommand::Wait;
+        
+        // Convert social behavior pattern to motor command using learned mapping
+        if (!bestModel->behaviorPattern.empty() && bestModel->behaviorPattern.size() >= 3) {
+            float patternSum = std::accumulate(bestModel->behaviorPattern.begin(), 
+                                              bestModel->behaviorPattern.end(), 0.0f);
+            float averageBehavior = patternSum / bestModel->behaviorPattern.size();
+            
+            // Apply sigmoid function to map to action probabilities
+            float actionProb = 1.0f / (1.0f + std::exp(-10.0f * (averageBehavior - 0.5f)));
+            
+            // Choose action based on mapped probability
+            if (actionProb > 0.7f) {
+                return MotorCommand::MoveForward;
+            } else if (actionProb > 0.4f) {
+                return MotorCommand::TurnLeft;
+            } else if (actionProb > 0.2f) {
+                return MotorCommand::Wait;
+            } else {
+                return MotorCommand::TurnRight;
+            }
+        }
+        
+        return MotorCommand::Wait;
+    }
+    
+    // Update exploration level based on curiosity and internal state
+    void AgentBrain::updateExplorationLevel() {
+        double timeSinceExploration = currentTime_ - lastExplorationTime_;
+        
+        if (curiosityLevel_ > config_.explorationThreshold) {
+            // Increase exploration level when curiosity is high
+            explorationLevel_ = std::min(1.0f, explorationLevel_ + config_.explorationRandomFactor * curiosityLevel_);
+            lastExplorationTime_ = currentTime_;
+        } else {
+            // Gradually decrease exploration level over time (exploration decay)
+            explorationLevel_ = std::max(0.0f, explorationLevel_ * (1.0f - config_.explorationCoolDown * timeStep_));
+        }
+    }
+    
+    // Get exploration level
+    float AgentBrain::getExplorationLevel() const {
+        return explorationLevel_;
+    }
+    
+    // Get developmental stage with enhanced information
+    devMentalStage AgentBrain::getDevelopmentalStage() const {
+        if (!brain_) return DevelopmentalStage::Initial;
+        return brain_->getDevelopmentalStage();
+    }
+    
+    // Get neuromodulation level with enhanced information
+    float AgentBrain::getNeuromodulationLevel() const {
+        return dopamineLevel_;
+    }
+    
+    // Get curiosity level with enhanced information
+    float AgentBrain::getCuriosityLevel() const {
+        return curiosityLevel_;
+    }
+    
+    // Get novelty level with enhanced information
+    float AgentBrain::getNoveltyLevel() const {
+        return noveltyLevel_;
+    }
+    
+    // Get prediction error with enhanced information
+    float AgentBrain::getPredictionError() const {
+        return predictionError_;
+    }
+    
+    // Get developmental age with enhanced information
+    double AgentBrain::getDevelopmentalAge() const {
+        return developmentalAge_;
+    }
+    
+    // Get plasticity modifier with enhanced information
+    float AgentBrain::getPlasticityModifier() const {
+        return plasticityModifier_;
+    }
+    
+    // Reset all state including learning history and patterns
+    void AgentBrain::reset() {
+        // Reset core neuromodulation state
+        dopamineLevel_ = 0.0f;
+        noveltyLevel_ = 0.0f;
+        curiosityLevel_ = config_.curiosityBaseLevel;
+        predictionError_ = 0.0f;
+        expectedReward_ = 0.0f;
+        developmentalAge_ = 0.0;
+        plasticityModifier_ = 1.0f;
+        explorationLevel_ = 0.0f;
+        lastExplorationTime_ = 0.0;
+        currentTime_ = 0.0;
+        
+        // Clear sensory history
+        std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+        
+        // Clear learning components
+        learningHistory_.clear();
+        patterns_.clear();
+        socialModels_.clear();
+        socialBehaviorPattern_.clear();
+    }
+    
+    // Get learning history for analysis and debugging
+    std::vector<AgentBrain::LearningEpisode> AgentBrain::getLearningHistory() const {
+        return learningHistory_;
+    }
+    
+    // Clear learning history
+    void AgentBrain::clearLearningHistory() {
+        learningHistory_.clear();
+    }
+    
+    // Get learned patterns for analysis
+    std::vector<AgentBrain::Pattern> AgentBrain::getPatterns() const {
+        return patterns_;
+    }
+    
+    // Clear learned patterns
+    void AgentBrain::clearPatterns() {
+        patterns_.clear();
+    }
