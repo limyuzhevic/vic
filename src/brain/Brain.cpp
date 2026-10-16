@@ -488,7 +488,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store sensory state from last input (simplified approach)
+            // In a real implementation, we would store the actual sensory input
+            episode.sensoryState = std::vector<float>(10, 0.0f);  // Placeholder
+            episode.positionX = 0.0f;  // Placeholder
+            episode.positionY = 0.0f;  // Placeholder
+            episode.orientation = 0.0f;  // Placeholder
+            
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +509,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Update concept formation with this experience
+            if (pImpl->conceptFormation) {
+                // Convert neural activity to experience features
+                std::vector<float> features;
+                features.reserve(episode.activeNeurons.size() + episode.neuronActivations.size());
+                for (float act : episode.neuronActivations) {
+                    features.push_back(act);
+                }
+                
+                // Present this as an experience to concept formation
+                pImpl->conceptFormation->presentExperience(
+                    episode.activeNeurons.size() > 0 ? "neural_pattern" : "idle",
+                    features,
+                    episode.reward,
+                    currentStep
+                );
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -512,7 +534,78 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // For now, update prediction error based on current activity
+        float predictionError = 0.0f;
+        
+        // Simple prediction error calculation based on neural activity variance
+        float totalActivity = 0.0f;
+        size_t activityCount = 0;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activityCount++;
+                    }
+                }
+            }
+        }
+        
+        if (activityCount > 0) {
+            float avgActivity = totalActivity / activityCount;
+            predictionError = std::max(0.0f, avgActivity - 10.0f);  // Threshold-based error
+            
+            // Update prediction system (placeholder implementation)
+            pImpl->predictionSystem->updatePredictions(
+                std::vector<float>(10, 0.0f),  // Placeholder predicted state
+                std::vector<float>(10, 0.0f)   // Placeholder actual state
+            );
+        }
+    }
+    
+    // Integrate NeuralPlanner for action planning
+    if (pImpl->planner) {
+        // Get current neural state as input for planning
+        std::vector<float> currentState;
+        currentState.reserve(pImpl->regions.size() * 5);
+        
+        // Add some neural activity indicators to the state
+        for (const auto& region : pImpl->regions) {
+            float regionActivity = 0.0f;
+            size_t activeNeurons = 0;
+            
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        regionActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activeNeurons++;
+                    }
+                }
+            }
+            
+            if (activeNeurons > 0) {
+                currentState.push_back(regionActivity / activeNeurons);
+            } else {
+                currentState.push_back(0.0f);
+            }
+        }
+        
+        // Add global statistics to state
+        currentState.push_back(static_cast<float>(pImpl->totalSpikesThisStep) / 100.0f);
+        currentState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+        
+        // Plan next action based on current state
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Store planned action for potential use
+        // In a full implementation, this would feed into action selection
+        // For now, just log the planned action
+        if (plannedAction != ActionType::Wait) {
+            NLM_LOG_INFO("NeuralPlanner suggested action: " + std::to_string(static_cast<int>(plannedAction)));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +621,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form new concepts
+        // For now, just a placeholder - concept formation needs proper integration
+        // This should process sensory input and neural patterns to discover patterns
+        
+        // Get current sensory state (simplified - would come from actual input)
+        std::vector<float> currentNeuralPattern;
+        currentNeuralPattern.reserve(pImpl->regions.size() * 10);
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        currentNeuralPattern.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Present this experience to concept formation
+        if (!currentNeuralPattern.empty()) {
+            // Use current reward level as experience reward
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->conceptFormation->presentExperience(
+                currentNeuralPattern,
+                currentNeuralPattern,  // Features same as pattern for now
+                reward,
+                currentStep
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -588,8 +711,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
+// Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
     const auto& values = input.getData();
@@ -614,7 +736,6 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
-}
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
