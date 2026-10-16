@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON or key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (key=value format)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,99 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Advanced Python-style setters for better error handling
+        .def("set", [](Config& self, const py::dict& kwargs) {
+            for (auto item : kwargs) {
+                std::string key = py::cast<std::string>(item.first);
+                auto value = item.second;
+                
+                // Try to determine value type from Python object
+                if (py::isinstance<py::int_>(value)) {
+                    self.set(key, py::cast<int>(value));
+                } else if (py::isinstance<py::float_>(value)) {
+                    self.set(key, py::cast<double>(value));
+                } else if (py::isinstance<py::bool_>(value)) {
+                    self.set(key, py::cast<bool>(value));
+                } else {
+                    self.set(key, py::cast<std::string>(value));
+                }
+            }
+        }, py::arg("kwargs"), 
+             "Set multiple configuration values using keyword arguments")
+        
+        .def("get", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            auto val = self.get<double>(key);  // Try double first
+            if (val.has_value()) {
+                return py::cast(val.value());
+            }
+            
+            // Try other types
+            auto valStr = self.get<std::string>(key);
+            if (valStr.has_value()) {
+                return py::cast(valStr.value());
+            }
+            
+            auto valInt = self.get<int>(key);
+            if (valInt.has_value()) {
+                return py::cast(valInt.value());
+            }
+            
+            auto valBool = self.get<bool>(key);
+            if (valBool.has_value()) {
+                return py::cast(valBool.value());
+            }
+            
+            // Return default value if provided
+            if (!defaultValue.is_none()) {
+                return defaultValue;
+            }
+            
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), py::arg("defaultValue") = py::none(),
+             "Get configuration value with optional default")
+        
+        .def("set_safe", [](Config& self, const std::string& key, const py::object& value) {
+            if (py::isinstance<py::int_>(value)) {
+                self.set(key, py::cast<int>(value));
+            } else if (py::isinstance<py::float_>(value)) {
+                self.set(key, py::cast<double>(value));
+            } else if (py::isinstance<py::bool_>(value)) {
+                self.set(key, py::cast<bool>(value));
+            } else {
+                self.set(key, py::cast<std::string>(value));
+            }
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value with automatic type detection")
+        
+        .def("validate_config", [](const Config& self) {
+            // Validate common configuration parameters
+            std::vector<std::string> errors;
+            
+            auto neuronCount = self.get<size_t>("brain.neuron_count");
+            if (neuronCount.has_value()) {
+                if (neuronCount.value() < 10 || neuronCount.value() > 100000) {
+                    errors.push_back("brain.neuron_count should be between 10 and 100000");
+                }
+            }
+            
+            auto simTimestep = self.get<double>("simulation_timestep");
+            if (simTimestep.has_value()) {
+                if (simTimestep.value() <= 0.0 || simTimestep.value() > 1.0) {
+                    errors.push_back("simulation_timestep should be between 0.001 and 1.0 seconds");
+                }
+            }
+            
+            auto connProb = self.get<double>("connection_probability");
+            if (connProb.has_value()) {
+                if (connProb.value() < 0.0 || connProb.value() > 1.0) {
+                    errors.push_back("connection_probability should be between 0.0 and 1.0");
+                }
+            }
+            
+            return py::make_tuple(errors.empty(), errors);
+        }, "Validate configuration parameters and return (is_valid, error_messages)"),
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -415,6 +508,70 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Factory function for complete agent setup (common pattern)
+    m.def("create_complete_agent", [](std::shared_ptr<Config> config, const py::dict& worldConfig) {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        SimpleWorld world;
+        int width = worldConfig["width"].cast<int>();
+        int height = worldConfig["height"].cast<int>();
+        int visionWidth = worldConfig["visionWidth"].cast<int>();
+        int visionHeight = worldConfig["visionHeight"].cast<int>();
+        world.configure(width, height, visionWidth, visionHeight);
+        world.reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable commonly used subsystems
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        return py::make_tuple(brain, agent, world);
+    }, py::arg("config"), py::arg("worldConfig"),
+        "Create a complete agent setup (brain, agent, world) with common configuration");
+    
+    // Convenience function for running simple simulation
+    m.def("run_simple_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                       std::shared_ptr<AgentBrain> agent, size_t steps) {
+        if (!brain || !world || !agent) {
+            throw std::invalid_argument("Invalid agent components");
+        }
+        
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward based on agent position
+            float reward = 0.0f;
+            if (world->getAgentBody().x > world->getWidth() * 0.8f) {
+                reward = 1.0f;
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return py::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+        "Run a simple simulation with default settings");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
