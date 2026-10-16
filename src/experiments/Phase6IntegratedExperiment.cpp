@@ -4,10 +4,59 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../agent/MotorCommand.hpp"
+#include "../brain/NeuralRegion.hpp"
 #include <chrono>
 #include <cmath>
+#include <stdexcept>
+#include <limits>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
+
+// Helper function to validate configuration
+bool validateConfig(const Phase6Config& config) {
+    if (config.maxSteps == 0) {
+        NLM_LOG_ERROR("Config error: maxSteps must be positive");
+        return false;
+    }
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Config error: neuronCount must be positive");
+        return false;
+    }
+    if (config.regionCount == 0) {
+        NLM_LOG_ERROR("Config error: regionCount must be positive");
+        return false;
+    }
+    if (config.connectionProbability < 0.0f || config.connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Config error: connectionProbability must be between 0.0 and 1.0");
+        return false;
+    }
+    if (config.checkpointPath.empty()) {
+        NLM_LOG_ERROR("Config error: checkpointPath cannot be empty");
+        return false;
+    }
+    return true;
+}
+
+// Helper function to check if file path is valid for writing
+bool isValidCheckpointPath(const std::string& path) {
+    if (path.empty()) return false;
+    
+    // Try to create directory if it doesn't exist
+    size_t last_slash = path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+        std::string dir = path.substr(0, last_slash);
+        if (!dir.empty()) {
+            // Note: In a real implementation, we would check if directory exists
+            // For now, we'll just assume it's valid
+        }
+    }
+    return true;
+}
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
@@ -48,12 +97,28 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Create agent
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
+    
+    // Configure agent based on experiment settings
+    agent.enableRewardModulation(config.enableReward);
+    agent.enableStructuralPlasticity(config.enableStructural);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableCuriosity);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
+    
+    // Get first region for world operations (if available)
+    NeuralRegion* firstRegion = nullptr;
+    auto regions = brain->getRegions();
+    if (!regions.empty()) {
+        firstRegion = regions[0].get();
+        if (!firstRegion) {
+            NLM_LOG_ERROR("First region is null!");
+            return result;
+        }
+    } else {
+        NLM_LOG_ERROR("No brain regions found!");
+        return result;
+    }
     
     // Run simulation
     float totalReward = 0.0f;
@@ -62,7 +127,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        SensoryPercept percept = world.observe(firstRegion);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +139,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(firstRegion, cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(firstRegion);
         totalReward += reward;
         
         // Apply reward modulation

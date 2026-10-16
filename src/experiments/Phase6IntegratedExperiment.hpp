@@ -84,6 +84,9 @@ struct Phase6Config {
     bool enableReplay;
     bool enableDevelopment;
     std::string checkpointPath;
+    bool enableCuriosity;
+    bool enableReward;
+    bool enableStructural;
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +96,10 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , enableCuriosity(true)
+        , enableReward(true)
+        , enableStructural(true) {}
 };
 
 /**
