@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -75,14 +74,58 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Integration Demo (Main Application)
+
+```bash
+./nlm
+```
+
+This runs the comprehensive Phase 6 integration test verifying all brain systems are connected.
+
+### Alternative: Phase 6 Demo
+
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This is an alternative entry point for the same Phase 6 integration demonstration.
 
-## Project Structure
+### Phase 2: Real Neural Computation
+
+```bash
+./nlm --neurons 100 --steps 50
+```
+
+This runs the basic neural computation demo with LIF neurons, STDP, and Hebbian plasticity.
+
+### Phase 3: World Interaction
+
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+Example: `./nlm_phase3_demo 3 200`
+
+### Phase 4: Emerging Cognition
+
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+Example: `./nlm_phase4_demo 100`
+
+## Command Line Options for nlm (Phase 6)
+
+```bash
+nlm [--help] [--config file.cfg] [--neurons N] [--steps S] [--demo-only]
+```
+
+Options:
+- `--help`: Display help information
+- `--config file.cfg`: Load configuration from file
+- `--neurons N`: Number of neurons to simulate
+- `--steps S`: Number of simulation steps
+- `--demo-only`: Skip integration tests and run only demo
 
 ```
 NLM/

@@ -15,11 +15,20 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Performance optimization libraries
+add_library(nlm_performance STATIC
+    src/performance/Performance.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/EventQueue.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/SparseConnectivity.cpp
+)
 
 # Core library
 add_library(nlm_core STATIC
@@ -79,6 +88,12 @@ add_library(nlm_core STATIC
     src/environment/Environment.cpp
     src/environment/Observation.cpp
     src/environment/Action.cpp
+    # Agent
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    # World
+    src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -92,59 +107,63 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Performance-optimized core (includes optimizations)
+add_library(nlm_core_optimized STATIC
+    ${NLM_CORE_SOURCES}
+    ${PLASTICITY_SOURCES}
+    ${PERFORMANCE_SOURCES}
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# Development system
+add_library(nlm_development STATIC
+    ${DEVELOPMENT_SOURCES}
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+    ${EXPERIMENT_SOURCES}
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+    ${EXPERIMENT_SOURCES}
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    ${EXPERIMENT_SOURCES}
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+
+# Main executable - Phase 6 Integration Demo
+add_executable(nlm
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core_optimized nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core_optimized nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core_optimized nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (alternative)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core_optimized nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
