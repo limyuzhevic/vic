@@ -1,0 +1,66 @@
+Usage: nlm [OPTIONS]
+
+Neural Learning Machine - Advanced Neural Simulation Framework
+
+Modes:
+  basic         Run basic neural connectivity tests (default)
+  learning      Run learning and plasticity experiments
+  stdp          Verify STDP (Spike-Timing Dependent Plasticity)
+  research      Run research-grade experiments
+  benchmark     Performance benchmarking
+  script        Execute saved scripts
+  replay        Replay saved brain states
+  config        Configuration management
+  debug         Debug and diagnostic tools
+
+Options:
+  --help, -h                     Show this help message
+  --version, -v                   Show version information
+  --config, -c FILE               Load configuration from file
+  --output, -o DIR                Output directory for results and logs
+  --quiet, -q                     Suppress non-essential output
+  --verbose, -V                   Enable verbose logging
+  --log-level LEVEL               Set logging level (DEBUG, INFO, WARN, ERROR)
+  --max-steps STEPS               Maximum simulation steps (default: 1000)
+  --timestep TIME                 Simulation timestep in seconds (default: 0.001)
+  --seed SEED                     Random seed for reproducible experiments
+  --neurons COUNT                 Number of neurons (default: 1000)
+  --regions COUNT                 Number of brain regions (default: 2)
+  
+Research-mode options:
+  --plasticity-mode MODE          Plasticity mode: hebbian, stdp, combined, none
+  --plasticity-rate RATE           Plasticity learning rate (default: 0.01)
+  --structural-plasticity         Enable structural plasticity
+  --neuromodulation               Enable neuromodulation systems
+  --memory-systems                Enable memory systems (working, episodic, associative)
+  
+Visualization options:
+  --plot-spikes                   Generate spike activity plots
+  --plot-synapses                  Generate synaptic weight evolution plots
+  --plot-neurons                   Generate neuron activity plots
+  --no-graphics                    Disable any graphical output
+  
+Advanced options:
+  --checkpoint INTERVAL            Checkpoint interval in steps (0 = disable)
+  --save-state PATH                Save final brain state
+  --load-state PATH               Load initial brain state
+  --profile CPU|MEMORY|BOTH       Enable performance profiling
+  --perf-measure                  Measure performance metrics
+  
+Script options:
+  --script SCRIPT                 Execute Lua/Python script
+  --script-arg ARG                 Additional script argument
+  
+Environment:
+  --device TYPE                   Computing device (CPU, GPU)
+  --threads COUNT                 Number of threads (default: auto)
+  --precision MODE                Numerical precision (float, double, half)
+
+Examples:
+  nlm basic                         Run simple connectivity tests
+  nlm learning --neurons 500       Study learning dynamics
+  nlm research --plasticity-mode combined --structural-plasticity
+  nlm benchmark --profile CPU      Benchmark performance
+  nlm script experiment.lua        Run saved experiment script
+  nlm config --list               List available configurations
+  nlm config --save myconfig.cfg    Save current configuration
