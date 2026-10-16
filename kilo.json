@@ -1,0 +1,313 @@
+{
+  "project": {
+    "name": "NLM",
+    "version": "0.1.0",
+    "description": "Neural Learning Machine - An Experimental Artificial Developmental Brain",
+    "homepage": "https://github.com/nlm-project/nlm",
+    "license": "MIT",
+    "authors": [
+      {
+        "name": "NLM Authors",
+        "email": "contact@nlm-project.org"
+      }
+    ],
+    "contributors": [
+      {
+        "name": "Research Team",
+        "description": "Brain simulation research and development"
+      }
+    ]
+  },
+  "build": {
+    "type": "hybrid",
+    "c++": {
+      "standard": "C++20",
+      "compiler": "g++ or clang++",
+      "minimum_version": "GCC 10+, Clang 12+, or MSVC 2019+",
+      "cmake_version": "3.16 or higher",
+      "optimizations": {
+        "release": {
+          "flags": "-O3 -march=native",
+          "symbols": false
+        },
+        "debug": {
+          "flags": "-O0 -g",
+          "symbols": true
+        }
+      },
+      "warnings": {
+        "enabled": true,
+        "level": "pedantic"
+      }
+    },
+    "python": {
+      "enabled": true,
+      "bindings": true,
+      "minimum_version": ">=3.8",
+      "dependencies": [
+        "pybind11>=2.11.0",
+        "scikit-build-core>=0.5.0",
+        "numpy>=1.20"
+      ]
+    }
+  },
+  "structure": {
+    "source_directory": "src",
+    "build_directory": "build",
+    "python_bindings": "python",
+    "documentation": "docs",
+    "tests": "tests",
+    "configs": "configs"
+  },
+  "targets": [
+    {
+      "name": "nlm",
+      "type": "executable",
+      "description": "Main NLM simulation executable",
+      "sources": ["src/main.cpp"],
+      "dependencies": ["nlm_core"]
+    },
+    {
+      "name": "nlm_core",
+      "type": "static_library",
+      "description": "Core NLM brain library",
+      "sources": [
+        "src/core/Types/Types.cpp",
+        "src/core/Config/Config.cpp",
+        "src/core/Random/Random.cpp",
+        "src/core/Logger/Logger.cpp",
+        "src/core/SimulationClock/SimulationClock.cpp",
+        "src/brain/Neuron.cpp",
+        "src/brain/Synapse.cpp",
+        "src/brain/NeuralPopulation.cpp",
+        "src/brain/NeuralRegion.cpp",
+        "src/brain/Brain.cpp",
+        "src/dynamics/NeuralDynamics.cpp",
+        "src/dynamics/SpikeSystem.cpp",
+        "src/plasticity/PlasticityRule.cpp",
+        "src/plasticity/Hebbian.cpp",
+        "src/plasticity/STDP.cpp",
+        "src/plasticity/StructuralPlasticity.cpp",
+        "src/development/DevelopmentSystem.cpp",
+        "src/development/Synaptogenesis.cpp",
+        "src/development/Pruning.cpp",
+        "src/development/Maturation.cpp",
+        "src/neuromodulation/Neuromodulator.cpp",
+        "src/neuromodulation/Reward.cpp",
+        "src/neuromodulation/PredictionError.cpp",
+        "src/neuromodulation/Novelty.cpp",
+        "src/neuromodulation/Curiosity.cpp",
+        "src/memory/WorkingMemory.cpp",
+        "src/memory/EpisodicMemory.cpp",
+        "src/memory/SemanticMemory.cpp",
+        "src/memory/ProceduralMemory.cpp",
+        "src/memory/AssociativeMemory.cpp",
+        "src/memory/NeuralWorkingMemory.cpp",
+        "src/memory/NeuralEpisodicMemory.cpp",
+        "src/cognition/ConceptFormation.cpp",
+        "src/cognition/NeuralPlanner.cpp",
+        "src/sensory/SensoryInput.cpp",
+        "src/sensory/Vision.cpp",
+        "src/sensory/Audio.cpp",
+        "src/sensory/InternalSignals.cpp",
+        "src/prediction/PredictionSystem.cpp",
+        "src/prediction/NeuralPrediction.cpp",
+        "src/motor/MotorSystem.cpp",
+        "src/environment/Environment.cpp",
+        "src/environment/Observation.cpp",
+        "src/environment/Action.cpp",
+        "src/experiments/Experiment.cpp",
+        "src/experiments/ExperimentRunner.cpp",
+        "src/experiments/Metrics.cpp",
+        "src/visualization/VisualizationInterface.cpp"
+      ]
+    },
+    {
+      "name": "nlm_agent",
+      "type": "static_library",
+      "description": "Agent system library",
+      "sources": ["src/agent/SensoryPercept.cpp", "src/agent/AgentBrain.cpp"],
+      "dependencies": ["nlm_core"]
+    },
+    {
+      "name": "nlm_world",
+      "type": "static_library",
+      "description": "World simulation library",
+      "sources": ["src/world/SimpleWorld.cpp"],
+      "dependencies": ["nlm_core"]
+    },
+    {
+      "name": "nlm_phase3",
+      "type": "static_library",
+      "description": "Phase 3 experiment library",
+      "sources": ["src/experiments/Phase3Experiment.cpp"],
+      "dependencies": ["nlm_core", "nlm_agent", "nlm_world"]
+    },
+    {
+      "name": "nlm_phase4",
+      "type": "static_library",
+      "description": "Phase 4 experiment library",
+      "sources": ["src/experiments/Phase4Experiment.cpp"],
+      "dependencies": ["nlm_core", "nlm_agent", "nlm_world"]
+    },
+    {
+      "name": "pynlm",
+      "type": "python_extension",
+      "description": "Python bindings for NLM",
+      "sources": ["python/bindings.cpp"],
+      "dependencies": ["nlm_core", "nlm_agent", "nlm_world"]
+    }
+  ],
+  "performance": {
+    "optimizations": [
+      "SIMD vectorization",
+      "memory pools",
+      "event queues",
+      "parallel processing"
+    ],
+    "memory_management": {
+      "pool_allocator": true,
+      "smart_pointers": true,
+      "reference_counting": true,
+      "circular_buffer": true
+    },
+    "parallel_processing": {
+      "omp_enabled": true,
+      "thread_pool": true,
+      "async_events": true
+    }
+  },
+  "scientific": {
+    "models": [
+      "LIF neuron dynamics",
+      "STDP synaptic plasticity",
+      "Hebbian learning",
+      "Neuromodulation (dopamine, curiosity)",
+      "Working memory",
+      "Episodic memory",
+      "Prediction-error learning",
+      "Developmental plasticity",
+      "Attention mechanisms",
+      "Concept formation"
+    ],
+    "limitations": [
+      "Simplified LIF neuron model (not Hodgkin-Huxley)",
+      "No realistic ion channel dynamics",
+      "No detailed dendritic morphology",
+      "No detailed cortical architecture",
+      "No claim of consciousness, intelligence, or human-like cognition"
+    ],
+    "target_investigations": [
+      "Whether memory systems can integrate with neural dynamics",
+      "Whether neuromodulation can affect plasticity in a coordinated way",
+      "Whether prediction can become a central organizing principle",
+      "Whether developmental stages can modulate learning",
+      "Whether replay can reinforce memory consolidation",
+      "Whether the complete brain loop functions coherently"
+    ]
+  },
+  "development": {
+    "phases": {
+      "phase1": {
+        "status": "Complete",
+        "description": "Project skeleton, core types and configuration, neural interfaces"
+      },
+      "phase2": {
+        "status": "Complete",
+        "description": "Real LIF neuron dynamics, event-driven spike propagation, STDP and Hebbian plasticity, structural plasticity"
+      },
+      "phase3": {
+        "status": "Complete",
+        "description": "World interaction loop, sensory input and motor output, reward prediction error, developmental stages, novelty and curiosity"
+      },
+      "phase4": {
+        "status": "Complete",
+        "description": "Neural prediction system, working memory, episodic-like memory, concept formation, neural attention, predictive planning, self-model, social learning, continual learning"
+      },
+      "phase5": {
+        "status": "Complete",
+        "description": "Performance optimizations, memory pools and event queues, SIMD vectorization, parallel processing, checkpoint system"
+      },
+      "phase6": {
+        "status": "Complete - Final Integration",
+        "description": "All systems integrated into coherent brain loop, memory systems connected to neural processing, neuromodulation affects plasticity and dynamics, prediction integrated with learning, development affects plasticity rates, checkpoint save/load working, replay and consolidation functional, Phase 6 integration experiment created"
+      }
+    },
+    "testing": {
+      "unit_tests": {
+        "enabled": true,
+        "framework": "CTest",
+        "coverage": "targeted"
+      },
+      "integration_tests": {
+        "enabled": true,
+        "phase6_demo": true,
+        "experiment_runner": true
+      },
+      "performance_benchmarks": {
+        "enabled": true,
+        "scaling_tests": true,
+        "memory_usage": true,
+        "speed_tests": true
+      }
+    }
+  },
+  "tools": {
+    "build": {
+      "generator": "CMake",
+      "version": "3.16 or higher",
+      "options": [
+        "CMAKE_BUILD_TYPE=Release",
+        "DPYTHON_EXECUTABLE={python}"
+      ]
+    },
+    "package": {
+      "backend": "scikit-build-core",
+      "version": "0.5.0 or higher",
+      "options": [
+        "--install-option=--prefix=/usr/local"
+      ]
+    },
+    "testing": {
+      "unit": "CTest",
+      "integration": "custom_test_framework",
+      "performance": "benchmarking_framework"
+    },
+    "documentation": {
+      "generator": "Doxygen",
+      "format": "HTML",
+      "output": "docs/html"
+    }
+  },
+  "maintenance": {
+    "code_quality": {
+      "linting": "ClangFormat + ClangTidy",
+      "static_analysis": "Enabled",
+      "code_coverage": "Targeted"
+    },
+    "continuous_integration": {
+      "enabled": true,
+      "platforms": ["Linux", "macOS", "Windows"],
+      "branches": ["main", "develop"],
+      "checks": [
+        "build_tests",
+        "run_unit_tests",
+        "performance_benchmarks"
+      ]
+    },
+    "release_process": {
+      "versioning": "semantic",
+      "checks": [
+        "all_tests_pass",
+        "performance_benchmarks_pass",
+        "documentation_complete",
+        "code_quality_checks"
+      ],
+      "publishing": {
+        "pypi": true,
+        "c++_packages": false,
+        "documentation": true
+      }
+    }
+  }
+}
