@@ -2,10 +2,13 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentConstants.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -69,6 +72,9 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Validation helper
+    bool validateParameters() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -85,6 +91,8 @@ private:
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     
     // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
