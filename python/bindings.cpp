@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <algorithm>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -21,10 +23,36 @@ namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
+        NLM (Neural Learning Machine) Python Bindings v0.1.0
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+
+        NEW in v0.1.0:
+        - Convenience functions for creating common brain configurations
+        - Helper functions for running standard simulation patterns  
+        - Configuration validation and parameter checking
+        - Better error messages and examples
+
+        Quick Start Examples:
+        
+        # Create a brain with optimized defaults
+        brain = pynlm.createQuickBrain()
+        
+        # Create config for training simulations
+        training_config = pynlm.createTrainingConfig()
+        
+        # Create config for exploration simulations  
+        exploration_config = pynlm.createExplorationConfig()
+        
+        # Validate configuration
+        issues, warnings, suggestions = pynlm.validateConfig(config)
+        
+        # Run a basic simulation
+        neurons, avg_rate = pynlm.runBasicSimulation(brain, world, 1000)
+        
+        # Run a training episode
+        neuron_count, avg_rate, total_reward = pynlm.runTrainingEpisode(brain, world, agent, 500)
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -400,21 +428,334 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Convenience functions for common use cases
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createQuickWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        // Configure with reasonable defaults
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        return world;
+    }, "Create a simple world with reasonable default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createAgentSetup", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - cannot create agent setup");
+        }
+        if (!world) {
+            throw std::runtime_error("World is null - cannot create agent setup");
+        }
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize an agent brain with the given world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("runTrainingEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                std::shared_ptr<AgentBrain> agent, int steps,
+                                bool enable_learning = true, bool verbose = false) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Null brain, world, or agent provided for training episode");
+        }
+        
+        brain->initialize();
+        
+        if (enable_learning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+        }
+        
+        float total_reward = 0.0f;
+        
+        for (nlm::SimulationStep step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1f);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process input and let brain think
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            // Get action and execute
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward and apply learning
+            float reward = 0.0f;
+            if (enable_learning) {
+                agent->applyRewardModulation(reward, 0.0f);  // No prediction error for basic training
+            }
+            total_reward += reward;
+            
+            if (verbose && step % 50 == 0) {
+                std::cout << "Training step " << step << ": reward=" << reward 
+                         << " | total_reward=" << total_reward
+                         << " | neurons_active=" << brain->getFiringNeuronCount()
+                         << " | avg_rate=" << brain->getAverageFiringRate() << std::endl;
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalNeuronCount(), 
+                             brain->getAverageFiringRate(),
+                             total_reward);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+        py::arg("enable_learning") = true, py::arg("verbose") = false,
+        "Run a complete training episode. Returns tuple of (neuron_count, avg_firing_rate, total_reward)");
+
+    m.def("isBrainReady", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            return false;
+        }
+        return brain->getTotalNeuronCount() > 0 && brain->getTotalSynapseCount() >= 0;
+    }, py::arg("brain"), "Check if a brain is properly initialized and ready for simulation");
+
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - cannot save checkpoint");
+        }
+        if (filepath.empty()) {
+            throw std::runtime_error("Filepath is empty - cannot save checkpoint");
+        }
+        
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw std::runtime_error("Failed to save brain checkpoint to " + filepath);
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), "Save brain checkpoint to file. Returns true on success.");
+
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - cannot load checkpoint");
+        }
+        if (filepath.empty()) {
+            throw std::runtime_error("Filepath is empty - cannot load checkpoint");
+        }
+        
+        bool success = brain->load(filepath);
+        if (!success) {
+            throw std::runtime_error("Failed to load brain checkpoint from " + filepath);
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), "Load brain checkpoint from file. Returns true on success.");
+
+    m.def("createExampleConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Create a minimal but functional configuration
+        config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+        config->set("learning_rate", 0.01, nlm::ConfigSource::Default);
+        config->set("dt", 0.01, nlm::ConfigSource::Default);
+        config->set("max_steps", 100, nlm::ConfigSource::Default);
+        config->set("enable_reward_modulation", false, nlm::ConfigSource::Default);
+        config->set("enable_development", false, nlm::ConfigSource::Default);
+        config->set("enable_structural_plasticity", false, nlm::ConfigSource::Default);
+        config->set("enable_curiosity", false, nlm::ConfigSource::Default);
+        config->set("enable_prediction", false, nlm::ConfigSource::Default);
+        return config;
+    }, "Create a minimal functional configuration for basic simulations");
+
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - cannot get stats");
+        }
+        
+        std::map<std::string, double> stats;
+        stats["neuron_count"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["synapse_count"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["active_neuron_count"] = static_cast<double>(brain->getActiveNeuronCount());
+        stats["firing_neuron_count"] = static_cast<double>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spike_count"] = static_cast<double>(brain->getTotalSpikeCount());
+        
+        return stats;
+    }, py::arg("brain"), "Get brain statistics as a dictionary. Includes neuron count, synapse count, active/firing neurons, firing rates, and other metrics.");
+
+    m.def("createTrainingConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Configuration optimized for learning simulations
+        config->set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+        config->set("learning_rate", 0.05, nlm::ConfigSource::Default);
+        config->set("dt", 0.005, nlm::ConfigSource::Default);
+        config->set("max_steps", 5000, nlm::ConfigSource::Default);
+        config->set("enable_reward_modulation", true, nlm::ConfigSource::Default);
+        config->set("enable_development", true, nlm::ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, nlm::ConfigSource::Default);
+        config->set("enable_curiosity", true, nlm::ConfigSource::Default);
+        config->set("enable_prediction", true, nlm::ConfigSource::Default);
+        config->set("record_observations", true, nlm::ConfigSource::Default);
+        config->set("save_checkpoints", true, nlm::ConfigSource::Default);
+        config->set("checkpoint_interval", 500, nlm::ConfigSource::Default);
+        return config;
+    }, "Create a configuration optimized for learning/training simulations");
+
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Configuration optimized for exploration and curiosity-driven learning
+        config->set("neuron_count", static_cast<int64_t>(800), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.08, nlm::ConfigSource::Default);
+        config->set("learning_rate", 0.03, nlm::ConfigSource::Default);
+        config->set("dt", 0.01, nlm::ConfigSource::Default);
+        config->set("max_steps", 3000, nlm::ConfigSource::Default);
+        config->set("enable_curiosity", true, nlm::ConfigSource::Default);
+        config->set("enable_novelty_detection", true, nlm::ConfigSource::Default);
+        config->set("enable_reward_prediction_error", true, nlm::ConfigSource::Default);
+        config->set("exploration_bonus", 1.0, nlm::ConfigSource::Default);
+        config->set("curiosity_strength", 2.0, nlm::ConfigSource::Default);
+        config->set("enable_replay", true, nlm::ConfigSource::Default);
+        config->set("replay_frequency", 100, nlm::ConfigSource::Default);
+        config->set("record_observations", true, nlm::ConfigSource::Default);
+        return config;
+    }, "Create a configuration optimized for exploration simulations");
+
+    m.def("runBasicSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                int steps, bool verbose = false) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - cannot run simulation");
+        }
+        if (!world) {
+            throw std::runtime_error("World is null - cannot run simulation");
+        }
+        
+        brain->initialize();
+        
+        if (verbose) {
+            brain->logStatus();
+        }
+        
+        for (nlm::SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step);
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step: " << step 
+                         << " | Neurons: " << brain->getTotalNeuronCount()
+                         << " | Active: " << brain->getActiveNeuronCount()
+                         << " | Firing: " << brain->getFiringNeuronCount()
+                         << std::endl;
+            }
+        }
+        
+        if (verbose) {
+            brain->logStatus();
+        }
+        
+        return std::make_pair(brain->getTotalNeuronCount(), brain->getAverageFiringRate());
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"), py::arg("verbose") = false,
+        "Run a basic simulation with the given brain and world for specified steps. "
+        "Returns tuple of (total_neurons, average_firing_rate)");
+
+    // Configuration specification for validation
+    static const std::unordered_map<std::string, std::tuple<double, double, std::string>> CONFIG_SPEC = {
+        {"neuron_count", std::make_tuple(1.0, 10000.0, "positive integer")},
+        {"region_count", std::make_tuple(1.0, 100.0, "positive integer")},
+        {"connection_probability", std::make_tuple(0.0, 1.0, "probability [0,1]")},
+        {"learning_rate", std::make_tuple(0.0, 1.0, "learning rate [0,1]")},
+        {"dt", std::make_tuple(0.001, 0.1, "time step [0.001,0.1]")},
+        {"max_steps", std::make_tuple(10.0, 1000000.0, "simulation steps [10,1000000]")},
+        {"random_seed", std::make_tuple(0.0, 2147483647.0, "random seed")},
+        {"simulation_timestep", std::make_tuple(0.0, 1.0, "simulation timestep")},
+        {"plasticity_learning_rate", std::make_tuple(0.0, 1.0, "plasticity learning rate")},
+        {"stdp_ltp_weight", std::make_tuple(0.0, 1.0, "STDP LTP weight")},
+        {"stdp_ltd_weight", std::make_tuple(0.0, 1.0, "STDP LTD weight")},
+        {"stdp_time_constant", std::make_tuple(0.0, 1000.0, "STDP time constant")},
+        {"development_synaptogenesis_rate", std::make_tuple(0.0, 1.0, "synaptogenesis rate")},
+        {"development_pruning_rate", std::make_tuple(0.0, 1.0, "pruning rate")},
+        {"dopamine_baseline", std::make_tuple(0.0, 10.0, "dopamine baseline")},
+        {"reward_discount_factor", std::make_tuple(0.0, 1.0, "discount factor")},
+        {"environment_width", std::make_tuple(1.0, 1000.0, "environment width")},
+        {"environment_height", std::make_tuple(1.0, 1000.0, "environment height")},
+        {"max_simulation_steps", std::make_tuple(1.0, 1000000.0, "max simulation steps")},
+        {"simulation_time_limit", std::make_tuple(0.0, 10000.0, "simulation time limit")},
+        {"visualization_update_rate", std::make_tuple(1.0, 1000.0, "visualization update rate")}
+    };
+
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config is null - cannot validate");
+        }
+        
+        std::vector<std::string> issues;
+        std::vector<std::string> warnings;
+        std::vector<std::string> suggestions;
+        
+        // Check for duplicate keys (config doesn't store duplicates, but we can check for consistency)
+        auto keys = config->getKeys();
+        std::sort(keys.begin(), keys.end());
+        auto last = std::unique(keys.begin(), keys.end());
+        if (last != keys.end()) {
+            // There are duplicate keys
+            std::vector<std::string> duplicates;
+            for (auto it = keys.begin(); it != last; ++it) {
+                if (it + 1 != last && *it == *(it + 1)) {
+                    duplicates.push_back(*it);
+                }
+            }
+            for (const auto& dup : duplicates) {
+                issues.push_back("Duplicate key found: '" + dup + "'");
+            }
+        }
+        
+        // Check for essential keys
+        auto essential_keys = std::vector<std::string>{
+            "neuron_count",
+            "region_count",
+            "connection_probability",
+            "learning_rate",
+            "dt",
+            "max_steps"
+        };
+        
+        for (const auto& key : essential_keys) {
+            if (!config->has(key)) {
+                warnings.push_back("Missing recommended key: \'" + key + "\'");
+            }
+        }
+        
+        // Validate ranges
+        auto validate_range = [config, &issues, &warnings](
+            const std::string& key, double min, double max, const std::string& type) {
+            if (config->has(key)) {
+                auto val = config->get<double>(key);
+                if (val && (*val < min || *val > max)) {
+                    issues.push_back("Invalid value for \'" + key + "\': " + std::to_string(*val) +
+                                   ". Expected " + type + " in range [" + std::to_string(min) +
+                                   ", " + std::to_string(max) + "]");
+                }
+            }
+        };
+        
+        // Use config spec for validation
+        for (const auto& [key, spec] : CONFIG_SPEC) {
+            validate_range(key, std::get<0>(spec), std::get<1>(spec), std::get<2>(spec));
+        }
+        
+        // Check consistency
+        if (config->has("neuron_count") && config->has("region_count")) {
+            auto neuron_count = config->get<int64_t>("neuron_count");
+            auto region_count = config->get<int64_t>("region_count");
+            if (neuron_count && region_count && *neuron_count < *region_count) {
+                suggestions.push_back("neuron_count (" + std::to_string(*neuron_count) +
+                                    ") should be greater than region_count (" +
+                                    std::to_string(*region_count) + ")");
+            }
+        }
+        
+        return std::make_tuple(issues, warnings, suggestions);
+    }, py::arg("config"), "Validate configuration parameters. "
+        "Returns tuple of (issues, warnings, suggestions)");
+
+    m.def("getCurrentTimestamp", []() {
+        return nlm::SimulationClock::getCurrentTime();
+    }, "Get current simulation timestamp");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
