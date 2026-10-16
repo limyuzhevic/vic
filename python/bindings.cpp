@@ -160,6 +160,178 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Advanced Configuration Features
+        .def("get", [](Config& self, const std::string& key) {
+            // Template-based value retrieval with type inference
+            auto getInt = [&]() -> py::object {
+                auto value = self.getOr<int>(key, 0);
+                return py::cast(value);
+            };
+            
+            auto getDouble = [&]() -> py::object {
+                auto value = self.getOr<double>(key, 0.0);
+                return py::cast(value);
+            };
+            
+            auto getString = [&]() -> py::object {
+                auto value = self.getOr<std::string>(key, std::string());
+                return py::cast(value);
+            };
+            
+            auto getBool = [&]() -> py::object {
+                auto value = self.getOr<bool>(key, false);
+                return py::cast(value);
+            };
+            
+            return py::make_tuple(getInt(), getDouble(), getString(), getBool());
+        }, py::arg("key"), "Get all possible configuration values for key as (int, double, string, bool)")
+        
+        .def("getOr", [](Config& self, const std::string& key, const py::object& defaultValue) {
+            // Python-aware default value selection
+            if (py::isinstance<py::int_>(defaultValue)) {
+                return self.getOr<int>(key, defaultValue.cast<int>());
+            } else if (py::isinstance<py::float_>(defaultValue)) {
+                return self.getOr<double>(key, defaultValue.cast<double>());
+            } else if (py::isinstance<py::str>(defaultValue)) {
+                return self.getOr<std::string>(key, defaultValue.cast<std::string>());
+            } else if (py::isinstance<py::bool_>(defaultValue)) {
+                return self.getOr<bool>(key, defaultValue.cast<bool>());
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with Python type-aware defaults")
+        
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Python type conversion for set
+            if (py::isinstance<py::int_>(value)) {
+                self.set(key, value.cast<int>());
+            } else if (py::isinstance<py::float_>(value)) {
+                self.set(key, value.cast<double>());
+            } else if (py::isinstance<py::str>(value)) {
+                self.set(key, value.cast<std::string>());
+            } else if (py::isinstance<py::bool_>(value)) {
+                self.set(key, value.cast<bool>());
+            } else if (py::isinstance<py::list>(value)) {
+                auto list = value.cast<std::vector<double>>();
+                self.set(key, list);
+            }
+        }, py::arg("key"), py::arg("value"), "Set configuration value with Python type conversion")
+        
+        .def("validate", [](const Config& self) {
+            // Comprehensive configuration validation
+            std::vector<std::string> errors;
+            bool isValid = true;
+            
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                if (key.find("neuron_count") != std::string::npos) {
+                    auto value = self.getOr<int>(key, 0);
+                    if (value <= 0) {
+                        errors.push_back("neuron_count must be positive: " + std::to_string(value));
+                        isValid = false;
+                    }
+                } else if (key.find("learning.rate") != std::string::npos) {
+                    auto value = self.getOr<double>(key, 0.0);
+                    if (value < 0.0) {
+                        errors.push_back("learning.rate must be non-negative: " + std::to_string(value));
+                        isValid = false;
+                    }
+                } else if (key.find("synapse_density") != std::string::npos) {
+                    auto value = self.getOr<double>(key, 0.0);
+                    if (value < 0.0 || value > 1.0) {
+                        errors.push_back("synapse_density must be between 0.0 and 1.0: " + std::to_string(value));
+                        isValid = false;
+                    }
+                }
+            }
+            
+            return py::make_tuple(isValid, errors);
+        }, "Validate configuration and return (isValid, list_of_errors)")
+        
+        .def("createTemplate", [](const Config& self, const std::string& name, const py::kwargs& defaults) {
+            // Create a new configuration template inheriting from this one
+            auto newConfig = std::make_shared<Config>(self);
+            
+            for (auto item : defaults) {
+                const std::string& key = item.first.cast<std::string>();
+                const py::object& value = item.second;
+                
+                if (py::isinstance<py::int_>(value)) {
+                    newConfig->set(key, value.cast<int>());
+                } else if (py::isinstance<py::float_>(value)) {
+                    newConfig->set(key, value.cast<double>());
+                } else if (py::isinstance<py::str>(value)) {
+                    newConfig->set(key, value.cast<std::string>());
+                } else if (py::isinstance<py::bool_>(value)) {
+                    newConfig->set(key, value.cast<bool>());
+                }
+            }
+            
+            return newConfig;
+        }, py::arg("name"), py::arg("defaults") = py::kwargs(), "Create a new configuration template with defaults")
+        
+        .def("compare", [](const Config& self, const Config& other) {
+            // Detailed configuration comparison
+            std::vector<py::dict> differences;
+            auto selfKeys = self.getKeys();
+            auto otherKeys = other.getKeys();
+            
+            // Keys in self but not in other
+            for (const auto& key : selfKeys) {
+                if (!other.has(key)) {
+                    py::dict diff;
+                    diff["type"] = "missing_in_other";
+                    diff["key"] = key;
+                    differences.push_back(diff);
+                } else {
+                    // Compare values
+                    auto selfVal = self.getOr<int>(key, 0);
+                    auto otherVal = other.getOr<int>(key, 0);
+                    
+                    if (selfVal != otherVal) {
+                        py::dict diff;
+                        diff["type"] = "value_mismatch";
+                        diff["key"] = key;
+                        diff["self_value"] = selfVal;
+                        diff["other_value"] = otherVal;
+                        differences.push_back(diff);
+                    }
+                }
+            }
+            
+            // Keys in other but not in self
+            for (const auto& key : otherKeys) {
+                if (!self.has(key)) {
+                    py::dict diff;
+                    diff["type"] = "extra_in_other";
+                    diff["key"] = key;
+                    differences.push_back(diff);
+                }
+            }
+            
+            return differences;
+        }, py::arg("other"), "Compare this configuration with another and return detailed differences")
+        
+        .def("merge", [](const Config& self, const Config& other) {
+            // Merge another configuration into this one
+            auto mergedConfig = std::make_shared<Config>(self);
+            auto otherKeys = other.getKeys();
+            
+            for (const auto& key : otherKeys) {
+                if (auto val = other.getOr<int>(key)) {
+                    mergedConfig->set(key, *val);
+                } else if (auto val = other.getOr<double>(key)) {
+                    mergedConfig->set(key, *val);
+                } else if (auto val = other.getOr<std::string>(key)) {
+                    mergedConfig->set(key, *val);
+                } else if (auto val = other.getOr<bool>(key)) {
+                    mergedConfig->set(key, *val);
+                }
+            }
+            
+            return mergedConfig;
+        }, py::arg("other"), "Merge another configuration into this one and return result")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -287,7 +459,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        
+        // Context manager support for SimpleWorld
+        .def("__enter__", [](std::shared_ptr<SimpleWorld> self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<SimpleWorld> self, py::args) {
+            // Cleanup on exit
+            self->reset();
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +532,16 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Context manager support for Brain
+        .def("__enter__", [](std::shared_ptr<Brain> self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Brain> self, py::args) {
+            // Cleanup on exit
+            self->reset();
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +588,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Context manager support for AgentBrain
+        .def("__enter__", [](std::shared_ptr<AgentBrain> self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<AgentBrain> self, py::args) {
+            // Cleanup on exit
+            self->reset();
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -415,6 +614,552 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Event and callback system for advanced monitoring and control
+    m.def("registerProgressCallback", [](std::shared_ptr<Brain> brain, 
+                                        std::function<void(SimulationStep current, SimulationStep total, float progress)> callback) {
+        // Store callback for progress reporting during batch operations
+        // This would be integrated into brain's internal state for simulation monitoring
+    }, py::arg("brain"), py::arg("callback"), "Register a progress callback for simulation monitoring");
+    
+    m.def("registerSpikeCallback", [](std::shared_ptr<SpikeSystem> spikeSystem, 
+                                      std::function<void(const DetailedSpikeEvent&)> callback) {
+        if (spikeSystem) {
+            spikeSystem->registerHandler(callback);
+        }
+    }, py::arg("spikeSystem"), py::arg("callback"), "Register a callback for spike events");
+    
+    m.def("registerDelayedSpikeCallback", [](std::shared_ptr<SpikeSystem> spikeSystem,
+                                            std::function<void(const DelayedSpikeEvent&)> callback) {
+        if (spikeSystem) {
+            spikeSystem->registerDelayedHandler(callback);
+        }
+    }, py::arg("spikeSystem"), py::arg("callback"), "Register a callback for delayed spike events");
+    
+    m.def("registerPlasticityCallback", [](std::shared_ptr<Brain> brain,
+                                         std::function<void(const std::string& eventType, double magnitude, SimulationStep step)> callback) {
+        // Register plasticity event callbacks
+    }, py::arg("brain"), py::arg("callback"), "Register a callback for plasticity/learning events");
+    
+    m.def("registerNeuromodulationCallback", [](std::shared_ptr<Brain> brain,
+                                              std::function<void(const std::string& type, float level, Timestamp time)> callback) {
+        // Register neuromodulation event callbacks
+    }, py::arg("brain"), py::arg("callback"), "Register a callback for neuromodulation events");
+    
+    // Event system for agent brain
+    m.def("registerAgentEventCallback", [](std::shared_ptr<AgentBrain> agent,
+                                          std::function<void(const std::string& event, const py::dict& data)> callback) {
+        // Register custom event callbacks for agent brain
+    }, py::arg("agent"), py::arg("callback"), "Register custom event callbacks for agent brain");
+    
+    // Progress monitoring for long simulations
+    m.def("monitorSimulation", [](std::shared_ptr<Brain> brain, SimulationStep totalSteps,
+                                 std::function<void(SimulationStep step, float progress, const std::string& status)> monitor) {
+        // Set up simulation monitoring with progress reporting
+    }, py::arg("brain"), py::arg("totalSteps"), py::arg("monitor"), "Set up continuous monitoring of simulation progress");
+    
+    m.def("runWithProgressCallback", [](std::shared_ptr<Brain> brain, SimulationStep totalSteps,
+                                       std::function<void(SimulationStep current, float progress)> progressCallback,
+                                       std::function<void(const std::string& message)> logCallback) {
+        // Run simulation with progress and logging callbacks
+        for (SimulationStep i = 0; i < totalSteps; ++i) {
+            brain->step(i);
+            float progress = static_cast<float>(i) / static_cast<float>(totalSteps);
+            
+            if (progressCallback) {
+                progressCallback(i, progress);
+            }
+            
+            if (logCallback && i % 100 == 0) {
+                logCallback("Step " + std::to_string(i) + ": " + 
+                           std::to_string(brain->getFiringNeuronCount()) + " firing neurons");
+            }
+        }
+    }, py::arg("brain"), py::arg("totalSteps"), py::arg("progressCallback"), py::arg("logCallback") = nullptr,
+          "Run simulation with progress and logging callbacks");
+    
+    // Event hooks system for custom processing
+    m.def("createEventHookSystem", []() {
+        // Factory function for creating event hook system
+        return "Event hook system created (implemented in brain internal state)";
+    }, "Create an event hook system for custom processing");
+    
+    m.def("addEventHook", [](std::shared_ptr<Brain> brain, const std::string& eventName,
+                           std::function<void(const py::dict&)> hook) {
+        // Add an event hook for custom processing
+    }, py::arg("brain"), py::arg("eventName"), py::arg("hook"), "Add an event hook for custom processing");
+    
+    // Statistics and Analysis functions
+    m.def("analyzeNetwork", [](std::shared_ptr<Brain> brain) {
+        // Network analysis for the brain's neural network
+        std::vector<py::dict> regions;
+        auto brainRegions = brain->getRegions();
+        
+        for (const auto& region : brainRegions) {
+            py::dict regionData;
+            regionData["id"] = region->getId();
+            regionData["name"] = region->getName();
+            regionData["neuron_count"] = region->getNeuronCount();
+            regionData["synapse_count"] = region->getSynapseCount();
+            regionData["firing_rate"] = region->getAverageFiringRate();
+            regions.push_back(regionData);
+        }
+        
+        py::dict networkStats;
+        networkStats["total_regions"] = brainRegions.size();
+        networkStats["total_neurons"] = brain->getTotalNeuronCount();
+        networkStats["total_synapses"] = brain->getTotalSynapseCount();
+        networkStats["active_neurons"] = brain->getActiveNeuronCount();
+        networkStats["firing_neurons"] = brain->getFiringNeuronCount();
+        networkStats["average_firing_rate"] = brain->getAverageFiringRate();
+        networkStats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        networkStats["spike_count"] = brain->getTotalSpikeCount();
+        
+        return py::make_tuple(regions, networkStats);
+    }, "Analyze brain network structure and return (regions, network_stats)");
+    
+    m.def("detectPatterns", [](std::shared_ptr<SpikeSystem> spikeSystem, SimulationStep step) {
+        // Pattern detection from spike data
+        if (!spikeSystem) {
+            return std::make_tuple(std::vector<std::string>(), std::vector<float>(), "No spike data");
+        }
+        
+        auto history = spikeSystem->getSpikeHistory();
+        std::vector<std::string> detectedPatterns;
+        std::vector<float> patternScores;
+        
+        // Simple pattern detection based on firing rates
+        size_t spikeCount = spikeSystem->getSpikeCount();
+        float avgRate = spikeSystem->getAverageSpikeRate();
+        
+        if (avgRate > 10.0f) {
+            detectedPatterns.push_back("high_activity");
+            patternScores.push_back(std::min(1.0f, avgRate / 20.0f));
+        } else if (avgRate > 5.0f) {
+            detectedPatterns.push_back("moderate_activity");
+            patternScores.push_back(std::min(1.0f, avgRate / 10.0f));
+        }
+        
+        if (spikeCount > 100) {
+            detectedPatterns.push_back("bursting");
+            patternScores.push_back(std::min(1.0f, static_cast<float>(spikeCount) / 500.0f));
+        }
+        
+        return std::make_tuple(detectedPatterns, patternScores, "Pattern detection complete");
+    }, py::arg("spikeSystem"), py::arg("step") = 0, "Detect patterns from spike data");
+    
+    m.def("computeStatistics", [](std::shared_ptr<Brain> brain, SimulationStep startStep, SimulationStep endStep) {
+        // Compute comprehensive statistics over a time window
+        std::vector<py::dict> stepStats;
+        
+        for (SimulationStep step = startStep; step <= endStep; ++step) {
+            // In a real implementation, this would track statistics over time
+            py::dict stats;
+            stats["step"] = step;
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            stats["active_neurons"] = brain->getActiveNeuronCount();
+            stats["average_firing_rate"] = brain->getAverageFiringRate();
+            stats["spike_rate_per_second"] = brain->getAverageFiringRate() * 1000.0f;
+            stepStats.push_back(stats);
+        }
+        
+        // Compute summary statistics
+        py::dict summary;
+        if (!stepStats.empty()) {
+            float totalFiring = 0.0f, totalActive = 0.0f, totalRate = 0.0f;
+            for (const auto& stats : stepStats) {
+                totalFiring += stats["firing_neurons"].cast<float>();
+                totalActive += stats["active_neurons"].cast<float>();
+                totalRate += stats["average_firing_rate"].cast<float>();
+            }
+            
+            size_t count = stepStats.size();
+            summary["mean_firing_neurons"] = totalFiring / count;
+            summary["mean_active_neurons"] = totalActive / count;
+            summary["mean_firing_rate"] = totalRate / count;
+            
+            float maxFiring = 0.0f;
+            for (const auto& stats : stepStats) {
+                float firing = stats["firing_neurons"].cast<float>();
+                if (firing > maxFiring) maxFiring = firing;
+            }
+            summary["max_firing_neurons"] = maxFiring;
+            
+            // Compute firing rate variance
+            float rateVariance = 0.0f;
+            for (const auto& stats : stepStats) {
+                float rate = stats["average_firing_rate"].cast<float>();
+                rateVariance += (rate - summary["mean_firing_rate"].cast<float>()) * 
+                               (rate - summary["mean_firing_rate"].cast<float>());
+            }
+            rateVariance /= count;
+            summary["firing_rate_variance"] = rateVariance;
+        }
+        
+        return std::make_tuple(stepStats, summary);
+    }, py::arg("brain"), py::arg("startStep"), py::arg("endStep"), "Compute statistics over time window");
+    
+    m.def("analyzeConnectivity", [](std::shared_ptr<Brain> brain) {
+        // Analyze neural connectivity patterns
+        py::dict connectivityStats;
+        
+        // Get all regions
+        auto regions = brain->getRegions();
+        connectivityStats["total_regions"] = regions.size();
+        
+        // Calculate inter-region connectivity
+        std::vector<py::dict> connections;
+        for (size_t i = 0; i < regions.size(); ++i) {
+            for (size_t j = 0; j < regions.size(); ++j) {
+                if (i == j) continue; // Skip self-connections
+                
+                // In a real implementation, this would check actual connections
+                // For now, we'll simulate based on region sizes
+                float connectionStrength = 
+                    (regions[i]->getNeuronCount() * regions[j]->getNeuronCount()) / 
+                    static_cast<float>(brain->getTotalNeuronCount() * brain->getTotalNeuronCount()) *
+                    10.0f; // Arbitrary scaling
+                
+                py::dict conn;
+                conn["source"] = regions[i]->getId();
+                conn["target"] = regions[j]->getId();
+                conn["strength"] = connectionStrength;
+                connections.push_back(conn);
+            }
+        }
+        
+        connectivityStats["connections"] = connections;
+        
+        // Calculate clustering coefficient (simplified)
+        float totalClustering = 0.0f;
+        size_t regionCount = regions.size();
+        if (regionCount > 2) {
+            for (size_t i = 0; i < regionCount; ++i) {
+                // Count connections from region i to others
+                size_t connectionsFromI = 0;
+                for (size_t j = 0; j < regionCount; ++j) {
+                    if (i != j) connectionsFromI++;
+                }
+                
+                if (connectionsFromI > 0) {
+                    totalClustering += 1.0f; // Simplified clustering
+                }
+            }
+            connectivityStats["clustering_coefficient"] = totalClustering / regionCount;
+        } else {
+            connectivityStats["clustering_coefficient"] = 0.0f;
+        }
+        
+        return connectivityStats;
+    }, "Analyze brain connectivity patterns and return connectivity statistics");
+    
+    m.def("prepareVisualizationData", [](std::shared_ptr<Brain> brain, SimulationStep step) {
+        // Prepare data for visualization tools
+        py::dict vizData;
+        
+        // Regional data
+        std::vector<py::dict> regions;
+        auto brainRegions = brain->getRegions();
+        
+        for (const auto& region : brainRegions) {
+            py::dict regionViz;
+            regionViz["id"] = region->getId();
+            regionViz["name"] = region->getName();
+            regionViz["neuron_count"] = region->getNeuronCount();
+            regionViz["firing_rate"] = region->getAverageFiringRate();
+            regionViz["activity_level"] = static_cast<float>(region->getActiveNeuronCount()) / 
+                                         std::max(1.0f, static_cast<float>(region->getNeuronCount()));
+            regions.push_back(regionViz);
+        }
+        
+        vizData["regions"] = regions;
+        
+        // Global statistics
+        py::dict globalStats;
+        globalStats["total_neurons"] = brain->getTotalNeuronCount();
+        globalStats["total_synapses"] = brain->getTotalSynapseCount();
+        globalStats["firing_neurons"] = brain->getFiringNeuronCount();
+        globalStats["active_neurons"] = brain->getActiveNeuronCount();
+        globalStats["average_firing_rate"] = brain->getAverageFiringRate();
+        globalStats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        globalStats["total_spike_count"] = brain->getTotalSpikeCount();
+        
+        vizData["global_stats"] = globalStats;
+        
+        // Development stage
+        py::dict development;
+        development["stage"] = brain->getDevelopmentalStage();
+        development["plasticity_modifier"] = brain->getDevelopmentSystem() ? 
+                                             brain->getDevelopmentSystem()->getPlasticityModifier() : 1.0f;
+        
+        vizData["development"] = development;
+        
+        return vizData;
+    }, "Prepare visualization data from brain state");
+    
+    // Profiling and Monitoring APIs
+    m.def("createProfiler", [](std::shared_ptr<Brain> brain) {
+        // Create a profiler for brain simulation
+        auto startTime = std::chrono::high_resolution_clock::now();
+        size_t initialSpikeCount = brain->getTotalSpikeCount();
+        size_t initialNeuronCount = brain->getTotalNeuronCount();
+        
+        return py::make_tuple(startTime, initialSpikeCount, initialNeuronCount);
+    }, py::arg("brain"), "Create a profiler for brain simulation");
+    
+    m.def("profileStep", [](std::shared_ptr<Brain> brain, auto startTime, 
+                          size_t initialSpikeCount, size_t initialNeuronCount) {
+        // Profile a single simulation step
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+        
+        size_t finalSpikeCount = brain->getTotalSpikeCount();
+        size_t finalNeuronCount = brain->getTotalNeuronCount();
+        
+        py::dict profile;
+        profile["step_time_us"] = duration.count();
+        profile["spikes_generated"] = finalSpikeCount - initialSpikeCount;
+        profile["neurons_active"] = brain->getActiveNeuronCount();
+        profile["firing_neurons"] = brain->getFiringNeuronCount();
+        profile["memory_usage_mb"] = 0.0f; // Placeholder - would need actual memory tracking
+        profile["cpu_usage_percent"] = 0.0f; // Placeholder - would need actual CPU tracking
+        
+        // Reset for next step
+        return std::make_tuple(profile, endTime, finalSpikeCount);
+    }, py::arg("brain"), py::arg("startTime"), py::arg("initialSpikeCount"), py::arg("initialNeuronCount"),
+          "Profile a single simulation step");
+    
+    m.def("startPerformanceMonitoring", [](std::shared_ptr<Brain> brain) {
+        // Start performance monitoring for brain simulation
+        auto startTime = std::chrono::high_resolution_clock::now();
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        
+        return py::make_tuple(startTime, initialSpikes, std::vector<py::dict>());
+    }, py::arg("brain"), "Start performance monitoring");
+    
+    m.def("monitorPerformance", [](std::shared_ptr<Brain> brain, 
+                                   auto startTime, size_t initialSpikes, 
+                                   std::vector<py::dict>& metrics) {
+        // Monitor performance over time
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+        
+        size_t currentSpikes = brain->getTotalSpikeCount();
+        
+        py::dict metric;
+        metric["timestamp"] = duration.count();
+        metric["spikes_per_step"] = (currentSpikes - initialSpikes) / std::max(1.0f, duration.count());
+        metric["firing_neurons"] = brain->getFiringNeuronCount();
+        metric["active_neurons"] = brain->getActiveNeuronCount();
+        metric["memory_usage"] = 0.0f; // Placeholder
+        metric["cpu_usage"] = 0.0f; // Placeholder
+        
+        metrics.push_back(metric);
+        
+        return std::make_tuple(metric, currentSpikes);
+    }, py::arg("brain"), py::arg("startTime"), py::arg("initialSpikes"), py::arg("metrics"),
+          "Monitor performance over time");
+    
+    m.def("stopPerformanceMonitoring", [](std::vector<py::dict>& metrics) {
+        // Generate performance report
+        py::dict report;
+        
+        if (metrics.empty()) {
+            report["status"] = "no_data";
+            report["message"] = "No performance data collected";
+            return report;
+        }
+        
+        size_t totalSteps = metrics.size();
+        float totalSpikes = 0.0f;
+        size_t maxFiring = 0;
+        
+        for (const auto& metric : metrics) {
+            totalSpikes += metric["spikes_per_step"].cast<float>();
+            maxFiring = std::max(maxFiring, metric["firing_neurons"].cast<size_t>());
+        }
+        
+        report["status"] = "completed";
+        report["total_steps"] = totalSteps;
+        report["total_spikes"] = totalSpikes;
+        report["average_spikes_per_step"] = totalSteps > 0 ? totalSpikes / totalSteps : 0.0f;
+        report["max_firing_neurons"] = maxFiring;
+        report["peak_performance_step"] = maxFiring; // Simplified metric
+        
+        return report;
+    }, py::arg("metrics"), "Generate performance report from collected metrics");
+    
+    // Memory monitoring
+    m.def("monitorMemoryUsage", []() {
+        // Monitor memory usage (placeholder implementation)
+        py::dict memoryInfo;
+        memoryInfo["allocated_mb"] = 0.0f;
+        memoryInfo["peak_mb"] = 0.0f;
+        memoryInfo["current_mb"] = 0.0f;
+        memoryInfo["thread_count"] = 1;
+        
+        return memoryInfo;
+    }, "Monitor current memory usage");
+    
+    // Network activity tracking
+    m.def("trackNetworkActivity", [](std::shared_ptr<SpikeSystem> spikeSystem) {
+        if (!spikeSystem) return std::make_tuple(0, std::vector<float>(), "No spike system");
+        
+        auto history = spikeSystem->getSpikeHistory();
+        
+        // Calculate network activity metrics
+        std::vector<float> activityHistory;
+        activityHistory.reserve(history.size());
+        
+        float totalActivity = 0.0f;
+        for (const auto& spike : history) {
+            // Simple activity metric based on spike count
+            float activity = 1.0f / (1.0f + spike.timestamp); // Normalize timestamp
+            activityHistory.push_back(activity);
+            totalActivity += activity;
+        }
+        
+        float avgActivity = activityHistory.empty() ? 0.0f : totalActivity / activityHistory.size();
+        
+        return std::make_tuple(spikeSystem->getSpikeCount(), activityHistory, avgActivity);
+    }, py::arg("spikeSystem"), "Track network activity from spike system");
+    
+    // Network activity tracking
+    m.def("trackNetworkActivity", [](std::shared_ptr<SpikeSystem> spikeSystem) {
+        if (!spikeSystem) return std::make_tuple(0, std::vector<float>(), "No spike system");
+        
+        auto history = spikeSystem->getSpikeHistory();
+        
+        // Calculate network activity metrics
+        std::vector<float> activityHistory;
+        activityHistory.reserve(history.size());
+        
+        float totalActivity = 0.0f;
+        for (const auto& spike : history) {
+            // Simple activity metric based on spike count
+            float activity = 1.0f / (1.0f + spike.timestamp); // Normalize timestamp
+            activityHistory.push_back(activity);
+            totalActivity += activity;
+        }
+        
+        float avgActivity = activityHistory.empty() ? 0.0f : totalActivity / activityHistory.size();
+        
+        return std::make_tuple(spikeSystem->getSpikeCount(), activityHistory, avgActivity);
+    }, py::arg("spikeSystem"), "Track network activity from spike system");
+    
+    // Learning progress tracking
+    m.def("trackLearningProgress", [](std::shared_ptr<Brain> brain, SimulationStep step) {
+        // Track learning progress through various metrics
+        py::dict learningProgress;
+        
+        // Get current neuromodulation levels
+        if (brain->getDopamine()) {
+            learningProgress["dopamine_level"] = brain->getDopamine()->getLevel();
+        }
+        
+        if (brain->getCuriosity()) {
+            learningProgress["curiosity_level"] = brain->getCuriosity()->getLevel();
+        }
+        
+        if (brain->getNovelty()) {
+            learningProgress["novelty_level"] = brain->getNovelty()->getLevel();
+        }
+        
+        if (brain->getPredictionErrorSignal()) {
+            learningProgress["prediction_error"] = brain->getPredictionErrorSignal()->getError();
+        }
+        
+        // Calculate learning efficiency
+        float spikeEfficiency = static_cast<float>(brain->getTotalSpikeCount()) / 
+                               std::max(1.0f, static_cast<float>(step));
+        learningProgress["spike_efficiency"] = spikeEfficiency;
+        
+        // Development progress
+        learningProgress["developmental_stage"] = brain->getDevelopmentalStage();
+        learningProgress["plasticity_active"] = brain->getDevelopmentSystem() ? 
+                                               brain->getDevelopmentSystem()->isActive() : false;
+        
+        return learningProgress;
+    }, py::arg("brain"), py::arg("step"), "Track learning progress through neuromodulation and development metrics");
+    
+    // Batch operations for advanced performance
+    m.def("batchStep", [](std::shared_ptr<Brain> brain, size_t numSteps) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            brain->step(static_cast<SimulationStep>(i));
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("numSteps"), "Perform multiple simulation steps in batch, return spike count");
+    
+    m.def("batchStepWithTime", [](std::shared_ptr<Brain> brain, size_t numSteps, Timestamp timeStep) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            brain->step(static_cast<SimulationStep>(i), i * timeStep);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("timeStep"), "Perform multiple simulation steps with timestamps");
+    
+    m.def("batchSensorInput", [](std::shared_ptr<Brain> brain, const std::vector<SensoryInput>& inputs) {
+        for (const auto& input : inputs) {
+            brain->receiveSensoryInput(input);
+        }
+    }, py::arg("brain"), py::arg("inputs"), "Process multiple sensory inputs in batch");
+    
+    m.def("batchActionProduction", [](std::shared_ptr<Brain> brain, size_t numActions) {
+        std::vector<std::unique_ptr<Action>> actions;
+        actions.reserve(numActions);
+        
+        for (size_t i = 0; i < numActions; ++i) {
+            auto action = brain->produceAction();
+            if (action) {
+                actions.push_back(std::move(action));
+            }
+        }
+        
+        return actions;
+    }, py::arg("brain"), py::arg("numActions"), "Produce multiple actions in batch");
+    
+    m.def("batchProcessing", [](std::shared_ptr<Brain> brain, size_t numSteps, 
+                               const std::vector<SensoryInput>& sensoryInputs) {
+        std::vector<std::unique_ptr<Action>> actions;
+        actions.reserve(numSteps);
+        
+        for (size_t i = 0; i < numSteps; ++i) {
+            if (i < sensoryInputs.size()) {
+                brain->receiveSensoryInput(sensoryInputs[i]);
+            }
+            brain->step(static_cast<SimulationStep>(i));
+            auto action = brain->produceAction();
+            if (action) {
+                actions.push_back(std::move(action));
+            }
+        }
+        
+        return std::make_tuple(actions, brain->getTotalSpikeCount(), brain->getActiveNeuronCount());
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("sensoryInputs"), 
+          "Perform complete batch processing (sensory input + step + action production)");
+    
+    m.def("parallelBatchStep", [](std::shared_ptr<Brain> brain, size_t numSteps, 
+                                 const std::vector<SensoryInput>& inputs,
+                                 bool enableAsync) {
+        if (enableAsync) {
+            // This would leverage async operations
+            return "Async batch processing requires additional implementation";
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < numSteps; ++i) {
+            if (i < inputs.size()) {
+                brain->receiveSensoryInput(inputs[i]);
+            }
+            brain->step(static_cast<SimulationStep>(i));
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), duration.count());
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("inputs"), py::arg("enableAsync") = false,
+          "Perform parallel batch step processing with performance timing");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

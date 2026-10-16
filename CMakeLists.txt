@@ -29,12 +29,19 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainCore.cpp
+    src/brain/BrainStep.cpp
+    src/brain/BrainRegions.cpp
+    src/brain/BrainMemory.cpp
+    src/brain/BrainNeuromodulation.cpp
+    src/brain/BrainUtils.cpp
+    src/brain/BrainMain.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -103,6 +110,8 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    src/world/WorldObjects.cpp
+    src/world/EnhancedWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)

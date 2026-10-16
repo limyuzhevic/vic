@@ -82,7 +82,16 @@ enum class WorldObjectType {
     Resource = 1,      // Positive reward
     Hazard = 2,        // Negative reward
     Wall = 3,         // Boundary
-    Marker = 4        // Navigation aid
+    Marker = 4,       // Navigation aid
+    Plant = 5,        // Living plant
+    Animal = 6,        // Living animal
+    Rock = 7,          // Solid rock
+    Water = 8,         // Liquid water
+    Fire = 9,          // Combustion
+    EnergySource = 10, // Generator, battery
+    Structure = 11,    // Building, door
+    Weather = 12,      // Environmental effect
+    Clock = 13         // Time-based object
 };
 
 } // namespace nlm
