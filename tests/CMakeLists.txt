@@ -5,15 +5,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 # Create test executable
 add_executable(nlm_test
-    test_main.cpp
-    test_types.cpp
-    test_config.cpp
-    test_random.cpp
-    test_clock.cpp
-    test_neuron.cpp
-    test_synapse.cpp
-    test_stdp.cpp
-    test_brain.cpp
+    test_main_enhanced.cpp
+    test_types_enhanced.cpp
+    test_config_enhanced.cpp
+    test_random_enhanced.cpp
+    test_clock_enhanced.cpp
+    test_neuron_enhanced.cpp
+    test_synapse_enhanced.cpp
+    test_stdp_enhanced.cpp
+    test_brain_enhanced.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

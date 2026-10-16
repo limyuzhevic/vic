@@ -95,6 +95,9 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Include enhanced memory management headers
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm

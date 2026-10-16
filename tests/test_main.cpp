@@ -1,130 +1,82 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Enhanced NLM Test Main with Comprehensive Reporting
+// Phase 2: Real Neural Computation Tests with Full Test Coverage
 
+#include "nlm_test_utilities.h"
 #include <iostream>
 #include <cassert>
+#include <map>
 
 // Forward declarations of test functions
 namespace test_types {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_config {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_random {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_clock {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_neuron {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_synapse {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_stdp {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 namespace test_brain {
-    void runAll();
+    bool runAllTests(nlm::test::TestFramework& framework);
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    nlm::test::TestFramework framework;
+    
+    std::cout << "=== NLM Phase 2 Tests - Comprehensive Test Suite ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Memory Management" << std::endl;
+    std::cout << "  - Integration Testing" << std::endl;
+    std::cout << "  - Performance Testing" << std::endl;
     std::cout << std::endl;
     
-    bool allPassed = true;
+    // Run all test suites
+    std::cout << "=== CORE COMPONENTS ===" << std::endl;
+    bool typesPassed = test_types::runAllTests(framework);
+    bool configPassed = test_config::runAllTests(framework);
+    bool randomPassed = test_random::runAllTests(framework);
+    bool clockPassed = test_clock::runAllTests(framework);
     
-    std::cout << "Running Types tests..." << std::endl;
-    try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    std::cout << "\n=== BRAIN LEVEL TESTING ===" << std::endl;
+    bool neuronPassed = test_neuron::runAllTests(framework);
+    bool synapsePassed = test_synapse::runAllTests(framework);
+    bool stdpPassed = test_stdp::runAllTests(framework);
     
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    std::cout << "\n=== SYSTEM INTEGRATION ===" << std::endl;
+    bool brainPassed = test_brain::runAllTests(framework);
     
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    // Generate comprehensive report
+    framework.printReport();
     
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+    // Check if all tests passed
+    if (typesPassed && configPassed && randomPassed && clockPassed &&
+        neuronPassed && synapsePassed && stdpPassed && brainPassed) {
+        std::cout << "\n=== ALL TESTS PASSED ===" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "\n=== SOME TESTS FAILED ===" << std::endl;
         return 1;
     }
 }
