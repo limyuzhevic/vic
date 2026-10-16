@@ -193,6 +193,42 @@ public:
     // Logging
     void logStatus() const;
     
+    // ===== HIGH-LEVEL BRAIN OPERATIONS =====
+    
+    // Perform a complete development cycle
+    // Updates developmental stage, plasticity rates, and system maturation
+    void develop();
+    
+    // Update all plasticity rules (STDP, Hebbian, structural)
+    // Called automatically in simulation step, can be called manually
+    void updatePlasticity();
+    
+    // Apply neuromodulatory signals from all systems
+    // Coordinates effects of dopamine, curiosity, novelty, etc.
+    void applyNeuromodulation(const Neuromodulator& signal);
+    
+    // ===== SYSTEM HEALTH AND MONITORING =====
+    
+    // Get comprehensive brain system statistics
+    // Returns vector of key metrics for monitoring and debugging
+    std::vector<float> getSystemMetrics() const;
+    
+    // Check if brain is in a healthy state for simulation
+    // Validates that all required systems are initialized and functional
+    bool isHealthy() const;
+    
+    // ===== ADVANCED NEURAL OPERATIONS =====
+    
+    // Inject complex current patterns into neural populations
+    // Useful for targeted stimulation experiments
+    void injectCurrentPattern(const std::vector<std::pair<NeuronId, float>>& neuronCurrents);
+    
+    // Create long-range inter-region connections
+    // Enables communication between different brain regions
+    void addInterRegionConnection(RegionId source, RegionId target, 
+                                 float weight = 0.0f, Delay delay = Delay(1),
+                                 PlasticityFlags flags = PlasticityFlags());
+    
 private:
     struct Impl;
     Impl* pImpl;

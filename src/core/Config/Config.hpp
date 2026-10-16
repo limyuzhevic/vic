@@ -93,6 +93,55 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ===== ADVANCED CONFIGURATION OPERATIONS =====
+    
+    // Import configuration from multiple sources with priority
+    // Merges configurations from file, command line, and runtime sources
+    bool importFromMultipleSources(const std::vector<std::string>& filepaths,
+                                  int argc = 0, char** argv = nullptr);
+    
+    // Validate configuration for simulation
+    // Checks that all required keys exist and have valid values
+    bool validate() const;
+    
+    // Get configuration differences between two configs
+    // Returns vector of keys that differ between this and another config
+    std::vector<std::string> diff(const Config& other) const;
+    
+    // Apply configuration overrides
+    // Takes a map of key-value pairs and applies them as runtime overrides
+    void applyOverrides(const std::map<std::string, ConfigValue>& overrides);
+    
+    // ===== CONFIGURATION METADATA =====
+    
+    // Get all configuration entries with source information
+    // Returns entries including their source (Default, File, CommandLine, Runtime)
+    std::vector<ConfigEntry> getAllEntries() const;
+    
+    // Get entries from specific source
+    // Filters entries by their configuration source
+    std::vector<ConfigEntry> getEntriesFromSource(ConfigSource source) const;
+    
+    // Count entries from specific source
+    // Useful for understanding configuration composition
+    size_t countFromSource(ConfigSource source) const;
+    
+    // ===== UTILITY OPERATIONS =====
+    
+    // Merge another configuration into this one
+    // Entries from the other config take precedence
+    void merge(const Config& other);
+    
+    // Create a copy of this configuration
+    std::unique_ptr<Config> clone() const;
+    
+    // Get configuration hash for comparison
+    // Useful for detecting configuration changes
+    size_t getHash() const;
+    
+    // Check if configuration equals another
+    bool equals(const Config& other) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
