@@ -57,6 +57,9 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
+    ${NLM_SOURCE_DIR}/experiments/AdvancedExperimentConfig.hpp
+    ${NLM_SOURCE_DIR}/experiments/AdvancedExperiment.hpp
+    ${NLM_SOURCE_DIR}/experiments/AdvancedExperimentImpl.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 

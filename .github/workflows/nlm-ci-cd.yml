@@ -1,0 +1,355 @@
+# GitHub Actions CI/CD Pipeline Configuration for NLM
+# Complete pipeline with build, test, and deployment stages
+
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/nlm
+  CACHE_VERSION: v1
+
+jobs:
+  # Build and test job
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Debug, Release, RelWithDebInfo]
+        include:
+          - os: ubuntu-latest
+            build_type: Debug
+            compiler: gcc
+            cmake_preset: "linux-debug"
+          - os: ubuntu-latest
+            build_type: Release
+            compiler: gcc
+            cmake_preset: "linux-release"
+          - os: ubuntu-latest
+            build_type: RelWithDebInfo
+            compiler: gcc
+            cmake_preset: "linux-relwithdebinfo"
+          - os: macos-latest
+            build_type: Release
+            compiler: clang
+            cmake_preset: "macos-release"
+          - os: windows-latest
+            build_type: Release
+            compiler: msvc
+            cmake_preset: "windows-release"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: true
+    
+    - name: Set up environment
+      run: |
+        echo "Setting up environment for ${{ matrix.os }}"
+        echo "Build type: ${{ matrix.build_type }}"
+        echo "Compiler: ${{ matrix.compiler }}"
+    
+    - name: Install dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libgtest-dev \
+          libbenchmark-dev \
+          python3-dev \
+          python3-pip \
+          git-lfs
+    
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew update
+        brew install cmake pkg-config benchmark python3 git-lfs
+    
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install benchmark
+        pip install python3-dev
+        git lfs install
+    
+    - name: Initialize Git LFS
+      run: git lfs install
+    
+    - name: Pull LFS objects
+      run: git lfs pull
+    
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DNLM_ENABLE_COVERAGE=ON \
+          -DNLM_ENABLE_SANITIZERS=OFF \
+          -DNLM_BUILD_TESTS=ON \
+          -DNLM_BUILD_EXAMPLES=ON \
+          ${{ matrix.cmake_preset }} || true
+    
+    - name: Build project
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} --parallel $(nproc)
+        cmake --build . --config ${{ matrix.build_type }} --target all --parallel $(nproc)
+    
+    - name: Run unit tests
+      run: |
+        cd build
+        if [ -f ./nlm_test ]; then
+          ./nlm_test
+        else
+          ctest --output-on-failure --parallel $(nproc)
+        fi
+    
+    - name: Run performance benchmarks
+      run: |
+        cd build
+        if [ -f ./nlm_perf_benchmark ]; then
+          ./nlm_perf_benchmark --benchmark --output benchmark_results.json
+        fi
+    
+    - name: Run integration tests
+      run: |
+        cd build
+        if [ -f ./nlm_integration_test ]; then
+          ./nlm_integration_test
+        fi
+    
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.build_type }}
+        path: |
+          build/test-results.xml
+          build/perf_analysis.json
+          build/benchmark_results.json
+        retention-days: 30
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-artifacts-${{ matrix.os }}-${{ matrix.build_type }}
+        path: |
+          build/nlm*
+          build/*.so
+          build/*.a
+          build/*.exe
+        retention-days: 30
+    
+    - name: Generate coverage report
+      if: matrix.build_type == 'Debug'
+      run: |
+        cd build
+        if [ -f ./coverage_report ]; then
+          ./coverage_report --generate --format=html --output=coverage_report.html
+        fi
+    
+    - name: Upload coverage report
+      if: matrix.build_type == 'Debug'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ matrix.os }}
+        path: build/coverage_report.html
+        retention-days: 30
+    
+    - name: Security scan
+      run: |
+        # Run security scanning tools
+        if command -v semgrep >/dev/null 2>&1; then
+          semgrep --config=auto --error .
+        fi
+        if command -v shellcheck >/dev/null 2>&1; then
+          shellcheck scripts/*.sh
+        fi
+  
+    - name: Build Docker image
+      run: |
+        cd build
+        docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+    
+    - name: Run security vulnerability scan
+      run: |
+        # Run vulnerability scanning
+        if command -vsnyk >/dev/null 2>&1; then
+          snyk test --severity-threshold=high
+        fi
+        if command -vgrype >/dev/null 2>&1; then
+          grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        fi
+    
+    - name: Store build cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/cmake
+          ~/.cache/pip
+          build/CMakeFiles
+          build/cmake_install.cmake
+        key: ${{ runner.os }}-cmake-${{ env.CACHE_VERSION }}-${{ hashFiles('**/*.cmake') }}
+        restore-keys: |
+          ${{ runner.os }}-cmake-${{ env.CACHE_VERSION }}-
+    
+    - name: Create build metrics
+      run: |
+        cd build
+        echo "# Build Metrics" > metrics.md
+        echo "Generated: $(date)" >> metrics.md
+        echo "OS: ${{ matrix.os }}" >> metrics.md
+        echo "Build Type: ${{ matrix.build_type }}" >> metrics.md
+        echo "Compiler: ${{ matrix.compiler }}" >> metrics.md
+        echo "Commit: ${{ github.sha }}" >> metrics.md
+        echo "Branch: ${{ github.ref }}" >> metrics.md
+    
+    - name: Upload metrics
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-metrics-${{ matrix.os }}-${{ matrix.build_type }}
+        path: build/metrics.md
+        retention-days: 30
+  
+  # Cross-compilation job
+  cross-compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [arm-linux-gnueabihf, x86_64-w64-mingw32, aarch64-linux-gnu]
+        build_type: [Debug, Release]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up cross-compilation
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-${{ matrix.target }} \
+          g++-${{ matrix.target }} \
+          binutils-${{ matrix.target }} \
+          cmake \
+          pkg-config
+    
+    - name: Configure cross-compilation
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/${{ matrix.target }}.cmake \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DNLM_ENABLE_TESTS=OFF
+    
+    - name: Build for target platform
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }}
+    
+    - name: Package cross-compiled artifacts
+      run: |
+        cd build
+        tar -czf nlm-${{ matrix.target }}-${{ matrix.build_type }}.tar.gz \
+          --exclude='*.cmake' \
+          --exclude='*.txt' \
+          --exclude='*.md'
+    
+    - name: Upload cross-compiled artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cross-compiled-${{ matrix.target }}-${{ matrix.build_type }}
+        path: build/nlm-*.tar.gz
+        retention-days: 30
+
+  # Performance benchmarking job
+  performance-benchmarks:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download release artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts-ubuntu-latest-Release
+        path: artifacts
+    
+    - name: Run performance benchmarks
+      run: |
+        cd artifacts
+        # Run comprehensive benchmark suite
+        ./nlm_perf_benchmark --benchmark-suite --output=perf_suite.json
+        ./nlm_perf_benchmark --memory-analysis --output=memory_analysis.json
+        ./nlm_perf_benchmark --stress-test --output=stress_test.json
+    
+    - name: Analyze performance results
+      run: |
+        cd artifacts
+        python3 analyze_performance.py --input=perf_suite.json --output=perf_analysis.md
+    
+    - name: Upload performance analysis
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-analysis
+        path: |
+          artifacts/perf_analysis.md
+          artifacts/perf_suite.json
+          artifacts/memory_analysis.json
+          artifacts/stress_test.json
+        retention-days: 30
+    
+    - name: Update performance metrics
+      run: |
+        # Update performance metrics in repository
+        echo "Performance benchmarks completed on $(date)" >> performance_metrics.log
+        # This would typically update a performance dashboard or database
+    
+  # Documentation generation job
+  documentation:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Generate API documentation
+      run: |
+        mkdir -p docs/api
+        # Generate Doxygen documentation
+        doxygen docs/Doxyfile
+        # Generate Sphinx documentation
+        cd docs && sphinx-build -b html source build/html
+    
+    - name: Generate build documentation
+      run: |
+        # Generate build system documentation
+        python3 scripts/generate_build_docs.py --output=docs/build-system/
+        # Generate testing documentation
+        python3 scripts/generate_test_docs.py --output=docs/testing/
+    
+    - name: Deploy documentation
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/
+        keep_files: false

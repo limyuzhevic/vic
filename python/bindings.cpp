@@ -145,21 +145,142 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file (supports multiple formats)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
+        .def("loadFromEnvironment", &Config::loadFromEnvironment,
+             "Load configuration from environment variables")
+        .def("loadWithInheritance", &Config::loadWithInheritance,
+             py::arg("baseFiles"), py::arg("overrides"),
+             "Load configuration with inheritance support")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a file")
+        .def("saveToJSONFile", &Config::saveToJSONFile, py::arg("filepath"), py::arg("includeComments") = false,
              "Save configuration to a JSON file")
+        .def("saveToYAMLFile", &Config::saveToYAMLFile, py::arg("filepath"), py::arg("includeComments") = false,
+             "Save configuration to a YAML file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val.has_value()) return *val;
+            val = self.get<double>(key);
+            if (val.has_value()) return *val;
+            val = self.get<bool>(key);
+            if (val.has_value()) return *val;
+            val = self.get<std::string>(key);
+            if (val.has_value()) return *val;
+            return std::string();
+        }, py::arg("key"),
+            "Get configuration value (automatic type conversion)")
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (int)")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (double)")
+        .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (bool)")
+        .def("getOr", [](Config& self, const std::string& key, std::string defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (bool)")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, const ConfigValue& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set configuration value (variant)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getKeysByCategory", &Config::getKeysByCategory,
+             py::arg("category"),
+             "Get configuration keys by category")
+        .def("getCategory", &Config::getCategory,
+             py::arg("key"),
+             "Get category for configuration key")
+        .def("getCategories", &Config::getCategories,
+             "Get all configuration categories")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("applyTemplate", &Config::applyTemplate,
+             py::arg("templateName"),
+             "Apply a configuration template")
+        .def("getTemplateNames", &Config::getTemplateNames,
+             "Get available template names")
+        .def("addPreset", &Config::addPreset,
+             py::arg("preset"),
+             "Add a configuration preset")
+        .def("applyPreset", &Config::applyPreset,
+             py::arg("presetName"),
+             "Apply a configuration preset")
+        .def("getPresetNames", &Config::getPresetNames,
+             "Get available preset names")
+        .def("getSuggestions", &Config::getSuggestions,
+             py::arg("key"),
+             "Get configuration suggestions for a key")
+        .def("getDocumentation", &Config::getDocumentation,
+             py::arg("key"),
+             "Get configuration documentation for a key")
+        .def("getAllDocumentation", &Config::getAllDocumentation,
+             "Get all configuration documentation")
+        .def("exportToFile", &Config::exportToFile,
+             py::arg("filepath"), py::arg("includeHistory") = false,
+             "Export configuration to file")
+        .def("importFromFile", &Config::importFromFile,
+             py::arg("filepath"),
+             "Import configuration from file")
+        .def("getDiff", &Config::getDiff,
+             py::arg("other"),
+             "Get configuration difference with another configuration")
+        .def("merge", &Config::merge,
+             py::arg("other"), py::arg("overwriteExisting") = false,
+             "Merge configuration with another configuration")
+        .def("getHistory", &Config::getHistory,
+             py::arg("limit") = 0,
+             "Get configuration history")
+        .def("getHistoryActions", &Config::getHistoryActions,
+             py::arg("key"),
+             "Get history actions for a specific key")
+        .def("enableHotReload", &Config::enableHotReload,
+             py::arg("enabled"), py::arg("interval") = std::chrono::milliseconds(100),
+             "Enable/disable hot-reload")
+        .def("getHelp", &Config::getHelp,
+             "Get configuration help and documentation")
+        .def("getStatistics", &Config::getStatistics,
+             "Get configuration statistics")
+        .def("getUsageStatistics", &Config::getUsageStatistics,
+             "Get configuration usage statistics")
+        .def("validateConfiguration", &Config::validateConfiguration,
+             "Validate current configuration")
+        .def("fixConfiguration", &Config::fixConfiguration,
+             "Attempt to fix configuration issues")
+        .def("getRecommendations", &Config::getRecommendations,
+             "Get configuration recommendations")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
