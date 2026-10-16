@@ -61,17 +61,17 @@ public:
     // Enable/disable plasticity rules
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
-    // Eligibility trace (for reward-modulated learning)
-    float getEligibilityTrace() const;
-    void setEligibilityTrace(float trace);
-    void decayEligibilityTrace(float decayRate);
+    // Update short-term plasticity state using Tsodyks-Markram model
+    void updateShortTermPlasticity(Timestamp currentTime, TimestepDuration dt);
     
-    // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    // Update synaptic efficacy based on recent use
+    void updateEfficacyBasedOnUse(Timestamp currentTime);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Update STDP (Spike-Timing Dependent Plasticity)
+    void updateSTDP(Timestamp currentTime, Timestamp preSpikeTime, Timestamp postSpikeTime);
+    
+    // Real synaptic dynamics
+    // TODO PHASE 2: Implement real synaptic dynamics (enhanced version)
     void step(Timestamp currentTime);
     
     // Reset to initial state

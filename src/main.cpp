@@ -6,6 +6,8 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Main execution with basic CLI support
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
