@@ -52,23 +52,89 @@ enum class CompressionLevel {
     Best
 };
 
-// Checkpoint section types
-enum class CheckpointSection : uint32_t {
-    Header = 0,
-    Config = 1,
-    Neurons = 2,
-    Synapses = 3,
-    Connectivity = 4,
-    Plasticity = 5,
-    Development = 6,
-    Neuromodulation = 7,
-    Memory = 8,
-    SpikeHistory = 9,
-    RandomState = 10,
-    SimulationState = 11,
-    Environment = 12,
-    Checksum = 13,
-    End = 14
+/**
+ * Memory system checkpoint data
+ */
+struct MemoryCheckpointData {
+    // Working memory state
+    std::vector<uint64_t> activeMemoryNeurons;    // Neuron IDs with active traces
+    std::vector<float> memoryActivations;          // Activation levels
+    std::vector<uint64_t> recentInputs;            // Recently processed inputs
+    std::vector<float> memoryPriorities;           // Memory priorities
+    
+    // Episodic memory state
+    std::vector<uint64_t> episodeIds;              // Episode identifiers
+    std::vector<double> episodeTimestamps;         // Episode creation times
+    std::vector<float> episodeRewards;             // Episode rewards
+    std::vector<uint32_t> episodeLengths;           // Number of steps per episode
+    
+    // Semantic memory (simplified)
+    std::vector<std::string> concepts;             // Formed concepts
+    std::vector<std::vector<uint64_t>> conceptLinks; // Concept associations
+    
+    // Procedural memory (simplified)
+    std::vector<std::string> actions;              // Learned actions
+    std::vector<float> actionProbabilities;        // Action execution probabilities
+};
+
+/**
+ * Neuromodulation system checkpoint data
+ */
+struct NeuromodulationCheckpointData {
+    // Dopamine system state
+    float dopamineLevel;                // Current dopamine concentration
+    float predictionError;              // Reward prediction error
+    float expectedReward;               // Expected future reward
+    
+    // Other neuromodulators (simplified)
+    float serotoninLevel;               // Serotonin level
+    float norepinephrineLevel;          // Norepinephrine level
+    float acetylcholineLevel;           // Acetylcholine level
+    
+    // Curiosity and novelty
+    float curiosityLevel;               // Exploration motivation
+    float noveltyLevel;                  // Novelty detection
+    
+    // Neuromodulator effects on plasticity
+    std::vector<float> eligibilityTraces;   // Synapse eligibility traces
+    std::vector<float> plasticityModifiers; // Per-synapse plasticity modifiers
+};
+
+/**
+ * Development system checkpoint data
+ */
+struct DevelopmentCheckpointData {
+    // Developmental stage
+    uint32_t developmentalStage;        // Current stage (0=Initial, 1=Critical, 2=Maturation, 3=Adult)
+    double developmentalAge;            // Age in simulation time
+    
+    // Plasticity modulation
+    float plasticityModifier;           // Overall plasticity factor
+    
+    // Structural development
+    std::vector<bool> synaptogenesis;    // Which regions have synaptogenesis enabled
+    std::vector<bool> pruning;          // Which regions have pruning enabled
+    
+    // maturation-related parameters
+    std::vector<float> maturationProgress; // Progress toward maturity for each region
+};
+
+/**
+ * Prediction system checkpoint data
+ */
+struct PredictionCheckpointData {
+    // Prediction state
+    std::vector<float> predictionValues;       // Current predictions
+    std::vector<float> confidenceLevels;        // Prediction confidence
+    std::vector<float> predictionErrors;        // Prediction errors
+    
+    // History tracking
+    std::vector<double> predictionHistory;     // Recent prediction history
+    std::vector<double> rewardHistory;          // Recent reward history
+    
+    // Internal state
+    float temporalDecay;                         // Temporal decay factor
+    std::vector<float> forwardModels;            // Forward model parameters
 };
 
 /**

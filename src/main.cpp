@@ -39,13 +39,122 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics          ║
+    ║     - Event-driven spike propagation with delays              ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "USAGE:" << std::endl;
+    std::cout << "  ./nlm [options]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                Show version information" << std::endl;
+    std::cout << "  --config <file>              Load configuration from file" << std::endl;
+    std::cout << "  --log-level <level>          Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  --random-seed <seed>          Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neuron-count <count>        Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count <count>        Number of brain regions" << std::endl;
+    std::cout << "  --connection-probability <p>  Connection probability for random connectivity (0.0-1.0)" << std::endl;
+    std::cout << "  --simulation-timestep <dt>     Simulation timestep in seconds" << std::endl;
+    std::cout << "  --stdp-ltp-weight <w>         STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd-weight <w>         STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau <tau>              STDP time constant in milliseconds" << std::endl;
+    std::cout << "  --synaptogenesis-rate <r>     Synaptogenesis rate per 1000 steps" << std::endl;
+    std::cout << "  --pruning-rate <r>            Pruning rate per 1000 steps" << std::endl;
+    std::cout << "  --enable-checkpointing         Enable checkpoint save/load functionality" << std::endl;
+    std::cout << "  --enable-replay               Enable episodic memory replay" << std::endl;
+    std::cout << "  --enable-development          Enable developmental stages" << std::endl;
+    std::cout << "  --checkpoint-path <path>      Path for checkpoint files" << std::endl;
+    std::cout << "  --enable-simulation-time      Enable wall clock time tracking" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./nlm --help" << std::endl;
+    std::cout << "  ./nlm --version" << std::endl;
+    std::cout << "  ./nlm --config myconfig.cfg" << std::endl;
+    std::cout << "  ./nlm --neuron-count 2000 --simulation-timestep 0.0001" << std::endl;
+    std::cout << "  ./nlm --enable-checkpointing --checkpoint-path /tmp/nlm_checkpoint.bin" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed documentation, see:\n" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: 2026-10-16" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed information, see:\n" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
+}
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "USAGE:" << std::endl;
+    std::cout << "  ./nlm [options]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config <file>              Load configuration from file" << std::endl;
+    std::cout << "  --log-level <level>          Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  --random-seed <seed>          Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neuron-count <count>        Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count <count>        Number of brain regions" << std::endl;
+    std::cout << "  --connection-probability <p>  Connection probability for random connectivity (0.0-1.0)" << std::endl;
+    std::cout << "  --simulation-timestep <dt>     Simulation timestep in seconds" << std::endl;
+    std::cout << "  --stdp-ltp-weight <w>         STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd-weight <w>         STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau <tau>              STDP time constant in milliseconds" << std::endl;
+    std::cout << "  --synaptogenesis-rate <r>     Synaptogenesis rate per 1000 steps" << std::endl;
+    std::cout << "  --pruning-rate <r>            Pruning rate per 1000 steps" << std::endl;
+    std::cout << "  --max-steps <steps>           Maximum simulation steps (for integration tests)" << std::endl;
+    std::cout << "  --enable-checkpointing         Enable checkpoint save/load functionality" << std::endl;
+    std::cout << "  --enable-replay               Enable episodic memory replay" << std::endl;
+    std::cout << "  --enable-development          Enable developmental stages" << std::endl;
+    std::cout << "  --checkpoint-path <path>      Path for checkpoint files" << std::endl;
+    std::cout << "  --enable-simulation-time      Enable wall clock time tracking" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./nlm --help" << std::endl;
+    std::cout << "  ./nlm --config myconfig.cfg" << std::endl;
+    std::cout << "  ./nlm --neuron-count 2000 --simulation-timestep 0.0001" << std::endl;
+    std::cout << "  ./nlm --enable-checkpointing --checkpoint-path /tmp/nlm_checkpoint.bin" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed documentation, see:
+" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: 2026-10-16" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed information, see:
+" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -321,7 +430,29 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+    // Check for help/version requests before loading configuration
+    bool helpRequested = false;
+    bool versionRequested = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        } else if (arg == "--version" || arg == "-v") {
+            versionRequested = true;
+        }
+    }
+    
+    // Handle help/version requests before anything else
+    if (helpRequested) {
+        printHelp();
+        return 0;
+    }
+    
+    if (versionRequested) {
+        printVersion();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -340,9 +471,6 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
@@ -352,6 +480,15 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
+            // These are already handled above, but just in case
+            if (arg == "--help" || arg == "-h") {
+                printHelp();
+                return 0;
+            } else if (arg == "--version" || arg == "-v") {
+                printVersion();
+                return 0;
             }
         }
     }
@@ -446,4 +583,80 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+void printHelp() {
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "USAGE:" << std::endl;
+    std::cout << "  ./nlm [options]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                Show version information" << std::endl;
+    std::cout << "  --config <file>              Load configuration from file" << std::endl;
+    std::cout << "  --log-level <level>          Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  --random-seed <seed>          Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neuron-count <count>        Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count <count>        Number of brain regions" << std::endl;
+    std::cout << "  --connection-probability <p>  Connection probability for random connectivity (0.0-1.0)" << std::endl;
+    std::cout << "  --simulation-timestep <dt>     Simulation timestep in seconds" << std::endl;
+    std::cout << "  --stdp-ltp-weight <w>         STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd-weight <w>         STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau <tau>              STDP time constant in milliseconds" << std::endl;
+    std::cout << "  --synaptogenesis-rate <r>     Synaptogenesis rate per 1000 steps" << std::endl;
+    std::cout << "  --pruning-rate <r>            Pruning rate per 1000 steps" << std::endl;
+    std::cout << "  --max-steps <steps>           Maximum simulation steps (for integration tests)" << std::endl;
+    std::cout << "  --enable-checkpointing         Enable checkpoint save/load functionality" << std::endl;
+    std::cout << "  --enable-replay               Enable episodic memory replay" << std::endl;
+    std::cout << "  --enable-development          Enable developmental stages" << std::endl;
+    std::cout << "  --checkpoint-path <path>      Path for checkpoint files" << std::endl;
+    std::cout << "  --enable-simulation-time      Enable wall clock time tracking" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./nlm --help" << std::endl;
+    std::cout << "  ./nlm --version" << std::endl;
+    std::cout << "  ./nlm --config myconfig.cfg" << std::endl;
+    std::cout << "  ./nlm --neuron-count 2000 --simulation-timestep 0.0001" << std::endl;
+    std::cout << "  ./nlm --enable-checkpointing --checkpoint-path /tmp/nlm_checkpoint.bin" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed documentation, see:\n" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "=== NLM — 熙然 ===" << std::endl;
+    std::cout << "Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: 2026-10-16" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For detailed information, see:\n" << std::endl;
+    std::cout << "  https://github.com/nlm-project/nlm/blob/main/README.md" << std::endl;
+}
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics          ║
+    ║     - Event-driven spike propagation with delays              ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
 }

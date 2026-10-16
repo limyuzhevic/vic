@@ -36,6 +36,32 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
+    // Apply dopamine-based relevance scoring if available
+    if (brain_ && brain_->getDopamine()) {
+        float dopamineLevel = brain_->getDopamine()->getLevel();
+        
+        // Dopamine modulates episode relevance
+        // Positive dopamine increases relevance (important memories)
+        float dopamineRelevance = std::max(0.0f, dopamineLevel);
+        
+        // Store relevance score
+        stored.relevance = dopamineRelevance;
+        
+        // Also apply noradrenergic and cholinergic modulation if available
+        if (brain_->getNovelty()) {
+            float noveltyLevel = brain_->getNovelty()->getLevel();
+            stored.relevance += noveltyLevel * 0.5f;
+        }
+        
+        if (brain_->getCuriosity()) {
+            float curiosityLevel = brain_->getCuriosity()->getLevel();
+            stored.relevance += curiosityLevel * 0.3f;
+        }
+        
+        // Cap relevance at 1.0
+        stored.relevance = std::min(1.0f, stored.relevance);
+    }
+    
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
@@ -50,6 +76,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Remove old episodes if over capacity
     while (episodes_.size() > maxEpisodes_) {
         episodes_.erase(episodes_.begin());
+        // Also remove corresponding episode neurons
         if (!pImpl->episodeNeurons.empty()) {
             pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
         }
@@ -167,6 +194,8 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
+    NLM_LOG_INFO("Replaying episode with " + std::to_string(episode->activeNeurons.size()) + " active neurons");
+    
     // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
@@ -175,6 +204,43 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
         
         // Inject current to reawaken this pattern
         brain_->injectCurrent(neuron, activation * 3.0f);
+    }
+    
+    // Also restore working memory from episode
+    if (brain_->getWorkingMemory()) {
+        // Clear current working memory
+        brain_->getWorkingMemory()->clear();
+        
+        // Reconstruct working memory from episode data
+        for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
+            brain_->getWorkingMemory()->storeToNeuron(
+                episode->activeNeurons[i], 
+                episode->neuronActivations[i]
+            );
+        }
+        
+        // Also restore working memory neurons if available
+        for (NeuronId neuronId : episode->workingMemoryNeurons) {
+            float activation = 0.0f;
+            if (i < episode->workingMemoryActivations.size()) {
+                activation = episode->workingMemoryActivations[i];
+            }
+            brain_->getWorkingMemory()->storeToNeuron(neuronId, activation);
+        }
+    }
+    
+    // Restore attention state from episode
+    if (brain_->getAttention() && !episode->attentionNeurons.empty()) {
+        // Apply top-down bias for attended neurons
+        for (NeuronId neuronId : episode->attentionNeurons) {
+            brain_->getAttention()->applyTopDownBias(neuronId, 1.0f);
+        }
+    }
+    
+    // Restore prediction system state from episode
+    if (brain_->getPredictionSystem() && episode->predictionError >= 0.0f) {
+        // prediction system would update based on episode prediction error
+        // predictionSystem->updatePredictionError(episode->predictionError);
     }
     
     // Also inject sensory pattern if available
