@@ -2,11 +2,19 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+    : AgentBrain(brain, nullptr)
+{
+}
+
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, const std::shared_ptr<Config>& config)
     : brain_(brain)
+    , config_(config)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,59 +27,168 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , advancedDevelopmentalStage_(AdvancedDevelopmentalStage::Embryonic)
+    , stageStartTime_(0.0)
+    , stageDuration_(60.0)
+    , availableResources_(1.0f)
+    , resourceRegenerationRate_(0.01f)
+    , currentStressLevel_(0.0f)
+    , stressRecoveryRate_(0.05f)
+    , lastStressEventTime_(0.0)
+    , consecutiveErrors_(0)
+    , lastErrorTime_(0.0)
+    , inErrorRecoveryMode_(false)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+    // Initialize advanced systems
+    initializeAdvancedSystems();
+    
+    // Configure from provided config if available
+    if (config_) {
+        configureFromConfig(config_);
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
+void AgentBrain::initializeAdvancedSystems() {
+    // Initialize development timing
+    stageStartTime_ = 0.0;
+    stageDuration_ = 60.0; // Initial developmental stage duration
+    
+    // Initialize resource management
+    availableResources_ = 1.0f;
+    resourceRegenerationRate_ = 0.01f;
+    
+    // Initialize environmental tracking
+    environmentalSignatures_.resize(10, 0.0f);
+    lastEnvironmentalUpdate_ = 0.0;
+    
+    // Initialize learning systems
+    learnedPatterns_.clear();
+    patternWeights_.clear();
+    patternTimestamps_.clear();
+    
+    // Initialize stress regulation
+    currentStressLevel_ = 0.0f;
+    stressRecoveryRate_ = 0.05f;
+    lastStressEventTime_ = 0.0f;
+    
+    // Initialize goal management
+    goalProgress_.clear();
+    goalPriority_.clear();
+    goalCompleted_.clear();
+    
+    // Initialize performance metrics
+    performanceMetrics_.totalTimeActive_ = 0.0;
+    performanceMetrics_.totalActionsTaken_ = 0;
+    performanceMetrics_.averageActionSuccessRate_ = 0.5f;
+    performanceMetrics_.learningEfficiency_ = 0.0;
+    performanceMetrics_.explorationEfficiency_ = 0.0;
+    performanceMetrics_.performanceHistory_.clear();
+    
+    // Setup motor and sensory neuron groups
+    setupMotorNeuronGroups();
+    setupSensoryNeuronGroups();
+    
+    NLM_LOG_INFO("AgentBrain advanced systems initialized");
+}
+
+void AgentBrain::configureFromConfig(const std::shared_ptr<Config>& config) {
+    if (!config) return;
+    
+    // Personality configuration
+    if (config->has("agent.personality.curiosity_level")) {
+        personality_.curiosityLevel_ = config->getOr<float>("agent.personality.curiosity_level", 0.5f);
+    }
+    if (config->has("agent.personality.exploration_rate")) {
+        personality_.explorationRate_ = config->getOr<float>("agent.personality.exploration_rate", 0.3f);
+    }
+    if (config->has("agent.personality.risk_tolerance")) {
+        personality_.riskTolerance_ = config->getOr<float>("agent.personality.risk_tolerance", 0.5f);
+    }
+    if (config->has("agent.personality.persistence")) {
+        personality_.persistence_ = config->getOr<float>("agent.personality.persistence", 0.5f);
+    }
+    
+    // Neuromodulation configuration
+    if (config->has("agent.neuromodulation.reward_sensitivity")) {
+        personality_.rewardSensitivity_ = config->getOr<float>("agent.neuromodulation.reward_sensitivity", 0.7f);
+    }
+    if (config->has("agent.neuromodulation.punishment_sensitivity")) {
+        personality_.punishmentSensitivity_ = config->getOr<float>("agent.neuromodulation.punishment_sensitivity", 0.3f);
+    }
+    
+    // Learning configuration
+    if (config->has("agent.learning.learning_rate")) {
+        personality_.learningRate_ = config->getOr<float>("agent.learning.learning_rate", 0.5f);
+    }
+    if (config->has("agent.learning.memory_retention")) {
+        personality_.memoryRetention_ = config->getOr<float>("agent.learning.memory_retention", 0.8f);
+    }
+    
+    // Development configuration
+    if (config->has("agent.development.development_stages")) {
+        // Parse number of developmental stages
+        int stages = config->getOr<int64_t>("agent.development.development_stages", 5);
+        switch (stages) {
+            case 1: stageDuration_ = 120.0; break;
+            case 2: stageDuration_ = 60.0; break;
+            case 3: stageDuration_ = 30.0; break;
+            case 4: stageDuration_ = 20.0; break;
+            case 5: stageDuration_ = 10.0; break;
+            default: stageDuration_ = 60.0; break;
+        }
+    }
+    
+    NLM_LOG_INFO("AgentBrain configured from config file");
+}
+
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Call legacy initialization for backward compatibility
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Initialize advanced systems with proper safety checks
+    advancedSystemsInitialized_ = false;
+    errorRecoveryInitialized_ = false;
+    performanceMetricsInitialized_ = false;
+    
+    // Setup all advanced systems in safe order
+    setupDevelopmentTracking();
+    setupResourceManagement();
+    setupEnvironmentalTracking();
+    setupLearningSystems();
+    setupStressRegulation();
+    setupGoalManagement();
+    setupSocialSystems();
+    setupErrorHandling();
+    setupPerformanceMetrics();
+    
+    // Initialize all advanced systems in the correct order
+    setupAdvancedNeuromodulation();
+    setupAdvancedCuriosity();
+    setupAdvancedPersonality();
+    setupAdvancedDevelopment();
+    setupAdvancedLearning();
+    setupAdvancedMemory();
+    setupAdvancedSocial();
+    
+    // Final verification and initialization
+    verifySystemConsistency();
+    finalizeInitialization();
+    
+    NLM_LOG_INFO("AgentBrain fully initialized with advanced systems");
+}
+
+void AgentBrain::initialize(const SimpleWorld& world, const AgentPersonality& personality) {
+    // Set personality
+    personality_ = personality;
+    
+    // Call regular initialization
+    initialize(world);
+    
+    NLM_LOG_INFO("AgentBrain initialized with personality traits applied");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -335,6 +452,7 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    // Reset to initial state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
@@ -343,8 +461,51 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Reset advanced systems
+    advancedDevelopmentalStage_ = AdvancedDevelopmentalStage::Embryonic;
+    stageStartTime_ = 0.0;
+    stageDuration_ = 60.0;
+    availableResources_ = 1.0f;
+    currentStressLevel_ = 0.0f;
+    consecutiveErrors_ = 0;
+    inErrorRecoveryMode_ = false;
+    
+    // Reset personality
+    personality_ = AgentPersonality();
+    
+    // Reset behavioral state
+    behavioralState_ = BehavioralState();
+    
+    // Reset performance metrics
+    performanceMetrics_ = PerformanceMetrics();
+    
+    // Reset learning systems
+    learnedPatterns_.clear();
+    patternWeights_.clear();
+    patternTimestamps_.clear();
+    
+    // Reset goal management
+    goalProgress_.clear();
+    goalPriority_.clear();
+    goalCompleted_.clear();
+    
+    // Reset social systems
+    socialConnections_.clear();
+    socialPreferences_.clear();
+    
+    // Reset environmental tracking
+    for (auto& sig : environmentalSignatures_) {
+        sig = 0.0f;
+    }
+    
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reinitialize neuron groups
+    setupMotorNeuronGroups();
+    setupSensoryNeuronGroups();
+    
+    NLM_LOG_INFO("AgentBrain reset to initial state");
 }
 
 } // namespace nlm

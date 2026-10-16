@@ -19,12 +19,11 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+// Include agent management functionality
+#include "agent/AgentBrain.hpp"
+#include "environment/Environment.hpp"
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
 
@@ -324,6 +323,132 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Check for help flag
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--help") {
+            std::cout << "=== NLM Agent Command-Line Interface ===" << std::endl;
+            std::cout << "Usage: ./nlm [options]" << std::endl << std::endl;
+            std::cout << "Available modes:" << std::endl;
+            std::cout << "  --mode agent      Run agent simulation" << std::endl;
+            std::cout << "  --mode basic      Run basic neural computation (default)" << std::endl;
+            return 0;
+        }
+    }
+    
+    // Check if agent mode is requested
+    bool agentModeRequested = false;
+    std::string configFile = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--mode" && i + 1 < argc) {
+            std::string modeArg = argv[++i];
+            if (modeArg == "agent") {
+                agentModeRequested = true;
+            }
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    if (agentModeRequested) {
+        return runAgentMode(argc, argv);
+    }
+    
+    return runPhase2Demo(argc, argv);
+}
+
+// Agent mode implementation
+int runAgentMode(int argc, char** argv) {
+    // This is a simplified version of the agent mode
+    // For a full implementation, the AgentCLI class would be used
+    
+    std::cout << "=== NLM Agent Mode ===" << std::endl;
+    
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    
+    // Load configuration
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Set agent-specific configuration
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+    
+    // Create brain
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    // Create agent
+    auto agent = std::make_shared<AgentBrain>(brain);
+    
+    // Create environment
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(30, 30, 16, 16);
+    
+    // Initialize agent
+    agent->initialize(*world);
+    
+    // Run agent simulation
+    for (int step = 0; step < 1000; ++step) {
+        world->update(0.1);
+        
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        
+        if (agent->getBrain()) {
+            agent->getBrain()->step(step);
+        }
+        
+        auto action = agent->decodeMotorCommandWithPersonality();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        if (agent->isRewardModulationEnabled()) {
+            float reward = 0.0f;
+            if (!percept.getInternal().empty()) {
+                reward = percept.getInternal()[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        if (agent->isDevelopmentEnabled()) {
+            agent->updateDevelopment(0.1);
+        }
+        
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + ": " +
+                        std::to_string(agent->getCuriosityLevel()) + " curiosity, " +
+                        std::to_string(agent->getNoveltyLevel()) + " novelty");
+        }
+    }
+    
+    // Print final statistics
+    NLM_LOG_INFO("=== Agent Simulation Complete ===");
+    
+    auto brainPtr = agent->getBrain();
+    if (brainPtr) {
+        brainPtr->logStatus();
+    }
+    
+    NLM_LOG_INFO("Agent simulation completed successfully!");
+    return 0;
+}
+
+// Original Phase 2 demo
+int runPhase2Demo(int argc, char** argv) {
+    printBanner();
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -369,7 +494,7 @@ int main(int argc, char** argv) {
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
