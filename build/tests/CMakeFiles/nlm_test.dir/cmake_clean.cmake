@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/nlm_test.dir/link.d"
+  "CMakeFiles/nlm_test.dir/integration/test_integration.cpp.o"
+  "CMakeFiles/nlm_test.dir/integration/test_integration.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/python_bindings/test_python_bindings.cpp.o"
+  "CMakeFiles/nlm_test.dir/python_bindings/test_python_bindings.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_brain.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_brain.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_clock.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_clock.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_config.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_config.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_main_google.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_main_google.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_neuron.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_neuron.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_random.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_random.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_stdp.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_stdp.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_synapse.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_synapse.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/test_types.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_types.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/unit/test_config_validator.cpp.o"
+  "CMakeFiles/nlm_test.dir/unit/test_config_validator.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/unit/test_error_handling.cpp.o"
+  "CMakeFiles/nlm_test.dir/unit/test_error_handling.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/unit/test_neuron_dynamics.cpp.o"
+  "CMakeFiles/nlm_test.dir/unit/test_neuron_dynamics.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/unit/test_performance_monitoring.cpp.o"
+  "CMakeFiles/nlm_test.dir/unit/test_performance_monitoring.cpp.o.d"
+  "CMakeFiles/nlm_test.dir/unit/test_synapse_plasticity.cpp.o"
+  "CMakeFiles/nlm_test.dir/unit/test_synapse_plasticity.cpp.o.d"
+  "nlm_test"
+  "nlm_test.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/nlm_test.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

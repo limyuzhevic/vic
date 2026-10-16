@@ -29,6 +29,13 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Performance Monitoring
+    src/performance_monitoring/PerformanceMonitor.cpp
+    src/performance_monitoring/Profiler.cpp
+    src/performance_monitoring/PerformanceMetrics.cpp
+    src/performance_monitoring/PerformanceAnalysis.cpp
+    src/performance_monitoring/PerformanceDashboard.cpp
+    src/performance_monitoring/PerformanceReporter.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -45,9 +52,9 @@ add_library(nlm_core STATIC
     src/plasticity/StructuralPlasticity.cpp
     # Development
     src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
     src/development/Maturation.cpp
+    src/development/Pruning.cpp
+    src/development/Synaptogenesis.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
@@ -55,13 +62,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -73,18 +76,19 @@ add_library(nlm_core STATIC
     # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Phase 3 experiments
+    src/experiments/Phase3Experiment.cpp
+    # Phase 4 experiments
+    src/experiments/Phase4Experiment.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

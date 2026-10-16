@@ -1,0 +1,39 @@
+{
+    "binding_level": "ADVANCED",
+    "output_directory": "generated_bindings",
+    "module_name": "pynlm",
+    "enable_documentation": true,
+    "enable_error_handling": true,
+    "enable_type_conversion": true,
+    "generate_convenience_methods": true,
+    "maintain_backward_compatibility": true,
+    "include_paths": [
+        "../src",
+        "../src/core",
+        "../src/brain",
+        "../src/agent",
+        "../src/world"
+    ],
+    "compile_flags": [
+        "-O2",
+        "-DNDEBUG",
+        "-std=c++20"
+    ],
+    "custom_bindings": {
+        "Config": "py::class_<Config>(m, \"Config\", R\"pbdoc(Configuration class)pbdoc\")\n    .def(py::init<>())",
+        "Brain": "py::class_<Brain>(m, \"Brain\", R\"pbdoc(Brain class)pbdoc\")\n    .def(py::init<std::shared_ptr<Config>>(), py::arg(\"config\"))"
+    },
+    "exclude_classes": [
+        "SomeInternalClass",
+        "DeprecatedClass"
+    ],
+    "include_only_classes": [],
+    "documentation_template": "standard",
+    "examples_directory": "examples",
+    "extension_hook_path": "",
+    "statistics": {
+        "classes_processed": 0,
+        "methods_processed": 0,
+        "lines_generated": 0
+    }
+}
