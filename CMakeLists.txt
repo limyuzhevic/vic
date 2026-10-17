@@ -83,12 +83,13 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
-)
+    # Performance infrastructure
+    src/performance/Performance.cpp
+
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
     $<INSTALL_INTERFACE:include>
 )
 

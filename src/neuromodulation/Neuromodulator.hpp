@@ -54,36 +54,94 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory consolidation effects
+    void strengthenMemory(float factor);
+    void enhanceAttention(float focus);
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
     const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal effects
+    void increaseVigilance(float alertness);
+    void enhanceSensoryProcessing(float gain);
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Phase 2
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin();
+    ~Serotonin() override;
+    
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood regulation effects
+    void modulateMood(float mood);
+    void regulateImpulsivity(float control);
+    void enhanceSocialBehavior(float socialFactor);
+};
+
+// Histamine: Wake-sleep cycles
+// Phase 2
+class Histamine : public Neuromodulator {
+public:
+    Histamine();
+    ~Histamine() override;
+    
+    const char* getName() const override { return "HA"; }
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Wake-sleep regulation
+    void promoteWake(float arousal);
+    void induceSleep(float calmness);
+};
+
+// Endorphin: Pain and pleasure
+// Phase 2
+class Endorphin : public Neuromodulator {
+public:
+    Endorphin();
+    ~Endorphin() override;
+    
+    const char* getName() const override { return "END"; }
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Pain-pleasure regulation
+    void reducePain(float relief);
+    void enhancePleasure(float reward);
 };
 
 } // namespace nlm

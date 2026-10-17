@@ -28,24 +28,76 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printAdvancedHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM - Advanced Command Line Interface
+
+Basic Commands:
+  --config=file.cfg      Load configuration from file
+  --help, -h             Show this help message
+  --version              Show version information
+
+Advanced Commands:
+  --advanced             Enable advanced features (memory, prediction, cognition)
+  --quick                Run quick functionality test (100 neurons, 1000 steps)
+  --test-integration     Run Phase 6 integration verification test
+  --memory-stats         Display detailed memory system statistics
+  --benchmark            Run performance benchmark
+  --output=file          Save brain state to file
+
+Advanced Configuration Options:
+  --neuron_count=N       Override number of neurons
+  --region_count=N       Override number of regions
+  --working_memory_capacity=N  Set working memory capacity
+  --episodic_memory_capacity=N Set episodic memory capacity
+  --replay_enabled[=true|false] Enable/disable memory replay
+  --consolidation_enabled[=true|false] Enable/disable memory consolidation
+  --attention_enabled[=true|false] Enable/disable attention system
+  --prediction_enabled[=true|false] Enable/disable prediction system
+  --cognitive_planning_enabled[=true|false] Enable/disable cognitive planning
+  --memory_pool_size=N   Set memory pool size for performance
+  --event_queue_size=N   Set event queue size for performance
+  --simd_enabled[=true|false] Enable/disable SIMD optimizations
+  --parallel_enabled[=true|false] Enable/disable parallel processing
+
+Phase Selection:
+  --phase2               Phase 2: Real neural computation (default)
+  --phase3               Phase 3: World interaction
+  --phase4               Phase 4: Cognitive capabilities
+  --phase6               Phase 6: Full integration
+
+Output Options:
+  --log_file=file        Log all output to file
+  --log_level=LEVEL      Set log level (ERROR, WARN, INFO, DEBUG)
+  --verbose              Enable verbose output
+  --quiet                Suppress non-essential output
+
+Examples:
+  NLM --advanced --quick --memory-stats
+  NLM --phase6 --test-integration --output=brain_state.bin
+  NLM --neuron_count=2000 --region_count=4 --working_memory_capacity=1000
+  NLM --benchmark --log_file=benchmark.log --log_level=DEBUG
+
+Phase 6 Advanced Features:
+  --enable_curiosity     Enable curiosity-driven exploration
+  --enable_structural_plasticity Enable developmental structural changes
+  --enable_development   Enable developmental stage progression
+  --checkpoint_path=file Path for brain state checkpointing
+  --replay_interval=N   Set memory replay frequency (default: 100 steps)
+  --consolidation_interval=N Set memory consolidation frequency (default: 1000 steps)
+
+Experience Level:
+  --novice              Basic mode with simplified configuration
+  --expert              Advanced mode with full control
+  --research            Research mode with maximum observability
+
+Performance Mode:
+  --performance          Optimized for speed
+  --accuracy            Optimized for learning accuracy
+  --balanced            Balanced performance
+
+For more information about NLM, visit: https://github.com/neural-learning-machine/nlm
+)" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -366,21 +418,70 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Parse advanced commands
+    bool enableAdvancedFeatures = false;
+    bool runQuickTest = false;
+    bool runIntegrationTest = false;
+    bool showMemoryStats = false;
+    bool enableVisualization = false;
+    bool runBenchmark = false;
+    std::string outputPath;
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Existing commands
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        
+        // New advanced commands
+        else if (arg == "--advanced") {
+            enableAdvancedFeatures = true;
+        }
+        else if (arg == "--quick") {
+            runQuickTest = true;
+        }
+        else if (arg == "--test-integration") {
+            runIntegrationTest = true;
+        }
+        else if (arg == "--memory-stats") {
+            showMemoryStats = true;
+        }
+        else if (arg == "--benchmark") {
+            runBenchmark = true;
+        }
+        else if (arg == "--output") {
+            if (i + 1 < argc) {
+                outputPath = argv[++i];
+            }
+        }
+        else if (arg == "--help" || arg == "-h") {
+            printAdvancedHelp();
+            return 0;
+        }
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Apply advanced features to config
+    if (enableAdvancedFeatures) {
+        config->set("working_memory_capacity", static_cast<int64_t>(1000), ConfigSource::CommandLine);
+        config->set("episodic_memory_capacity", static_cast<int64_t>(5000), ConfigSource::CommandLine);
+        config->set("replay_enabled", true, ConfigSource::CommandLine);
+        config->set("consolidation_enabled", true, ConfigSource::CommandLine);
+        config->set("attention_enabled", true, ConfigSource::CommandLine);
+        config->set("prediction_enabled", true, ConfigSource::CommandLine);
+        config->set("cognitive_planning_enabled", true, ConfigSource::CommandLine);
+        
+        // Performance optimizations
+        config->set("memory_pool_size", static_cast<int64_t>(2000), ConfigSource::CommandLine);
+        config->set("event_queue_size", static_cast<int64_t>(1000), ConfigSource::CommandLine);
+        config->set("simd_enabled", true, ConfigSource::CommandLine);
+        config->set("parallel_enabled", true, ConfigSource::CommandLine);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

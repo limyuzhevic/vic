@@ -221,6 +221,202 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+# Advanced Command Line Interface
+
+NLM now features an enhanced command-line interface for advanced users:
+
+### Phase Selection
+
+**Default Phase (Phase 2):** Real neural computation
+```bash
+./nlm
+```
+
+**Integration Phase (Phase 6):** Full system integration
+```bash
+./nlm_phase6_demo
+```
+
+**Integration Test:** Verify all systems work together
+```bash
+./nlm --test-integration
+```
+
+### Advanced Commands
+
+**Enable advanced features:**
+```bash
+./nlm --advanced
+./nlm_phase6_demo --advanced
+```
+
+**Quick functionality test:**
+```bash
+./nlm --quick
+./nlm_phase6_demo --quick
+```
+
+**Run integration verification:**
+```bash
+./nlm --test-integration
+./nlm_phase6_demo --test-integration
+```
+
+**Display memory statistics:**
+```bash
+./nlm --memory-stats
+./nlm_phase6_demo --memory-stats
+```
+
+**Performance benchmark:**
+```bash
+./nlm --benchmark
+./nlm_phase6_demo --benchmark
+```
+
+**Save brain state:**
+```bash
+./nlm --output=brain_state.bin
+./nlm_phase6_demo --output=phase6_state.bin
+```
+
+**Experience levels:**
+```bash
+# Basic mode (simplified configuration)
+./nlm --novice
+
+# Advanced mode (full control)
+./nlm --expert
+
+# Research mode (maximum observability)
+./nlm --research
+```
+
+**Performance modes:**
+```bash
+# Optimized for speed
+./nlm --performance
+
+# Optimized for learning accuracy
+./nlm --accuracy
+
+# Balanced performance
+./nlm --balanced
+```
+
+### Advanced Configuration Options
+
+**Memory systems:**
+```bash
+./nlm --working_memory_capacity=1000
+./nlm --episodic_memory_capacity=5000
+./nlm --replay_enabled
+./nlm --consolidation_enabled
+```
+
+**Cognition and prediction:**
+```bash
+./nlm --attention_enabled
+./nlm --prediction_enabled
+./nlm --cognitive_planning_enabled
+```
+
+**Performance optimizations:**
+```bash
+./nlm --memory_pool_size=2000
+./nlm --event_queue_size=1000
+./nlm --simd_enabled
+./nlm --parallel_enabled
+```
+
+**Development features:**
+```bash
+./nlm --enable_curiosity
+./nlm --enable_structural_plasticity
+./nlm --enable_development
+./nlm --checkpoint_path=./checkpoints/
+```
+
+**Neuromodulation control:**
+```bash
+./nlm --enable_dopamine
+./nlm --enable_curiosity
+./nlm --enable_novelty
+./nlm --enable_prediction_error
+```
+
+### Complex Examples
+
+**Advanced integration demo with full monitoring:**
+```bash
+./nlm_phase6_demo \
+  --advanced \
+  --test-integration \
+  --memory-stats \
+  --output=integrated_brain.bin \
+  --benchmark \
+  --enable_curiosity \
+  --enable_structural_plasticity \
+  --enable_development \
+  --checkpoint_path=./checkpoints/phase6
+```
+
+**Research mode with maximum observability:**
+```bash
+./nlm_phase6_demo \
+  --research \
+  --memory-stats \
+  --log_file=research.log \
+  --log_level=DEBUG \
+  --replay_enabled \
+  --consolidation_enabled \
+  --attention_enabled \
+  --prediction_enabled \
+  --cognitive_planning_enabled
+```
+
+**Performance tuning for large-scale simulations:**
+```bash
+./nlm_phase6_demo \
+  --performance \
+  --memory_pool_size=5000 \
+  --event_queue_size=3000 \
+  --simd_enabled \
+  --parallel_enabled \
+  --working_memory_capacity=2000 \
+  --episodic_memory_capacity=10000 \
+  --neuron_count=5000 \
+  --region_count=8
+```
+
+**Quick development test:**
+```bash
+./nlm_phase6_demo \
+  --quick \
+  --test-integration \
+  --enable_curiosity \
+  --enable_structural_plasticity \
+  --enable_development
+```
+
+### Help and Documentation
+
+**Show advanced help:**
+```bash
+./nlm --help
+./nlm_phase6_demo --help
+```
+
+**Show version information:**
+```bash
+./nlm --version
+```
+
+**See all command-line options:**
+```bash
+./nlm --help
+```
+
 ## License
 
 MIT
