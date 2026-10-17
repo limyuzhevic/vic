@@ -2,12 +2,13 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentBrainConfig.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
 
-namespace nlm {
+namespace nlm
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -69,6 +70,24 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration access methods
+    const AgentBrainConfig& getConfig() const { return config_; }
+    AgentBrainConfig& getConfig() { return config_; }
+    void setConfig(const AgentBrainConfig& config) { config_ = config; }
+    
+    // Advanced configuration methods for extensibility
+    void addCustomParameter(const std::string& name, float value) {
+        config_.setParameter(name, value);
+    }
+    
+    float getCustomParameter(const std::string& name, float defaultValue = 0.0f) const {
+        return config_.getParameter(name, defaultValue);
+    }
+    
+    // Export/Import configuration
+    std::string exportConfig() const { return config_.exportToString(); }
+    bool importConfig(const std::string& configStr) { return config_.importFromString(configStr); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +96,9 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Configuration
+    AgentBrainConfig config_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -112,6 +134,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Additional configurable parameters for performance optimization
+    float motorActivityThreshold_;
+    float explorationBaseProbability_;
+    float curiosityThreshold_;
+    float highCuriosityThreshold_;
 };
 
 } // namespace nlm
