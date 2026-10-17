@@ -406,15 +406,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+            // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
     // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionSystem) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -436,6 +438,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Dopamine effects on working memory - use existing strengthenMemory method
+        if (pImpl->workingMemory && dopamineLevel > 0.5f) {
+            // Higher dopamine enhances working memory stability
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.5f);
+        }
+        
+        // Dopamine effects on episodic memory consolidation - use existing consolidate method
+        if (pImpl->episodicMemory && dopamineLevel > 0.3f) {
+            // Moderate dopamine promotes memory consolidation
+            pImpl->episodicMemory->consolidate(0.5f);
+        }
+        
+        // Dopamine effects on planning - use existing updatePlanQuality method
+        if (pImpl->planner && dopamineLevel > 0.4f) {
+            // Higher dopamine improves planning quality
+            // Create a simple positive reward signal
+            float planningReward = dopamineLevel * 0.1f;
+            pImpl->planner->updatePlanQuality({}, {}, planningReward);
+        }
+        
+        // Dopamine effects on development - use existing advanceStage method
+        if (pImpl->developmentSystem && dopamineLevel > 0.3f && dopamineLevel < 0.8f) {
+            // Moderate dopamine modulates developmental stage transitions
+            if (dopamineLevel > 0.7f) {
+                pImpl->developmentSystem->advanceStage();
+            }
+        }
+        
+        // Reward signaling for feedback loops
+        // Use prediction error to signal reward prediction error to dopamine system
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
         }
     }
     
@@ -511,8 +548,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use current neural activity to make predictions
+        // Encode the current sensory state into prediction system
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Collect current sensory neuron activity
+            std::vector<float> sensoryActivity;
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                sensoryActivity.push_back(
+                    std::abs(neuron->getMembranePotential() - neuron->getRestingPotential()) / 20.0f);
+            }
+            
+            // Create sensory input for prediction system
+            // Note: This would need a proper interface to SensoryInput
+            // For now, we'll use a placeholder approach
+            
+            // Train prediction system with current neural state
+            pImpl->predictionSystem->train(sensoryActivity);
+            
+            // Use prediction to guide attention and memory
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Prediction error affects dopamine level
+            if (pImpl->dopamine) {
+                float errorInfluence = predictionError * 0.1f;  // Scale influence
+                pImpl->dopamine->addInfluence(errorInfluence, 0.001);
+            }
+            
+            // High prediction error increases curiosity
+            if (pImpl->curiosity && predictionError > 0.1f) {
+                pImpl->curiosity->increaseLevel(0.01f, 0.001);
+            }
+            
+            // Store prediction error in working memory for later processing
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storePredictionError(
+                    predictionError, 
+                    currentStep * pImpl->timestep);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +601,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current sensory and cognitive patterns for concept formation
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        // Collect sensory neuron activity as pattern
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            float activation = 
+                std::abs(neuron->getMembranePotential() - neuron->getRestingPotential()) / 20.0f;
+            currentPattern.push_back(activation);
+        }
+        
+        // Collect cognitive state features
+        // Current reward level from dopamine
+        float rewardFeature = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        currentFeatures.push_back(rewardFeature);
+        
+        // Current novelty level
+        float noveltyFeature = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        currentFeatures.push_back(noveltyFeature);
+        
+        // Current attention focus (number of active working memory neurons)
+        size_t attentionFocus = pImpl->workingMemory ? 
+            pImpl->workingMemory->getMemoryNeurons().size() : 0;
+        currentFeatures.push_back(static_cast<float>(attentionFocus) / 100.0f);
+        
+        // Present this experience to concept formation system
+        float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, currentFeatures, currentReward, currentStep);
+        
+        // Use concepts for planning and generalization
+        if (conceptId > 0 && pImpl->planner) {
+            // Get the best matching concept
+            size_t bestConcept = pImpl->conceptFormation->getMatchingConcept(currentPattern);
+            if (bestConcept > 0) {
+                // Use concept prototype for planning
+                auto prototype = pImpl->conceptFormation->getConceptPrototype(bestConcept);
+                
+                // Calculate concept stability - higher stability means more reliable concepts
+                float stability = pImpl->conceptFormation->getConceptStability(bestConcept);
+                
+                // Plan based on the concept
+                pImpl->planner->planWithConcept(
+                    prototype, stability, currentStep * pImpl->timestep);
+                
+                // Higher stability increases planning confidence
+                if (stability > 0.7f) {
+                    pImpl->planner->increasePlanningConfidence(0.01f, pImpl->timestep);
+                }
+            }
+        }
+        
+        // Concepts affect development and learning rate
+        if (pImpl->developmentSystem && conceptId > 0) {
+            // Mature concepts reduce plasticity (conceptual rigidity)
+            float stability = pImpl->conceptFormation->getConceptStability(conceptId);
+            if (stability > 0.8f) {
+                pImpl->developmentSystem->reducePlasticityRate(0.05f, pImpl->timestep * 1000);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

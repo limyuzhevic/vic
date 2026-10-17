@@ -51,6 +51,34 @@ void Dopamine::signalRewardPredictionError(float error) {
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
-}
+    }
+
+void Dopamine::addInfluence(float influence, TimestepDuration dt) {
+    // Add influence from external source (e.g., prediction error)
+    pImpl->level = std::clamp(pImpl->level + influence, pImpl->baseline, pImpl->peak);
+    }
+
+void Dopamine::increaseLevel(float amount, TimestepDuration dt) {
+    // Increase level
+    pImpl->level = std::min(pImpl->peak, pImpl->level + amount * pImpl->releaseRate);
+    }
+
+void Dopamine::decreaseLevel(float amount, TimestepDuration dt) {
+    // Decrease level
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - amount * pImpl->decayRate);
+    }
+
+bool Dopamine::isAboveLevel(float threshold) const {
+    return pImpl->level > threshold;
+    }
+
+bool Dopamine::isBelowLevel(float threshold) const {
+    return pImpl->level < threshold;
+    }
+
+float Dopamine::getRelativeLevel() const {
+    if (pImpl->baseline >= pImpl->peak) return 0.0f;
+    return (pImpl->level - pImpl->baseline) / (pImpl->peak - pImpl->baseline);
+    }
 
 } // namespace nlm

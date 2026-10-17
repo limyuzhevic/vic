@@ -44,9 +44,26 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Add influence from external source
+    void addInfluence(float influence, TimestepDuration dt);
+    
+    // Increase level
+    void increaseLevel(float amount, TimestepDuration dt);
+    
+    // Decrease level
+    void decreaseLevel(float amount, TimestepDuration dt);
+    
+    // Check if level is above threshold
+    bool isAboveLevel(float threshold) const;
+    
+    // Check if level is below threshold
+    bool isBelowLevel(float threshold) const;
+    
+    // Get level relative to baseline (0.0 = baseline, 1.0 = peak)
+    float getRelativeLevel() const;
     
 private:
     struct Impl;
