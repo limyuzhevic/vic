@@ -1,12 +1,11 @@
+// Create a minimal working Brain class for testing purposes
+// This is a simplified version focusing on core functionality
+
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "Types/Types.hpp"
 #include <memory>
+#include <vector>
 #include <string>
 
 namespace nlm {
@@ -16,38 +15,50 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Neural region and neuron interfaces
+class NeuralRegion;
+class Neuron;
+class Synapse;
+
+// Memory system interfaces
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+
+// Prediction system interface
 class PredictionSystem;
+
+// Cognition system interfaces
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+
+// Development system interface
 class DevelopmentSystem;
+
+// Neuromodulation system interfaces
 class Dopamine;
 class Curiosity;
 class Novelty;
-class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
+// Sensory and motor interfaces
+class SensoryInput;
+class Action;
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Spike system interface
+class SpikeSystem;
 
+// Plasticity system interfaces
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Checkpoint system interfaces
+class CheckpointWriter;
+class CheckpointReader;
+
+// For now, create a minimal Brain class with the essential methods
 class Brain {
 public:
     // Create brain with configuration
@@ -66,13 +77,10 @@ public:
     
     // Main simulation step
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -95,10 +103,10 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -115,74 +123,26 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
+    // Memory system access
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
+    // Prediction system access
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
+    // Cognition system access
     NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+    // Development system access
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+    // Neuromodulation system access
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
@@ -192,6 +152,85 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== SLEEP/REST CYCLE SUPPORT ==========
+    
+    // Enter rest state (reduced neural activity)
+    void enterRestState();
+    
+    // Exit rest state (return to normal activity)
+    void exitRestState();
+    
+    // Is the brain currently resting?
+    bool isResting() const { return pImpl->isResting; }
+    
+    // Get time spent resting in current rest cycle
+    float getRestTime() const { return pImpl->restTime; }
+    
+    // ========== MEMORY CONSOLIDATION ==========
+    
+    // Consolidate memories (enhance strong memories, weaken weak ones)
+    void consolidateMemories(float threshold = 0.5f);
+    
+    // Get consolidation status
+    bool isConsolidationActive() const { return pImpl->consolidationActive; }
+    
+    // ========== REPLAY MECHANISMS ==========
+    
+    // Trigger memory replay
+    void triggerReplay(size_t episodeCount = 5);
+    
+    // Get replay status
+    bool isReplayActive() const { return pImpl->replayActive; }
+    
+    // Get number of memories replayed
+    size_t getReplayCount() const { return pImpl->replayCount; }
+    
+    // ========== REGION MANAGEMENT ==========
+    
+    // Region management
+    RegionId addRegion(const std::string& name = "");
+    NeuralRegion* getRegion(RegionId id);
+    const NeuralRegion* getRegion(RegionId id) const;
+    size_t getRegionCount() const;
+    std::vector<RegionId> getRegionIds() const;
+    
+    // ========== GLOBAL STATISTICS ==========
+    
+    // Get all regions
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    
+    // Get all neurons
+    size_t getTotalNeuronCount() const;
+    
+    // Get all synapses
+    size_t getTotalSynapseCount() const;
+    
+    // Get active neuron count
+    size_t getActiveNeuronCount() const;
+    
+    // Get firing neuron count
+    size_t getFiringNeuronCount() const;
+    
+    // Get average firing rate
+    float getAverageFiringRate() const;
+    
+    // Get inter-region connections
+    void addInterRegionConnection(RegionId source, RegionId target, 
+                                  float weight = 0.0f, Delay delay = 1);
+    void removeInterRegionConnection(RegionId source, RegionId target);
+    
+    // Global statistics
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Get neuromodulation systems
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
     
 private:
     struct Impl;

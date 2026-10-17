@@ -34,7 +34,25 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Update prediction system with current sensory input
+    void update(const class SensoryInput& input, TimestepDuration dt);
+    
+    // Process prediction for action selection
+    ActionType selectActionBasedOnPrediction(const std::vector<float>& currentState);
+    
+    // Get current predictions for planning
+    std::vector<float> getCurrentPredictions() const;
+    
+    // Set prediction parameters
+    void setPredictionConfidence(float confidence) { confidence_ = confidence; }
+    
 private:
+    Brain* brain_;
+    float confidence_;
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
