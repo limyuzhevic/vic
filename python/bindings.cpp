@@ -15,6 +15,14 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "advanced_api.hpp"
+#include "advanced_brain.hpp"
+#include "advanced_agent.hpp"
+#include "monitoring.hpp"
+#include "neural_ops.hpp"
+#include "integration.hpp"
+#include "advanced_neuroscience.hpp"
+#include "performance.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -416,10 +424,135 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Register advanced API classes and functions
+    py::class_<nlm::python::AdvancedBrainConfiguration>(m, "AdvancedBrainConfiguration")
+        .def_static("createConfig", &nlm::python::AdvancedBrainConfiguration::createConfig,
+                   py::arg("params"), "Create configuration from parameters")
+        .def_static("applyPreset", &nlm::python::AdvancedBrainConfiguration::applyPreset,
+                   py::arg("preset_name"), "Apply configuration preset")
+        .def_static("modifyParameter", &nlm::python::AdvancedBrainConfiguration::modifyParameter,
+                   py::arg("key"), py::arg("value"), "Modify configuration parameter")
+        .def_static("mergeConfigurations", &nlm::python::AdvancedBrainConfiguration::mergeConfigurations,
+                   py::arg("configs"), "Merge multiple configurations")
+        .def_static("validateConfig", &nlm::python::AdvancedBrainConfiguration::validateConfig,
+                   py::arg("config"), "Validate configuration against schema")
+        .def_static("getDefaultBrainSchema", &nlm::python::AdvancedBrainConfiguration::getDefaultBrainSchema,
+                   "Get default brain configuration schema")
+        .def_static("getAvailablePresets", &nlm::python::AdvancedBrainConfiguration::getAvailablePresets,
+                   "Get available configuration presets");
 
-} // namespace nlm
+    py::class_<nlm::python::AdvancedAgent>(m, "AdvancedAgent")
+        .def(py::init<std::shared_ptr<nlm::AgentBrain>, const nlm::python::AdvancedAgent::RLSimulationParameters&>(),
+             py::arg("agent_brain"), py::arg("rl_params"), "Create advanced agent")
+        .def("startLearning", &nlm::python::AdvancedAgent::startLearning)
+        .def("stopLearning", &nlm::python::AdvancedAgent::stopLearning)
+        .def("isLearning", &nlm::python::AdvancedAgent::isLearning)
+        .def("addExperience", &nlm::python::AdvancedAgent::addExperience,
+             py::arg("state"), py::arg("action"), py::arg("reward"), py::arg("next_state"), py::arg("done"))
+        .def("getExperienceCount", &nlm::python::AdvancedAgent::getExperienceCount)
+        .def("getExperienceBatch", &nlm::python::AdvancedAgent::getExperienceBatch, py::arg("batch_size") = 32)
+        .def("registerRewardFunction", &nlm::python::AdvancedAgent::registerRewardFunction,
+             py::arg("name"), py::arg("reward_func"))
+        .def("setRewardFunction", &nlm::python::AdvancedAgent::setRewardFunction,
+             py::arg("name"))
+        .def("computeCustomReward", &nlm::python::AdvancedAgent::computeCustomReward,
+             py::arg("state"), py::arg("action"), py::arg("next_state"))
+        .def("enableAdvancedPerception", &nlm::python::AdvancedAgent::enableAdvancedPerception,
+             py::arg("enable_predictions") = true, py::arg("enable_novelty") = true,
+             py::arg("enable_curiosity") = true, py::arg("enable_attention") = true);
+
+    py::class_<nlm::python::MonitoringSystem>(m, "MonitoringSystem")
+        .def_static("startMetricsStreaming", &nlm::python::MonitoringSystem::startMetricsStreaming,
+                   py::arg("brain"), py::arg("interval_ms") = 100.0)
+        .def_static("stopMetricsStreaming", &nlm::python::MonitoringSystem::stopMetricsStreaming)
+        .def_static("getCurrentMetrics", &nlm::python::MonitoringSystem::getCurrentMetrics,
+                   py::arg("brain"))
+        .def_static("getBrainStateVisualization", &nlm::python::MonitoringSystem::getBrainStateVisualization,
+                   py::arg("brain"))
+        .def_static("getPerformanceProfile", &nlm::python::MonitoringSystem::getPerformanceProfile,
+                   py::arg("brain"))
+        .def_static("analyzeActivityPatterns", &nlm::python::MonitoringSystem::analyzeActivityPatterns,
+                   py::arg("brain"), py::arg("window_seconds") = 60.0);
+
+    py::class_<nlm::python::AdvancedNeuralOperations>(m, "AdvancedNeuralOperations")
+        .def_static("createNeuralPopulation", &nlm::python::AdvancedNeuralOperations::createNeuralPopulation,
+                   py::arg("brain"), py::arg("region_name"), py::arg("neuron_type"),
+                   py::arg("neuron_count"), py::arg("connection_pattern") = "random",
+                   py::arg("connection_density") = 0.1f, py::arg("mean_synaptic_strength") = 1.0f)
+        .def_static("connectNeurons", &nlm::python::AdvancedNeuralOperations::connectNeurons,
+                   py::arg("brain"), py::arg("source_neuron"), py::arg("target_neuron"),
+                   py::arg("weight") = 1.0f, py::arg("synapse_type") = nlm::SynapseType::Excitatory)
+        .def_static("findStrongestConnections", &nlm::python::AdvancedNeuralOperations::findStrongestConnections,
+                   py::arg("brain"), py::arg("top_n") = 10)
+        .def_static("optimizePlasticityForLearning", &nlm::python::AdvancedNeuralOperations::optimizePlasticityForLearning,
+                   py::arg("brain"))
+        .def_static("advanceDevelopmentStage", &nlm::python::AdvancedNeuralOperations::advanceDevelopmentStage,
+                   py::arg("brain"), py::arg("stage"));
+
+    py::class_<nlm::python::IntegrationSystem>(m, "IntegrationSystem")
+        .def_static("convertToNumPyFormat", &nlm::python::IntegrationSystem::convertToNumPyFormat,
+                   py::arg("nlm_data"))
+        .def_static("convertFromNumPyFormat", &nlm::python::IntegrationSystem::convertFromNumPyFormat,
+                   py::arg("numpy_array"))
+        .def_static("computeStatisticalAnalysis", &nlm::python::IntegrationSystem::computeStatisticalAnalysis,
+                   py::arg("data"))
+        .def_static("exportBrainToJSON", &nlm::python::IntegrationSystem::exportBrainToJSON,
+                   py::arg("brain"), py::arg("filepath"))
+        .def_static("importBrainFromJSON", &nlm::python::IntegrationSystem::importBrainFromJSON,
+                   py::arg("filepath"))
+        .def_static("serializeToJSON", &nlm::python::IntegrationSystem::serializeToJSON,
+                   py::arg("brain"))
+        .def_static("deserializeFromJSON", &nlm::python::IntegrationSystem::deserializeFromJSON,
+                   py::arg("json_string"));
+
+    py::class_<nlm::python::AdvancedNeuroscience>(m, "AdvancedNeuroscience")
+        .def_static("registerCustomNeuromodulator", &nlm::python::AdvancedNeuroscience::registerCustomNeuromodulator,
+                   py::arg("config"))
+        .def_static("computeNoveltyScore", &nlm::python::AdvancedNeuroscience::computeNoveltyScore,
+                   py::arg("brain"), py::arg("input"), py::arg("method") = "prediction_error")
+        .def_static("computeCuriosityScore", &nlm::python::AdvancedNeuroscience::computeCuriosityScore,
+                   py::arg("brain"), py::arg("state"), py::arg("method") = "information_gain")
+        .def_static("recordMemory", &nlm::python::AdvancedNeuroscience::recordMemory,
+                   py::arg("brain"), py::arg("memory_trace"), py::arg("importance"),
+                   py::arg("memory_type") = "episodic")
+        .def_static("triggerMemoryConsolidation", &nlm::python::AdvancedNeuroscience::triggerMemoryConsolidation,
+                   py::arg("brain"), py::arg("threshold") = 0.8);
+
+    py::class_<nlm::python::PerformanceOptimizer>(m, "PerformanceOptimizer")
+        .def_static("enableBatchProcessing", &nlm::python::PerformanceOptimizer::enableBatchProcessing,
+                   py::arg("brain"), py::arg("enable") = true)
+        .def_static("enableParallelExecution", &nlm::python::PerformanceOptimizer::enableParallelExecution,
+                   py::arg("brain"), py::arg("enable") = true)
+        .def_static("enableMemoryOptimization", &nlm::python::PerformanceOptimizer::enableMemoryOptimization,
+                   py::arg("brain"), py::arg("enable") = true)
+        .def_static("getPerformanceMetrics", &nlm::python::PerformanceOptimizer::getPerformanceMetrics,
+                   py::arg("brain"))
+        .def_static("getMemoryStatistics", &nlm::python::PerformanceOptimizer::getMemoryStatistics,
+                   py::arg("brain"))
+        .def_static("getResourceUsage", &nlm::python::PerformanceOptimizer::getResourceUsage,
+                   py::arg("brain"));
+
+    // Advanced API singleton
+    m.def("getAdvancedAPI", &nlm::python::AdvancedAPI::getInstance,
+          "Get the advanced API singleton instance");
+
+    m.def("createAdvancedBrainConfig", &nlm::python::AdvancedBrainConfiguration::createConfig,
+          py::arg("params"), "Create advanced brain configuration");
+
+    m.def("createAdvancedAgent", &nlm::python::AdvancedAgent::AdvancedAgent,
+          py::arg("agent_brain"), py::arg("rl_params"), "Create advanced agent");
+
+    m.def("getMonitoringSystem", &nlm::python::MonitoringSystem::getInstance,
+          "Get the monitoring system instance");
+
+    m.def("getNeuralOperations", &nlm::python::AdvancedNeuralOperations::getInstance,
+          "Get the neural operations instance");
+
+    m.def("getIntegrationSystem", &nlm::python::IntegrationSystem::getInstance,
+          "Get the integration system instance");
+
+    m.def("getNeuroscienceSystem", &nlm::python::AdvancedNeuroscience::getInstance,
+          "Get the neuroscience system instance");
+
+    m.def("getPerformanceOptimizer", &nlm::python::PerformanceOptimizer::getInstance,
+          "Get the performance optimizer instance");

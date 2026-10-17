@@ -149,3 +149,20 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Argument Parser library
+add_library(nlm_argsparse STATIC
+    src/core/ArgsParser/ArgsParser.hpp
+    src/core/ArgsParser/ArgsParser.cpp
+    src/core/ArgsParser/ArgsCategory.hpp
+    src/core/ArgsParser/ArgsValidator.hpp
+    src/core/ArgsParser/PresetManager.hpp
+)
+
+target_include_directories(nlm_argsparse PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Update main executable to link with argsparse
+target_link_libraries(nlm PUBLIC nlm_core nlm_argsparse)

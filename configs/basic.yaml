@@ -1,0 +1,37 @@
+core:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 500
+  region_count: 1
+  connection_probability: 0.15
+
+brain:
+  brain_type: standard
+
+plasticity:
+  enable_plasticity: true
+  stdp_ltp_weight: 0.02
+  stdp_ltd_weight: 0.015
+  stdp_tau: 20.0
+  synaptogenesis_rate: 0.0001
+  pruning_rate: 0.00001
+
+neuromodulation:
+  enable_neuromodulation: true
+  curiosity_strength: 0.5
+  novelty_threshold: 0.3
+  reward_decay: 0.95
+
+simulation:
+  max_steps: 1000
+  enable_checkpointing: false
+
+output:
+  output_dir: outputs
+  save_weights: true
+
+debugging:
+  log_level: info
+  debug_neurons:
+    - "1"
+  enable_profiling: false

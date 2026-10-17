@@ -87,9 +87,17 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+pybind11_add_module(pynlm bindings.cpp advanced_api.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(pynlm PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Add advanced API headers to the target
+target_include_directories(pynlm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
@@ -99,4 +107,17 @@ install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Installation for advanced API headers
+install(FILES
+    advanced_api.hpp
+    advanced_brain.hpp
+    advanced_agent.hpp
+    monitoring.hpp
+    neural_ops.hpp
+    integration.hpp
+    advanced_neuroscience.hpp
+    performance.hpp
+    DESTINATION pynlm/include
 )
