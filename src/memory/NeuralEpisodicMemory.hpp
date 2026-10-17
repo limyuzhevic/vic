@@ -121,6 +121,10 @@ public:
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
+    // Update episodic memory with current brain state
+    // Captures ongoing experience for continuous episodic memory
+    void updateExperience(SimulationStep currentStep, Timestamp currentTime);
+
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 

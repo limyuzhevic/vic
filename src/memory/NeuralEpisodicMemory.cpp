@@ -31,6 +31,70 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 
+void NeuralEpisodicMemory::updateExperience(SimulationStep currentStep, Timestamp currentTime) {
+    // Create a continuous experience update based on current brain state
+    // This is called every step to capture ongoing activity
+    
+    if (!brain_) {
+        return;
+    }
+    
+    // Create a minimal episode for current moment
+    // In a full implementation, this would capture detailed state
+    EpisodicMemoryItem currentExperience;
+    currentExperience.timestamp = currentStep;
+    currentExperience.age = 0;
+    
+    // Capture current sensory-like activity (based on brain state)
+    // This could be enhanced to actually read from brain's sensory buffer
+    // For now, use empty state which represents current moment
+    currentExperience.sensoryState.clear();
+    
+    // Use current time as position for spatial memory
+    currentExperience.positionX = currentTime * 0.001f;  // Scale time to position
+    currentExperience.positionY = 0.0f;  // Simplified - could be enhanced
+    currentExperience.orientation = 0.0f;
+    
+    // Default action for continuous update
+    currentExperience.action = ActionType::Wait;
+    
+    // Reward from dopamine if available
+    if (brain_->getDopamine()) {
+        currentExperience.reward = brain_->getDopamine()->getLevel();
+    } else {
+        currentExperience.reward = 0.0f;
+    }
+    
+    currentExperience.energy = 0.0f;
+    currentExperience.novelty = 0.0f;  // Would require novelty detector
+    
+    currentExperience.resultingSensoryState.clear();
+    currentExperience.resultingReward = currentExperience.reward;
+    
+    // Store recent neural activity pattern
+    for (auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    currentExperience.activeNeurons.push_back(neuron->getId());
+                    currentExperience.neuronActivations.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                }
+            }
+        }
+    }
+    
+    // Store this as a minimal episode
+    storeEpisode(currentExperience);
+    
+    // Update relevance of stored episodes
+    if (!currentExperience.activeNeurons.empty()) {
+        float relevanceDelta = currentExperience.activeNeurons.size() * 0.01f;
+        updateRelevance(currentStep, relevanceDelta);
+    }
+}
+
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
