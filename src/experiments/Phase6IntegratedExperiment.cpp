@@ -1,7 +1,7 @@
 #include "Phase6IntegratedExperiment.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
+#include "../brain/BrainIntegration.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
@@ -33,7 +33,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
-    // Create brain
+    // Create brain (Phase 6 final integration)
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");

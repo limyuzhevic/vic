@@ -18,10 +18,11 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Phase 6: Final Integration - Added Python bindings and enhanced testing
 
-# Core library
+# Source directory
+
+# Core library (unchanged)
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -35,6 +36,10 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    # New: Integration layer (Phase 6)
+    src/brain/BrainIntegration.cpp
+    # New: Python bindings for extensibility
+    src/brain/nlm_python_bindings.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -65,6 +70,7 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/AttentionalSelection.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -83,8 +89,14 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
 )
 
 target_include_directories(nlm_core PUBLIC
