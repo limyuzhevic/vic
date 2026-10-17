@@ -355,8 +355,8 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+        .def("initialize", &AgentBrain::initializeWithValidation, py::arg("world"),
+             "Initialize with world and validation")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
@@ -387,6 +387,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Configuration methods
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -398,7 +399,75 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced configuration access
+        .def("setSensoryNoveltyDecay", &AgentBrain::setSensoryNoveltyDecay,
+             py::arg("decay"), "Set sensory novelty decay rate")
+        .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+             py::arg("threshold"), "Set curiosity threshold for exploration")
+        .def("setExplorationProbability", &AgentBrain::setExplorationProbability,
+             py::arg("prob"), "Set exploration probability based on curiosity")
+        .def("setPredictionErrorLearningRate", &AgentBrain::setPredictionErrorLearningRate,
+             py::arg("rate"), "Set prediction error learning rate")
+        .def("setPlasticityFactorRange", &AgentBrain::setPlasticityFactorRange,
+             py::arg("min"), py::arg("max"), "Set plasticity factor min/max range")
+        // Configuration getters
+        .def("getSensoryNoveltyDecay", &AgentBrain::getSensoryNoveltyDecay,
+             "Get sensory novelty decay rate")
+        .def("getCuriosityThreshold", &AgentBrain::getCuriosityThreshold,
+             "Get curiosity threshold")
+        .def("getExplorationProbability", &AgentBrain::getExplorationProbability,
+             "Get exploration probability")
+        .def("getPredictionErrorLearningRate", &AgentBrain::getPredictionErrorLearningRate,
+             "Get prediction error learning rate")
+        .def("getPlasticityFactorMin", &AgentBrain::getPlasticityFactorMin,
+             "Get minimum plasticity factor")
+        .def("getPlasticityFactorMax", &AgentBrain::getPlasticityFactorMax,
+             "Get maximum plasticity factor")
+        // Advanced methods
+        .def("logSystemState", &AgentBrain::logSystemState,
+             "Log complete system state for debugging")
+        .def("validateConfiguration", &AgentBrain::validateConfiguration,
+             "Validate current configuration")
+        .def("checkMemoryConsistency", &AgentBrain::checkMemoryConsistency,
+             "Check for memory consistency issues")
+        // Factory methods for convenience
+        .def_static("createWithConfig", [](std::shared_ptr<Config> config) {
+            auto brain = std::make_shared<Brain>(config);
+            auto agentBrain = std::make_shared<AgentBrain>(brain);
+            return std::make_tuple(brain, agentBrain);
+        }, py::arg("config"), "Create brain and agent brain together with config")
+        .def_static("createDefaultAgent", []() {
+            auto config = createDefaultConfig();
+            auto brain = std::make_shared<Brain>(config);
+            return std::make_shared<AgentBrain>(brain);
+        }, "Create agent brain with default configuration")
+        .def_static("createSimpleAgentWithWorld", [](std::shared_ptr<Config> config, 
+                                                     std::shared_ptr<SimpleWorld> world) {
+            auto brain = std::make_shared<Brain>(config);
+            auto agentBrain = std::make_shared<AgentBrain>(brain);
+            agentBrain->initializeWithValidation(*world);
+            return std::make_tuple(brain, agentBrain, world);
+        }, py::arg("config"), py::arg("world"), "Create complete agent with world and config")
+        // Iteration and utility methods
+        .def("getAllNeuronCounts", [](const AgentBrain& self) {
+            py::dict counts;
+            counts["motor_forward"] = self.motorForward_.size();
+            counts["motor_backward"] = self.motorBackward_.size();
+            counts["motor_left"] = self.motorTurnLeft_.size();
+            counts["motor_right"] = self.motorTurnRight_.size();
+            counts["motor_interact"] = self.motorInteract_.size();
+            counts["motor_wait"] = self.motorWait_.size();
+            counts["sensory_vision"] = self.sensoryVision_.size();
+            counts["sensory_touch"] = self.sensoryTouch_.size();
+            counts["sensory_internal"] = self.sensoryInternal_.size();
+            counts["sensory_proprioception"] = self.sensoryProprioception_.size();
+            return counts;
+        }, "Get counts of all neuron groups")
+        .def("isHealthy", [](const AgentBrain& self) {
+            return !self.motorForward_.empty() && !self.sensoryVision_.empty() &&
+                   self.brain_ && self.brain_->getRandomGenerator();
+        }, "Check if agent brain is in healthy state")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

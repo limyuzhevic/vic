@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -69,6 +70,53 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration access
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
+    float getSensoryNoveltyDecay() const { return sensoryNoveltyDecay_; }
+    
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    
+    void setExplorationProbability(float prob) { explorationProbability_ = prob; }
+    float getExplorationProbability() const { return explorationProbability_; }
+    
+    void setPredictionErrorLearningRate(float rate) { predictionErrorLearningRate_ = rate; }
+    float getPredictionErrorLearningRate() const { return predictionErrorLearningRate_; }
+    
+    void setPlasticityFactorRange(float min, float max) { 
+        plasticityFactorMin_ = std::min(min, max); 
+        plasticityFactorMax_ = std::max(min, max); 
+    }
+    float getPlasticityFactorMin() const { return plasticityFactorMin_; }
+    float getPlasticityFactorMax() const { return plasticityFactorMax_; }
+    
+    // Advanced validation and debugging
+    void initializeWithValidation(const SimpleWorld& world);
+    void validateBrainState() const;
+    void validateConfiguration() const;
+    bool validateNeuron(std::vector<Neuron*>& neurons, const std::string& operation) const;
+    std::vector<Neuron*> getValidNeurons(const std::vector<Neuron*>& neurons) const;
+    float safeClamp(float value, float min, float max) const;
+    
+    // Debugging and monitoring
+    void logSystemState() const;
+    void checkMemoryConsistency() const;
+    void resetMemoryTracking();
+    
+    // Utility methods
+    std::string developmentalStageToString(DevelopmentalStage stage) const;
+    
+    // Health and status
+    bool isHealthy() const;
+    
+    // Performance profiling and optimization
+    void addPerformanceProfiling();
+    void printPerformanceReport() const;
+    void enablePerformanceLogging(bool enable);
+    void setCacheSize(size_t maxSize);
+    void clearCache();
+    void enableMemoryOptimization(bool enable);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +160,21 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Performance and optimization state
+    bool performanceLoggingEnabled_;
+    size_t cacheSizeLimit_;
+    SimpleCache performanceCache_;
+    bool memoryOptimizationEnabled_;
+    
+    // Performance tracking
+    struct PerformanceMetrics {
+        size_t totalSteps = 0;
+        double totalTime = 0.0;
+        double averageStepTime = 0.0;
+        size_t cacheHits = 0;
+        size_t cacheMisses = 0;
+        size_t validationErrors = 0;
+    };
+    PerformanceMetrics perfMetrics_;
 };
-
-} // namespace nlm
