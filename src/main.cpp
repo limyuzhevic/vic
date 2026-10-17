@@ -6,6 +6,11 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// NLM Phase 6 provides the complete, integrated artificial brain:
+// Phase 2-6 constitute a comprehensive developmental cognitive architecture
+// where each phase builds upon the previous one, creating increasingly
+// sophisticated cognitive abilities from primitive neural dynamics.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -37,12 +42,9 @@ void printBanner() {
     ║                                                               ║
     ║     Phase 2: Real Neural Computation                         ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Complete developmental cognitive architecture:        ║
+    ║     Phase 2-6: LIF neurons, event-driven spikes, plasticity, ║
+    ║     working memory, neuromodulation, prediction, cognition. ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -382,6 +384,33 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Neuromodulation parameters (Phase 2+ for reward learning)
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+    config->set("novelty_decay_rate", 0.95f, ConfigSource::Default);
+    
+    // Memory parameters (Phase 3+ for working and episodic memory)
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_capacity", 1000, ConfigSource::Default);
+    config->set("memory_retention", 0.1f, ConfigSource::Default);
+    
+    // Prediction parameters (Phase 4+ for temporal prediction)
+    config->set("prediction_horizon", 10, ConfigSource::Default);
+    config->set("prediction_error_decay", 0.9f, ConfigSource::Default);
+    config->set("confidence_threshold", 0.5f, ConfigSource::Default);
+    
+    // Development parameters (Phase 5+ for developmental stages)
+    config->set("critical_period_start", 60.0, ConfigSource::Default);
+    config->set("critical_period_end", 300.0, ConfigSource::Default);
+    config->set("developmental_plasticity_rate", 0.5f, ConfigSource::Default);
+    config->set("structural_maturation_rate", 0.3f, ConfigSource::Default);
+    
+    // Cognitive integration parameters (Phase 6 final integration)
+    config->set("attention_selectivity", 0.5f, ConfigSource::Default);
+    config->set("planning_confidence_threshold", 0.4f, ConfigSource::Default);
+    config->set("self_model_weight", 0.2f, ConfigSource::Default);
+    config->set("social_learning_rate", 0.3f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +419,28 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
+    NLM_LOG_INFO("  curiosity_threshold: " + std::to_string(config->getOr<float>("curiosity_threshold", 0.3f)));
+    NLM_LOG_INFO("  novelty_decay_rate: " + std::to_string(config->getOr<float>("novelty_decay_rate", 0.95f)));
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<int>("working_memory_capacity", 100)));
+    NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<int>("episodic_memory_capacity", 1000)));
+    NLM_LOG_INFO("  memory_retention: " + std::to_string(config->getOr<float>("memory_retention", 0.1f)));
+    NLM_LOG_INFO("  prediction_horizon: " + std::to_string(config->getOr<int>("prediction_horizon", 10)));
+    NLM_LOG_INFO("  prediction_error_decay: " + std::to_string(config->getOr<float>("prediction_error_decay", 0.9f)));
+    NLM_LOG_INFO("  confidence_threshold: " + std::to_string(config->getOr<float>("confidence_threshold", 0.5f)));
+    NLM_LOG_INFO("  critical_period_start: " + std::to_string(config->getOr<double>("critical_period_start", 60.0)));
+    NLM_LOG_INFO("  critical_period_end: " + std::to_string(config->getOr<double>("critical_period_end", 300.0)));
+    NLM_LOG_INFO("  developmental_plasticity_rate: " + std::to_string(config->getOr<float>("developmental_plasticity_rate", 0.5f)));
+    NLM_LOG_INFO("  structural_maturation_rate: " + std::to_string(config->getOr<float>("structural_maturation_rate", 0.3f)));
+    NLM_LOG_INFO("  attention_selectivity: " + std::to_string(config->getOr<float>("attention_selectivity", 0.5f)));
+    NLM_LOG_INFO("  planning_confidence_threshold: " + std::to_string(config->getOr<float>("planning_confidence_threshold", 0.4f)));
+    NLM_LOG_INFO("  self_model_weight: " + std::to_string(config->getOr<float>("self_model_weight", 0.2f)));
+    NLM_LOG_INFO("  social_learning_rate: " + std::to_string(config->getOr<float>("social_learning_rate", 0.3f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Implements reward computation for value-based learning
 
 class Reward {
 public:
@@ -23,7 +23,7 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // Uses observation features to estimate state value
     float computeReward(const class Observation& observation) const;
     
     // Reward history

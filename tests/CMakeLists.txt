@@ -13,6 +13,7 @@ add_executable(nlm_test
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
+    test_reward.cpp
     test_brain.cpp
 )
 

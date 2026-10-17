@@ -145,6 +145,42 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
+void testSTDPWeightBoundsNegative() {
+    nlm::STDP stdp;
+    
+    nlm::Synapse synapse(nlm::SynapseId(5), nlm::NeuronId(9), nlm::NeuronId(10));
+    synapse.setType(nlm::SynapseType::Inhibitory);
+    synapse.setWeight(-0.99f);  // Near min
+    
+    // Very strong depression
+    std::vector<nlm::Timestamp> preSpikes = {10.0, 20.0, 30.0, 40.0, 50.0};
+    std::vector<nlm::Timestamp> postSpikes = {11.0, 21.0, 31.0, 41.0, 51.0};
+    
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    
+    // Weight should be clamped to min
+    assert(synapse.getWeight() >= -1.0f);
+    
+    std::cout << "    testSTDPWeightBoundsNegative passed" << std::endl;
+}
+
+void testSTDPTimeConstant() {
+    nlm::STDP stdp;
+    
+    // Change time constant
+    stdp.setTimeConstant(50.0f);
+    assert(stdp.getTimeConstant() == 50.0f);
+    
+    // Test extreme values
+    stdp.setTimeConstant(1.0f);
+    assert(stdp.getTimeConstant() == 1.0f);
+    
+    stdp.setTimeConstant(100.0f);
+    assert(stdp.getTimeConstant() == 100.0f);
+    
+    std::cout << "    testSTDPTimeConstant passed" << std::endl;
+}
+
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
     testSTDPCreation();
