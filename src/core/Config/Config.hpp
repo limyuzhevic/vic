@@ -5,11 +5,18 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <limits>
+
+// Forward declarations for rapidjson
+namespace rapidjson {
+    class Document;
+    template<typename>
+    class AllocatorType;
+    template<typename>
+    class Value;
+}
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -41,6 +48,76 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Main configuration class
+class Config {
+public:
+    Config();
+    ~Config();
+    
+    // Disable copying, enable moving
+    Config(const Config&) = delete;
+    Config& operator=(const Config&) = delete;
+    Config(Config&&) noexcept;
+    Config& operator=(Config&&) noexcept;
+    
+    // Load from file (JSON format)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Load from command line arguments
+    bool loadFromArgs(int argc, char** argv);
+    
+    // Save to file
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Set values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static bool startsWith(const std::string& str, const std::string& prefix);
+    void setValueFromString(const std::string& key, const std::string& value);
+    bool parseSimpleJSON(const std::string& content);
+    bool parseJSONValue(const std::string& content, size_t& pos);
+    bool parseJSONObject(const std::string& content, size_t& pos);
+    bool parseJSONArray(const std::string& content, size_t& pos);
+    bool parseJSONString(const std::string& content, size_t& pos);
+    bool parseJSONBoolean(const std::string& content, size_t& pos);
+    bool parseJSONNull(const std::string& content, size_t& pos);
+    bool parseJSONNumber(const std::string& content, size_t& pos);
+    void skipWhitespace(const std::string& content, size_t& pos);
 };
 
 // Main configuration class

@@ -351,7 +351,48 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Convenience methods for Python
+        .def("runSteps", [](Brain& self, size_t num_steps) {
+            for (size_t i = 0; i < num_steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("num_steps"), "Run simulation for given number of steps")
+        
+        .def("runEpisode", [](Brain& self, const class SensoryInput& input, size_t num_steps) {
+            self.receiveSensoryInput(input);
+            for (size_t i = 0; i < num_steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("input"), py::arg("num_steps"), "Run one episode with sensory input")
+        
+        .def("getStats", [](const Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            stats["dev_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics as a dictionary")
+        
+        .def("copyFrom", [](Brain& self, const Brain& other) {
+            // Create a copy of other's configuration and regions
+            // Note: This is a simplified copy operation
+            auto config = other.getConfig();
+            // Copy configuration
+            for (const auto& entry : config->getKeys()) {
+                auto value = config->get<std::string>(entry);
+                if (value) {
+                    self.getConfig()->set(entry, *value);
+                }
+            }
+            // Note: Deep copying regions is more complex and would need proper implementation
+            return self;
+        }, py::arg("other"), "Copy brain state from another brain (basic configuration copy)");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,28 +439,164 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Convenience methods for Python
+        .def("runEpisode", [](AgentBrain& self, const class SensoryInput& percept, const class SimpleWorld& world, size_t num_steps) {
+            self.initialize(world);
+            self.processSensoryInput(percept);
+            for (size_t i = 0; i < num_steps; ++i) {
+                auto brainPtr = self.getBrain();
+                brainPtr->step(i);
+            }
+        }, py::arg("percept"), py::arg("world"), py::arg("num_steps"),
+             "Run a complete agent episode")
+        
+        .def("getAgentStats", [](const AgentBrain& self) {
+            py::dict stats;
+            auto brain = self.getBrain();
+            stats["brain_stats"] = py::cast(*brain, py::return_value_policy::copy);
+            stats["curiosity"] = self.getCuriosityLevel();
+            stats["novelty"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["neuromodulation"] = self.getNeuromodulationLevel();
+            stats["reward_modulation_enabled"] = self.isRewardModulationEnabled();
+            stats["structural_plasticity_enabled"] = self.isStructuralPlasticityEnabled();
+            stats["development_enabled"] = self.isDevelopmentEnabled();
+            stats["curiosity_enabled"] = self.isCuriosityEnabled();
+            return stats;
+        }, "Get comprehensive agent statistics")
+        
+        .def("enableAllSystems", &AgentBrain::enableRewardModulation, &AgentBrain::enableStructuralPlasticity, &AgentBrain::enableDevelopment, &AgentBrain::enableCuriosity,
+             "Enable all neuromodulation systems at once (convenience method)")
+        
+        .def("disableAllSystems", []() -> std::function<void(AgentBrain&)> {
+            return [](AgentBrain& self) {
+                self.enableRewardModulation(false);
+                self.enableStructuralPlasticity(false);
+                self.enableDevelopment(false);
+                self.enableCuriosity(false);
+            };
+        }(), "Disable all neuromodulation systems (convenience method)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    }, "Create a default configuration")
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
+    }, py::arg("config"), "Create a new brain with configuration")
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
+    }, "Create a new simple world")
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    }, py::arg("brain"), "Create a new agent brain interface")
+    
+    // Additional factory functions for convenience
+    m.def("createDefaultConfigWithParams", [](size_t neuron_count, double connection_probability) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+        config->set("connection_probability", connection_probability, ConfigSource::Default);
+        return config;
+    }, py::arg("neuron_count"), py::arg("connection_probability"),
+       "Create a configuration with specified parameters")
+    
+    m.def("createAgentBrainWithSystems", [](std::shared_ptr<Brain> brain, bool enable_reward_modulation, bool enable_structural_plasticity, bool enable_development, bool enable_curiosity) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableRewardModulation(enable_reward_modulation);
+        agent->enableStructuralPlasticity(enable_structural_plasticity);
+        agent->enableDevelopment(enable_development);
+        agent->enableCuriosity(enable_curiosity);
+        return agent;
+    }, py::arg("brain"), py::arg("enable_reward_modulation"), py::arg("enable_structural_plasticity"), py::arg("enable_development"), py::arg("enable_curiosity"),
+       "Create an agent brain with specified neuromodulation systems enabled")
+    
+    m.def("createWorldWithConfig", [](size_t width, size_t height, size_t vision_width, size_t vision_height) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, vision_width, vision_height);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("vision_width"), py::arg("vision_height"),
+       "Create a configured simple world")
+    
+    // Version and metadata information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM Python Bindings for Neural Learning Machine";
+    m.attr("__author__") = "NLM Authors";
+    
+    // Constants for common values
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_CONNECTION_PROBABILITY") = 0.1;
+    m.attr("DEFAULT_SIMULATION_TIMESTEP") = 0.001;
+    
+    // Error types for Python
+    py::register_exception<std::runtime_error>(m, "NLMError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+    
+    // Utility functions
+    m.def("validateBrain", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::invalid_argument("Brain pointer is null");
+        }
+        if (brain->getTotalNeuronCount() == 0) {
+            throw std::invalid_argument("Brain has no neurons");
+        }
+        return true;
+    }, py::arg("brain"), "Validate brain state and return True if valid")
+    
+    m.def("validateWorld", [](const std::shared_ptr<SimpleWorld>& world) {
+        if (!world) {
+            throw std::invalid_argument("World pointer is null");
+        }
+        if (world->getWidth() == 0 || world->getHeight() == 0) {
+            throw std::invalid_argument("World dimensions are invalid");
+        }
+        return true;
+    }, py::arg("world"), "Validate world state and return True if valid")
+    
+    // Serialization utilities
+    m.def("saveBrainState", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        if (!validateBrain(brain)) {
+            throw std::runtime_error("Cannot save invalid brain state");
+        }
+        brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file")
+    
+    m.def("loadBrainState", [](std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        auto newBrain = std::make_shared<Brain>(brain->getConfig());
+        newBrain->load(filepath);
+        brain = newBrain;
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from file and replace current brain")
+    
+    // Advanced configuration utilities
+    m.def("getDefaultBrainConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Get a default brain configuration with sensible parameters")
+    
+    m.def("configureBrainForLearning", [](std::shared_ptr<Brain>& brain) {
+        auto config = brain->getConfig();
+        config->set("plasticity_stdp_enable", true, ConfigSource::Runtime);
+        config->set("plasticity_hebbian_enable", true, ConfigSource::Runtime);
+        config->set("plasticity_structural_enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+    }, py::arg("brain"), "Configure brain with settings optimized for learning")
+    
+    m.def("configureWorldForNavigation", [](std::shared_ptr<SimpleWorld>& world) {
+        world->configure(100, 100, 16, 16);
+        world->setMaxEnergy(100.0);
+        world->setEnergyDecayRate(0.01);
+    }, py::arg("world"), "Configure world for navigation tasks with resource objects");
 
 } // namespace nlm
