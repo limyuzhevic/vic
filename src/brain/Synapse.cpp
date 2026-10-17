@@ -1,7 +1,11 @@
+# Synapse.cpp - Implementation of Synapse class with improved error handling
+
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
@@ -44,6 +48,24 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl() : id(), sourceNeuron(), destinationNeuron()
+        , weight(0.0f), delay(1), type(SynapseType::Excitatory)
+        , plasticityFlags(), shortTermDepression(1.0f), shortTermFacilitation(0.0f)
+        , lastPreSpikeTime(-1.0f), lastPostSpikeTime(-1.0f)
+        , eligibilityTrace(0.0f), efficacy(1.0f) {}
+    
+    ~Impl() {
+        // Clean up vectors
+        preSpikeHistory.clear();
+        postSpikeHistory.clear();
+    }
+    
+    std::string getErrorMessage(const std::string& context) const {
+        std::stringstream ss;
+        ss << "Synapse " << id.index() << " [" << context << "]";
+        return ss.str();
+    }
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -94,10 +116,17 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    if (std::isnan(weight)) {
+        // Ignore NaN values (may come from corrupted data)
+        return;
+    }
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    if (std::isnan(delta)) {
+        return;  // Ignore NaN updates
+    }
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -108,6 +137,14 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
+    if (delay == 0) {
+        // Zero delay might cause stability issues
+        return;
+    }
+    if (delay > 1000) {
+        // Cap maximum delay to prevent excessive memory usage
+        return;
+    }
     pImpl->delay = delay;
 }
 
@@ -128,6 +165,9 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (timestamp < 0.0) {
+        return;  // Invalid timestamp
+    }
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +175,9 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (timestamp < 0.0) {
+        return;  // Invalid timestamp
+    }
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -158,14 +201,14 @@ PlasticityFlags& Synapse::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
 
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
@@ -173,10 +216,16 @@ float Synapse::getEligibilityTrace() const {
 }
 
 void Synapse::setEligibilityTrace(float trace) {
+    if (std::isnan(trace)) {
+        return;  // Ignore NaN
+    }
     pImpl->eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    if (decayRate < 0.0f || decayRate > 1.0f) {
+        return;  // Invalid decay rate
+    }
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -188,6 +237,9 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    if (std::isnan(efficacy)) {
+        return;  // Ignore NaN
+    }
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
@@ -198,6 +250,11 @@ void Synapse::step(Timestamp currentTime) {
     // 3. Update efficacy based on use
     
     TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Validate current time
+    if (currentTime < 0.0) {
+        return;
+    }
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
