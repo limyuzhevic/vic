@@ -1,3 +1,4 @@
+// Clean Neural Dynamics Header
 #pragma once
 
 #include "../core/Types/Types.hpp"
@@ -7,18 +8,14 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
-
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,27 +50,101 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// Implements classic HH equations for neuron membrane dynamics
+// Includes voltage-gated sodium and potassium channels with proper gating variable dynamics
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    HodgkinHuxleyDynamics();
+    ~HodgkinHuxleyDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // HH-specific parameters
+    void setMembraneCapacitance(float cm);
+    float getMembraneCapacitance() const;
+    
+    void setMaxSodiumConductance(float gNa);
+    float getMaxSodiumConductance() const;
+    void setMaxPotassiumConductance(float gK);
+    float getMaxPotassiumConductance() const;
+    void setMaxLeakConductance(float gL);
+    float getMaxLeakConductance() const;
+    
+    void setSodiumReversalPotential(float ENa);
+    float getSodiumReversalPotential() const;
+    void setPotassiumReversalPotential(float EK);
+    float getPotassiumReversalPotential() const;
+    void setLeakReversalPotential(float EL);
+    float getLeakReversalPotential() const;
+    
+    // Numerical integration method
+    enum class IntegrationMethod { Euler, RungeKutta4 };
+    void setIntegrationMethod(IntegrationMethod method);
+    IntegrationMethod getIntegrationMethod() const;
+    
+    // Spike detection and recording
+    void setSpikeThreshold(float threshold);
+    float getSpikeThreshold() const;
+    bool hasRecentSpike() const;
+    float getLastSpikeTime() const;
+    void clearRecentSpikes();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitable system model)
+// Implements fast-slow dynamics with recovery variable
+// Supports bistability and limit cycles with different excitability types
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FitzHughNagumoDynamics();
+    ~FitzHughNagumoDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // FHN-specific parameters
+    void setCubicParameter(float b);
+    float getCubicParameter() const;
+    
+    void setRecoveryTimeConstant(float tau);
+    float getRecoveryTimeConstant() const;
+    
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    
+    void setMembraneTimeConstant(float tau);
+    float getMembraneTimeConstant() const;
+    
+    void setExternalCurrent(float Iext);
+    float getExternalCurrent() const;
+    
+    // Integration method
+    enum class IntegrationMethod { Euler, RungeKutta4 };
+    void setIntegrationMethod(IntegrationMethod method);
+    
+    // Excitability type
+    enum class ExcitabilityType { TypeI, TypeII };
+    void setExcitabilityType(ExcitabilityType type);
+    ExcitabilityType getExcitabilityType() const;
+    
+    // Spike detection
+    bool hasRecentSpike() const;
+    float getLastSpikeTime() const;
+    void clearRecentSpikes();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

@@ -100,6 +100,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    
+    // Parsing methods
+    bool parseJSON(const std::string& content);
+    bool parseYAML(const std::string& content);
+    bool parseKeyValue(const std::string& content);
 };
 
 } // namespace nlm

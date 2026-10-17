@@ -54,6 +54,34 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
+    // Learning rule selection
+    enum class LearningRuleType {
+        Hebbian,
+        BCM,
+        Oja,
+        AntiHebbian,
+        RewardModulated,
+        TripletSTDP
+    };
+    
+    void setRuleType(LearningRuleType rule);
+    LearningRuleType getRuleType() const;
+    
+    // Neuromodulator integration
+    void setNeuromodulators(class Dopamine* dopamine,
+                            class Serotonin* serotonin,
+                            class PredictionError* predictionError);
+    
+    // Homeostatic and normalization parameters
+    void setHomeostaticParameters(float targetWeight, float homeostaticRate, float normalization);
+    void setSTDPParameters(float ltpWeight, float ltdWeight, float timeConstant);
+    void setRewardModulationParameters(float threshold, float factor);
+    
+    // Complete configuration
+    void configure(float ltpWeight, float ltdWeight, float tau,
+                   float targetWeight, float homeostaticRate,
+                   float rewardThreshold, float rewardFactor);
+    
 private:
     struct Impl;
     Impl* pImpl;
