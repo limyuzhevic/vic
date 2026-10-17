@@ -1,3 +1,34 @@
+/**
+ * @file AgentBrain.hpp
+ * @brief Agent interface for connecting NLM brain to the world
+ * 
+ * This file defines the AgentBrain class which serves as the bridge between the
+ * neural brain and the external environment. It handles sensory transduction from
+ * the world and motor decoding from neural activity, enabling interaction with
+ * simulated environments.
+ * 
+ * The AgentBrain class is the primary interface for external users to:
+ * - Process sensory input from the world and inject into the brain
+ * - Decode neural motor activity into executable commands
+ * - Apply neuromodulatory signals based on environmental feedback
+ * - Monitor internal brain states and levels
+ * - Reset the agent for new episodes
+ * 
+ * @note This class abstracts away the complexity of neural computation while
+ *       maintaining direct access to the brain's internal state and parameters.
+ *       It's designed to be the main user-facing interface for NLM applications.
+ * 
+ * @warning The AgentBrain depends on the Brain and world implementations being
+ *         properly initialized. Using an uninitialized AgentBrain will result
+ *         in undefined behavior. Always initialize with a valid world object
+ *         before use.
+ * 
+ * @see Brain.hpp - Underlying neural computation engine
+ * @see SimpleWorld.hpp - World simulation environment
+ * @see AgentBody.hpp - Physical representation in world
+ * @see SensoryPercept.hpp - Sensory input abstraction
+ */
+
 #pragma once
 
 #include "AgentBody.hpp"
@@ -11,6 +42,33 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+/**
+ * @brief Connects NLM brain to the world and handles perception/action loop
+ * 
+ * The AgentBrain class is the primary interface for connecting neural computation
+ * to the external world. It acts as a transducer that:
+ * - Receives sensory information from the world and converts it into neural input
+ * - Interprets neural motor activity and converts it into world commands
+ * - Applies environmental feedback through neuromodulation
+ * - Maintains the agent's internal state and developmental progress
+ * 
+ * This class is the main user-facing interface for NLM applications. It provides
+ * a clean abstraction over the complex neural computation while maintaining full
+ * access to brain functionality when needed.
+ * 
+ * @note External users should primarily interact with the AgentBrain class rather
+ *       than directly accessing the Brain class. The AgentBrain handles the
+ *       world-interaction aspects of the neural system.
+ * 
+ * @warning The AgentBrain must be properly initialized with both a brain and
+ *         world object before use. Uninitialized use will result in undefined
+ *         behavior or crashes. Always call initialize() before processing
+ *         sensory input or decoding motor commands.
+ * 
+ * @see Brain.hpp - Underlying neural computation engine
+ * @see SimpleWorld.hpp - World simulation environment
+ * @see AgentBrain::initialize() - Initialization method
+ */
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
