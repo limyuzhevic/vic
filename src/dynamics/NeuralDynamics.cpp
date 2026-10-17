@@ -1,5 +1,7 @@
 #include "NeuralDynamics.hpp"
 #include <cmath>
+#include <stdexcept>
+#include <cassert>
 
 namespace nlm {
 
@@ -17,6 +19,14 @@ IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     // PLACEHOLDER: Simple leaky integrator
+    
+    if (!neuron) {
+        throw std::invalid_argument("Neuron pointer cannot be null");
+    }
+    
+    if (dt <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
     
     const auto& state = neuron->getState();
     
@@ -52,12 +62,31 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    
+    if (!synapse) {
+        throw std::invalid_argument("Synapse pointer cannot be null");
+    }
+    
+    if (dt <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
+    
+    // Pass dt as current time for the synapse step
+    synapse->step(static_cast<Timestamp>(dt));
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
     // TODO PHASE 2: Implement real synaptic input
     // PLACEHOLDER: Simple additive input
+    
+    if (!neuron) {
+        throw std::invalid_argument("Neuron pointer cannot be null");
+    }
+    
+    if (!synapse) {
+        throw std::invalid_argument("Synapse pointer cannot be null");
+    }
+    
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
@@ -67,6 +96,10 @@ void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* sy
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
+    if (!neuron) {
+        throw std::invalid_argument("Neuron pointer cannot be null");
+    }
+    
     return neuron->getMembranePotential() >= neuron->getThreshold();
 }
 
@@ -75,6 +108,9 @@ void IntegrateAndFireDynamics::reset() {
 }
 
 void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
+    if (tau <= 0.0f) {
+        throw std::invalid_argument("Membrane time constant must be positive");
+    }
     pImpl->membraneTimeConstant = tau;
 }
 

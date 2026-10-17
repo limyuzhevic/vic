@@ -2,6 +2,8 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <cassert>
 
 namespace nlm {
 
@@ -28,6 +30,11 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Validate input
+    if (id == INVALID_NEURON_ID) {
+        throw std::invalid_argument("Invalid neuron ID");
+    }
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -51,22 +58,39 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    if (type == NeuronType::Invalid) {
+        throw std::invalid_argument("Neuron type cannot be Invalid");
+    }
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Check for NaN and infinity
+    if (std::isnan(potential) || std::isinf(potential)) {
+        throw std::invalid_argument("Membrane potential cannot be NaN or infinity");
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    // Check for NaN and infinity
+    if (std::isnan(delta) || std::isinf(delta)) {
+        throw std::invalid_argument("Membrane potential delta cannot be NaN or infinity");
+    }
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    if (std::isnan(threshold) || std::isinf(threshold)) {
+        throw std::invalid_argument("Threshold cannot be NaN or infinity");
+    }
     pImpl->state.threshold = threshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
+    if (state == FiringState::Invalid) {
+        throw std::invalid_argument("Firing state cannot be Invalid");
+    }
     pImpl->state.firingState = state;
 }
 
@@ -80,10 +104,16 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    if (rate < 0.0f) {
+        throw std::invalid_argument("Firing rate cannot be negative");
+    }
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    if (conductance < 0.0f) {
+        throw std::invalid_argument("Leak conductance cannot be negative");
+    }
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,6 +122,9 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    if (steps == 0) {
+        throw std::invalid_argument("Refractory period cannot be zero");
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +133,9 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    if (std::isnan(potential) || std::isinf(potential)) {
+        throw std::invalid_argument("Resting potential cannot be NaN or infinity");
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +144,9 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    if (std::isnan(potential) || std::isinf(potential)) {
+        throw std::invalid_argument("Reset potential cannot be NaN or infinity");
+    }
     pImpl->state.resetPotential = potential;
 }
 

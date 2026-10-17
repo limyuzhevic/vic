@@ -2,6 +2,8 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <cassert>
 
 namespace nlm {
 
@@ -48,6 +50,15 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    // Validate inputs
+    if (source == destination) {
+        throw std::invalid_argument("Source and destination neurons cannot be the same");
+    }
+    
+    if (id == INVALID_SYNAPSE_ID) {
+        throw std::invalid_argument("Invalid synapse ID");
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -94,10 +105,17 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    if (std::isnan(weight)) {
+        throw std::invalid_argument("Weight cannot be NaN");
+    }
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    if (std::isnan(delta)) {
+        throw std::invalid_argument("Weight delta cannot be NaN");
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -108,6 +126,9 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
+    if (delay < 0) {
+        throw std::invalid_argument("Delay cannot be negative");
+    }
     pImpl->delay = delay;
 }
 
@@ -116,6 +137,9 @@ SynapseType Synapse::getType() const {
 }
 
 void Synapse::setType(SynapseType type) {
+    if (type == SynapseType::Invalid) {
+        throw std::invalid_argument("Synapse type cannot be Invalid");
+    }
     pImpl->type = type;
 }
 
@@ -128,6 +152,10 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        throw std::invalid_argument("Timestamp cannot be negative");
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +163,10 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        throw std::invalid_argument("Timestamp cannot be negative");
+    }
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
