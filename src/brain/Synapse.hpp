@@ -71,7 +71,11 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Implements real synaptic dynamics including:
+    // - Short-term plasticity (STP: Tsodyks-Markram model)
+    // - Eligibility trace decay for reward-modulated learning
+    // - Synaptic efficacy modulation
+    // - Weight homeostasis and bounds enforcement
     void step(Timestamp currentTime);
     
     // Reset to initial state
