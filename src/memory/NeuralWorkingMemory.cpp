@@ -22,6 +22,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -44,8 +50,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        if (auto neurons = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -67,6 +73,14 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
+    
+    // Update active traces
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
+        }
+    }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
@@ -81,6 +95,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        // Note: activeTraces_ is not initialized yet - this will be handled by update()
     }
     
     // Inject current to maintain activation

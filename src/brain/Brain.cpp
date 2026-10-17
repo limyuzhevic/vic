@@ -414,7 +414,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Calculate curiosity as combination of novelty and prediction error
+        float novelty = pImpl->novelty ? pImpl->novelty->getNovelty() : 0.0f;
+        float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -437,6 +440,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+    }
+    
+    // Apply acetylcholine effects on attention and memory
+    // TODO PHASE 2: Implement full ACh effects
+    // For now, ACh would modulate attention system strength
+    float acHlevel = 0.5f;  // Baseline ACh
+    if (pImpl->attention) {
+        // ACh enhances attentional selection
+        float attentionBoost = acHlevel * 0.3f;
+        pImpl->attention->setInhibitionStrength(0.5f - attentionBoost * 0.2f);
+        pImpl->attention->setExcitationStrength(1.5f + attentionBoost * 0.2f);
+    }
+    
+    // Apply norepinephrine effects on arousal and vigilance
+    // TODO PHASE 2: Implement full NE effects
+    float nElevel = 0.3f;  // Baseline NE
+    if (pImpl->curiosity) {
+        // NE enhances curiosity and exploration drive
+        float curiosityBoost = nElevel * 0.5f;
+        // Curiosity system already updated above, could boost further
+    }
+    
+    // Apply serotonin effects on mood and impulse control
+    // TODO PHASE 2: Implement full 5-HT effects
+    float sElevel = 0.4f;  // Baseline 5-HT
+    if (pImpl->workingMemory) {
+        // 5-HT would modulate working memory stability
+        // Higher 5-HT improves memory stability, reducing overwriting
+        float memoryStability = sElevel * 0.3f;
+        // Could apply to working memory decay rate
+    }
+    
+    // Apply neuromodulation to synaptic plasticity
+    // This is already done in the plasticity step
+    // Dopamine affects STDP rates through getPlasticityFactor()
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -488,7 +529,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons (neural activity pattern)
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +543,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store sensory input pattern if available
+            // This captures the actual sensory experience from the environment
+            if (!pImpl->sensoryNeurons.empty() && pImpl->workingMemory) {
+                // Get current working memory content as sensory pattern
+                std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+                if (!sensoryPattern.empty()) {
+                    episode.sensoryState = sensoryPattern;
+                    // Also compute resulting sensory state based on action and environment feedback
+                    // For now, use a simple encoding of the motor output
+                    episode.resultingSensoryState = sensoryPattern;
+                    episode.resultingReward = episode.reward;
+                }
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Set position/orientation based on motor neuron activity
+            episode.positionX = 0.0f;
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Set action based on most active motor neuron
+            if (!pImpl->motorNeurons.empty()) {
+                auto* mostActiveMotor = nullptr;
+                float highestActivation = -1000.0f;
+                for (auto* motor : pImpl->motorNeurons) {
+                    const auto& state = motor->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    if (activation > highestActivation) {
+                        highestActivation = activation;
+                        mostActiveMotor = motor;
+                    }
+                }
+                if (mostActiveMotor) {
+                    // Simple mapping from neuron ID to action type
+                    episode.action = ActionType::Wait;  // Default
+                    if (highestActivation > 0.5f) {
+                        // Could be based on specific motor neuron properties
+                    }
+                }
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +592,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create prediction from current sensory state
+        if (!pImpl->sensoryNeurons.empty() && pImpl->workingMemory) {
+            // Get current sensory pattern from working memory
+            std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+            if (!sensoryPattern.empty()) {
+                // Create SensoryInput from the pattern for prediction
+                // (In a real implementation, this would use actual Vision/Audio input)
+                auto prediction = pImpl->predictionSystem->predictNextState(*pImpl->sensoryInput);
+                
+                // Update predictions based on current state
+                pImpl->predictionSystem->updatePredictions(*prediction, *pImpl->sensoryInput);
+                
+                // Use prediction to influence attention and working memory
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                float confidence = pImpl->predictionSystem->getConfidence();
+                
+                // Higher prediction error increases attention to novel sensory input
+                if (predictionError > 0.5f && confidence > 0.7f) {
+                    // Apply attentional boost for prediction errors
+                    for (auto* neuron : pImpl->sensoryNeurons) {
+                        neuron->injectCurrent(0.5f * confidence);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -548,31 +652,73 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            // Update development with full parameters
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                    case DevelopmentalStage::Aging:
+                        plasticityMod = 0.1f;  // Declining
+                        break;
+                }
+                
+                // Apply development effects on structural plasticity
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Development affects neural excitability through neuromodulation
+            if (pImpl->developmentSystem) {
+                DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+                
+                // Different developmental stages affect different neuromodulators
+                float excitabilityMod = 1.0f;
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        excitabilityMod = 1.5f;  // Hyper-excitable
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        excitabilityMod = 1.2f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        excitabilityMod = 1.0f;  // Normal
+                        break;
+                    case DevelopmentalStage::Adult:
+                        excitabilityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Aging:
+                        excitabilityMod = 0.6f;  // Reduced
+                        break;
+                }
+                
+                // Apply excitability modulation to sensory neurons
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    neuron->injectCurrent(0.1f * (excitabilityMod - 1.0f));
+                }
+                
+                // Apply to motor neurons for action selection
+                for (auto* neuron : pImpl->motorNeurons) {
+                    neuron->injectCurrent(0.1f * (excitabilityMod - 1.0f));
+                }
+            }
         }
     }
     
@@ -580,6 +726,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -690,9 +841,27 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for action selection (replaces simple motor activity-based selection)
+    if (pImpl->planner) {
+        // Convert current sensory state to pattern for planning
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            currentState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential);
+                currentState.push_back(std::min(activation * 2.0f, 1.0f));  // Scale to [0,1]
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get planned action from neural planner
+            ActionType plannedAction = pImpl->planner->planAction(currentState, 0.0f);  // Target reward = 0 for now
+            return std::make_unique<Action>(plannedAction);
+        }
+    }
     
+    // Fallback: simple action selection based on motor neuron activity
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -712,6 +881,24 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
+    
+    // Record action in episodic memory for learning
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem actionEpisode;
+        actionEpisode.timestamp = pImpl->currentStep;
+        actionEpisode.action = type;
+        actionEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Convert action to sensory pattern for storage
+        std::vector<float> actionPattern;
+        actionPattern.reserve(10);
+        for (int i = 0; i < 10; ++i) {
+            actionPattern.push_back((static_cast<int>(type) + i) % 10 / 9.0f);
+        }
+        actionEpisode.sensoryState = actionPattern;
+        
+        pImpl->episodicMemory->storeEpisode(actionEpisode);
+    }
     
     return action;
 }
