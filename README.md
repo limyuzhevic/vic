@@ -75,14 +75,107 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Python API (pynlm)
+
+### Quick Start
+
+```python
+import pynlm
+
+# Create a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for i in range(1000):
+    brain.step(i)
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### Complete Agent Simulation
+
+```python
+def run_complete_simulation(steps=1000):
+    """Run a complete agent simulation with world interaction."""
+    
+    # Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    agent.initialize(world)
+    
+    # Enable learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Run simulation
+    for step in range(steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process input
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Execute action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply learning signals
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            
+    print(f"Simulation complete after {steps} steps")
+    return brain, agent, world
+
+# Run the simulation
+run_complete_simulation(1000)
+```
+
+## Documentation
+
+For comprehensive documentation including examples, API reference, and advanced features, see:
+- `EnhancedDocumentation.md` - Complete API documentation and examples
+- `easy_usage.md` - Beginner-friendly usage guide
+- `HOW_TO_USE.md` - Detailed technical documentation
+- `docs/` - Architecture, science, and roadmap documents
 
 ```
 NLM/
