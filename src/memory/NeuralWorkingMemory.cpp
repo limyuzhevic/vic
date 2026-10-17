@@ -19,7 +19,6 @@ struct NeuralWorkingMemory::Impl {
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
@@ -44,8 +43,10 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        auto* region = brain_->getRegion(RegionId(1));  // Use first region
+        if (region && neuron.getId() < 1000) {  // Simple validation
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;

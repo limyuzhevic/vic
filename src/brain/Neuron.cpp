@@ -253,8 +253,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    // Clear synaptic input for next step (but keep for refractory neurons)
+    if (pImpl->state.refractoryRemaining <= 0) {
+        pImpl->synapticInput = 0.0f;
+    }
     
     return fired;
 }

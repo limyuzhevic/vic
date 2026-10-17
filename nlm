@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface Launcher
+# This script provides easy access to NLM CLI functionality
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Check if NLM Python bindings are available
+if python3 -c "import pynlm" 2>/dev/null; then
+    echo "NLM Python bindings are available"
+else
+    echo "Error: NLM Python bindings not found"
+    echo "Please ensure NLM is properly built and installed."
+    echo "You can build it with: cmake --build . --target install"
+    exit 1
+fi
+
+# Add the python directory to Python path
+export PYTHONPATH="$PROJECT_ROOT/python:$PYTHONPATH"
+
+# Execute the CLI
+exec python3 "$SCRIPT_DIR/nlm_cli.py" "$@"
