@@ -43,6 +43,34 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validator interface
+class ConfigValidator {
+public:
+    virtual ~ConfigValidator() = default;
+    virtual bool validate(const std::string& key, const ConfigValue& value) const = 0;
+    virtual std::string getErrorMessage(const std::string& key, const ConfigValue& value) const = 0;
+};
+
+// Schema entry for configuration validation
+struct ConfigSchemaEntry {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::function<std::string(const ConfigValue&)> errorFormatter;
+    std::string description;
+    bool required;
+    ConfigValue defaultValue;
+    std::string typeName;
+    
+    ConfigSchemaEntry(const std::string& k, std::function<bool(const ConfigValue&)> val, 
+                     const std::string& desc = "", bool req = false, ConfigValue def = ConfigValue())
+        : key(k), validator(val), errorFormatter(nullptr), description(desc), required(req), defaultValue(def), typeName("unknown") {}
+    
+    ConfigSchemaEntry(const std::string& k, std::function<bool(const ConfigValue&)> val,
+                     std::function<std::string(const ConfigValue&)> err,
+                     const std::string& desc = "", bool req = false, ConfigValue def = ConfigValue())
+        : key(k), validator(val), errorFormatter(err), description(desc), required(req), defaultValue(def), typeName("unknown") {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -87,11 +115,27 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    // Get all entries
+    std::vector<ConfigEntry> getAllEntries() const;
+    
     // Clear all
     void clear();
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation
+    bool validate() const;
+    bool validateEntry(const ConfigEntry& entry) const;
+    void setValidator(std::shared_ptr<ConfigValidator> validator);
+    
+    // Configuration schema
+    void addSchemaEntry(const ConfigSchemaEntry& schemaEntry);
+    bool validateAgainstSchema() const;
+    
+    // Configuration presets
+    static std::map<std::string, std::vector<ConfigEntry>> getPresets();
+    bool applyPreset(const std::string& presetName);
     
 private:
     struct Impl;
@@ -100,6 +144,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getCurrentTimestamp();
 };
 
 } // namespace nlm
