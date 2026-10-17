@@ -55,10 +55,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
+    src/memory/Memory.cpp
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
@@ -68,7 +67,6 @@ add_library(nlm_core STATIC
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
@@ -82,9 +80,22 @@ add_library(nlm_core STATIC
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
+    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase4Demo.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase3Experiment.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Agent
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    # World
+    src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

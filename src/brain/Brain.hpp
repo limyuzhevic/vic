@@ -193,6 +193,62 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== INTEGRATION METHODS ==========
+    
+    // Initialize memory systems with brain connections
+    void initializeMemorySystems();
+    
+    // Initialize prediction system with brain connections
+    void initializePredictionSystem();
+    
+    // Initialize cognition systems with brain connections
+    void initializeCognitionSystems();
+    
+    // Integrate neuromodulation with neural dynamics
+    void integrateNeuromodulation();
+    
+    // Update prediction based on current sensory state
+    void updatePrediction(const class SensoryInput& sensoryInput);
+    
+    // Update cognition based on current brain state
+    void updateCognition(const class SensoryInput& sensoryInput);
+    
+    // Store current experience in episodic memory
+    void storeExperienceInEpisodicMemory();
+    
+    // Update working memory with current neural activity
+    void updateWorkingMemory();
+    
+    // Apply development effects to brain structure
+    void applyDevelopmentEffects();
+    
+    // Replay important memories
+    void replayImportantMemories();
+    
+    // Consolidate memory traces
+    void consolidateMemoryTraces();
+    
+    // Generate and store concepts from patterns
+    void generateAndStoreConcepts();
+    
+    // Plan actions based on current state
+    void planActions();
+    
+    // Apply neuromodulatory effects to neural dynamics
+    void applyNeuromodulatoryEffects();
+    
+    // Track prediction error for learning
+    void trackPredictionError(const class SensoryInput& sensoryInput);
+    
+    // Update curiosity based on novel experiences
+    void updateCuriosity(const class SensoryInput& sensoryInput);
+    
+    // Update novelty detection
+    void updateNovelty(const class SensoryInput& sensoryInput);
+    
+    // Apply structural development changes
+    void applyStructuralDevelopment();
+    
 private:
     struct Impl;
     Impl* pImpl;
