@@ -55,7 +55,6 @@ struct LearningExperiment {
     size_t initialSynapseCount;
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
@@ -89,8 +88,6 @@ struct LearningExperiment {
                 finalWeights.push_back(syn->getWeight());
             }
         }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -144,7 +141,6 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
@@ -356,28 +352,27 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with error handling
+    NLM_LOG_INFO("Attempting to load configuration from: " + configFile);
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARN("Configuration file not found or invalid. Using defaults.");
+        NLM_LOG_WARN("Create configs/default.cfg to customize behavior");
     }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+    config->set("connection_probability", 0.15f, ConfigSource::Default);  // Now consistent with default.cfg
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);

@@ -18,8 +18,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Performance features (enabled by default)
+option(NLM_PERFORMANCE_ENABLED "Enable performance optimizations (MemoryPool, SIMD, parallelization)" ON)
 
 # Core library
 add_library(nlm_core STATIC
@@ -142,6 +142,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Performance infrastructure (only if enabled)
+if(NLM_PERFORMANCE_ENABLED)
+    target_compile_definitions(nlm_core PUBLIC NLM_PERFORMANCE_ENABLED)
+    target_compile_definitions(nlm_core PUBLIC NLM_USE_MEMORY_POOL=1 NLM_USE_SOA=1 NLM_USE_EVENT_QUEUE=1 NLM_USE_SPARE_CONNECTIVITY=1 NLM_USE_MULTITHREADING=1 NLM_USE_SIMD=1)
+    target_include_directories(nlm_core PUBLIC src/performance)
+endif()
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

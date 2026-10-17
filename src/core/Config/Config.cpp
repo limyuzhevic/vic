@@ -19,18 +19,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first
+    auto jsonData = loadFromJSON(filepath);
+    if (jsonData) {
+        return true;
+    }
     
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
@@ -48,7 +56,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_WARN(std::string("Warning: Invalid config entry at line ") + std::to_string(lineNumber) + ": " + key + " = " + value);
+            }
+        } else {
+            NLM_LOG_WARN(std::string("Warning: Invalid config format at line ") + std::to_string(lineNumber) + ": " + line);
         }
     }
     
@@ -56,6 +70,7 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,17 +80,33 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR(std::string("Invalid command line argument: ") + arg + ". " + e.what());
+                    success = false;
+                }
+            } else {
+                NLM_LOG_ERROR(std::string("Invalid command line argument (missing '='): ") + arg);
+                success = false;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Invalid command line argument: -") + key + " " + value + ". " + e.what());
+                success = false;
+            }
+        } else {
+            NLM_LOG_ERROR(std::string("Invalid command line argument: ") + arg);
+            success = false;
         }
     }
-    return true;
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -92,14 +123,93 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+std::optional<std::vector<ConfigEntry>> Config::parseJSON(const std::string& jsonStr) {
+    std::vector<ConfigEntry> entries;
     
-    if (it == pImpl->entries.end()) {
+    // Simple JSON parser for key=value pairs
+    // This handles basic JSON objects: {"key": "value", "key2": "value2"}
+    size_t pos = 0;
+    size_t len = jsonStr.length();
+    
+    while (pos < len) {
+        // Skip whitespace
+        while (pos < len && std::isspace(jsonStr[pos])) {
+            pos++;
+        }
+        
+        if (pos >= len || jsonStr[pos] != '"') {
+            break; // Invalid JSON format
+        }
+        
+        // Find key
+        size_t keyEnd = jsonStr.find('"', pos + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = jsonStr.substr(pos + 1, keyEnd - pos - 1);
+        
+        // Skip whitespace and colon
+        pos = keyEnd + 1;
+        while (pos < len && std::isspace(jsonStr[pos])) {
+            pos++;
+        }
+        if (pos < len && jsonStr[pos] == ':') {
+            pos++;
+        } else {
+            break;
+        }
+        
+        // Skip whitespace
+        while (pos < len && std::isspace(jsonStr[pos])) {
+            pos++;
+        }
+        
+        if (pos >= len || jsonStr[pos] != '"') {
+            break; // Invalid JSON format
+        }
+        
+        // Find value
+        size_t valueEnd = jsonStr.find('"', pos + 1);
+        if (valueEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string value = jsonStr.substr(pos + 1, valueEnd - pos - 1);
+        
+        // Add entry
+        entries.push_back({key, value, ConfigSource::File});
+        
+        // Skip comma if present
+        pos = valueEnd + 1;
+        while (pos < len && std::isspace(jsonStr[pos])) {
+            pos++;
+        }
+        if (pos < len && jsonStr[pos] == ',') {
+            pos++;
+        }
+    }
+    
+    return entries;
+}
+
+std::optional<std::vector<ConfigEntry>> Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
         return std::nullopt;
     }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Check if file starts with { (simple JSON object detection)
+    if (content.empty() || content.front() != '{') {
+        return std::nullopt;
+    }
+    
+    return parseJSON(content);
+}
     
     try {
         return std::get<T>(it->value);

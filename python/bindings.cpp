@@ -31,7 +31,8 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<uint64_t>(), py::arg("value"),
+             "Create NeuronId with specific value. Value must be less than 2^64-1.")
         .def_readwrite("value", &NeuronId::value)
         .def("index", &NeuronId::index)
         .def("__eq__", &NeuronId::operator==)
@@ -177,6 +178,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Vision data cannot be empty");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
@@ -187,6 +191,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Audio data cannot be empty");
+            }
+            if (data.size() > 1000000) {  // 1M samples limit
+                throw std::invalid_argument("Audio data too large. Maximum size is 1,000,000 samples");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
@@ -273,9 +283,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
              py::arg("cmd"), py::arg("currentTime"))
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             "Get the sensory percept from the world")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+             "Get the agent body state")
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
@@ -318,15 +328,13 @@ PYBIND11_MODULE(pynlm, m) {
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
+.def("getRegion", &Brain::getRegion, py::arg("id"),
              "Get a region by ID")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
         .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
              "Get all regions")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
@@ -384,8 +392,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
+.def("getBrain", &AgentBrain::getBrain,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
