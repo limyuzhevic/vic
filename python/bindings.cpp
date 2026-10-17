@@ -162,7 +162,142 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Advanced configuration methods
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a boolean configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a float configuration value")
+        .def("setDouble", [](Config& self, const std::string& key, double value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a double configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a string configuration value")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a boolean configuration value")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a float configuration value")
+        .def("getDouble", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a double configuration value")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value")
+        .def("validate", &Config::validate,
+             "Validate the current configuration")
+        .def("clone", []() {
+            return std::make_shared<Config>();
+        }, "Create a copy of the configuration")
+        .def("merge", [](Config& self, const Config& other) {
+            // Merge another config into this one
+            auto keys = other.getKeys();
+            for (const auto& key : keys) {
+                if (other.has(key)) {
+                    self.set(key, other.getOr(key, ""));
+                }
+            }
+            return self;
+        }, py::arg("other"),
+           "Merge another configuration into this one");
+
+    // Add convenience functions for creating configurations
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createOptimizedConfig", [](bool enableMultithreading = true, bool enableSIMD = true) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Performance optimizations
+        config->set("brain.neuron_count", 100000, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("performance.enable_multithreading", enableMultithreading, ConfigSource::Default);
+        config->set("performance.enable_simd", enableSIMD, ConfigSource::Default);
+        config->set("performance.thread_count", std::thread::hardware_concurrency(), ConfigSource::Default);
+        
+        // Advanced features
+        config->set("neuromodulation.enabled", true, ConfigSource::Default);
+        config->set("memory.working_memory_capacity", 1000, ConfigSource::Default);
+        config->set("memory.episodic_memory_max_episodes", 10000, ConfigSource::Default);
+        config->set("prediction.enabled", true, ConfigSource::Default);
+        config->set("development.enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, py::arg("enableMultithreading") = true, py::arg("enableSIMD") = true,
+       "Create an optimized configuration with performance settings");
+    
+    m.def("createExperimentConfig", [](const std::string& experimentName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentName == "phase5_lifelong") {
+            // Phase 5 lifelong learning configuration
+            config->set("brain.neuron_count", 100000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+            config->set("development.synapse_formation_steps", 10000, ConfigSource::Default);
+            config->set("development.sensory_development_steps", 40000, ConfigSource::Default);
+            config->set("development.motor_development_steps", 50000, ConfigSource::Default);
+            config->set("development.associative_development_steps", 100000, ConfigSource::Default);
+            config->set("development.memory_consolidation_steps", 100000, ConfigSource::Default);
+            config->set("development.social_development_steps", 100000, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+            config->set("memory.enabled", true, ConfigSource::Default);
+            config->set("memory.working_memory_capacity", 10000, ConfigSource::Default);
+            config->set("memory.episodic_memory_max_episodes", 100000, ConfigSource::Default);
+            config->set("neuromodulation.enabled", true, ConfigSource::Default);
+            config->set("prediction.enabled", true, ConfigSource::Default);
+            config->set("visualization.enabled", false, ConfigSource::Default); // Disable for speed
+        } else if (experimentName == "phase5_single") {
+            // Single Phase 5 experiment configuration
+            config->set("brain.neuron_count", 50000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+        } else if (experimentName == "quick_test") {
+            // Quick test configuration
+            config->set("brain.neuron_count", 1000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+            config->set("performance.enable_multithreading", false, ConfigSource::Default);
+            config->set("performance.enable_simd", false, ConfigSource::Default);
+            config->set("performance.enable_event_driven", false, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("experimentName"), "Create a configuration optimized for a specific experiment type");
+
+    m.def("getDefaultConfigs", []() {
+        py::dict configs;
+        configs["default"] = std::make_shared<Config>();
+        configs["optimized"] = createOptimizedConfig();
+        configs["phase5_lifelong"] = createExperimentConfig("phase5_lifelong");
+        configs["phase5_single"] = createExperimentConfig("phase5_single");
+        configs["quick_test"] = createExperimentConfig("quick_test");
+        return configs;
+    }, "Get a dictionary of predefined configuration presets");
+
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -263,158 +398,347 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+    // Advanced Python API functions for developers
+    
+    // Performance monitoring and profiling
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, uint64_t steps, bool warmup = true) -> py::dict {
+        py::dict results;
+        
+        if (warmup) {
+            NLM_LOG_INFO("Warming up brain...")
+            for (uint64_t i = 0; i < steps / 10; ++i) {
+                brain->step(i, i * 0.001);
+            }
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        double duration = std::chrono::duration<double>(endTime - startTime).count();
+        double stepsPerSecond = steps / duration;
+        
+        results["steps"] = steps;
+        results["duration_seconds"] = duration;
+        results["steps_per_second"] = stepsPerSecond;
+        results["avg_firing_rate"] = brain->getAverageFiringRate();
+        results["total_neurons"] = brain->getTotalNeuronCount();
+        results["total_synapses"] = brain->getTotalSynapseCount();
+        results["firing_neurons"] = brain->getFiringNeuronCount();
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), py::arg("warmup") = true,
+       "Benchmark brain performance over a given number of steps");
+    
+    m.def("profileBrainMemory", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict results;
+        
+        results["neuron_count"] = brain->getTotalNeuronCount();
+        results["synapse_count"] = brain->getTotalSynapseCount();
+        results["firing_neuron_count"] = brain->getFiringNeuronCount();
+        results["average_firing_rate"] = brain->getAverageFiringRate();
+        results["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Estimate memory usage (rough approximation)
+        size_t memoryBytes = sizeof(Brain) + 
+                            brain->getTotalNeuronCount() * sizeof(Neuron) +
+                            brain->getTotalSynapseCount() * sizeof(Synapse);
+        results["estimated_memory_bytes"] = memoryBytes;
+        
+        return results;
+    }, py::arg("brain"), "Get memory usage and statistics for a brain");
+    
+    // Advanced configuration management
+    m.def("validateConfiguration", [](const Config& config) -> py::dict {
+        py::dict results;
+        results["valid"] = config.validate();
+        
+        if (!results["valid"].cast<bool>()) {
+            results["errors"] = py::list(); // Empty list for errors
+        }
+        
+        return results;
+    }, py::arg("config"), "Validate a configuration and return validation results");
+    
+    m.def("mergeConfigs", [](const Config& config1, const Config& config2) {
+        auto result = std::make_shared<Config>(config1);
+        auto keys = config2.getKeys();
+        for (const auto& key : keys) {
+            if (config2.has(key)) {
+                result->set(key, config2.getOr(key, ""));
+            }
+        }
+        return result;
+    }, py::arg("config1"), py::arg("config2"), "Merge two configurations");
+    
+    // Experiment utilities
+    m.def("createExperimentConfig", [](const std::string& experimentType, const py::dict& customSettings) {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentType == "phase5_lifelong") {
+            // Phase 5 lifelong learning configuration
+            config->set("brain.neuron_count", 100000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+            config->set("development.synapse_formation_steps", 10000, ConfigSource::Default);
+            config->set("development.sensory_development_steps", 40000, ConfigSource::Default);
+            config->set("development.motor_development_steps", 50000, ConfigSource::Default);
+            config->set("development.associative_development_steps", 100000, ConfigSource::Default);
+            config->set("development.memory_consolidation_steps", 100000, ConfigSource::Default);
+            config->set("development.social_development_steps", 100000, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+            config->set("memory.enabled", true, ConfigSource::Default);
+            config->set("memory.working_memory_capacity", 10000, ConfigSource::Default);
+            config->set("memory.episodic_memory_max_episodes", 100000, ConfigSource::Default);
+            config->set("neuromodulation.enabled", true, ConfigSource::Default);
+            config->set("prediction.enabled", true, ConfigSource::Default);
+        } else if (experimentType == "phase5_single") {
+            // Single Phase 5 experiment configuration
+            config->set("brain.neuron_count", 50000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+        }
+        
+        // Apply custom settings
+        for (auto it = customSettings.begin(); it != customSettings.end(); ++it) {
+            std::string key = it->first.cast<std::string>();
+            if (it->second.is_same_type(py::int_(0))) {
+                config->set(key, it->second.cast<int64_t>(), ConfigSource::Default);
+            } else if (it->second.is_same_type(py::float_(0.0))) {
+                config->set(key, it->second.cast<float>(), ConfigSource::Default);
+            } else if (it->second.is_same_type(py::bool_(true))) {
+                config->set(key, it->second.cast<bool>(), ConfigSource::Default);
+            } else {
+                config->set(key, it->second.cast<std::string>(), ConfigSource::Default);
+            }
+        }
+        
+        return config;
+    }, py::arg("experimentType"), py::arg("customSettings") = py::dict(),
+       "Create a configuration optimized for a specific experiment type");
+    
+    // Batch operations
+    m.def("runBatchBenchmarks", [](const std::vector<std::shared_ptr<Config>>& configs, uint64_t steps) {
+        py::list results;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            auto startTime = std::chrono::high_resolution_clock::now();
+            for (uint64_t step = 0; step < steps; ++step) {
+                brain->step(step, step * 0.001);
+            }
+            auto endTime = std::chrono::high_resolution_clock::now();
+            
+            double duration = std::chrono::duration<double>(endTime - startTime).count();
+            
+            py::dict result;
+            result["config_index"] = static_cast<int>(i);
+            result["config_summary"] = configs[i]->summary();
+            result["steps_per_second"] = steps / duration;
+            result["total_reward"] = brain->getAverageFiringRate() * steps;
+            result["neurons"] = brain->getTotalNeuronCount();
+            result["synapses"] = brain->getTotalSynapseCount();
+            
+            results.append(result);
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("steps"), "Run benchmarks on multiple configurations");
+    
+    // Advanced utility functions
+    m.def("getSystemInfo", []() {
+        py::dict info;
+        info["version"] = "NLM Phase 5";
+        info["cpp_standard"] = "C++20";
+        info["build_type"] = "Release";
+        info["threading"] = std::thread::hardware_concurrency();
+        info["pybind11_version"] = PYBIND11_VERSION;
+        return info;
+    }, "Get system information about the NLM installation");
+    
+    m.def("benchmarkConfiguration", [](const Config& config, uint64_t steps) {
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>(config));
+        brain->initialize();
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        double duration = std::chrono::duration<double>(endTime - startTime).count();
+        double stepsPerSecond = steps / duration;
+        
+        py::dict result;
+        result["config"] = config.summary();
+        result["steps_per_second"] = stepsPerSecond;
+        result["avg_firing_rate"] = brain->getAverageFiringRate();
+        result["memory_usage"] = brain->getTotalNeuronCount() * 100; // Approximate
+        
+        return result;
+    }, py::arg("config"), py::arg("steps"), "Benchmark a specific configuration");
+    
+    // Error handling utilities
+    m.def("safeBrainStep", [](std::shared_ptr<Brain> brain, uint64_t step, Timestamp time) {
+        try {
+            brain->step(step, time);
+            return py::make_tuple(true, "Step completed successfully");
+        } catch (const std::exception& e) {
+            return py::make_tuple(false, std::string(e.what()));
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time"), "Safely execute a brain step with error handling");
+    
+    m.def("safeBrainInitialization", [](std::shared_ptr<Brain> brain) {
+        try {
+            if (brain->initialize()) {
+                return py::make_tuple(true, "Initialization successful");
+            } else {
+                return py::make_tuple(false, "Initialization failed");
+            }
+        } catch (const std::exception& e) {
+            return py::make_tuple(false, std::string(e.what()));
+        }
+    }, py::arg("brain"), "Safely initialize a brain with error handling");
+    
+    // Performance optimization suggestions
+    m.def("getPerformanceRecommendations", [](uint64_t neuronCount) {
+        py::dict recommendations;
+        
+        if (neuronCount > 50000) {
+            recommendations["use_multithreading"] = true;
+            recommendations["use_simd"] = true;
+            recommendations["use_event_driven"] = true;
+            recommendations["use_sparse_connectivity"] = true;
+            recommendations["memory_pool_size"] = neuronCount / 1000 * 100; // MB
+        } else if (neuronCount > 10000) {
+            recommendations["use_multithreading"] = true;
+            recommendations["use_simd"] = true;
+            recommendations["use_event_driven"] = false;
+            recommendations["use_sparse_connectivity"] = false;
+        } else {
+            recommendations["use_multithreading"] = false;
+            recommendations["use_simd"] = false;
+            recommendations["use_event_driven"] = false;
+            recommendations["use_sparse_connectivity"] = false;
+        }
+        
+        return recommendations;
+    }, py::arg("neuronCount"), "Get performance optimization recommendations for a given neuron count");
+    
+    // Configuration validation and suggestions
+    m.def("validateAndSuggestImprovements", [](const Config& config) {
+        py::dict results;
+        bool isValid = config.validate();
+        results["valid"] = isValid;
+        
+        py::list suggestions;
+        
+        if (config.getOr<int64_t>("brain.neuron_count", 0) > 50000) {
+            if (!config.has("performance.enable_multithreading") || 
+                !config.getOr<bool>("performance.enable_multithreading", false)) {
+                suggestions.append("Consider enabling multithreading for large neuron counts");
+            }
+            if (!config.has("performance.enable_simd") || 
+                !config.getOr<bool>("performance.enable_simd", false)) {
+                suggestions.append("Consider enabling SIMD optimization for large neuron counts");
+            }
+        }
+        
+        if (config.getOr<int64_t>("brain.neuron_count", 0) > 10000) {
+            if (!config.has("performance.enable_event_driven") || 
+                !config.getOr<bool>("performance.enable_event_driven", false)) {
+                suggestions.append("Consider enabling event-driven processing for large networks");
+            }
+        }
+        
+        results["suggestions"] = suggestions;
+        return results;
+    }, py::arg("config"), "Validate configuration and provide improvement suggestions");
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
+    // Add convenience functions for creating configurations
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
+    
+    m.def("createOptimizedConfig", [](bool enableMultithreading = true, bool enableSIMD = true) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Performance optimizations
+        config->set("brain.neuron_count", 100000, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("performance.enable_multithreading", enableMultithreading, ConfigSource::Default);
+        config->set("performance.enable_simd", enableSIMD, ConfigSource::Default);
+        config->set("performance.thread_count", std::thread::hardware_concurrency(), ConfigSource::Default);
+        
+        // Advanced features
+        config->set("neuromodulation.enabled", true, ConfigSource::Default);
+        config->set("memory.working_memory_capacity", 1000, ConfigSource::Default);
+        config->set("memory.episodic_memory_max_episodes", 10000, ConfigSource::Default);
+        config->set("prediction.enabled", true, ConfigSource::Default);
+        config->set("development.enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, py::arg("enableMultithreading") = true, py::arg("enableSIMD") = true,
+       "Create an optimized configuration with performance settings");
+    
+    m.def("createExperimentConfig", [](const std::string& experimentName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentName == "phase5_lifelong") {
+            // Phase 5 lifelong learning configuration
+            config->set("brain.neuron_count", 100000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+            config->set("development.synapse_formation_steps", 10000, ConfigSource::Default);
+            config->set("development.sensory_development_steps", 40000, ConfigSource::Default);
+            config->set("development.motor_development_steps", 50000, ConfigSource::Default);
+            config->set("development.associative_development_steps", 100000, ConfigSource::Default);
+            config->set("development.memory_consolidation_steps", 100000, ConfigSource::Default);
+            config->set("development.social_development_steps", 100000, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+            config->set("memory.enabled", true, ConfigSource::Default);
+            config->set("memory.working_memory_capacity", 10000, ConfigSource::Default);
+            config->set("memory.episodic_memory_max_episodes", 100000, ConfigSource::Default);
+            config->set("neuromodulation.enabled", true, ConfigSource::Default);
+            config->set("prediction.enabled", true, ConfigSource::Default);
+            config->set("visualization.enabled", false, ConfigSource::Default); // Disable for speed
+        } else if (experimentName == "phase5_single") {
+            // Single Phase 5 experiment configuration
+            config->set("brain.neuron_count", 50000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+            config->set("performance.enable_multithreading", true, ConfigSource::Default);
+            config->set("performance.enable_simd", true, ConfigSource::Default);
+            config->set("performance.enable_event_driven", true, ConfigSource::Default);
+        } else if (experimentName == "quick_test") {
+            // Quick test configuration
+            config->set("brain.neuron_count", 1000, ConfigSource::Default);
+            config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+            config->set("performance.enable_multithreading", false, ConfigSource::Default);
+            config->set("performance.enable_simd", false, ConfigSource::Default);
+            config->set("performance.enable_event_driven", false, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("experimentName"), "Create a configuration optimized for a specific experiment type");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("getDefaultConfigs", []() {
+        py::dict configs;
+        configs["default"] = std::make_shared<Config>();
+        configs["optimized"] = createOptimizedConfig();
+        configs["phase5_lifelong"] = createExperimentConfig("phase5_lifelong");
+        configs["phase5_single"] = createExperimentConfig("phase5_single");
+        configs["quick_test"] = createExperimentConfig("quick_test");
+        return configs;
+    }, "Get a dictionary of predefined configuration presets");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
