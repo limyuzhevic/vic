@@ -107,6 +107,13 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Enhanced Python bindings
+add_library(nlm_enhanced_bindings STATIC
+    src/python/ImprovedBindings.cpp
+)
+target_include_directories(nlm_enhanced_bindings PUBLIC src)
+target_link_libraries(nlm_enhanced_bindings PUBLIC nlm_core nlm_agent nlm_world)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp

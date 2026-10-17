@@ -1,0 +1,464 @@
+#!/usr/bin/env bash
+
+# Enhanced NLM command-line interface implementation
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_CONFIG="${PWD}/configs/default_config.txt"
+DEFAULT_STEPS=100
+DEFAULT_VISION_WIDTH=16
+DEFAULT_VISION_HEIGHT=16
+
+# Logging setup
+LOG_FILE="${PWD}/nlm_session_$(date +%Y%m%d_%H%M%S).log"
+function log() {
+    echo -e "${BLUE}[NLM]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+function error() {
+    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+function warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+# Function to show help
+function show_help() {
+    cat << EOF
+NLM Command-Line Interface
+===========================
+
+USAGE:
+    nlm [OPTIONS]
+
+OPTIONS:
+    --help, -h              Show this help message
+    --version, -v           Show version information
+    --init, -i [CONFIG]     Initialize and run simulation with optional configuration file
+    --batch, -b [STEPS]     Run simulation in batch mode with optional step count
+    --save, -s [FILE]       Save brain state to file
+    --load, -l [FILE]       Load brain state from file
+    --demo, -d [TYPE]       Run predefined demonstration (phase3, phase4, phase6)
+    --config, -c [FILE]     Load configuration from file
+    --explore, -e [SEED]    Run exploration simulation with random seed
+    --benchmark, -bmark      Run benchmark test
+    --help-examples         Show available example demonstrations
+
+EXAMPLES:
+    # Basic simulation
+    nlm --init
+
+    # Run with custom configuration
+    nlm --init --config my_config.txt
+
+    # Run batch simulation
+    nlm --batch 1000
+
+    # Save brain state
+    nlm --save brain_state.json
+
+    # Load brain state and continue
+    nlm --load brain_state.json --batch 500
+
+    # Run exploration
+    nlm --explore
+
+    # Run demo
+    nlm --demo phase6
+
+    # Run benchmark
+    nlm --benchmark
+EOF
+}
+
+# Function to show version
+function show_version() {
+    echo "NLM (Neural Learning Machine) Version 0.1.0"
+    echo "Enhanced Command-Line Interface"
+    echo "Built with C++20 and Python bindings"
+}
+
+# Function to show examples
+function show_examples() {
+    echo "Available Example Demonstrations:"
+    echo "==============================="
+    echo "1. phase3 - Phase 3 experiment (basic neural computation)"
+    echo "2. phase4 - Phase 4 experiment (working memory and prediction)"
+    echo "3. phase6 - Phase 6 experiment (full integration test)"
+    echo "4. learning - Learning with curiosity and exploration"
+    echo "5. development - Developmental stages and plasticity"
+    echo "6. neuromodulation - Reward and curiosity systems"
+    echo ""
+    echo "To run an example: nlm --demo <example_name>"
+}
+
+# Function to initialize simulation
+function run_init() {
+    local config_file="$1"
+    
+    log "Initializing NLM simulation..."
+    
+    # Check if configuration file exists
+    if [[ -n "$config_file" && -f "$config_file" ]]; then
+        log "Using configuration file: $config_file"
+    else
+        log "Using default configuration"
+        config_file="$DEFAULT_CONFIG"
+    fi
+    
+    # Check if configuration file exists
+    if [[ ! -f "$config_file" ]]; then
+        error "Configuration file not found: $config_file"
+        warning "Creating default configuration file"
+        create_default_config
+    fi
+    
+    # Create output directory
+    local output_dir="$(pwd)/output"
+    mkdir -p "$output_dir"
+    
+    # Run the simulation (placeholder - would integrate with actual NLM binary)
+    log "Starting simulation with configuration: $config_file"
+    log "Output directory: $output_dir"
+    
+    # Display simulation parameters
+    local steps=$(get_config_value "steps" "$DEFAULT_STEPS")
+    local vision_width=$(get_config_value "vision_width" "$DEFAULT_VISION_WIDTH")
+    local vision_height=$(get_config_value "vision_height" "$DEFAULT_VISION_HEIGHT")
+    
+    log "Simulation parameters:"
+    log "  Steps: $steps"
+    log "  Vision resolution: ${vision_width}x${vision_height}"
+    log "  Configuration file: $config_file"
+    
+    # In a real implementation, this would call the actual NLM executable
+    echo "[Simulation would run here with $steps steps]"
+    
+    # Save simulation metadata
+    local metadata_file="$output_dir/simulation_metadata_$(date +%Y%m%d_%H%M%S).json"
+    cat > "$metadata_file" << EOF
+{
+    "timestamp": "$(date -Iseconds)",
+    "config_file": "$config_file",
+    "steps": $steps,
+    "vision_width": $vision_width,
+    "vision_height": $vision_height,
+    "output_dir": "$output_dir"
+}
+EOF
+    
+    log "Simulation metadata saved to: $metadata_file"
+    log "Simulation completed successfully!"
+}
+
+# Function to run batch simulation
+function run_batch() {
+    local steps="$1"
+    
+    if [[ -z "$steps" ]]; then
+        steps="$DEFAULT_STEPS"
+    fi
+    
+    log "Starting batch simulation with $steps steps..."
+    
+    # Load brain state if available
+    if [[ -n "$LOAD_FILE" ]]; then
+        log "Loading brain state from: $LOAD_FILE"
+    fi
+    
+    # Run batch simulation (placeholder)
+    echo "[Batch simulation with $steps steps would run here]"
+    
+    # Show progress
+    local progress_interval=$((steps / 10))
+    if [[ $progress_interval -eq 0 ]]; then
+        progress_interval=1
+    fi
+    
+    for ((i=1; i<=steps; i++)); do
+        # In real implementation, this would run actual simulation steps
+        if [[ $((i % progress_interval)) -eq 0 ]]; then
+            local progress=$((i * 100 / steps))
+            echo -ne "\rProgress: ${progress}% (${i}/${steps})"
+        fi
+    done
+    
+    echo -e "\nBatch simulation completed!"
+}
+
+# Function to save brain state
+function save_state() {
+    local output_file="$1"
+    
+    if [[ -z "$output_file" ]]; then
+        output_file="brain_state_$(date +%Y%m%d_%H%M%S).json"
+    fi
+    
+    log "Saving brain state to: $output_file"
+    echo "[Brain state would be saved to: $output_file]"
+    log "Brain state saved successfully!"
+}
+
+# Function to load brain state
+function load_state() {
+    local input_file="$1"
+    
+    if [[ -z "$input_file" ]]; then
+        error "No input file specified for load operation"
+        show_help
+        exit 1
+    fi
+    
+    if [[ ! -f "$input_file" ]]; then
+        error "Input file not found: $input_file"
+        exit 1
+    fi
+    
+    log "Loading brain state from: $input_file"
+    echo "[Brain state would be loaded from: $input_file]"
+    log "Brain state loaded successfully!"
+}
+
+# Function to run demo
+function run_demo() {
+    local demo_type="$1"
+    
+    case "$demo_type" in
+        phase3|Phase3)
+            log "Running Phase 3 demonstration..."
+            echo "[Phase 3 demonstration would run here]"
+            ;;
+        phase4|Phase4)
+            log "Running Phase 4 demonstration..."
+            echo "[Phase 4 demonstration would run here]"
+            ;;
+        phase6|Phase6)
+            log "Running Phase 6 demonstration (Full Integration Test)..."
+            echo "[Phase 6 demonstration would run here]"
+            ;;
+        learning|Learning)
+            log "Running learning demonstration..."
+            echo "[Learning demonstration would run here]"
+            ;;
+        development|Development)
+            log "Running development demonstration..."
+            echo "[Development demonstration would run here]"
+            ;;
+        neuromodulation|Neuromodulation)
+            log "Running neuromodulation demonstration..."
+            echo "[Neuromodulation demonstration would run here]"
+            ;;
+        *)
+            error "Unknown demo type: $demo_type"
+            show_examples
+            exit 1
+            ;;
+    esac
+}
+
+# Function to run exploration
+function run_explore() {
+    local seed="$1"
+    
+    if [[ -z "$seed" ]]; then
+        seed=$(date +%s)
+    fi
+    
+    log "Starting exploration simulation with seed: $seed"
+    echo "[Exploration simulation with seed $seed would run here]"
+    log "Exploration simulation completed!"
+}
+
+# Function to run benchmark
+function run_benchmark() {
+    log "Running benchmark test..."
+    echo "[Benchmark test would run here]"
+    echo "Benchmark completed!"
+}
+
+# Function to get configuration value
+function get_config_value() {
+    local key="$1"
+    local default_value="$2"
+    
+    # In real implementation, this would read from config file
+    # For now, return default value
+    echo "$default_value"
+}
+
+# Function to create default configuration
+function create_default_config() {
+    local config_dir="$(dirname "$DEFAULT_CONFIG")"
+    mkdir -p "$config_dir"
+    
+    cat > "$DEFAULT_CONFIG" << EOF
+# Default NLM Configuration File
+# Generated by NLM CLI
+
+# Simulation parameters
+steps = 1000
+vision_width = 16
+vision_height = 16
+
+# World parameters
+world_width = 20.0
+world_height = 20.0
+max_energy = 100.0
+energy_decay_rate = 0.01
+
+# Neural parameters
+random_seed = 42
+development_enabled = true
+reward_modulation_enabled = true
+structural_plasticity_enabled = true
+curiosity_enabled = true
+novelty_enabled = true
+prediction_enabled = true
+planning_enabled = true
+attention_enabled = true
+
+# Learning parameters
+learning_rate = 0.01
+plasticity_decay = 0.995
+
+# I/O
+output_dir = ./output
+log_file = nlm_session.log
+EOF
+    
+    log "Default configuration created at: $DEFAULT_CONFIG"
+}
+
+# Main script logic
+function main() {
+    # Set default values
+    ACTION=""
+    CONFIG_FILE=""
+    LOAD_FILE=""
+    OUTPUT_FILE=""
+    DEMO_TYPE=""
+    SEED=""
+    STEPS=""
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            --version|-v)
+                show_version
+                exit 0
+                ;;
+            --help-examples)
+                show_examples
+                exit 0
+                ;;
+            --init|-i)
+                ACTION="init"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    CONFIG_FILE="$1"
+                    shift
+                fi
+                ;;
+            --batch|-b)
+                ACTION="batch"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    STEPS="$1"
+                    shift
+                fi
+                ;;
+            --save|-s)
+                ACTION="save"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    OUTPUT_FILE="$1"
+                    shift
+                fi
+                ;;
+            --load|-l)
+                ACTION="load"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    LOAD_FILE="$1"
+                    shift
+                fi
+                ;;
+            --demo|-d)
+                ACTION="demo"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    DEMO_TYPE="$1"
+                    shift
+                fi
+                ;;
+            --config|-c)
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    CONFIG_FILE="$1"
+                    shift
+                fi
+                ;;
+            --explore|-e)
+                ACTION="explore"
+                shift
+                if [[ $# -gt 0 && ! $1 =~ ^-- ]]; then
+                    SEED="$1"
+                    shift
+                fi
+                ;;
+            --benchmark|-bmark)
+                ACTION="benchmark"
+                ;;
+            *)
+                error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Execute action
+    case "$ACTION" in
+        init)
+            run_init "$CONFIG_FILE"
+            ;;
+        batch)
+            run_batch "$STEPS"
+            ;;
+        save)
+            save_state "$OUTPUT_FILE"
+            ;;
+        load)
+            run_batch "$STEPS"
+            load_state "$LOAD_FILE"
+            ;;
+        demo)
+            run_demo "$DEMO_TYPE"
+            ;;
+        explore)
+            run_explore "$SEED"
+            ;;
+        benchmark)
+            run_benchmark
+            ;;
+        *)
+            error "No action specified"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"

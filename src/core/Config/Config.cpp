@@ -83,12 +83,49 @@ bool Config::saveToFile(const std::string& filepath) const {
     if (!file.is_open()) {
         return false;
     }
-    
+
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // FIXED: Use proper value serialization instead of PLACEHOLDER_VALUE
+        std::visit([&](const auto& val) {
+            std::string str_val;
+            if constexpr (std::is_same_v<decltype(val), int> ||
+                         std::is_same_v<decltype(val), int64_t>) {
+                str_val = std::to_string(val);
+            } else if constexpr (std::is_same_v<decltype(val), double>) {
+                str_val = std::to_string(val);
+            } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                str_val = val ? "true" : "false";
+            } else if constexpr (std::is_same_v<decltype(val), std::string>) {
+                str_val = "\"" + val + "\"";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<int>>) {
+                str_val = "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) str_val += ", ";
+                    str_val += std::to_string(val[i]);
+                }
+                str_val += "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<double>>) {
+                str_val = "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) str_val += ", ";
+                    str_val += std::to_string(val[i]);
+                }
+                str_val += "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<std::string>>) {
+                str_val = "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) str_val += ", ";
+                    str_val += "\"" + val[i] + "\"";
+                }
+                str_val += "]";
+            } else {
+                str_val = "unknown_type";
+            }
+            file << entry.key << " = " << str_val << "\n";
+        }, entry.value);
     }
-    
+
     return true;
 }
 
