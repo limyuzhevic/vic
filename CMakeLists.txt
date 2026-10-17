@@ -121,11 +121,22 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Test framework
+add_library(nlm_test_framework STATIC
+    src/test_framework/TestFramework.cpp
+)
+target_include_directories(nlm_test_framework PUBLIC src)
+target_link_libraries(nlm_test_framework PUBLIC nlm_core)
+
 # Main executable
 add_executable(nlm
-    src/main.cpp
+    src/main_new.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli nlm_test_framework)
+
+# Examples
+add_executable(cli_test examples/cli_test.cpp)
+target_link_libraries(cli_test PUBLIC nlm_core nlm_cli nlm_test_framework)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
