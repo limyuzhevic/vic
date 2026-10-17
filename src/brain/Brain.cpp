@@ -11,22 +11,37 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+
+namespace nlm {
+
+// Memory pool optimizations for brain components
+#include "../performance/MemoryPool.hpp"
 
 namespace nlm {
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
+    
+    // Memory pools for neurons and regions
+    std::unique_ptr<NeuronPool> neuronPool;
+    std::unique_ptr<SynapsePool> synapsePool;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Neuron index for O(1) spike delivery lookup
+    std::unordered_map<NeuronId, Neuron*> neuronIndex;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -90,16 +105,29 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , neuronIndex()
+        , neuronPool(nullptr)
+        , synapsePool(nullptr)
     {
+        // Initialize memory pools for neurons and synapses
+        // Configure pool sizes based on estimated requirements
+        size_t neuronPoolSize = config->getOr<size_t>("neuron_pool_size", 10000);
+        size_t synapsePoolSize = config->getOr<size_t>("synapse_pool_size", 50000);
+        
+        neuronPool = std::make_unique<NeuronPool>(neuronPoolSize / 64, 4);  // 64 neurons per block
+        synapsePool = std::make_unique<SynapsePool>(synapsePoolSize / 64, 4);  // 64 synapses per block
+        
+        // Reserve initial capacity
+        neuronPool->reserve(neuronPoolSize);
+        synapsePool->reserve(synapsePoolSize);
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
@@ -205,12 +233,17 @@ bool Brain::initialize() {
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
+                    neuron->initializeRandom(*pImpl->rng);
                     pImpl->sensoryNeurons.push_back(neuron);
+                    // Add to neuron index for O(1) spike delivery
+                    pImpl->neuronIndex[neuron->getId()] = neuron;
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
+                    neuron->initializeRandom(*pImpl->rng);
                     pImpl->motorNeurons.push_back(neuron);
+                    pImpl->neuronIndex[neuron->getId()] = neuron;
                 }
             }
             
@@ -268,20 +301,17 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // Optimized spike delivery: O(1) lookup instead of O(n²)
+        // Use neuron index for direct access
+        auto it = pImpl->neuronIndex.find(event.destination_neuron);
+        if (it != pImpl->neuronIndex.end()) {
+            auto* neuron = it->second;
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -752,6 +782,9 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
+    // Rebuild neuron index after reset
+    updateNeuronIndex();
+    
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
@@ -912,6 +945,15 @@ RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
+    
+    // Update neuron index for this region
+    auto* neuralRegion = pImpl->regions.back().get();
+    for (auto& pop : neuralRegion->getPopulations()) {
+        for (auto* neuron : pop->getNeurons()) {
+            pImpl->neuronIndex[neuron->getId()] = neuron;
+        }
+    }
+    
     return id;
 }
 
@@ -950,7 +992,20 @@ const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
     return pImpl->regions;
 }
 
-void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+/**
+ * Update neuron index with current neuron pointers
+ * Called when neurons are added/removed to maintain O(1) spike delivery lookup
+ */
+void Brain::updateNeuronIndex() {
+    pImpl->neuronIndex.clear();
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                pImpl->neuronIndex[neuron->getId()] = neuron;
+            }
+        }
+    }
+}
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
 }
 
