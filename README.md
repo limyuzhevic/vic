@@ -20,49 +20,22 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+The main NLM executable (`./nlm`) implements Phase 2: Real Neural Computation. This phase implements real spiking neural computation with:
 
-### Phase 6 Integration Achievements
+### Phase 2 Implementation
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+#### Core Neural Computation
+- **Real LIF neuron dynamics**: Leaky Integrate-and-Fire neurons with real biophysical properties
+- **Event-driven spike propagation**: Spikes propagate with synaptic delays in real-time
+- **STDP and Hebbian plasticity**: Activity-dependent synaptic modification rules
+- **Structural plasticity**: Synaptogenesis and pruning based on activity
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### Learning Experiments
+- **Plasticity Learning Experiment**: Demonstrates measurable synaptic changes through experience
+- **STDP Verification**: Tests spike-timing dependent plasticity with pre-before-post correlation
+- **Basic Connectivity Test**: Verifies neural network connectivity and spike propagation
 
 ## Building
 
@@ -75,12 +48,54 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main NLM Executable (Phase 2)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 2 real neural computation tests:
+1. Basic neural connectivity test
+2. Plasticity learning experiment with STDP and Hebbian learning
+3. STDP verification experiment
+
+### Advanced Demos (Available)
+
+The project also includes Phase 3 and Phase 4 demo executables that build on the core Phase 2 neural computation:
+
+```bash
+# Phase 3: World interaction loop
+./nlm_phase3_demo
+
+# Phase 4: Advanced cognitive systems
+./nlm_phase4_demo
+```
+
+These demos integrate additional systems like world interaction, memory, prediction, and cognition onto the neural foundation established in Phase 2.
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+├── src/
+│   ├── core/           # Core utilities
+│   ├── brain/          # Neural components (Phase 2: Real neural computation)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation # Neuromodulators
+│   ├── memory/        # Memory systems
+│   ├── prediction/     # Prediction systems
+│   ├── cognition/     # Cognitive mechanisms
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment    # Environment interface
+│   ├── experiments/   # Experiment framework
+│   └── visualization  # Visualization
+└── tests/
+```
 
 ## Project Structure
 
