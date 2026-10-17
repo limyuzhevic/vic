@@ -95,6 +95,24 @@ public:
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
+    // Enhanced logging with structured data
+    void logWithContext(LogLevel level, const std::string& message, 
+                        const std::unordered_map<std::string, std::string>& context,
+                        const std::string& file = "", int line = 0, 
+                        const std::string& function = "");
+    
+    // Performance-aware logging (throttled)
+    void logThrottled(LogLevel level, const std::string& message, 
+                      double intervalSeconds = 1.0,
+                      const std::string& file = "", int line = 0, 
+                      const std::string& function = "");
+    
+    // Batch logging for performance
+    void batchLog(const std::vector<LogEntry>& entries);
+    
+    // Get recent log entries
+    std::vector<LogEntry> getRecentLogs(size_t count = 100) const;
+    
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
