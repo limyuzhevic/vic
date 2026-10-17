@@ -19,14 +19,77 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <chrono>
 
 using namespace nlm;
+
+void printHelp(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file.cfg        Load configuration from file" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version               Show version information" << std::endl;
+    std::cout << "  --neurons=N             Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --steps=N               Set number of simulation steps (default: 1000)" << std::endl;
+    std::cout << "  --seed=N                Set random seed (default: 42)" << std::endl;
+    std::cout << "  --output=file            Save brain state to file" << std::endl;
+    std::cout << "  --benchmark              Run performance benchmark" << std::endl;
+}
+
+// Simple benchmark function
+void runBenchmark(size_t neurons, size_t steps) {
+    std::cout << "Running NLM Performance Benchmark..." << std::endl;
+    std::cout << "Neurons: " << neurons << ", Steps: " << steps << std::endl << std::endl;
+    
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.1f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    
+    // Create brain
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Run simulation
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (size_t step = 0; step < steps; ++step) {
+        // Inject some input
+        for (size_t i = 0; i < std::min(size_t(10), neurons / 10); ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        }
+        brain->step(step, step * 0.001);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+    
+    // Collect results
+    double stepsPerSecond = steps / totalTime;
+    double spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
+    
+    std::cout << std::endl;
+    std::cout << "╔══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
+    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
+    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
+    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
+    std::cout << "║ " << std::setw(13) << neurons 
+              << " ║ " << std::setw(13) << brain->getTotalSynapseCount()
+              << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << stepsPerSecond
+              << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << spikesPerStep
+              << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) 
+              << static_cast<double>(brain->getTotalSynapseCount()) / brain->getTotalNeuronCount()
+              << " ║" << std::endl;
+    std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╝" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
+    std::cout << "Steps/sec: " << std::fixed << std::setprecision(0) << stepsPerSecond << std::endl;
+    std::cout << "Spikes/step: " << std::fixed << std::setprecision(2) << spikesPerStep << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -35,14 +98,15 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                               ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Complete artificial brain integration with all systems   ║
+    ║     - Memory systems connected to neural processing          ║
+    ║     - Neuromodulation affects plasticity and dynamics        ║
+    ║     - Prediction integrated with learning                   ║
+    ║     - Development affects plasticity rates                   ║
+    ║     - Checkpoint save/load working                           ║
+    ║     - Replay and consolidation functional                     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -324,7 +388,34 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Handle help and version options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Version 0.1.0 (Phase 6: Final Integration)" << std::endl;
+            std::cout << "Experimental Artificial Developmental Brain" << std::endl;
+            return 0;
+        } else if (arg == "--benchmark") {
+            // Parse benchmark arguments
+            size_t neurons = 100;
+            size_t steps = 1000;
+            
+            for (int j = i + 1; j < argc; ++j) {
+                std::string next_arg(argv[j]);
+                if (next_arg == "--neurons") {
+                    neurons = std::stoul(argv[++j]);
+                } else if (next_arg == "--steps") {
+                    steps = std::stoul(argv[++j]);
+                }
+            }
+            
+            runBenchmark(neurons, steps);
+            return 0;
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +423,14 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
     NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Integrated memory systems with neural processing");
+    NLM_LOG_INFO("  - Neuromodulation affects plasticity and neural dynamics");
+    NLM_LOG_INFO("  - Prediction system integrated with learning");
+    NLM_LOG_INFO("  - Development affects plasticity rates");
+    NLM_LOG_INFO("  - Checkpoint save/load working");
+    NLM_LOG_INFO("  - Replay and consolidation functional");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -352,6 +445,9 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            } else {
+                NLM_LOG_ERROR("Error: --config option requires a filename");
+                return 1;
             }
         }
     }
@@ -366,7 +462,8 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Update config comments to reflect Phase 6
+    // These are Phase 6 integration defaults
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
