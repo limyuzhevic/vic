@@ -56,23 +56,31 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Memory management optimizations
+    static constexpr bool isSmallObject() noexcept { return true; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    
+    // Validate log level
+    static void validateLevel(LogLevel level) noexcept;
 };
 
 // Main Logger class
 class Logger {
 public:
     Logger();
-    ~Logger();
+    ~Logger() noexcept;
     
-    // Disable copying
+    // Disable copying, enable moving with proper noexcept
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
+    Logger(Logger&& other) noexcept;
+    Logger& operator=(Logger&& other) noexcept;
     
     // Add logger sink
     void addLogger(std::shared_ptr<ILogger> logger);
@@ -103,10 +111,16 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Memory management optimizations
+    static constexpr bool isSmallObject() noexcept { return false; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Initialize implementation
+    void initializeImpl();
 };
 
 // Convenience macro for file/line/function info

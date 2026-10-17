@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include "ErrorHandling/Error.hpp"
 
 namespace nlm {
 
@@ -18,7 +19,7 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters - optimized for cache locality
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
@@ -27,27 +28,36 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) {
+    validateId(id);
+    initializeImpl(id);
+}
+
+Neuron::~Neuron() noexcept = default;
+
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+Neuron& Neuron::operator=(Neuron&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
+void Neuron::validateId(NeuronId id) {
+    if (id == INVALID_NEURON_ID) {
+        NLM_THROW_VALIDATION("Neuron ID cannot be invalid");
+    }
+}
+
+void Neuron::initializeImpl(NeuronId id) {
+    pImpl = std::make_unique<Impl>();
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
-}
-
-Neuron::~Neuron() = default;
-
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
+    pImpl->synapticInput = 0.0f;
 }
 
 void Neuron::setType(NeuronType type) {
@@ -189,6 +199,9 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
     bool fired = false;
     
     // Handle refractory period
@@ -260,18 +273,23 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
 void Neuron::reset() {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
@@ -299,4 +317,69 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+NeuronId Neuron::getId() const noexcept {
+    return pImpl ? pImpl->id : INVALID_NEURON_ID;
+}
+
+NeuronType Neuron::getType() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->type;
+}
+
+bool Neuron::isFiring() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->state.firingRate;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->state.threshold;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    if (!pImpl) {
+        NLM_THROW_NEURAL("Neuron not properly initialized");
+    }
+    return pImpl->outgoingSynapses;
+}

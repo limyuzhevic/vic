@@ -15,16 +15,17 @@ public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
-    ~Synapse();
+    // Destructor with explicit cleanup
+    ~Synapse() noexcept;
     
-    // Disable copying, enable moving
+    // Disable copying, enable moving with proper noexcept
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse(Synapse&& other) noexcept;
+    Synapse& operator=(Synapse&& other) noexcept;
     
     // Identity
-    SynapseId getId() const;
+    SynapseId getId() const noexcept;
     
     // Connection
     NeuronId getSourceNeuron() const;
@@ -57,8 +58,6 @@ public:
     // Plasticity flags
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
-    
-    // Enable/disable plasticity rules
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
     // Eligibility trace (for reward-modulated learning)
@@ -80,9 +79,22 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // Small object optimization check
+    static constexpr bool isSmallObject() noexcept { return true; }
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Validate synapse parameters
+    static void validateSynapseId(SynapseId id);
+    static void validateNeuronIds(NeuronId source, NeuronId destination);
+    
+    // Initialize implementation
+    void initializeImpl(SynapseId id, NeuronId source, NeuronId destination);
+    
+    // Validate weight range
+    void validateWeight(SynapticWeight weight) const noexcept;
 };
 
 } // namespace nlm

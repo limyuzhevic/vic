@@ -1,28 +1,26 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Beginner-Friendly Usage Guide
 
-## What is NLM?
+## Welcome to NLM!
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+**NLM (Neural Learning Machine)** is a brain simulator that lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
-
----
+| Real World | NLM Code |
+|------------|----------|
+| You see something | `percept = world.getSensoryPercept()` |
+| Your brain processes it | `agent.processSensoryInput(percept)` |
+| You decide to act | `action = agent.decodeMotorCommand()` |
+| You do the action | `world.applyMotorCommand(action, time)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
 
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
+2. **World** - The environment the brain lives in  
 3. **Agent** - The bridge connecting brain to world
 
----
-
-## Quick Start (Copy & Paste)
+## Quick Start (Copy & Paste Examples)
 
 ### Example 1: Simplest Brain
 
@@ -71,8 +69,6 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -82,8 +78,6 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
 | Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
 
 ## The Simplest Possible Example
 
@@ -101,8 +95,6 @@ brain.step(0)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
-
----
 
 ## Common Patterns
 
@@ -153,8 +145,6 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
----
-
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
@@ -178,8 +168,6 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
-
----
 
 ## Mini Projects
 
@@ -254,8 +242,6 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
----
-
 ## Quick Reference
 
 | What you want | Code |
@@ -269,29 +255,63 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
----
-
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
+### "My brain isn't doing anything"
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check if your brain has neurons
 
-**"The agent isn't moving"**
+### "The agent isn't moving"
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Make sure the brain has motor neurons
 
-**"Everything is 0"**
+### "Everything is 0"
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Check that you have both excitatory and inhibitory neurons
 
----
+## Learning Path Recommendations
+
+### Week 1: Getting Started
+1. Run the "Silent Brain" project
+2. Try the "Simplest Possible Example"
+3. Understand the basic brain/world/agent pattern
+
+### Week 2: Basic Interaction
+1. Work through the "Brain Watching a World" project
+2. Learn how to read brain statistics
+3. Understand development stages
+
+### Week 3: Advanced Usage
+1. Complete the "Complete Agent" project
+2. Experiment with different configurations
+3. Learn about enabling learning features
+
+### Week 4: Customization
+1. Modify example projects
+2. Create your own variations
+3. Explore the Python API documentation
 
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Check out the example C++ projects in the source directory
+5. Look at the Python API for advanced features
 
-That's it! You're now ready to use NLM.
+## Getting Help
+
+- **Documentation**: This guide, HOW_TO_USE.md, and ARCHITECTURE.md
+- **Examples**: Look at example.cpp, demo_example.cpp in the source directory
+- **Troubleshooting**: Check the Troubleshooting section above
+- **Community**: Join the NLM discussion forum (if available)
+
+That's it! You're now ready to use NLM. Happy simulating!
+
+*Note: This is an enhanced beginner-friendly version. For more detailed information, refer to HOW_TO_USE.md.*
+

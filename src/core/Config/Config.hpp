@@ -5,6 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ErrorHandling/Error.hpp"
+
+#pragma once
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <variant>
+#include <optional>
+#include "ErrorHandling/Error.hpp"
 
 namespace nlm {
 
@@ -43,17 +53,16 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
-    ~Config();
+    ~Config() noexcept;
     
-    // Disable copying, enable moving
+    // Disable copying, enable moving with proper noexcept
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    Config(Config&& other) noexcept;
+    Config& operator=(Config&& other) noexcept;
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
@@ -93,13 +102,25 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Memory management optimizations
+    static constexpr bool isSmallObject() noexcept { return true; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Validate configuration key
+    static void validateKey(const std::string& key);
+    
+    // Initialize implementation
+    void initializeImpl();
+    
+    // Cleanup implementation
+    void cleanupImpl() noexcept;
 };
 
 } // namespace nlm
+
+// Define exception macros for use in other files
+#define NLM_CONFIG_THROW(msg) throw nlm::ConfigurationException(msg)
+#define NLM_CONFIG_THROW_CODE(msg, code) throw nlm::ConfigurationException(msg, code)

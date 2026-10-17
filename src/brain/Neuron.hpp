@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include "ErrorHandling/Error.hpp"
 
 namespace nlm {
 
@@ -47,16 +48,17 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
-    ~Neuron();
+    // Destructor with explicit cleanup
+    ~Neuron() noexcept;
     
-    // Disable copying, enable moving
+    // Disable copying, enable moving with proper noexcept
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&& other) noexcept;
+    Neuron& operator=(Neuron&& other) noexcept;
     
     // Identity
-    NeuronId getId() const;
+    NeuronId getId() const noexcept;
     
     // Type
     NeuronType getType() const;
@@ -143,9 +145,25 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Small object optimization check
+    static constexpr bool isSmallObject() noexcept { return true; }
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Validate neuron ID
+    static void validateId(NeuronId id);
+    
+    // Initialize implementation
+    void initializeImpl(NeuronId id);
+    
+    // Helper for LIF step optimization
+    void updateLIFState(MembranePotential& V, MembranePotential V_rest, 
+                       MembranePotential V_reset, MembranePotential threshold,
+                       float tau, float C, float synapticContribution,
+                       float adaptationContribution, bool& fired,
+                       Timestamp currentTime);
 };
 
 } // namespace nlm

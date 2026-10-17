@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "ErrorHandling/Error.hpp"
 
 namespace nlm {
 
@@ -10,13 +11,46 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() {
+    initializeImpl();
+}
 
-Config::~Config() = default;
+Config::~Config() noexcept = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
+void Config::validateKey(const std::string& key) {
+    if (key.empty()) {
+        NLM_THROW_CONFIG("Configuration key cannot be empty");
+    }
+    // Remove any potential whitespace from key
+    std::string trimmed = key;
+    size_t start = trimmed.find_first_not_of(" \t\r\n");
+    size_t end = trimmed.find_last_not_of(" \t\r\n");
+    if (start != std::string::npos && end != std::string::npos) {
+        trimmed = trimmed.substr(start, end - start + 1);
+        if (trimmed.empty()) {
+            NLM_THROW_CONFIG("Configuration key cannot be only whitespace");
+        }
+    }
+}
+
+void Config::initializeImpl() {
+    pImpl = std::make_unique<Impl>();
+}
+
+void Config::cleanupImpl() noexcept {
+    if (pImpl) {
+        pImpl->entries.clear();
+    }
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -115,6 +149,12 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    validateKey(key);
+    
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -143,11 +183,23 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    validateKey(key);
+    
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized");
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    validateKey(key);
+    
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized");
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,6 +208,10 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized");
+    }
+    
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
@@ -165,10 +221,14 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    cleanupImpl();
 }
 
 std::string Config::summary() const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized");
+    }
+    
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {

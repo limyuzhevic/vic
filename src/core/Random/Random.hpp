@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -19,19 +20,20 @@ public:
     // Create with time-based seed (not deterministic)
     RandomGenerator();
     
-    ~RandomGenerator();
+    // Destructor with explicit cleanup
+    ~RandomGenerator() noexcept;
     
     // Disable copying
     RandomGenerator(const RandomGenerator&) = delete;
     RandomGenerator& operator=(const RandomGenerator&) = delete;
     
-    // Enable moving
-    RandomGenerator(RandomGenerator&&) noexcept;
-    RandomGenerator& operator=(RandomGenerator&&) noexcept;
+    // Enable moving with noexcept specification
+    RandomGenerator(RandomGenerator&& other) noexcept;
+    RandomGenerator& operator=(RandomGenerator&& other) noexcept;
     
     // Seed operations
     void seed(uint64_t seed);
-    uint64_t getSeed() const;
+    uint64_t getSeed() const noexcept;
     
     // Random number generation
     // Uniform integer in [min, max]
@@ -76,19 +78,25 @@ public:
     void fillBytes(void* data, size_t size);
     
     // Get underlying engine for advanced use
-    std::mt19937_64& engine();
-    const std::mt19937_64& engine() const;
+    std::mt19937_64& engine() noexcept;
+    const std::mt19937_64& engine() const noexcept;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() noexcept { return std::mt19937_64::min(); }
+    static constexpr result_type max() noexcept { return std::mt19937_64::max(); }
     
     // Operator for compatibility with std functions
-    result_type operator()() { return static_cast<result_type>(engine()()); }
+    result_type operator()() noexcept { return static_cast<result_type>(engine()()); }
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Validate seed value
+    void validateSeed(uint64_t seed) const noexcept;
+    
+    // Initialize implementation
+    void initializeImpl(uint64_t seed);
 };
 
 // Template implementations
@@ -100,7 +108,7 @@ void RandomGenerator::shuffle(Container& container) {
 template<typename Container>
 auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
     if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+        NLM_THROW_VALIDATION("Cannot pick from empty container");
     }
     auto it = container.begin();
     std::advance(it, pickRandomIndex(container.size()));
