@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
@@ -121,11 +116,22 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Python bindings
+add_library(pynlm MODULE
+    python/bindings.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(pynlm PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/python>
+)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+
+# Set Python module output name
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,12 +145,24 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
+
+# Main executable
+add_executable(nlm
+    src/main.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

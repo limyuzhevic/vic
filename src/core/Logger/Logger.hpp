@@ -56,6 +56,26 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // File management
+    void rotateLogFile();
+    void setMaxFileSize(uint64_t maxSize);
+    uint64_t getMaxFileSize() const;
+    
+    // Format options
+    void setUseJsonFormat(bool useJson);
+    bool getUseJsonFormat() const;
+    
+    // Performance logging
+    void enablePerformanceLogging(bool enable);
+    bool isPerformanceLoggingEnabled() const;
+    std::string startPerformanceMetric(const std::string& name);
+    void endPerformanceMetric(const std::string& metricId);
+    void printPerformanceMetrics();
+    
+    // Helper methods
+    std::string formatTimestamp(std::chrono::system_clock::time_point timestamp) const;
+    std::string escapeJson(const std::string& str) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
