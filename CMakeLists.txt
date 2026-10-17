@@ -26,9 +26,11 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigValidator.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Performance/Profiler.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -83,6 +85,9 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    # Phase 2 experiments (new framework)
+    src/experiments/Phase2Experiments.cpp
+    src/experiments/Phase2ExperimentRunner.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
