@@ -3,20 +3,107 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <set>
+#include <cmath>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::vector<std::string>> validationRules;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize default validation rules
+    pImpl->validationRules = {
+        {"neuron_count", {"positive_int"}},
+        {"region_count", {"positive_int"}},
+        {"simulation_timestep", {"positive_float", "min_0.0001"}},
+        {"connection_probability", {"range_0_to_1"}},
+        {"plasticity_learning_rate", {"positive_float"}},
+        {"stdp_ltp_weight", {"positive_float"}},
+        {"stdp_ltd_weight", {"positive_float"}},
+        {"stdp_time_constant", {"positive_float"}},
+        {"synaptogenesis_rate", {"positive_float"}},
+        {"pruning_rate", {"positive_float"}},
+        {"dopamine_baseline", {"range_0_to_1"}},
+        {"reward_discount_factor", {"range_0_to_1"}},
+        {"environment_width", {"positive_int", "max_1000"}},
+        {"environment_height", {"positive_int", "max_1000"}},
+        {"max_simulation_steps", {"positive_int", "max_1000000"}},
+        {"visualization_update_rate", {"positive_float"}}
+    };
+}
 
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
+
+// Validation helper functions
+namespace {
+    bool validatePositiveInt(const ConfigValue& value, const std::string& key) {
+        if (const auto* val = std::get_if<int64_t>(&value)) {
+            return *val > 0;
+        } else if (const auto* val = std::get_if<int>(&value)) {
+            return *val > 0;
+        }
+        return false;
+    }
+    
+    bool validatePositiveFloat(const ConfigValue& value, const std::string& key) {
+        if (const auto* val = std::get_if<double>(&value)) {
+            return *val > 0.0;
+        }
+        return false;
+    }
+    
+    bool validateRange0To1(const ConfigValue& value, const std::string& key) {
+        if (const auto* val = std::get_if<double>(&value)) {
+            return *val >= 0.0 && *val <= 1.0;
+        } else if (const auto* val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 1.0f;
+        }
+        return false;
+    }
+    
+    bool validateMin(const ConfigValue& value, const std::string& key, double minVal) {
+        if (const auto* val = std::get_if<double>(&value)) {
+            return *val >= minVal;
+        } else if (const auto* val = std::get_if<float>(&value)) {
+            return *val >= minVal;
+        }
+        return false;
+    }
+    
+    bool validateMax(const ConfigValue& value, const std::string& key, int64_t maxVal) {
+        if (const auto* val = std::get_if<int64_t>(&value)) {
+            return *val <= maxVal;
+        } else if (const auto* val = std::get_if<int>(&value)) {
+            return *val <= maxVal;
+        }
+        return false;
+    }
+    
+    bool applyValidationRule(const ConfigValue& value, const std::string& rule, const std::string& key) {
+        if (rule == "positive_int") {
+            return validatePositiveInt(value, key);
+        } else if (rule == "positive_float") {
+            return validatePositiveFloat(value, key);
+        } else if (rule == "range_0_to_1") {
+            return validateRange0To1(value, key);
+        } else if (rule.find("min_") == 0) {
+            double minVal = std::stod(rule.substr(4));
+            return validateMin(value, key, minVal);
+        } else if (rule.find("max_") == 0) {
+            int64_t maxVal = std::stoll(rule.substr(4));
+            return validateMax(value, key, maxVal);
+        }
+        return true; // Unknown rule, skip validation
+    }
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -86,7 +173,16 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -166,6 +262,47 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+}
+
+bool Config::validate(const std::unordered_map<std::string, std::vector<std::string>>& customRules) const {
+    std::unordered_map<std::string, std::vector<std::string>> allRules = pImpl->validationRules;
+    
+    // Merge custom rules
+    for (const auto& custom : customRules) {
+        allRules[custom.first] = custom.second;
+    }
+    
+    bool isValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        auto it = allRules.find(entry.key);
+        if (it != allRules.end()) {
+            for (const auto& rule : it->second) {
+                if (!applyValidationRule(entry.value, rule, entry.key)) {
+                    std::cerr << "ERROR: Configuration key '" << entry.key << "' failed validation: " << rule << std::endl;
+                    std::cerr << "  Value: ";
+                    std::visit([](auto&& arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, std::string>) {
+                            std::cerr << "\"" << arg << "\"";
+                        } else {
+                            std::cerr << arg;
+                        }
+                    }, entry.value);
+                    std::cerr << std::endl;
+                    isValid = false;
+                }
+            }
+        }
+    }
+    
+    return isValid;
+}
+
+bool Config::validate(const std::string& schemaFile) const {
+    // TODO PHASE 3: Implement schema validation
+    // For now, use default validation rules
+    return validate({});
 }
 
 std::string Config::summary() const {
