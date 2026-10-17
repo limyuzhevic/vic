@@ -181,8 +181,6 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
-
 ### Project 1: Silent Brain (Just Neurons)
 
 ```python
@@ -252,6 +250,171 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+```
+
+### Project 4: Direct Neuron Access
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access neurons directly from brain regions
+for region_id in brain.getRegionIds():
+    region = brain.getRegion(region_id)
+    for population_id in region.getPopulationIds():
+        population = region.getPopulation(population_id)
+        for neuron_idx in range(min(10, population.getSize())):
+            neuron = population.getNeuron(neuron_idx)
+            print(f"Neuron {neuron.getId()} - Type: {neuron.getType()}, Potential: {neuron.getMembranePotential():.1f}mV")
+            
+            # Modify neuron directly
+            neuron.setMembranePotential(-60.0)
+            neuron.injectCurrent(0.1)
+
+print("Direct neuron access complete!")
+```
+
+### Project 5: Synaptic Connections
+
+```python
+import pynlm
+
+# Create brain with region
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+region = brain.addRegion("cortex")
+
+# Create neurons in population
+population = region.addPopulation(100, pynlm.NeuronType.Excitatory)
+
+# Create specific synaptic connections between neurons
+for i in range(10):
+    for j in range(i+1, 15):  # Connections from neurons i to j
+        source_neuron = population.getNeuron(i)
+        target_neuron = population.getNeuron(j)
+        source_id = source_neuron.getId()
+        target_id = target_neuron.getId()
+        
+        # Create synapse with initial weight
+        synapse = region.addSynapse(source_id, target_id, weight=0.5)
+        print(f"Created synapse from {source_id} to {target_id} with weight 0.5")
+```
+
+### Project 6: Working Memory
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access working memory (brain property)
+working_memory = brain.getWorkingMemory() if hasattr(brain, 'getWorkingMemory') else None
+if working_memory:
+    # Store neural activity patterns
+    for i in range(20):
+        neuron = brain.get_neuron(i) if i < brain.getTotalNeuronCount() else None
+        if neuron:
+            activation = neuron.getMembranePotential()
+            working_memory.store(neuron, activation)
+    
+    # Retrieve patterns
+    for neuron in brain.getAllNeurons():
+        pattern = working_memory.retrieve(neuron)
+        if pattern:
+            print(f"Neuron {neuron.getId()} stored pattern: {pattern:.3f}")
+
+print("Working memory example complete!")
+```
+
+### Project 7: Neuromodulation Systems
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access neuromodulation systems
+# Note: These would be accessed through the agent interface
+try:
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(None)
+    
+    # Enable neuromodulation systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # Create neuromodulation objects directly
+    dopamine = pynlm.Dopamine()
+    curiosity = pynlm.Curiosity()
+    
+    print("Neuromodulation example created!")
+except:
+    # Alternative access if agent interface not available
+    print("Neuromodulation objects available: Dopamine, Curiosity, Novelty, PredictionError, Reward")
+```
+
+### Project 8: Memory Systems
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access memory systems
+working_memory = pynlm.WorkingMemory()
+episodic_memory = pynlm.EpisodicMemory()
+semantic_memory = pynlm.SemanticMemory()
+
+# Store and retrieve episodic memories
+episodic_memory.storeEpisode({
+    'step': 100,
+    'reward': 1.0,
+    'action': pynlm.ActionType.MoveForward,
+    'sensory_input': [0.1, 0.2, 0.3, 0.4]
+})
+
+# Retrieve similar episodes
+results = episodic_memory.retrieveSimilar([0.1, 0.2, 0.3, 0.4], max_results=3)
+print(f"Found {len(results)} similar episodes")
+
+# Store semantic facts
+semantic_memory.storeFact("temperature", "hot")
+semantic_memory.storeFact("time_of_day", "morning")
+print("Semantic facts stored")
+
+print("Memory systems example complete!")
+```
+
+### Project 9: Performance Monitoring
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Start monitoring performance
+nlm.start_profiling(brain)
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+# Get performance metrics
+metrics = nlm.stop_profiling(brain)
+print(f"Simulation completed in {metrics['total_time']:.2f} seconds")
+print(f"Average step time: {metrics['avg_step_time']:.4f} seconds")
+print(f"CPU usage: {metrics['cpu_usage']:.1f}%")
 ```
 
 ---
