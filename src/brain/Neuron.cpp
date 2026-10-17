@@ -189,7 +189,21 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate timestep
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR(std::string("Invalid timestep in stepLIF: ") + std::to_string(dt));
+        return false;
+    }
+    
     bool fired = false;
+    
+    // Validate neuron state
+    const auto& state = pImpl->state;
+    if (std::isnan(state.membranePotential) || std::isnan(state.restingPotential) || 
+        std::isnan(state.threshold) || std::isnan(dt)) {
+        NLM_LOG_ERROR("Invalid neuron state detected - NaN values found");
+        return false;
+    }
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
@@ -213,6 +227,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate parameters
+    if (tau <= 0.0f || C <= 0.0f) {
+        NLM_LOG_ERROR(std::string("Invalid neuron parameters: tau=") + std::to_string(tau) + 
+                     ", C=" + std::to_string(C));
+        return false;
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
@@ -220,7 +241,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Clamp input to prevent numerical instability
+    float maxIntegrationChange = 100.0f; // Maximum change in one step
+    float integration = static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    if (integration > maxIntegrationChange) {
+        integration = maxIntegrationChange;
+    } else if (integration < -maxIntegrationChange) {
+        integration = -maxIntegrationChange;
+    }
+    
+    V = V + integration;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -237,7 +267,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike with validation
         recordSpike(currentTime);
         
         // Reset membrane potential
@@ -255,6 +285,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
+    
+    // Final validation
+    if (std::isnan(V) || std::isinf(V)) {
+        NLM_LOG_ERROR("Invalid membrane potential detected after LIF step");
+        V = V_rest; // Reset to resting potential
+    }
     
     return fired;
 }

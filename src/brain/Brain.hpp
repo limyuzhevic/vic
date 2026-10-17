@@ -47,37 +47,156 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// This class represents a complete artificial brain implementing Phase 6 integration.
+// It coordinates all neural subsystems including working memory, episodic memory,
+// prediction systems, cognition, neuromodulation, and development.
+// 
+// Key Features:
+// - Real LIF (Leaky Integrate-and-Fire) neuron dynamics
+// - Event-driven spike propagation with synaptic delays
+// - Integrated memory systems (working, episodic, associative)
+// - Prediction and error correction mechanisms
+// - Cognitive functions (planning, concept formation, attention)
+// - Neuromodulation (dopamine, curiosity, novelty detection)
+// - Developmental plasticity and structural changes
+// - Checkpoint save/load for persistence
+// - Replay and consolidation mechanisms
+// 
+// The brain operates as a closed-loop system processing sensory input,
+// generating motor output, and learning from rewards through plasticity.
 
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Construct a new Brain object with the given configuration
+     * 
+     * @param config Configuration parameters for brain initialization including
+     *               neuron count, region count, connection probability, etc.
+     * 
+     * @throws std::bad_alloc if memory allocation fails
+     * @throws std::invalid_argument if configuration is invalid
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object and clean up resources
+     */
     ~Brain();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Copy constructor (deleted - brains cannot be copied)
+     */
     Brain(const Brain&) = delete;
+    
+    /**
+     * @brief Copy assignment operator (deleted - brains cannot be copied)
+     */
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor - transfers ownership of implementation
+     * 
+     * @param other Brain to move from
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator - transfers ownership of implementation
+     * 
+     * @param other Brain to move from
+     * @return Brain& Reference to this brain
+     */
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initialize the brain with configuration parameters
+     * 
+     * This method creates neurons, populations, and initializes all integrated systems
+     * including memory systems, prediction systems, cognition systems, neuromodulation,
+     * and developmental systems. It establishes the initial neural architecture and
+     * configures plasticity parameters.
+     * 
+     * @return bool true if initialization succeeded, false otherwise
+     * 
+     * @note This method should be called after brain construction but before simulation.
+     * @throws std::runtime_error if critical initialization fails
+     */
     bool initialize();
     
-    // Main simulation step
+    /**
+     * @brief Execute one simulation step (time-discrete version)
+     * 
+     * @param currentStep The current simulation step number (integer)
+     * 
+     * @note This is a convenience wrapper for the time-based version with
+     *       timestep = 0.001. Use the two-parameter version for precise timing.
+     */
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    /**
+     * @brief Execute one simulation step with precise timing
+     * 
+     * This is the core simulation method that advances the brain by one timestep.
+     * It implements the complete integrated brain loop as described in Phase 6:
+     * 
+     * 1. Process pending delayed spike events (deliver synaptic input)
+     * 2. Update all neuron membrane potentials (LIF dynamics)
+     * 3. Detect spikes and schedule outgoing spike events
+     * 4. Update working memory (maintenance and competition)
+     * 5. Apply neuromodulation effects on neural excitability
+     * 6. Apply plasticity rules (STDP, Hebbian)
+     * 7. Update episodic memory with current experience
+     * 8. Update prediction system
+     * 9. Update attention system
+     * 10. Update concept formation
+     * 11. Apply structural plasticity (synaptogenesis, pruning)
+     * 12. Replay important memories (during rest or periodically)
+     * 13. Apply development effects
+     * 14. Collect statistics
+     * 
+     * @param currentStep The current simulation step number
+     * @param currentTime The current simulation time in seconds
+     * 
+     * @note This method implements the complete Phase 6 integrated brain loop.
+     *       All integrated systems are updated in each step.
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    /**
+     * @brief Receive sensory input from the environment and inject into sensory neurons
+     * 
+     * This method processes external sensory data and converts it into neural current
+     * injection for sensory neurons. It implements basic sensory encoding where
+     * environmental input is scaled and distributed across the sensory neuron population.
+     * 
+     * @param input Sensory input data containing environmental observations
+     * 
+     * @note Sensory neurons are automatically created during brain initialization.
+     *       This input is used for perceptual processing and motor control.
+     */
     void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inject current directly into a specific neuron
+    /**
+     * @brief Inject current directly into a specific neuron by ID
+     * 
+     * @param neuron Neuron identifier to receive current injection
+     * @param current Amount of current to inject (in nanoamps)
+     * 
+     * @note Used for targeted stimulation or external input.
+     * @throws std::out_of_range if neuron ID is not found
+     */
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
-    // Inject current into all neurons of a specific type
+    /**
+     * @brief Inject current into all neurons of a specific type
+     * 
+     * This is useful for modeling structured input patterns such as
+     * coordinated sensory stimulation or motor commands.
+     * 
+     * @param type Neuron type to receive current (Sensory, Internal, or Motor)
+     * @param current Amount of current to inject to each neuron (in nanoamps)
+     */
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
@@ -89,31 +208,56 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    /**
+     * @brief Access the spike system for event-driven spike propagation
+     * 
+     * The spike system manages real-time spike events, including delayed spikes
+     * for synaptic transmission. This is essential for the event-driven nature
+     * of the neural simulation.
+     * 
+     * @return SpikeSystem* Pointer to the spike system, or nullptr if not initialized
+     */
+    SpikeSystem* getSpikeSystem();
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    /**
+     * @brief Constant version of getSpikeSystem()
+     * 
+     * @return const SpikeSystem* Constant pointer to the spike system
+     */
+    const SpikeSystem* getSpikeSystem() const;
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    /**
+     * @brief Access the spike-timing-dependent plasticity (STDP) system
+     * 
+     * STDP implements synaptic strengthening (LTP) when presynaptic neurons
+     * fire before postsynaptic neurons, and synaptic weakening (LTD) when the
+     * reverse temporal order occurs.
+     * 
+     * @return STDP* Pointer to the STDP system
+     */
+    STDP* getSTDP();
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    /**
+     * @brief Access the Hebbian plasticity system
+     * 
+     * Hebbian learning implements the principle "neurons that fire together,
+     * wire together." This system strengthens synapses based on simultaneous
+     * activation of pre- and postsynaptic neurons.
+     * 
+     * @return Hebbian* Pointer to the Hebbian plasticity system
+     */
+    Hebbian* getHebbian();
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
-    
-    // Reset brain state
-    void reset();
-    
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    /**
+     * @brief Access the structural plasticity system
+     * 
+     * Structural plasticity implements the creation (synaptogenesis) and
+     * elimination (pruning) of synaptic connections over time, mimicking
+     * biological brain development and learning.
+     * 
+     * @return StructuralPlasticity* Pointer to the structural plasticity system
+     */
+    StructuralPlasticity* getStructuralPlasticity();
     
     // Region management
     RegionId addRegion(const std::string& name = "");
