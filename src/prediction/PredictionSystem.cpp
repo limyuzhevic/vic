@@ -1,4 +1,10 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../core/Types/Types.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -7,14 +13,24 @@ struct PredictionSystem::Impl {
     float confidence;
     std::vector<float> errorHistory;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    // Training state
+    size_t trainingSteps;
+    float patternLearningRate;
+    float confidenceDecayRate;
+    
+    // Pattern storage for prediction
+    std::vector<std::vector<float>> learnedPatterns;
+    std::vector<float> patternStrengths;
+    
+    Impl() : predictionError(0.0f), confidence(0.5f), trainingSteps(0), 
+             patternLearningRate(0.01f), confidenceDecayRate(0.001f) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
+std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const class SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
     return currentState.clone();
@@ -37,6 +53,26 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+void PredictionSystem::train(const class SensoryInput& observation) {
+    pImpl->trainingSteps++;
+    
+    // Extract sensory pattern from observation
+    const auto& data = observation.getData();
+    if (data.empty()) return;
+    
+    // Learn pattern from observation
+    // In a real implementation, this would extract patterns from neural activity
+    // For now, we'll store the raw observation as a learned pattern
+    if (pImpl->learnedPatterns.size() < 100) {  // Limit memory
+        pImpl->learnedPatterns.push_back(data);
+        pImpl->patternStrengths.push_back(1.0f);
+    }
+    
+    // Update confidence based on prediction accuracy
+    // This would normally track how well the prediction system matches reality
+    pImpl->confidence = std::max(0.1f, pImpl->confidence - pImpl->confidenceDecayRate);
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }
@@ -51,10 +87,9 @@ const std::vector<float>& PredictionSystem::getErrorHistory() const {
 
 void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
+    pImpl->learnedPatterns.clear();
+    pImpl->patternStrengths.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
-}
+}} // namespace nlm
 
-} // namespace nlm

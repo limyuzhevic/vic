@@ -6,6 +6,20 @@
 
 namespace nlm {
 
+// Serotonin: Mood, impulsivity, and social behavior
+// PLACEHOLDER - Phase 2
+class Serotonin : public Neuromodulator {
+public:
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override { return "5-HT"; }
+    float getLevel() const override { return 0.0f; }
+    void setLevel(float level) override {}
+    float getPlasticityFactor() const override { return 1.0f; }
+    void update(TimestepDuration dt) override {}
+};
+
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
@@ -57,6 +71,9 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
@@ -68,6 +85,9 @@ public:
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
     const char* getName() const override { return "NE"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
@@ -79,6 +99,9 @@ public:
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin();
+    ~Serotonin() override;
+    
     const char* getName() const override { return "5-HT"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
