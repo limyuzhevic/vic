@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -42,6 +43,25 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Logging macro for config system
+#ifdef NLM_LOG_ERROR
+#undef NLM_LOG_ERROR
+#endif
+
+#define NLM_LOG_ERROR(msg) std::cerr << "[ERROR] " << msg << std::endl
+
+#ifdef NLM_LOG_WARNING
+#undef NLM_LOG_WARNING
+#endif
+
+#define NLM_LOG_WARNING(msg) std::cerr << "[WARNING] " << msg << std::endl
+
+#ifdef NLM_LOG_INFO
+#undef NLM_LOG_INFO
+#endif
+
+#define NLM_LOG_INFO(msg) std::cout << "[INFO] " << msg << std::endl
 
 // Main configuration class
 class Config {

@@ -4,7 +4,6 @@
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
-#include <functional>
 #include <unordered_map>
 
 namespace nlm {
@@ -74,36 +73,52 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Enhanced features
+    void enablePatternRecognition(bool enable);
+    void enableCompetition(bool enable);
+    void setConsolidationThreshold(float threshold);
+    void setGlobalInhibition(float inhibition);
+    void setAttentionModulation(float modulation);
+    void setPatternSimilarityThreshold(float threshold);
+
+    // Memory consolidation and status
+    bool isMemoryConsolidated(NeuronId neuron) const;
+    void setMemoryConsolidation(NeuronId neuron, bool consolidated);
+    float getConsolidationProgress(NeuronId neuron) const;
+    void boostConsolidation(NeuronId neuron, float factor);
+    std::vector<NeuronId> getActiveTraces() const;
+    std::vector<NeuronId> getConsolidatedTraces() const;
+    float getMemoryUtilization() const;
+    void printMemoryStats() const;
+
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
+    // Enhanced internal structure
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
-    
+    float consolidationThreshold_;
+    bool patternRecognitionEnabled_;
+    bool competitionEnabled_;
+
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
-    
+
     // Active memory traces
     std::vector<size_t> activeTraces_;
-    
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
-    // Winner neurons (for competition)
+
+    // Enhanced recurrent connections with weights
+    std::vector<std::tuple<NeuronId, NeuronId, float>> maintenanceConnections_;
+
+    // Competition and attention tracking
     std::vector<NeuronId> winners_;
+
+    // Deprecated: kept for compatibility
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
 };
 
 // AttentionalSelection: Neural attention through competition
@@ -174,11 +189,11 @@ private:
     float inhibitionStrength_;
     float excitationStrength_;
     float competitionThreshold_;
-    
+
     std::vector<RegionId> attendedRegions_;
     std::vector<NeuronId> winners_;
     std::vector<float> neuronSalience_;
-    
+
     // Biases/salience stored by NeuronId for correct lookup in processCompetition
     std::unordered_map<uint64_t, float> topDownBias_;
     std::unordered_map<uint64_t, float> bottomUpSalience_;

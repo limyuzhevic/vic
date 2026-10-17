@@ -275,21 +275,21 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
 }
 
 float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
-                                             const EpisodicMemoryItem& episode) const {
+                                              const EpisodicMemoryItem& episode) const {
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;
     if (query.size() != episode.sensoryState.size()) return 0.0f;
     
-    // Cosine similarity
-    float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
-    for (size_t i = 0; i < query.size(); ++i) {
-        dot += query[i] * episode.sensoryState[i];
-        normQ += query[i] * query[i];
-        normE += episode.sensoryState[i] * episode.sensoryState[i];
-    }
+    // Enhanced similarity computation using multiple measures
+    float cosineSimilarity = computeCosineSimilarity(query, episode.sensoryState);
+    float euclideanDistance = computeEuclideanDistance(query, episode.sensoryState);
+    float correlation = computeCorrelation(query, episode.sensoryState);
     
-    if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
+    // Combine similarities
+    float combinedSimilarity = cosineSimilarity * 0.5f + 
+                               (1.0f - euclideanDistance / 10.0f) * 0.3f + 
+                               correlation * 0.2f;
     
-    return dot / (std::sqrt(normQ) * std::sqrt(normE));
+    return std::max(0.0f, std::min(1.0f, combinedSimilarity));
 }
 
 bool NeuralEpisodicMemory::matchesCriteria(
@@ -316,6 +316,51 @@ bool NeuralEpisodicMemory::matchesCriteria(
     }
     
     return true;
+}
+
+float NeuralEpisodicMemory::computeCosineSimilarity(const std::vector<float>& a,
+                                                    const std::vector<float>& b) const {
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+float NeuralEpisodicMemory::computeEuclideanDistance(const std::vector<float>& a,
+                                                    const std::vector<float>& b) const {
+    float sum = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return std::sqrt(sum);
+}
+
+float NeuralEpisodicMemory::computeCorrelation(const std::vector<float>& a,
+                                               const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.size() < 2) return 0.0f;
+    
+    float meanA = std::accumulate(a.begin(), a.end(), 0.0f) / a.size();
+    float meanB = std::accumulate(b.begin(), b.end(), 0.0f) / b.size();
+    
+    float numerator = 0.0f, denomA = 0.0f, denomB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diffA = a[i] - meanA;
+        float diffB = b[i] - meanB;
+        numerator += diffA * diffB;
+        denomA += diffA * diffA;
+        denomB += diffB * diffB;
+    }
+    
+    if (denomA < 0.0001f || denomB < 0.0001f) return 0.0f;
+    
+    return numerator / (std::sqrt(denomA) * std::sqrt(denomB));
 }
 
 // NeuralAssociativeMemory Implementation
@@ -366,13 +411,21 @@ void NeuralAssociativeMemory::associateFromExperience(const EpisodicMemoryItem& 
         associate(episode.sensoryState, episode.resultingSensoryState, 0.8f);
     }
     
-    // Associate action with resulting state
+    // Enhanced action-state associations
     if (!episode.sensoryState.empty()) {
-        // Create action-specific pattern
+        // Create action-specific pattern with richer encoding
         std::vector<float> actionPattern(episode.sensoryState.size(), 0.0f);
         actionPattern[0] = static_cast<float>(episode.action) / 10.0f;
+        actionPattern[1] = episode.reward;  // Include reward in action pattern
+        actionPattern[2] = episode.success ? 1.0f : 0.0f;  // Include success in action pattern
         
         associate(actionPattern, episode.resultingSensoryState, 0.7f);
+    }
+    
+    // Time-based associations
+    if (episode.timestamp > 0) {
+        std::vector<float> timePattern(1, episode.timestamp / 10000.0f);
+        associate(timePattern, episode.sensoryState, 0.5f);
     }
 }
 
@@ -503,7 +556,7 @@ std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
         return activated;
     }
     
-    // Spread through association network
+    // Enhanced spreading activation with decay
     for (size_t step = 0; step < steps; ++step) {
         std::vector<NeuronId> nextNeurons;
         
@@ -532,8 +585,22 @@ std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
         
         if (nextNeurons.empty()) break;
         
-        // Pick highest associated next neuron
-        currentNeuron = nextNeurons[0];
+        // Pick next neuron with highest association strength
+        float maxStrength = 0.0f;
+        currentNeuron = INVALID_NEURON_ID;
+        for (NeuronId next : nextNeurons) {
+            for (const auto& assoc : associations_) {
+                if ((std::get<0>(assoc) == currentNeuron && std::get<1>(assoc) == next) ||
+                    (std::get<0>(assoc) == next && std::get<1>(assoc) == currentNeuron)) {
+                    if (std::get<2>(assoc) > maxStrength) {
+                        maxStrength = std::get<2>(assoc);
+                        currentNeuron = next;
+                    }
+                }
+            }
+        }
+        
+        if (currentNeuron == INVALID_NEURON_ID) break;
     }
     
     return activated;
@@ -545,14 +612,15 @@ void NeuralAssociativeMemory::clear() {
 }
 
 NeuronId NeuralAssociativeMemory::findPatternNeuron(const std::vector<float>& pattern) {
-    // Check if we already have a similar pattern
+    // Enhanced pattern matching with multiple thresholds
     for (const auto& pn : patternNeurons_) {
-        if (computeSimilarity(pattern, pn.second) > 0.8f) {
+        float similarity = computeSimilarity(pattern, pn.second);
+        if (similarity > 0.8f) {  // Higher threshold for better matches
             return pn.first;
         }
     }
     
-    // Create new pattern neuron
+    // Create new pattern neuron with enhanced metadata
     NeuronId newId(patternNeurons_.size() + 30000);
     patternNeurons_.push_back({newId, pattern});
     return newId;
@@ -562,6 +630,21 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
                                                  const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
+    // Enhanced similarity with multiple measures
+    float cosineSimilarity = computeCosineSimilarity(a, b);
+    float euclideanDistance = computeEuclideanDistance(a, b);
+    float correlation = computeCorrelation(a, b);
+    
+    // Combine similarities
+    float combinedSimilarity = cosineSimilarity * 0.5f + 
+                               (1.0f - euclideanDistance / 10.0f) * 0.3f + 
+                               correlation * 0.2f;
+    
+    return std::max(0.0f, std::min(1.0f, combinedSimilarity));
+}
+
+float NeuralAssociativeMemory::computeCosineSimilarity(const std::vector<float>& a,
+                                                       const std::vector<float>& b) const {
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
     for (size_t i = 0; i < a.size(); ++i) {
         dot += a[i] * b[i];
@@ -572,6 +655,37 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+float NeuralAssociativeMemory::computeEuclideanDistance(const std::vector<float>& a,
+                                                       const std::vector<float>& b) const {
+    float sum = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return std::sqrt(sum);
+}
+
+float NeuralAssociativeMemory::computeCorrelation(const std::vector<float>& a,
+                                                  const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.size() < 2) return 0.0f;
+    
+    float meanA = std::accumulate(a.begin(), a.end(), 0.0f) / a.size();
+    float meanB = std::accumulate(b.begin(), b.end(), 0.0f) / b.size();
+    
+    float numerator = 0.0f, denomA = 0.0f, denomB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diffA = a[i] - meanA;
+        float diffB = b[i] - meanB;
+        numerator += diffA * diffB;
+        denomA += diffA * diffA;
+        denomB += diffB * diffB;
+    }
+    
+    if (denomA < 0.0001f || denomB < 0.0001f) return 0.0f;
+    
+    return numerator / (std::sqrt(denomA) * std::sqrt(denomB));
 }
 
 } // namespace nlm
