@@ -6,9 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
@@ -134,12 +131,26 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
         .export_values();
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
@@ -203,6 +214,52 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<ActionType>(), py::arg("type"))
         .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
         .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getParameters", &Action::getParameters)
+        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("getName", &Action::getName)
+        .def("clone", &Action::clone);
+
+    // Add Phase6Config structure for Python
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Phase 6 experiment configuration)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath)
+        .def("__repr__", [](const Phase6Config& config) {
+            return "<Phase6Config: neurons=" + std::to_string(config.neuronCount) + 
+                   " steps=" + std::to_string(config.maxSteps) + ">";
+        });
+
+    // Add Phase6IntegrationResult structure for Python
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Phase 6 integration test result)pbdoc")
+        .def(py::init<>())
+        .def_readonly("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readonly("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readonly("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readonly("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readonly("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readonly("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readonly("replayWorks", &Phase6IntegrationResult::replayWorks)
+        .def_readonly("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readonly("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readonly("avgSynapticWeight", &Phase6IntegrationResult::avgSynapticWeight)
+        .def_readonly("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readonly("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readonly("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readonly("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readonly("startTime", &Phase6IntegrationResult::startTime)
+        .def_readonly("endTime", &Phase6IntegrationResult::endTime)
+        .def_readonly("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime)
+        .def("__repr__", [](const Phase6IntegrationResult& result) {
+            return "<Phase6IntegrationResult: reward=" + std::to_string(result.totalReward) + 
+                   " integration_ok=" + std::to_string(result.memoryWorkingMemoryIntegrated) + "...>";
+        });
         .def("setType", &Action::setType, py::arg("type"))
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
@@ -412,9 +469,34 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createPhase6Config", []() -> Phase6Config {
+        Phase6Config config;
+        return config;
+    }, "Create a default Phase 6 experiment configuration");
+
+    m.def("createPhase6Config", [](uint64_t maxSteps, size_t neuronCount, bool enableCheckpointing, 
+                                 bool enableReplay, bool enableDevelopment) -> Phase6Config {
+        Phase6Config config;
+        config.maxSteps = maxSteps;
+        config.neuronCount = neuronCount;
+        config.enableCheckpointing = enableCheckpointing;
+        config.enableReplay = enableReplay;
+        config.enableDevelopment = enableDevelopment;
+        return config;
+    }, py::arg("maxSteps") = 10000, py::arg("neuronCount") = 1000,
+       py::arg("enableCheckpointing") = true, py::arg("enableReplay") = true,
+       py::arg("enableDevelopment") = true, "Create a Phase 6 experiment configuration with custom settings");
+
+    // Add convenience functions for running experiments
+    m.def("runPhase6IntegrationTest", [](Phase6Config config) -> Phase6IntegrationResult {
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("config"), "Run Phase 6 integration test with custom configuration");
+
+    m.def("verifyPhase6Integration", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.verifyIntegration();
+    }, "Run quick integration verification for Phase 6");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
