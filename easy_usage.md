@@ -42,10 +42,11 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Enhanced)
 
 ```python
 import pynlm
+import random
 
 # Create everything
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
@@ -58,7 +59,13 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Run for 50 steps
+# Enable advanced learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run for 50 steps with learning
 for step in range(50):
     world.update(0.1)  # Update world
     percept = world.getSensoryPercept()  # What does the agent see?
@@ -69,6 +76,113 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+print("Curiosity level:", agent.getCuriosityLevel())
+print("Development stage:", brain.getDevelopmentalStage())
+```
+
+### Example 3: Complete Learning Simulation
+
+```python
+import pynlm
+
+def run_learning_simulation(num_steps=500):
+    """Run a complete learning simulation with agent and world."""
+    
+    # Create configuration with custom parameters
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 200)  # Smaller for faster testing
+    config.set("brain.connection_probability", 0.1)
+    
+    # Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(7.5, 7.5)
+    
+    # Initialize agent with world
+    agent.initialize(world)
+    
+    # Enable learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    # Track learning progress
+    learning_history = {
+        'rewards': [],
+        'curiosity': [],
+        'novelty': [],
+        'development': []
+    }
+    
+    # Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        action = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation based on agent's experience
+        reward = agent.getNeuromodulationLevel() * 10.0f  # Scale dopamine to reward
+        agent.applyRewardModulation(reward, 0.0f)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Record learning metrics
+        if step % 10 == 0:
+            learning_history['rewards'].append(reward)
+            learning_history['curiosity'].append(agent.getCuriosityLevel())
+            learning_history['novelty'].append(agent.getNoveltyLevel())
+            learning_history['development'].append(brain.getDevelopmentalStage())
+            
+            # Print progress every 100 steps
+            if step % 100 == 0:
+                print(f"Step {step}:")
+                print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                print(f"  Development stage: {brain.getDevelopmentalStage()}")
+                print(f"  Reward signal: {reward:.3f}")
+    
+    print("\nLearning Simulation Complete!")
+    
+    # Calculate statistics
+    avg_reward = sum(learning_history['rewards']) / len(learning_history['rewards'])
+    final_curiosity = learning_history['curiosity'][-1]
+    
+    print(f"Final Statistics:")
+    print(f"  Average reward per 10 steps: {avg_reward:.3f}")
+    print(f"  Final curiosity level: {final_curiosity:.3f}")
+    print(f"  Total simulation steps: {num_steps}")
+    print(f"  Brain spike count: {brain.getTotalSpikeCount()}")
+    print(f"  Final developmental stage: {brain.getDevelopmentalStage()}")
+    
+    return learning_history
+
+# Run the simulation
+print("Starting Learning Simulation...")
+results = run_learning_simulation(500)
 ```
 
 ---

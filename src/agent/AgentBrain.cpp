@@ -76,16 +76,37 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    size_t totalSize = 256 + 8 + 4 + 6;
+    
+    // Safety check - ensure we have all required sensory neuron groups
+    size_t actualSize = 0;
+    actualSize += sensoryVision_.size() * 256;  // Each vision neuron handles 256 values
+    actualSize += sensoryTouch_.size() * 8;     // Each touch neuron handles 8 values  
+    actualSize += sensoryInternal_.size() * 4;  // Each internal neuron handles 4 values
+    actualSize += sensoryProprioception_.size() * 6;  // Each proprioception neuron handles 6 values
+    
+    // Use the actual size if we have neurons, otherwise fall back to expected size
+    if (actualSize > 0) {
+        return actualSize;
+    }
+    return totalSize;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // Count actual motor neurons
+    size_t actualSize = motorForward_.size() + motorBackward_.size() + 
+                       motorTurnLeft_.size() + motorTurnRight_.size() +
+                       motorInteract_.size() + motorWait_.size();
+    
+    // Return actual count or fallback to expected 6 if no neurons configured
+    return actualSize > 0 ? actualSize : 6;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARN("Cannot process sensory input: brain_ is null");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -167,13 +188,19 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
+        size_t validNeurons = 0;
+        
         for (Neuron* n : neurons) {
+            if (!n) continue;  // Safety check for null pointers
+            validNeurons++;
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
-        return sum / neurons.size();
+        
+        if (validNeurons == 0) return 0.0f;
+        return sum / validNeurons;
     };
-    
+
     float forwardAct = calcActivity(motorForward_);
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
@@ -181,7 +208,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Find maximum activity with threshold filtering
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -194,19 +221,28 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
     
+    // Filter out weak commands below threshold
+    const float activityThreshold = 0.3f;  // Minimum activity to consider
+    bool hasStrongCommand = false;
+    
     for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
+        if (c.activity > bestActivity && c.activity >= activityThreshold) {
             bestActivity = c.activity;
             best = c.cmd;
+            hasStrongCommand = true;
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity above threshold
+    if (hasStrongCommand) {
+        return best;
+    } else {
+        // If no strong command, return wait but keep track of why
+        if (bestActivity < activityThreshold) {
+            NLM_LOG_DEBUG("No strong motor command detected (best: " + std::to_string(bestActivity) + ")");
+        }
         return MotorCommand::Wait;
     }
-    
-    return best;
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {

@@ -145,24 +145,62 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file", py::return_value_policy::reference_internal)
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file", py::return_value_policy::reference_internal)
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists", py::return_value_policy::reference_internal)
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys", py::return_value_policy::reference_internal)
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries", py::return_value_policy::reference_internal)
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (user source)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (user source)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (user source)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (user source)")
+        .def("get", [](const Config& self, const std::string& key) {
+            std::string value;
+            if (self.get(key, value)) return value;
+            throw py::key_error("Key not found: '" + key + "'");
+        }, py::arg("key"), "Get configuration value as string")
+        .def("get", [](const Config& self, const std::string& key) {
+            int64_t value;
+            if (self.get(key, value)) return value;
+            throw py::key_error("Key not found: '" + key + "'");
+        }, py::arg("key"), "Get configuration value as int")
+        .def("get", [](const Config& self, const std::string& key) {
+            float value;
+            if (self.get(key, value)) return value;
+            throw py::key_error("Key not found: '" + key + "'");
+        }, py::arg("key"), "Get configuration value as float")
+        .def("get", [](const Config& self, const std::string& key) {
+            double value;
+            if (self.get(key, value)) return value;
+            throw py::key_error("Key not found: '" + key + "'");
+        }, py::arg("key"), "Get configuration value as double")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key", py::return_value_policy::reference_internal);
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -400,21 +438,147 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Create advanced brain with custom development profile
+    m.def("createAdvancedBrain", [](std::shared_ptr<Config> config, const std::string& developmentProfile, 
+                                  bool enableRewardModulation, bool enableCuriosity, 
+                                  bool enableStructuralPlasticity, bool enableDevelopment) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        
+        agentBrain->enableRewardModulation(enableRewardModulation);
+        agentBrain->enableCuriosity(enableCuriosity);
+        agentBrain->enableStructuralPlasticity(enableStructuralPlasticity);
+        agentBrain->enableDevelopment(enableDevelopment);
+        
+        return std::make_tuple(brain, agentBrain);
+    }, py::arg("config"), py::arg("developmentProfile") = "normal",
+       py::arg("enableRewardModulation") = true,
+       py::arg("enableCuriosity") = true,
+       py::arg("enableStructuralPlasticity") = true,
+       py::arg("enableDevelopment") = true,
+       "Create an advanced brain with custom development profile and enabled subsystems");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Complete simulation with automatic reset and statistics
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agentBrain, 
+                           std::shared_ptr<SimpleWorld> world, int numSteps,
+                           bool logProgress, bool enableLearning) {
+        if (!brain || !agentBrain || !world) {
+            throw std::runtime_error("Invalid parameters: brain, agentBrain, and world must not be null");
+        }
+        
+        agentBrain->enableRewardModulation(enableLearning);
+        agentBrain->enableCuriosity(enableLearning);
+        
+        double totalReward = 0.0;
+        int successfulActions = 0;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agentBrain->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agentBrain->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (enableLearning) {
+                float reward = 0.0f;
+                if (world->getSensoryPercept().getInternal() && !world->getSensoryPercept().getInternal()->empty()) {
+                    reward = world->getSensoryPercept().getInternal()->at(0);
+                }
+                agentBrain->applyRewardModulation(reward, 0.0f);
+                totalReward += reward;
+                
+                if (reward > 0.0f) successfulActions++;
+            }
+            
+            if (logProgress && (step % 100 == 0)) {
+                std::cout << "Step " << step << ": "
+                         << "Neurons: " << brain->getFiringNeuronCount() << ", "
+                         << "Curiosity: " << agentBrain->getCuriosityLevel() << ", "
+                         << "Novelty: " << agentBrain->getNoveltyLevel() << ", "
+                         << "Reward: " << reward << std::endl;
+            }
+        }
+        
+        std::cout << "Simulation completed: " << numSteps << " steps" << std::endl;
+        std::cout << "Total reward: " << totalReward << ", "
+                 << "Successful actions: " << successfulActions << ", "
+                 << "Success rate: " << (successfulActions * 100.0 / numSteps) << "%" << std::endl;
+        
+        return std::make_tuple(totalReward, successfulActions);
+    }, py::arg("brain"), py::arg("agentBrain"), py::arg("world"), py::arg("numSteps") = 1000,
+       py::arg("logProgress") = false, py::arg("enableLearning") = true,
+       "Run a complete simulation with agent and world interaction");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // High-performance simulation with batch processing
+    m.def("runBatchSimulations", [](int numSimulations, int stepsPerSimulation, 
+                                  const std::string& profile) {
+        std::vector<double> totalRewards;
+        std::vector<int> successfulActions;
+        
+        for (int sim = 0; sim < numSimulations; ++sim) {
+            auto config = std::make_shared<Config>();
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(10, 10, 8, 8);
+            world->reset();
+            
+            auto agentBrain = std::make_shared<AgentBrain>(brain);
+            agentBrain->initialize(*world);
+            agentBrain->enableRewardModulation(true);
+            agentBrain->enableCuriosity(true);
+            
+            double simReward = 0.0;
+            int simSuccessful = 0;
+            
+            for (int step = 0; step < stepsPerSimulation; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agentBrain->processSensoryInput(percept);
+                brain->step(step);
+                
+                auto action = agentBrain->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                float reward = 0.0f;
+                if (world->getSensoryPercept().getInternal() && !world->getSensoryPercept().getInternal()->empty()) {
+                    reward = world->getSensoryPercept().getInternal()->at(0);
+                }
+                agentBrain->applyRewardModulation(reward, 0.0f);
+                simReward += reward;
+                if (reward > 0.0f) simSuccessful++;
+            }
+            
+            totalRewards.push_back(simReward);
+            successfulActions.push_back(simSuccessful);
+        }
+        
+        double avgReward = 0.0;
+        double avgSuccess = 0.0;
+        for (double reward : totalRewards) avgReward += reward;
+        for (int actions : successfulActions) avgSuccess += actions;
+        
+        if (numSimulations > 0) {
+            avgReward /= numSimulations;
+            avgSuccess /= numSimulations;
+        }
+        
+        std::cout << "Batch simulation results (" << numSimulations << " runs, " 
+                 << stepsPerSimulation << " steps each):" << std::endl;
+        std::cout << "Average reward per step: " << avgReward << std::endl;
+        std::cout << "Average successful actions: " << avgSuccess << std::endl;
+        std::cout << "Average success rate: " << (avgSuccess * 100.0 / stepsPerSimulation) << "%" << std::endl;
+        
+        return std::make_tuple(totalRewards, successfulActions);
+    }, py::arg("numSimulations") = 5, py::arg("stepsPerSimulation") = 100,
+       py::arg("profile") = "balanced",
+       "Run multiple simulations in batch for statistical analysis");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
