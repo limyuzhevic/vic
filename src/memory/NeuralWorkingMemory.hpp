@@ -71,22 +71,25 @@ public:
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
 
-    // Get overall memory activity level
+// Get overall memory activity level
     float getMemoryActivity() const;
+    
+    // Rehearse winning memories to strengthen them
+    void runRehearsal();
 
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
+    
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
-
+    
     // Decay weak memory traces
     void decayWeakTraces();
-
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t capacity_;
     float decayRate_;

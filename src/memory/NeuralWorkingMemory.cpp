@@ -36,30 +36,25 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+    // Store pattern in working memory traces
+    // This is simplified - real implementation would encode pattern as distributed neural activity
+    if (pattern.size() <= memoryNeurons_.size()) {
+        for (size_t i = 0; i < pattern.size(); ++i) {
+            NeuronId neuron = memoryNeurons_[i];
+            float activation = pattern[i] * strength;
+            
+            // Update stored activation
+            if (i < memoryActivations_.size()) {
+                memoryActivations_[i] = activation;
+                memoryTimestamps_[i] = 0;
+            } else {
+                memoryActivations_.push_back(activation);
+                memoryTimestamps_.push_back(0);
+                memoryNeurons_.push_back(neuron);
             }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            
+            // Inject current to maintain activation
+            brain_->injectCurrent(neuron, activation * 5.0f);
         }
     }
     
@@ -128,12 +123,34 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Check if trace needs consolidation
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
+                
+                // If still above threshold, consolidate to episodic memory
+                if (activation > 0.5f && episodicMemory_) {
+                    // Create a simple episodic memory entry
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = 0; // Would need current step
+                    episode.activeNeurons.push_back(neuron);
+                    episode.neuronActivations.push_back(activation);
+                    episode.reward = 0.5f;  // Would need dopamine level
+                    
+                    episodicMemory_->storeEpisode(episode);
+                }
             }
             
             memoryActivations_[i] = activation;
+        }
+    }
+    
+    // Enhanced decay based on neuromodulators
+    if (novelty_) {
+        // Novelty accelerates decay of old traces
+        for (size_t i = 0; i < memoryTimestamps_.size(); ++i) {
+            if (memoryTimestamps_[i] > 500) {  // Old traces
+                memoryActivations_[i] *= 0.98f;
+            }
         }
     }
     
@@ -142,6 +159,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Rehearsal of winning memories
+    runRehearsal();
 }
 
 void NeuralWorkingMemory::clear() {
@@ -183,44 +203,60 @@ void NeuralWorkingMemory::runCompetition() {
     }
 }
 
-bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
+void NeuralWorkingMemory::runCompetition() {
+    winners_.clear();
     
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
-    }
-    return total / memoryActivations_.size();
-}
-
-void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
+    if (memoryActivations_.empty()) return;
+    
+    // Find neurons with above-threshold activation
+    float threshold = 0.3f;
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] >= threshold) {
+            winners_.push_back(memoryNeurons_[i]);
+        }
     }
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
-}
-
-void NeuralWorkingMemory::updateRecurrentConnections() {
-    // Apply maintenance currents through recurrent connections
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        float fromActivation = 0.0f;
+    // Inhibitory competition - suppress non-winners
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
-        // Find from neuron activation
-        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
-        if (it != memoryNeurons_.end()) {
-            size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+        if (!isWinner && brain_) {
+            // Apply strong inhibition
+            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::runRehearsal() {
+    if (winners_.empty() || !episodicMemory_) return;
+    
+    // Rehearse winning memories by replaying them
+    for (const auto& winner : winners_) {
+        // Find winner activation
+        float winnerActivation = 0.0f;
+        size_t winnerIdx = 0;
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            if (memoryNeurons_[i] == winner) {
+                winnerActivation = memoryActivations_[i];
+                winnerIdx = i;
+                break;
+            }
         }
         
-        if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+        if (winnerActivation > 0.5f) {
+            // Create a rehearsal episode
+            EpisodicMemoryItem rehearsalEpisode;
+            rehearsalEpisode.timestamp = memoryTimestamps_[winnerIdx] / 100;  // Scale
+            rehearsalEpisode.activeNeurons.push_back(winner);
+            rehearsalEpisode.neuronActivations.push_back(winnerActivation);
+            rehearsalEpisode.reward = 0.5f;
+            
+            // Store rehearsal episode
+            episodicMemory_->storeEpisode(rehearsalEpisode);
+            
+            // Apply rehearsal to strengthen memory
+            strengthenMemory(1.05f);
         }
     }
 }

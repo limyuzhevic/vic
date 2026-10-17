@@ -318,7 +318,7 @@ bool NeuralEpisodicMemory::matchesCriteria(
     return true;
 }
 
-// NeuralAssociativeMemory Implementation
+} // namespace nlm
 struct NeuralAssociativeMemory::Impl {
     Brain* brain;
     
