@@ -64,6 +64,7 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
+    size_t firingNeuronsThisStep;  // Track neurons that fired this step
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -88,6 +89,7 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , firingNeuronsThisStep(0)  // Track neurons that fired this step
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
@@ -328,6 +330,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    pImpl->firingNeuronsThisStep = 0;  // Track neurons that fired this step
+    
+    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -353,6 +359,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
+                    ++pImpl->firingNeuronsThisStep;  // Count neuron that fired
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
@@ -991,7 +998,7 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    return pImpl->firingNeuronsThisStep;
 }
 
 float Brain::getAverageFiringRate() const {

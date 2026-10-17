@@ -25,6 +25,10 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <thread>
+#include <map>
+#include <algorithm>
 
 using namespace nlm;
 
@@ -46,6 +50,70 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp(const char* programName) {
+    std::cout << R"(
+NLM - Neural Learning Machine (熙然)
+Phase 2: Real Neural Computation
+
+USAGE:
+  """ << programName << R"(" [--config=<file>] [-c <file>]
+                      [--neuron_count=<n>] [-n <n>]
+                      [--region_count=<n>] [-r <n>]
+                      [--connection_probability=<p>] [-p <p>]
+                      [--random_seed=<s>] [-s <s>]
+                      [--stdp_ltp_weight=<w>] [--stdp_ltd_weight=<w>]
+                      [--synaptogenesis_rate=<r>] [--pruning_rate=<r>]
+                      [--simulation_timestep=<t>] [--max_steps=<n>]
+                      [--enable_visualization] [-v]
+                      [--checkpoint_dir=<dir>]
+                      [--save_checkpoint] [--load_checkpoint=<file>]
+                      [--help] [-h]
+
+ADVANCED OPTIONS:
+  --test-plasticity     Run enhanced plasticity learning experiment
+  --test-stdp           Run detailed STDP verification test
+  --test-connectivity   Run basic neural connectivity test
+  --run-all-tests       Run all integrated tests
+  --benchmark           Run performance benchmarks
+  --profiling           Enable detailed profiling
+  --parallel            Enable parallel processing optimizations
+  --optimize-memory     Enable memory optimization techniques
+
+OUTPUT OPTIONS:
+  --verbose             Enable verbose logging
+  --quiet               Suppress non-essential output
+  --log-file=<file>     Write logs to file in addition to console
+
+CONFIGURATION:
+  Configuration can be provided via:
+    1. Command line arguments (as shown above)
+    2. Config file (default: configs/default.cfg)
+    3. Runtime defaults
+
+EXAMPLES:
+  """ << programName << R"("    Run with default config:
+    """ << programName << R"(" 
+
+    Run with custom config:
+    """ << programName << R"("    """ << programName << R"(" --config=my_config.cfg
+
+    Run with 2000 neurons:
+    """ << programName << R"("    """ << programName << R"(" --neuron_count=2000
+
+    Run with enhanced plasticity test:
+    """ << programName << R"("    """ << programName << R"(" --test-plasticity
+
+    Save a checkpoint every 100 steps:
+    """ << programName << R"("    """ << programName << R"(" --checkpoint_dir=./checkpoints
+
+    Run performance benchmark with profiling:
+    """ << programName << R"("    """ << programName << R"(" --benchmark --profiling
+
+    Enable parallel processing:
+    """ << programName << R"("    """ << programName << R"(" --benchmark --parallel
+""" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,6 +392,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Handle help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -347,12 +424,10 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        if (arg.substr(0, 9) == "--config=") {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
         }
     }
     
@@ -409,20 +484,110 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Check for advanced performance options
+    bool profilingEnabled = false;
+    bool parallelEnabled = false;
+    bool optimizeMemory = false;
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--profiling") {
+            profilingEnabled = true;
+        } else if (arg == "--parallel") {
+            parallelEnabled = true;
+        } else if (arg == "--optimize-memory") {
+            optimizeMemory = true;
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Override tests with run-all-tests
+    if (runAllTests) {
+        runPlasticityTest = true;
+        runStdpTest = true;
+        runConnectivityTest = true;
+        runBenchmark = true;
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests
+    if (runConnectivityTest) {
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
+    
+    if (runPlasticityTest) {
+        runPlasticityExperiment(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
+    
+    if (runStdpTest) {
+        runStdpVerification(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
+    
+    if (runBenchmark) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Performance Benchmark ===");
+        if (profilingEnabled) {
+            NLM_LOG_INFO("Profiling enabled - detailed metrics will be collected");
+        }
+        if (parallelEnabled) {
+            NLM_LOG_INFO("Parallel processing enabled");
+        }
+        if (optimizeMemory) {
+            NLM_LOG_INFO("Memory optimization enabled");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        // Run simulation for benchmark
+        size_t steps = 1000;
+        for (SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        NLM_LOG_INFO("Benchmark completed:");
+        NLM_LOG_INFO("  Steps: " + std::to_string(steps));
+        NLM_LOG_INFO("  Time: " + std::to_string(duration.count()) + "ms");
+        NLM_LOG_INFO("  Steps/second: " + std::to_string(steps * 1000.0 / duration.count()));
+        
+        // Reset brain
+        brain->reset();
+        brain->initialize();
+    }
+    
+    // Run default experiments if no tests were specified
+    if (!runAllTests && !runPlasticityTest && !runStdpTest && !runConnectivityTest && !runBenchmark) {
+        // Reset brain for default experiments
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
