@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>  // For std::hash
 
 namespace nlm {
 
@@ -190,3 +191,36 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Hash specializations for ID types used in std::unordered_map
+namespace std {
+
+template<>
+struct hash<nlm::NeuronId> {
+    size_t operator()(const nlm::NeuronId& id) const {
+        return hash<uint64_t>()(id.value);
+    }
+};
+
+template<>
+struct hash<nlm::SynapseId> {
+    size_t operator()(const nlm::SynapseId& id) const {
+        return hash<uint64_t>()(id.value);
+    }
+};
+
+template<>
+struct hash<nlm::RegionId> {
+    size_t operator()(const nlm::RegionId& id) const {
+        return hash<uint64_t>()(id.value);
+    }
+};
+
+template<>
+struct hash<nlm::PopulationId> {
+    size_t operator()(const nlm::PopulationId& id) const {
+        return hash<uint64_t>()(id.value);
+    }
+};
+
+} // namespace std

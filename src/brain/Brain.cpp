@@ -6,9 +6,8 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -412,9 +411,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update curiosity with novelty, prediction error, and timestep
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionError) {
+        float novelty = pImpl->novelty->getLevel();
+        float predictionError = pImpl->predictionError->getError();
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
