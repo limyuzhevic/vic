@@ -488,7 +488,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store sensory state (simplified - would get from sensory system)
+            episode.sensoryState = std::vector<float>(10, 0.0f);  // Placeholder
+            
+            // Store location (simplified - would get from world)
+            episode.positionX = 0.0f;  // Placeholder
+            episode.positionY = 0.0f;  // Placeholder
+            episode.orientation = 0.0f;  // Placeholder
+            
+            // Store action (get from planned action)
+            episode.action = ActionType::Wait;
+            
+            // Store energy (simplified)
+            episode.energy = 0.5f;
+            
+            // Store novelty (from novelty detector)
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +519,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store resulting sensory state (would get from next step)
+            episode.resultingSensoryState = episode.sensoryState;  // Same for now
+            episode.resultingReward = episode.reward;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +529,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity for sensory prediction
+        // Integrate prediction with working memory patterns
+        std::vector<float> currentActivity;
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                currentActivity.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        if (!currentActivity.empty()) {
+            pImpl->predictionSystem->updatePrediction(currentActivity);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +557,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process working memory patterns and episodic memory to form concepts
+        // Integrate with prediction system for error-driven learning
+        std::vector<float> workingMemoryPattern;
+        if (pImpl->workingMemory) {
+            workingMemoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!workingMemoryPattern.empty()) {
+            pImpl->conceptFormation->processPattern(workingMemoryPattern);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -574,12 +611,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Development also affects neuromodulation and memory consolidation
+        if (pImpl->dopamine) {
+            // More dopamine during development to encourage exploration
+            float developmentalDopamine = pImpl->dopamine->getLevel() * (1.0f + stage);  // More in earlier stages
+            pImpl->dopamine->setLevel(developmentalDopamine);
+        }
+        
+        if (pImpl->attention) {
+            // Adjust attention during development - more exploration in early stages
+            float attentionStrength = (stage == DevelopmentalStage::Initial || stage == DevelopmentalStage::CriticalPeriod) ? 2.0f : 1.0f;
+            pImpl->attention->setExcitationStrength(attentionStrength);
+        }
+        
+        // Update memory consolidation intervals during development
+        if (currentStep % 2000 == 0) {
+            pImpl->replayInterval = (stage == DevelopmentalStage::Initial || stage == DevelopmentalStage::CriticalPeriod) ? 50 : 100;
+            pImpl->consolidationInterval = (stage == DevelopmentalStage::Initial || stage == DevelopmentalStage::CriticalPeriod) ? 500 : 1000;
+        }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Also update working memory - decay and rehearse strong traces
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->strengthenMemory(1.1f);  // Gently reinforce strong traces
+        }
+        
+        // Neuromodulation-based consolidation
+        if (pImpl->dopamine) {
+            // Dopamine strengthens recent memories (reward-modulated consolidation)
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            if (dopamineLevel > 0.5f) {
+                // Get recent episodes and update their relevance
+                auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+                for (const auto* episode : recentEpisodes) {
+                    // Recent episodes are more likely to be consolidated
+                    pImpl->episodicMemory->updateRelevance(episode->timestamp, 0.5f * dopamineLevel);
+                }
+            }
+        }
+        
+        if (pImpl->attention) {
+            // Attention modulates which memories get consolidated
+            auto winners = pImpl->attention->getWinners();
+            for (const auto& winnerId : winners) {
+                // Find and strengthen winning neural patterns in episodic memory
+                pImpl->episodicMemory->updateRelevance(winnerId.getId(), 0.3f);
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -690,9 +774,32 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using NeuralPlanner when available
+    // If NeuralPlanner is active, use it for intelligent action planning
+    if (pImpl->planner) {
+        // Get current neural state for planning
+        std::vector<float> currentState;
+        for (const auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (const auto* neuron : neurons) {
+                currentState.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Use NeuralPlanner to select the best action
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Create action with confidence feedback
+        auto action = std::make_unique<Action>(plannedAction);
+        
+        // Update planner based on actual neural state
+        pImpl->planner->updatePlanQuality({}, {}, 0.0f);  // Will be updated by AgentBrain
+        
+        return action;
+    }
     
+    // Fallback to simple motor neuron activity-based selection
+    // The motor neuron population with highest average activity determines action
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -712,7 +819,6 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
-    
     return action;
 }
 

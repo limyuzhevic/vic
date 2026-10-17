@@ -1,44 +1,34 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
-#include <iostream>
-#include <cassert>
-
-// Forward declarations of test functions
-namespace test_types {
-    void runAll();
-}
-
-namespace test_config {
-    void runAll();
-}
-
-namespace test_random {
-    void runAll();
-}
-
-namespace test_clock {
-    void runAll();
-}
-
-namespace test_neuron {
-    void runAll();
-}
-
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
 namespace test_brain {
     void runAll();
 }
 
-int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+namespace test_memory {
+    void runAllMemoryTests();
+}
+
+int main(int argc, char** argv) {
+    // Check if we should run memory tests
+    bool runMemoryTests = false;
+    if (argc > 1 && std::string(argv[1]) == "--memory") {
+        runMemoryTests = true;
+    }
+    
+    if (runMemoryTests) {
+        // Run memory tests
+        std::cout << "=== NLM Memory System Tests (Phase 6) ===" << std::endl;
+        std::cout << "Testing integrated memory systems and learning..." << std::endl;
+        std::cout << std::endl;
+        
+        try {
+            test_memory::runAllMemoryTests();
+            return 0;
+        } catch (const std::exception& e) {
+            std::cerr << "Memory test suite failed with error: " << e.what() << std::endl;
+            return 1;
+        }
+    }
+    
+    std::cout << "=== NLM Phase 2 & 6 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
@@ -121,10 +111,10 @@ int main() {
     
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== All Core Tests PASSED ===" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "=== Some Core Tests FAILED ===" << std::endl;
         return 1;
     }
 }
