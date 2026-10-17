@@ -51,13 +51,20 @@ public:
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
 
-    // Get capacity
+// Get capacity
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
-
+    
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
+    
+    // Enable persistent activity (reverberating activity)
+    void enablePersistentActivity(bool enable) {
+        // Persistent activity is always enabled in this implementation
+        // The system maintains activity through recurrent connections
+        (void)enable;  // Mark parameter as used
+    }
 
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }

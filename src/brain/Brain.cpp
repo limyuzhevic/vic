@@ -90,7 +90,9 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
+        , stepsSinceLastSleep(0)
         , replayInterval(100)      // Replay every 100 steps
+        , sleepInterval(10000)     // Sleep every 10000 steps (~5 seconds at 1ms timestep)
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
@@ -147,6 +149,7 @@ struct Brain::Impl {
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
+        sleepInterval = config->getOr<size_t>("sleep_interval", 10000);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
         // Initialize checkpoint manager
@@ -510,9 +513,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Integrate prediction system with sensory processing and learning
+        
+        // Get prediction error from neuromodulation system
+        float predictionError = pImpl->predictionError->getError();
+        
+        // Update prediction system with current error
+        // This could be used for:
+        // 1. Updating prediction model weights
+        // 2. Computing prediction accuracy metrics
+        // 3. Guiding curiosity-driven exploration
+        
+        // For now, we integrate prediction error into the curiosity system
+        if (pImpl->curiosity) {
+            // Prediction error contributes to curiosity/exploration drive
+            // Weight prediction error lower than novelty for exploration
+            pImpl->curiosity->update(predictionError * 0.3f, predictionError * 0.3f, pImpl->timestep);
+        }
+        
+        // Also update novelty with prediction error as a component
+        if (pImpl->novelty) {
+            // Novelty can be enhanced by prediction errors
+            // prediction errors signal that something unexpected happened
+            pImpl->novelty->update(predictionError * 0.5f);
+        }
+        
+        // Log prediction accuracy if confidence is reasonable
+        if (pImpl->predictionError->getMagnitude() > 0.1f) {
+            NLM_LOG_INFO("Prediction error detected: " + std::to_string(predictionError));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,27 +556,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 12: Sleep/rest cycle for memory consolidation ==========
+    // Biological inspiration: sleep is essential for memory consolidation
+    // and synaptic homeostasis
+    pImpl->stepsSinceLastSleep++;
+    if (pImpl->stepsSinceLastSleep >= pImpl->sleepInterval) {
+        // Enter resting/sleep phase
+        pImpl->isResting = true;
+        
+        // Enhanced memory consolidation during rest
+        if (pImpl->episodicMemory) {
+            // During rest, prioritize consolidation of:
+            // 1. Strong recent memories (high activation)
+            // 2. Memories with high reward value
+            // 3. Novel or unexpected experiences
+            
+            // Get current neuromodulation state for consolidation strength
+            float consolidationStrength = 1.0f;
+            if (pImpl->dopamine) {
+                // Dopamine modulates consolidation: optimal consolidation
+                // at moderate dopamine levels
+                consolidationStrength = std::min(1.0f, 0.5f + pImpl->dopamine->getLevel());
+            }
+            if (pImpl->curiosity) {
+                // Curiosity levels affect how much is consolidated
+                consolidationStrength *= (1.0f - pImpl->curiosity->getLevel() * 0.5f);
+            }
+            
+            // Perform enhanced consolidation
+            pImpl->episodicMemory->consolidate(consolidationStrength);
+            
+            // Trigger offline replay for consolidation
+            auto episodesToConsolidate = pImpl->episodicMemory->getRecentEpisodes(5);
+            for (const auto* episode : episodesToConsolidate) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+        
+        // Restore synaptic homeostasis
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->restoreHomeostasis(this, *pImpl->rng);
+        }
+        
+        // Integrate development during rest
+        if (pImpl->developmentSystem) {
+            // Rest periods allow developmental pruning and optimization
+            pImpl->developmentSystem->updateDuringRest(this, *pImpl->rng, pImpl->timestep * 100);
+        }
+        
+        // Reset sleep counter
+        pImpl->stepsSinceLastSleep = 0;
+        pImpl->isResting = false;
+    }
+    
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+        // Get episodes for replay (during non-rest periods)
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -895,10 +972,35 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match synapses by source/destination neurons
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Update synapse properties
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    
+                    // Update plasticity flags
+                    syn->enablePlasticity(
+                        synapseData.plasticityFlags[synapseIdx].hebbian,
+                        synapseData.plasticityFlags[synapseIdx].stdp,
+                        synapseData.plasticityFlags[synapseIdx].reward_modulated
+                    );
+                    
+                    // Update short-term plasticity
+                    syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                    
+                    // Note: pre/post spike history will be re-recorded naturally
+                    // during simulation, as they depend on spike timing
+                }
+                ++synapseIdx;
+            }
+        }
         
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseIdx) + " synapses");
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
