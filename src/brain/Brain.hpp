@@ -20,6 +20,7 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -153,7 +154,8 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // Advanced neural prediction system for temporal sequences
+    NeuralPrediction* getNeuralPrediction();
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
