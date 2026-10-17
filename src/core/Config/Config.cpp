@@ -1,8 +1,5 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -19,16 +16,17 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    bool hasError = false;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,10 +47,67 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
+            hasError = true;
         }
     }
     
-    return true;
+    return !hasError;
+}
+
+// Overloaded set method for string values
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty key");
+        return;
+    }
+    
+    // Validate key name (alphanumeric + underscores)
+    bool validKey = true;
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-') {
+            validKey = false;
+            break;
+        }
+    }
+    
+    if (!validKey) {
+        NLM_LOG_WARNING("Config key \"" + key + "\" contains unusual characters");
+    }
+    
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty key");
+        return;
+    }
+    
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty key");
+        return;
+    }
+    
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty key");
+        return;
+    }
+    
+    set(key, ConfigValue(value), source);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -66,6 +121,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg);
             }
         }
         // Handle -key value format
@@ -73,6 +130,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_WARNING("Invalid command line argument: " + arg);
         }
     }
     return true;
@@ -81,12 +140,35 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file for writing: " + filepath);
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << "PLACEHOLDER_TIMESTAMP" << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description if present
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key and value
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -186,17 +268,139 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validateKey(const std::string& key, const std::string& expectedType) const {
+    if (!has(key)) {
+        return false;
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    
+    // Check type based on expectedType
+    std::string type = toLower(expectedType);
+    bool isValid = false;
+    
+    if (type == "int" || type == "integer") {
+        isValid = std::holds_alternative<int>(it->value);
+    } else if (type == "double" || type == "float" || type == "number") {
+        isValid = std::holds_alternative<double>(it->value);
+    } else if (type == "string") {
+        isValid = std::holds_alternative<std::string>(it->value);
+    } else if (type == "bool" || type == "boolean") {
+        isValid = std::holds_alternative<bool>(it->value);
+    }
+    
+    return isValid;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::vector<std::string> Config::getMissingKeys(const std::vector<std::string>& requiredKeys) const {
+    std::vector<std::string> missing;
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            missing.push_back(key);
+        }
+    }
+    
+    return missing;
+}
+
+bool Config::validateRange(const std::string& key, double min, double max) const {
+    if (!has(key)) {
+        NLM_LOG_WARNING("Cannot validate range for missing key: " + key);
+        return false;
+    }
+    
+    auto value = get<double>(key);
+    if (!value.has_value()) {
+        NLM_LOG_WARNING("Key \"" + key + "\" is not a numeric type");
+        return false;
+    }
+    
+    if (value.value() < min || value.value() > max) {
+        NLM_LOG_WARNING("Key \"" + key + "\" value " + std::to_string(value.value()) +
+                       " is outside valid range [" + std::to_string(min) + ", " + std::to_string(max) + "]");
+        return false;
+    }
+    
+    return true;
+}
+
+bool Config::validatePattern(const std::string& key, const std::string& pattern) const {
+    if (!has(key)) {
+        NLM_LOG_WARNING("Cannot validate pattern for missing key: " + key);
+        return false;
+    }
+    
+    auto value = get<std::string>(key);
+    if (!value.has_value()) {
+        NLM_LOG_WARNING("Key \"" + key + "\" is not a string type");
+        return false;
+    }
+    
+    return matchesPattern(value.value(), pattern);
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Basic validation
+        if (entry.key.empty()) {
+            errors.push_back("Empty key found");
+        }
+        
+        // Type-specific validation
+        std::string typeStr;
+        if (std::holds_alternative<int>(entry.value)) {
+            typeStr = "int";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            typeStr = "double";
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            typeStr = "bool";
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            typeStr = "string";
+        }
+        
+        if (entry.description.empty()) {
+            errors.push_back("Key \"" + entry.key + "\" has no description");
+        }
+    }
+    
+    return errors;
+}
+
+// Validation implementation
+bool Config::isValidKey(const std::string& key) {
+    if (key.empty()) {
+        return false;
+    }
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::matchesPattern(const std::string& value, const std::string& pattern) {
+    // Simple pattern matching for common cases
+    if (pattern == "alphanumeric") {
+        return std::all_of(value.begin(), value.end(), ::isalnum);
+    } else if (pattern == "alphanumeric_with_underscores") {
+        return std::all_of(value.begin(), value.end(), [](char c) {
+            return std::isalnum(c) || c == '_';
+        });
+    }
+    
+    // For other patterns, just return true for now (can be extended)
+    return true;
 }
 
 // Explicit template instantiations

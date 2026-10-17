@@ -321,10 +321,41 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+// Print help message
+    if (argc == 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        printBanner();
+        std::cout << R"(
+USAGE:
+    nlm [OPTIONS]
+
+DESCRIPTION:
+    NLM (Neural Learning Machine) Phase 2: Real Neural Computation
+    Implements a biologically-inspired artificial neural system with:
+      - Leaky Integrate-and-Fire (LIF) neuron dynamics
+      - Event-driven spike propagation with synaptic delays
+      - STDP and Hebbian plasticity rules
+      - Structural plasticity (synaptogenesis/pruning)
+
+OPTIONS:
+    --config=file      Load configuration from file (default: configs/default.cfg)
+    --help, -h        Show this help message
+    --demo-mode        Run demonstration mode with logging
+    --quick-test       Run quick connectivity test only
+    --neurons=N       Number of neurons (default: 500)
+    --steps=N         Number of simulation steps (default: 1000)
+    --seed=N          Random seed for reproducible experiments (default: 42)
+
+EXAMPLES:
+    nlm                           Run full neural computation demo
+    nlm --config=my_config.cfg    Use custom configuration file
+    nlm --neurons=100 --steps=500 Run with specific parameters
+    nlm --quick-test              Run only connectivity test
+    nlm --help                     Show this help
+
+For more information, see documentation in docs/ or use the Python API (pynlm).
+)";
+        return 0;
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -366,6 +397,29 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Process additional command line options
+    bool demoMode = false;
+    bool quickTest = false;
+    size_t simulationSteps = 1000;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--demo-mode") {
+            demoMode = true;
+        } else if (arg == "--quick-test") {
+            quickTest = true;
+        } else if (arg.find("--neurons=") != std::string::npos) {
+            size_t value = std::stoul(arg.substr(arg.find("=") + 1));
+            config->set("neuron_count", static_cast<int64_t>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--steps=") != std::string::npos) {
+            simulationSteps = std::stoul(arg.substr(arg.find("=") + 1));
+        } else if (arg.find("--seed=") != std::string::npos) {
+            uint64_t value = std::stoull(arg.substr(arg.find("=") + 1));
+            config->set("random_seed", static_cast<int64_t>(value), ConfigSource::CommandLine);
+        }
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -390,6 +444,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    if (demoMode) NLM_LOG_INFO("  demo_mode: enabled");
+    if (quickTest) NLM_LOG_INFO("  quick_test: enabled");
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

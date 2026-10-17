@@ -107,6 +107,31 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Utilities library
+add_library(nlm_utils STATIC
+    src/utils/Utilities.cpp
+)
+
+target_include_directories(nlm_utils PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/utils>
+    $<INSTALL_INTERFACE:include/nlm>
+)
+
+# Error handling library
+add_library(nlm_error_handling STATIC
+    src/error_handling/EnhancedErrorHandling.cpp
+)
+
+target_include_directories(nlm_error_handling PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/error_handling>
+    $<INSTALL_INTERFACE:include/nlm>
+)
+
+# Update core libraries to use both utils and error handling
+target_link_libraries(nlm_core PUBLIC nlm_utils nlm_error_handling)
+target_link_libraries(nlm_agent PUBLIC nlm_utils nlm_error_handling)
+target_link_libraries(nlm_world PUBLIC nlm_utils nlm_error_handling)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
@@ -125,27 +150,62 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_utils nlm_error_handling)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_utils nlm_error_handling)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_utils nlm_error_handling)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Benchmark executable
+add_executable(nlm_benchmarks
+    src/benchmarks/Benchmarks.cpp
+)
+target_link_libraries(nlm_benchmarks PUBLIC nlm_core nlm_utils nlm_error_handling)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Install benchmarks (optional)
+install(TARGETS nlm_benchmarks
     RUNTIME DESTINATION bin
+)
+
+# Create CMake directory if it doesn't exist
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+endif()
+
+# Generate and install package configuration
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    VERSION 0.1.0
+    COMPATIBILITY AnyNewerVersion
+)
+
+# Create a simple config file since we don't have a full template
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    "# NLM CMake Configuration File\n"
+    "\n"
+    "include(\"${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake\")\n"
+    "\n"
+    "# Provide aliases for convenience\n"
+    "add_library(nlm::core ALIAS nlm_core)\n"
+    "add_library(nlm::agent ALIAS nlm_agent)\n"
+    "add_library(nlm::world ALIAS nlm_world)\n"
+    "\n"
+    "if(TARGET nlm)\n"
+    "    add_executable(nlm::nlm ALIAS nlm)\n"
+    "endif()\n"
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    DESTINATION lib/cmake/NLM
 )

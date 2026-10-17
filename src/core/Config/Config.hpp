@@ -93,6 +93,25 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const std::unordered_map<std::string, std::string>& schema) const;
+    bool validate(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators) const;
+    
+    // Validate specific keys
+    bool validateKey(const std::string& key, const std::string& expectedType) const;
+    
+    // Check for missing required keys
+    std::vector<std::string> getMissingKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Validate numeric ranges
+    bool validateRange(const std::string& key, double min, double max) const;
+    
+    // Validate string patterns
+    bool validatePattern(const std::string& key, const std::string& pattern) const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +119,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidKey(const std::string& key);
+    static bool matchesPattern(const std::string& value, const std::string& pattern);
 };
 
 } // namespace nlm

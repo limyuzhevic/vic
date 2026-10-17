@@ -1,0 +1,28 @@
+# NLM CMake Configuration File for find_package support
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Include target exports
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# For backward compatibility
+set_and_check(NLM_INCLUDE_DIR "@PACKAGE_PREFIX_DIR@/include")
+
+set(NLM_LIBRARIES nlm_core nlm_agent nlm_world)
+set(NLM_EXECUTABLES nlm nlm_phase3_demo nlm_phase4_demo)
+
+# Find dependencies
+if(NLM_ENABLE_PYTHON_BINDINGS)
+    find_dependency(pybind11 REQUIRED)
+endif()
+
+# Create convenience targets for common use cases
+add_library(nlm::core ALIAS nlm_core)
+add_library(nlm::agent ALIAS nlm_agent)
+add_library(nlm::world ALIAS nlm_world)
+
+if(TARGET nlm)
+    add_executable(nlm::nlm ALIAS nlm)
+endif()
