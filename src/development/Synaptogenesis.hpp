@@ -23,6 +23,9 @@ public:
     // Update synapse formation
     void update(class Brain* brain, class RandomGenerator& rng);
     
+    // Set brain reference for accessing regions
+    void setBrainReference(class Brain* brain);
+    
 private:
     struct Impl;
     Impl* pImpl;

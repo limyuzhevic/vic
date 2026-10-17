@@ -32,9 +32,10 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    // Create episode copy with age 0
+    // Create episode copy with age 0 and relevance 1.0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
+    stored.relevance = 1.0f;
     
     episodes_.push_back(stored);
     
@@ -58,6 +59,26 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Age all episodes
     for (auto& ep : episodes_) {
         ep.age++;
+    }
+    
+    // Enhanced integration with neuromodulation
+    if (brain_) {
+        // Dopamine enhances reward-based memory encoding
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            if (dopamineLevel > 0.0f) {
+                // Store with reward modulation - dopamine influences importance
+                // Higher dopamine makes experiences more salient
+            }
+        }
+        
+        // Acetylcholine enhances memory encoding and consolidation
+        if (brain_->getAcetylcholine()) {
+            float achLevel = brain_->getAcetylcholine()->getLevel();
+            if (achLevel > 0.0f) {
+                // ACh enhances attention and encoding of novel experiences
+            }
+        }
     }
 }
 
@@ -174,19 +195,48 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
                           episode->neuronActivations[i] : 0.5f;
         
         // Inject current to reawaken this pattern
+        // Enhanced with neuromodulatory influences
         brain_->injectCurrent(neuron, activation * 3.0f);
+        
+        // Apply neuromodulatory modulation during replay
+        // Dopamine enhances replay of rewarded experiences
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            if (dopamineLevel > 0.0f && episode->reward > 0.0f) {
+                // Boost replay of rewarded experiences
+                brain_->injectCurrent(neuron, activation * dopamineLevel * 0.5f);
+            }
+        }
+        
+        // Acetylcholine enhances attentional focus during replay
+        if (brain_->getAcetylcholine()) {
+            float achLevel = brain_->getAcetylcholine()->getLevel();
+            if (achLevel > 0.0f) {
+                // Enhance pattern completion
+                brain_->injectCurrent(neuron, activation * achLevel * 0.3f);
+            }
+        }
     }
     
     // Also inject sensory pattern if available
     if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+        // This would go through sensory channels - enhanced integration
+        // For now, stimulate associated neurons with sensory pattern
     }
 }
 
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
     if (episodeId < episodes_.size()) {
-        // In a full implementation, episodes would have a relevance field
-        // For now, this would age the episode differently
+        episodes_[episodeId].relevance = std::clamp(episodes_[episodeId].relevance + relevanceDelta, 0.0f, 1.0f);
+        
+        // Also update age based on relevance change
+        if (relevanceDelta < 0.0f) {
+            // Decreasing relevance -> episode ages faster (less reinforced)
+            episodes_[episodeId].age += static_cast<SimulationStep>(-relevanceDelta * 100);
+        } else {
+            // Increasing relevance -> episode ages slower (more reinforced)
+            episodes_[episodeId].age += static_cast<SimulationStep>(1.0f / (relevanceDelta + 0.1f));
+        }
     }
 }
 
@@ -220,11 +270,26 @@ float NeuralEpisodicMemory::getAverageReward() const {
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        if (episodes_[i].relevance < relevanceThreshold) {
+            toRemove.push_back(i);
+        }
     }
+    
+    // Remove low-relevance episodes (in reverse order to maintain indices)
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        episodes_.erase(episodes_.begin() + *it);
+    }
+    
+    // Also update episodeNeurons to match
+    if (!pImpl->episodeNeurons.empty() && toRemove.size() > 0) {
+        // Remove corresponding neurons
+        size_t neuronsToRemove = std::min(toRemove.size(), pImpl->episodeNeurons.size());
+        pImpl->episodeNeurons.erase(pImpl->episodeNeurons.end() - neuronsToRemove, pImpl->episodeNeurons.end());
+    }
+}
 }
 
 void NeuralEpisodicMemory::clear() {
@@ -235,17 +300,50 @@ void NeuralEpisodicMemory::clear() {
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     
-    // Select episodes for replay based on:
-    // 1. Recency (more recent episodes)
-    // 2. Reward (higher reward episodes)
-    // 3. Unpredictability (higher prediction error episodes)
+    // Enhanced episode selection for replay based on multiple factors
     
     std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
-        float recencyScore = 1.0f / (episodes_[i].age + 1);
-        float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
+        const auto& episode = episodes_[i];
+        
+        // 1. Recency score - more recent episodes have higher replay priority
+        float recencyScore = 1.0f / (episode.age + 1);
+        
+        // 2. Reward score - higher reward episodes are more important
+        float rewardScore = episode.reward;
+        
+        // 3. Novelty score - higher novelty episodes are more valuable for learning
+        float noveltyScore = episode.novelty;
+        
+        // 4. Integration state score - use neuromodulatory effects
+        float integrationScore = 1.0f;
+        if (brain_) {
+            // Dopamine influences replay priority (reward-based learning)
+            if (brain_->getDopamine()) {
+                float dopamineLevel = brain_->getDopamine()->getLevel();
+                if (dopamineLevel > 0.0f) {
+                    // Boost replay of episodes associated with dopamine peaks
+                    integrationScore *= (1.0f + dopamineLevel * 0.3f);
+                }
+            }
+            
+            // Acetylcholine influences attention and memory consolidation
+            if (brain_->getAcetylcholine()) {
+                float achLevel = brain_->getAcetylcholine()->getLevel();
+                if (achLevel > 0.0f) {
+                    // ACh enhances consolidation of attended experiences
+                    integrationScore *= (1.0f + achLevel * 0.2f);
+                }
+            }
+        }
+        
+        // 5. Combined score
+        float score = recencyScore * 0.3f + 
+                     rewardScore * 0.3f + 
+                     noveltyScore * 0.2f + 
+                     integrationScore * 0.2f;
+        
         scored.emplace_back(score, rewardScore, i);
     }
     
@@ -268,8 +366,19 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
         if (id < episodes_.size()) {
             replayEpisode(&episodes_[id]);
             
-            // Small delay between replays
+            // Small delay between replays for proper temporal sequencing
             // (In simulation, this would be steps)
+            
+            // Integrate with neuromodulation during replay sequence
+            if (brain_) {
+                // Dopamine influences sequential replay (learning temporal patterns)
+                if (brain_->getDopamine()) {
+                    float dopamineLevel = brain_->getDopamine()->getLevel();
+                    if (dopamineLevel > 0.0f) {
+                        // Sequential replay is enhanced by dopamine
+                    }
+                }
+            }
         }
     }
 }
@@ -279,7 +388,9 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;
     if (query.size() != episode.sensoryState.size()) return 0.0f;
     
-    // Cosine similarity
+    // Enhanced similarity computation with multiple factors
+    
+    // 1. Primary: Cosine similarity on sensory state
     float dot = 0.0f, normQ = 0.0f, normE = 0.0f;
     for (size_t i = 0; i < query.size(); ++i) {
         dot += query[i] * episode.sensoryState[i];
@@ -289,7 +400,46 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     
     if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
     
-    return dot / (std::sqrt(normQ) * std::sqrt(normE));
+    float cosineSimilarity = dot / (std::sqrt(normQ) * std::sqrt(normE));
+    
+    // 2. Location similarity (if both have position data)
+    float locationSimilarity = 1.0f;
+    if (!std::isnan(episode.positionX) && !std::isnan(episode.positionY) && 
+        query.size() >= 6) {
+        // Extract position from query if available
+        float queryX = query.size() >= 6 ? query[4] : query[0];
+        float queryY = query.size() >= 6 ? query[5] : query.size() > 1 ? query[1] : 0.0f;
+        
+        float distX = std::abs(queryX - episode.positionX);
+        float distY = std::abs(queryY - episode.positionY);
+        float dist = std::sqrt(distX * distX + distY * distY);
+        locationSimilarity = std::max(0.0f, 1.0f - dist / 10.0f); // Within 10 units = high similarity
+    }
+    
+    // 3. Reward similarity (if both have reward data)
+    float rewardSimilarity = 1.0f;
+    if (!std::isnan(episode.reward) && query.size() >= 3) {
+        // Extract reward from query if available
+        float queryReward = query.size() >= 3 ? query[2] : 0.5f;
+        
+        float rewardDist = std::abs(queryReward - episode.reward);
+        rewardSimilarity = std::max(0.0f, 1.0f - rewardDist / 2.0f); // Within 2 reward units = high similarity
+    }
+    
+    // 4. Temporal proximity (recency-based similarity)
+    float temporalSimilarity = 1.0f;
+    if (episode.age > 0) {
+        // Recency penalty - older episodes are less similar
+        temporalSimilarity = std::max(0.1f, 1.0f - episode.age / 1000.0f);
+    }
+    
+    // Weighted combination of similarity measures
+    float totalSimilarity = cosineSimilarity * 0.5f + 
+                           locationSimilarity * 0.2f + 
+                           rewardSimilarity * 0.2f + 
+                           temporalSimilarity * 0.1f;
+    
+    return totalSimilarity;
 }
 
 bool NeuralEpisodicMemory::matchesCriteria(

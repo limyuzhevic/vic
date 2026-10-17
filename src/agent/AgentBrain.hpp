@@ -58,6 +58,21 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Cognitive system integration methods
+    void integrateCognitiveSystems();
+    void updateCognitiveSystemsWithSensory(const SensoryPercept& percept);
+    void updateCognitiveSystemsWithAction(MotorCommand action, float reward);
+    void applyNeuromodulationToCognitiveSystems(float reward, float predictionError);
+    
+    // Cognitive system behavior methods
+    ActionType getPlannedAction(const std::vector<float>& currentState);
+    void recognizePattern(const std::vector<float>& sensoryData, float reward);
+    float getSelfAwareness() const;
+    void learnFromSocialInteraction(ActionType action, const std::vector<float>& outcome);
+    std::pair<float, float> getSpatialAwareness() const;
+    std::vector<float> predictTemporalSequence(const std::vector<float>& currentState) const;
+    void updateAttention(const std::vector<NeuronId>& competitors, float globalInhibition);
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -112,6 +127,20 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive system integration state
+    bool cognitiveSystemsInitialized_;
+    SimulationStep lastUpdateStep_;
+    float integrationLevel_;
+    
+    // Cognitive system instances
+    void* neuralPlanner_;
+    void* conceptFormation_;
+    void* attentionalSelection_;
+    void* selfModel_;
+    void* socialLearning_;
+    void* spatialRepresentation_;
+    void* temporalRelation_;
 };
 
 } // namespace nlm

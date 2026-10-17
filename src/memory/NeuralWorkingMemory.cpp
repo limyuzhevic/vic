@@ -36,22 +36,25 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Ensure we have enough neurons for the pattern
+    while (memoryNeurons_.size() < pattern.size()) {
+        // Create a new neuron ID for storage
+        size_t neuronId = memoryNeurons_.size() + 10000;
+        memoryNeurons_.push_back(NeuronId(neuronId));
+        memoryActivations_.push_back(0.0f);
+        memoryTimestamps_.push_back(0);
+    }
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+    // Encode pattern into neurons
+    size_t neuronsToUse = std::min(pattern.size(), memoryNeurons_.size());
+    
+    for (size_t i = 0; i < neuronsToUse; ++i) {
+        NeuronId neuron = memoryNeurons_[i];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Set neuron activation directly
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -66,6 +69,17 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    }
+    
+    // Enhanced competition after storing new pattern
+    runCompetition();
+    
+    // Update active traces
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
+        }
     }
 }
 
@@ -125,10 +139,39 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
+            // Apply neuromodulatory effects
+            // Dopamine enhances memory consolidation
+            if (brain_ && brain_->getDopamine()) {
+                float dopamineLevel = brain_->getDopamine()->getLevel();
+                if (dopamineLevel > 0.0f) {
+                    // Boost activation based on dopamine
+                    float dopamineBoost = dopamineLevel * 0.3f;
+                    memoryActivations_[i] = std::min(1.0f, activation + dopamineBoost);
+                }
+            }
+            
+            // Acetylcholine enhances attention and focus
+            if (brain_ && brain_->getAcetylcholine()) {
+                float achLevel = brain_->getAcetylcholine()->getLevel();
+                if (achLevel > 0.0f) {
+                    // Enhance winner selection
+                    memoryActivations_[i] = std::min(1.0f, activation * (1.0f + achLevel * 0.2f));
+                }
+            }
+            
+            // Norepinephrine modulates working memory capacity and arousal
+            if (brain_ && brain_->getNorepinephrine()) {
+                float neLevel = brain_->getNorepinephrine()->getLevel();
+                if (neLevel > 0.0f) {
+                    // Enhance memory trace strength
+                    memoryActivations_[i] = std::min(1.0f, activation * (1.0f + neLevel * 0.1f));
+                }
+            }
+            
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Check if trace is too old (decay based on age and decay rate)
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
             }
@@ -136,6 +179,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();
@@ -163,8 +209,31 @@ void NeuralWorkingMemory::runCompetition() {
     
     if (memoryActivations_.empty()) return;
     
+    // Enhanced competition with neuromodulatory influences
+    float globalInhibition = 0.5f;
+    
+    // Get neuromodulatory influences
+    if (brain_) {
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            globalInhibition = std::max(0.1f, 0.5f - dopamineLevel * 0.3f); // Dopamine reduces inhibition
+        }
+        if (brain_->getAcetylcholine()) {
+            float achLevel = brain_->getAcetylcholine()->getLevel();
+            globalInhibition *= (1.0f - achLevel * 0.2f); // ACh reduces inhibition
+        }
+    }
+    
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
+    
+    // Apply neuromodulatory adjustments to threshold
+    if (brain_) {
+        if (brain_->getNorepinephrine()) {
+            float neLevel = brain_->getNorepinephrine()->getLevel();
+            threshold *= (1.0f + neLevel * 0.2f); // NE raises threshold (more selective)
+        }
+    }
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
@@ -172,13 +241,21 @@ void NeuralWorkingMemory::runCompetition() {
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // Enhanced inhibitory competition - suppress non-winners more strongly
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
         if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            // Apply strong inhibition based on competition and neuromodulation
+            float inhibitionStrength = globalInhibition * memoryActivations_[i] * 2.0f;
+            
+            // Serotonin modulates inhibition (more inhibition at high levels)
+            if (brain_->getSerotonin()) {
+                float serotoninLevel = brain_->getSerotonin()->getLevel();
+                inhibitionStrength *= (1.0f + serotoninLevel * 0.5f);
+            }
+            
+            brain_->injectCurrent(memoryNeurons_[i], -inhibitionStrength);
         }
     }
 }
@@ -222,6 +299,13 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
             // Send maintenance signal
             brain_->injectCurrent(conn.second, fromActivation * 2.0f);
         }
+    }
+    
+    // Also update recurrentConnections_ vector for consistency
+    // This maintains the connection list used by other methods
+    recurrentConnections_.clear();
+    for (const auto& conn : pImpl->maintenanceSynapses) {
+        recurrentConnections_.emplace_back(conn.first, conn.second);
     }
 }
 

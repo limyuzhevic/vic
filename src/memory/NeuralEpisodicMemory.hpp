@@ -41,11 +41,14 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Relevance of this episode (0.0 to 1.0)
+    float relevance;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0), relevance(1.0f) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate

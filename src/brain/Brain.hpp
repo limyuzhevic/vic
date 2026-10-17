@@ -25,9 +25,16 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 class Curiosity;
-class Novelty;
 class PredictionError;
+class Novelty;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,16 +171,39 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // ========== ADVANCED COGNITION SYSTEMS ==========
+    
+    // Self model for self-awareness
+    SelfModel* getSelfModel();
+    
+    // Social learning for social interaction
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation for spatial awareness
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relation for temporal awareness
+    TemporalRelation* getTemporalRelation();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Serotonin - mood and behavioral inhibition
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
