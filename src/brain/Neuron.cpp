@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
@@ -23,8 +25,40 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Neuron biophysical parameters (mV)
+    static constexpr float MEMBRANE_POTENTIAL_BOUNDS_MIN = -100.0f;
+    static constexpr float MEMBRANE_POTENTIAL_BOUNDS_MAX = 50.0f;
+    static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_THRESHOLD = -55.0f;
+    static constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;
+    
+    // Plasticity and adaptation parameters
+    static constexpr float MODULATORY_INPUT_FACTOR = 0.1f;
+    static constexpr float ADAPTATION_DECREMENT_FACTOR = 0.95f;
+    static constexpr float ADAPTATION_INCREMENT_PER_SPIKE = 1.0f;
+    static constexpr float ADAPTATION_INFLUENCE_FACTOR = 0.01f;
+    static constexpr float TIMESTEP = 0.001f;  // 1ms timestep
+    static constexpr float TIME_TO_MS_CONVERSION = 1000.0f;
+    
+    // Randomization ranges
+    static constexpr float RESTING_POTENTIAL_RANGE = 3.0f;
+    static constexpr float THRESHOLD_RANGE = 2.0f;
+    static constexpr float RESET_POTENTIAL_OFFSET_RANGE = 5.0f;
+    static constexpr float REFRACTORY_PERIOD_MIN = 2;
+    static constexpr float REFRACTORY_PERIOD_MAX = 10;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        spikeHistory.reserve(MAX_SPIKE_HISTORY + 1);
+    }
+    
+    void addSpikeRecord(Timestamp timestamp) {
+        spikeHistory.push_back(timestamp);
+        if (spikeHistory.size() > MAX_SPIKE_HISTORY) {
+            spikeHistory.erase(spikeHistory.begin());
+        }
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -134,7 +168,7 @@ void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    pImpl->state.adaptationVariable += amplitude * Impl::MODULATORY_INPUT_FACTOR;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
@@ -148,10 +182,7 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    pImpl->addSpikeRecord(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
@@ -220,16 +251,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt) * Impl::TIME_TO_MS_CONVERSION * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * Impl::ADAPTATION_INFLUENCE_FACTOR;
+        pImpl->state.adaptationVariable *= Impl::ADAPTATION_DECREMENT_FACTOR;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, Impl::MEMBRANE_POTENTIAL_BOUNDS_MIN, Impl::MEMBRANE_POTENTIAL_BOUNDS_MAX);
     
     // Check for spike
     if (V >= threshold) {
@@ -238,7 +269,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
-        recordSpike(currentTime);
+        pImpl->addSpikeRecord(currentTime);
         
         // Reset membrane potential
         V = V_reset;
@@ -248,9 +279,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.adaptationVariable += Impl::ADAPTATION_INCREMENT_PER_SPIKE;
     }
     
     // Clear synaptic input for next step
@@ -260,8 +289,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Default LIF step with standard timestep
+    TimestepDuration dt = Impl::TIMESTEP;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
@@ -274,19 +303,19 @@ void Neuron::reset() {
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-Impl::RESTING_POTENTIAL_RANGE, Impl::RESTING_POTENTIAL_RANGE);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = Impl::DEFAULT_THRESHOLD + rng.uniformReal(-Impl::THRESHOLD_RANGE, Impl::THRESHOLD_RANGE);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = Impl::DEFAULT_RESTING_POTENTIAL + rng.uniformReal(-Impl::THRESHOLD_RANGE, Impl::THRESHOLD_RANGE);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, Impl::RESET_POTENTIAL_OFFSET_RANGE);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(Impl::REFRACTORY_PERIOD_MIN, Impl::REFRACTORY_PERIOD_MAX));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
