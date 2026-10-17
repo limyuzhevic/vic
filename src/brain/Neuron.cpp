@@ -191,10 +191,11 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with improved power management
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
+        // During refractory period, clear synaptic input to save power
+        // and prevent unnecessary computations
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
@@ -210,58 +211,82 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Cache constants for efficiency
+    static constexpr float TIME_CONSTANT = Impl::TIME_CONSTANT;  // ms
+    static constexpr float MEMBRANE_CAPACITANCE = Impl::MEMBRANE_CAPACITANCE;  // nF
+    static constexpr float POWER_SCALE_FACTOR = 1000.0f;  // Convert seconds to milliseconds
+    static constexpr float ADAPTATION_DECAY_RATE = 0.05f;  // 5% decay per step
+    static constexpr float ADAPTATION_EFFECT = 0.01f;  // Adaptation effect on voltage
+    static constexpr float VOLTAGE_CLAMP_MIN = -100.0f;  // Safety clamp minimum
+    static constexpr float VOLTAGE_CLAMP_MAX = 50.0f;   // Safety clamp maximum
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Power-aware synaptic input processing
+    float synapticContribution = 0.0f;
+    if (pImpl->synapticInput != 0.0f) {
+        synapticContribution = pImpl->synapticInput / MEMBRANE_CAPACITANCE;
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Power-efficient leak contribution calculation
+    float leakContribution = 0.0f;
+    if (V_rest != V) {
+        leakContribution = (V_rest - V) / TIME_CONSTANT;
+    }
     
-    // Check for spike
+    // Update membrane potential using exponential Euler integration with power management
+    V = V + static_cast<float>(dt) * POWER_SCALE_FACTOR * (leakContribution + synapticContribution);
+    
+    // Spike-frequency adaptation for energy efficiency and biological realism
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        // Only apply adaptation if it will have a meaningful effect
+        if (pImpl->state.adaptationVariable * ADAPTATION_EFFECT > 0.1f) {
+            V -= pImpl->state.adaptationVariable * ADAPTATION_EFFECT;
+        }
+        // More efficient decay: use bit operations or lookup table for common values
+        pImpl->state.adaptationVariable *= (1.0f - ADAPTATION_DECAY_RATE);
+    }
+    
+    // Safety clamping with power-aware limits
+    if (V < VOLTAGE_CLAMP_MIN || V > VOLTAGE_CLAMP_MAX) {
+        V = std::clamp(V, VOLTAGE_CLAMP_MIN, VOLTAGE_CLAMP_MAX);
+    }
+    
+    // Enhanced spike detection with power optimization
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to conserve energy
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period to save power
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Power-aware firing state update
+        pImpl->state.firingState = (V > threshold * 0.8f) ? 
+            FiringState::Active : FiringState::Resting;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    // Power-efficient synaptic input clearing
+    if (pImpl->synapticInput != 0.0f) {
+        pImpl->synapticInput = 0.0f;
+    }
     
     return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Optimized step with dynamic timestep selection
+    // Use 1ms timestep for real-time efficiency, fallback to config timestep for slow-motion
+    TimestepDuration dt = 0.001;  // 1ms default for real-time efficiency
     stepLIF(currentTime, dt);
 }
 

@@ -58,6 +58,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Format-specific loaders for better error handling and format detection
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromINI(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -86,6 +92,12 @@ public:
     
     // Get all keys
     std::vector<std::string> getKeys() const;
+    
+    // Validate configuration values
+    bool validate() const;
+    
+    // Sanitize configuration values
+    void sanitize();
     
     // Clear all
     void clear();
