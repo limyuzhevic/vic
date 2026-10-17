@@ -83,6 +83,7 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/LearningExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -114,18 +115,51 @@ add_library(nlm_phase3 STATIC
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Python bindings module
+add_library(pynlm MODULE
+    src/pynlm/PythonBindings.cpp
+)
+target_include_directories(pynlm PUBLIC src)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
+# Optional: Create Python-specific executables
+# add_executable(nlm_phase6_demo
+#     src/experiments/Phase6Demo.cpp
+# )
+# target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+# target_link_libraries(nlm_phase6_demo PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Test suite library
+add_library(nlm_tests STATIC
+    src/experiments/TestSuite.cpp
+)
+target_include_directories(nlm_tests PUBLIC src)
+target_link_libraries(nlm_tests PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

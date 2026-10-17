@@ -19,36 +19,50 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with improved support
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        if (pos == std::string::npos) {
+            // Warn about malformed lines but continue
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string valueStr = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            continue;
+        }
+        
+        // Try to parse the value with type detection
+        ConfigValue value;
+        bool parsedSuccessfully = false;
+        
+        // Try different types in order of likelihood
+        if (parseValue(valueStr, value)) {
+            parsedSuccessfully = true;
+        }
+        
+        if (parsedSuccessfully) {
             set(key, value, ConfigSource::File);
+        } else {
+            // If parsing fails, store as string
+            set(key, valueStr, ConfigSource::File);
         }
     }
     
@@ -84,9 +98,58 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write comments and values in a readable format
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Convert value to string based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                // Use reasonable precision for floating point
+                file.precision(6);
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file.precision(6);
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Fallback for unknown types
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -197,6 +260,136 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper function to parse string values to appropriate types
+bool Config::parseValue(const std::string& str, ConfigValue& value) {
+    std::string trimmed = trim(str);
+    
+    // Remove surrounding quotes if present
+    bool isQuoted = false;
+    if (trimmed.size() >= 2 && 
+        ((trimmed.front() == '"' && trimmed.back() == '"') ||
+         (trimmed.front() == '\'' && trimmed.back() == '\''))) {
+        isQuoted = true;
+        trimmed = trimmed.substr(1, trimmed.size() - 2);
+    }
+    
+    // Try parsing as boolean
+    if (!isQuoted) {
+        std::string lower = toLower(trimmed);
+        if (lower == "true") {
+            value = true;
+            return true;
+        } else if (lower == "false") {
+            value = false;
+            return true;
+        } else if (lower == "null" || lower == "none") {
+            value = std::string("");
+            return true;
+        }
+    }
+    
+    // Try parsing as integer (decimal and hex)
+    if (!isQuoted) {
+        size_t pos;
+        try {
+            // Try decimal integer
+            int intVal = std::stoi(trimmed);
+            value = intVal;
+            return true;
+        } catch (...) {
+            // Try hex integer (0x prefix)
+            if (trimmed.size() >= 2 && trimmed.substr(0, 2) == "0x") {
+                try {
+                    int64_t hexVal = std::stoll(trimmed.substr(2), &pos, 16);
+                    if (pos == trimmed.size() - 2) {
+                        value = static_cast<int64_t>(hexVal);
+                        return true;
+                    }
+                } catch (...) {}
+            }
+        }
+    }
+    
+    // Try parsing as floating point
+    if (!isQuoted) {
+        size_t pos;
+        try {
+            double floatVal = std::stod(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                value = floatVal;
+                return true;
+            }
+        } catch (...) {}
+    }
+    
+    // Try parsing as vector (simple case: [item1,item2,item3])
+    if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']') {
+        std::string inner = trimmed.substr(1, trimmed.size() - 2);
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream tokenStream(inner);
+        
+        while (std::getline(tokenStream, token, ',')) {
+            tokens.push_back(trim(token));
+        }
+        
+        if (!tokens.empty()) {
+            // Try to parse as int vector
+            bool allInts = true;
+            std::vector<int> intVec;
+            for (const auto& token : tokens) {
+                try {
+                    intVec.push_back(std::stoi(token));
+                } catch (...) {
+                    allInts = false;
+                    break;
+                }
+            }
+            if (allInts) {
+                value = intVec;
+                return true;
+            }
+            
+            // Try to parse as float vector
+            bool allFloats = true;
+            std::vector<double> floatVec;
+            for (const auto& token : tokens) {
+                try {
+                    floatVec.push_back(std::stod(token));
+                } catch (...) {
+                    allFloats = false;
+                    break;
+                }
+            }
+            if (allFloats) {
+                value = floatVec;
+                return true;
+            }
+            
+            // If tokens can't be parsed as numbers, try as string vector
+            bool allStrings = true;
+            std::vector<std::string> stringVec;
+            for (const auto& token : tokens) {
+                if (token.size() >= 2 && 
+                    ((token.front() == '"' && token.back() == '"') ||
+                     (token.front() == '\'' && token.back() == '\''))) {
+                    stringVec.push_back(token.substr(1, token.size() - 2));
+                } else {
+                    stringVec.push_back(token);
+                }
+            }
+            if (allStrings) {
+                value = stringVec;
+                return true;
+            }
+        }
+    }
+    
+    // Default to string if nothing else works
+    value = trimmed;
+    return true;
 }
 
 // Explicit template instantiations
