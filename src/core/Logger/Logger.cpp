@@ -12,6 +12,11 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    // Log rotation support
+    std::string outputFilepath;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10 MB default
+    size_t currentFileSize = 0;
+    uint64_t rotationCount = 0;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -39,6 +44,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     oss << " " << entry.message;
     
     std::string output = oss.str();
+    size_t messageSize = output.size() + 1;  // +1 for newline
     
     // Console output
     if (pImpl->useColors) {
@@ -49,8 +55,22 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
+        // Check for rotation
+        if (pImpl->currentFileSize + messageSize > pImpl->maxFileSize) {
+            // Rotate file
+            std::error_code ec;
+            std::string rotatedPath = pImpl->outputFilepath + "." + std::to_string(++pImpl->rotationCount);
+            std::filesystem::rename(pImpl->outputFilepath, rotatedPath, ec);
+            
+            // Clear and reopen
+            pImpl->fileOut.close();
+            pImpl->fileOut.open(pImpl->outputFilepath, std::ios::trunc);
+            pImpl->currentFileSize = 0;
+        }
+        
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+        pImpl->currentFileSize += messageSize;
     }
 }
 
@@ -71,11 +91,64 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close current file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Check if we need to rotate
+    std::error_code ec;
+    if (std::filesystem::exists(filepath, ec) && ec) {
+        // File doesn't exist, create it
+        pImpl->fileOut.open(filepath, std::ios::app);
+        pImpl->outputFilepath = filepath;
+        pImpl->currentFileSize = 0;
+        pImpl->rotationCount = 0;
+    } else {
+        // File exists, check size for rotation
+        auto fileSize = std::filesystem::file_size(filepath, ec);
+        if (!ec && fileSize >= pImpl->maxFileSize) {
+            // Rotate file
+            std::string rotatedPath = filepath + "." + std::to_string(++pImpl->rotationCount);
+            std::filesystem::rename(filepath, rotatedPath, ec);
+            if (!ec) {
+                pImpl->fileOut.open(filepath, std::ios::trunc);
+                pImpl->currentFileSize = 0;
+            } else {
+                // Fallback to append mode if rename fails
+                pImpl->fileOut.open(filepath, std::ios::app);
+                pImpl->currentFileSize = fileSize;
+            }
+        } else {
+            // Just open in append mode
+            pImpl->fileOut.open(filepath, std::ios::app);
+            pImpl->currentFileSize = fileSize;
+        }
+        pImpl->outputFilepath = filepath;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+void ConsoleLogger::setMaxFileSize(size_t maxSize) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->maxFileSize = maxSize;
+}
+
+void ConsoleLogger::setLogRotationCount(uint64_t maxRotations) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->rotationCount = maxRotations;
+}
+
+void ConsoleLogger::enableLogRotation(bool enable) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (!enable && pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
 }
@@ -182,8 +255,20 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Set global logger and update all existing loggers
+    static std::shared_ptr<Logger> globalLogger = nullptr;
+    
+    if (!logger) {
+        // Reset to default behavior
+        globalLogger = std::make_shared<Logger>();
+        globalLogger->setLevel(LogLevel::Info);
+        std::cout << "[WARNING] Global logger reset to default" << std::endl;
+    } else {
+        globalLogger = logger;
+        
+        // Update level for all global loggers
+        globalLogger->setLevel(LogLevel::Info);
+    }
 }
 
 // LogStream implementation

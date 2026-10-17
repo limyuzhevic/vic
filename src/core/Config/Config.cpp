@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationRule> validationRules;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -212,4 +213,104 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Add validation rule
+    void Config::addValidationRule(const std::string& key, const std::string& type, 
+                                  const std::string& min, const std::string& max,
+                                  const std::string& description) {
+        pImpl->validationRules.emplace_back(key, type, min, max, description);
+    }
+    
+    // Validate configuration
+    bool Config::validate() const {
+        std::vector<std::string> errors = getValidationErrors();
+        if (!errors.empty()) {
+            NLM_LOG_ERROR("Configuration validation failed:");
+            for (const auto& error : errors) {
+                NLM_LOG_ERROR("  " + error);
+            }
+            return false;
+        }
+        return true;
+    }
+    
+    // Get validation errors
+    std::vector<std::string> Config::getValidationErrors() const {
+        std::vector<std::string> errors;
+        
+        for (const auto& rule : pImpl->validationRules) {
+            auto valueOpt = get(rule.type);  // Try to get value as the specified type
+            
+            if (!valueOpt) {
+                // Value not found, but only error if it's a required field
+                if (rule.key == "random_seed" || rule.key == "simulation_timestep" || 
+                    rule.key == "neuron_count" || rule.key == "region_count" ||
+                    rule.key == "connection_probability") {
+                    errors.push_back("Required key '" + rule.key + "' is missing");
+                }
+                continue;
+            }
+            
+            // Validate based on type
+            bool isValid = true;
+            std::string errorMsg;
+            
+            if (rule.type == "int") {
+                int value = valueOpt.value();
+                if (rule.min != "" && value < std::stoi(rule.min)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is less than minimum " + rule.min;
+                }
+                if (rule.max != "" && value > std::stoi(rule.max)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is greater than maximum " + rule.max;
+                }
+            } else if (rule.type == "double") {
+                double value = valueOpt.value();
+                if (rule.min != "" && value < std::stod(rule.min)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is less than minimum " + rule.min;
+                }
+                if (rule.max != "" && value > std::stod(rule.max)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is greater than maximum " + rule.max;
+                }
+            } else if (rule.type == "float") {
+                float value = static_cast<float>(valueOpt.value());
+                if (rule.min != "" && value < std::stof(rule.min)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is less than minimum " + rule.min;
+                }
+                if (rule.max != "" && value > std::stof(rule.max)) {
+                    isValid = false;
+                    errorMsg = "Value " + std::to_string(value) + " is greater than maximum " + rule.max;
+                }
+            } else if (rule.type == "bool") {
+                // Boolean values don't have range validation
+                bool value = valueOpt.value();
+                // Additional boolean validation can be added here
+            } else if (rule.type == "string") {
+                // String validation - can check for empty strings, etc.
+                std::string value = valueOpt.value();
+                if (value.empty()) {
+                    isValid = false;
+                    errorMsg = "String value cannot be empty";
+                }
+            } else if (rule.type == "range") {
+                // Special validation for range types (like connection_probability 0-1)
+                if (rule.key == "connection_probability") {
+                    float value = static_cast<float>(valueOpt.value());
+                    if (value < 0.0f || value > 1.0f) {
+                        isValid = false;
+                        errorMsg = "connection_probability must be in [0.0, 1.0], got: " + std::to_string(value);
+                    }
+                }
+            }
+            
+            if (!isValid) {
+                errors.push_back(rule.key + ": " + errorMsg + " (" + rule.description + ")");
+            }
+        }
+        
+        return errors;
+    }
+

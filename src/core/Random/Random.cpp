@@ -30,8 +30,11 @@ RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
 }
 
 void RandomGenerator::seed(uint64_t seed) {
-    pImpl->gen.seed(seed);
-    pImpl->currentSeed = seed;
+    // Only re-seed if seed is different from current
+    if (seed != pImpl->currentSeed) {
+        pImpl->gen.seed(seed);
+        pImpl->currentSeed = seed;
+    }
 }
 
 uint64_t RandomGenerator::getSeed() const {
@@ -61,7 +64,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
+    if (max <= min) {  // Changed from >= to <= to match float version
         throw std::invalid_argument("min must be < max");
     }
     std::uniform_real_distribution<double> dist(min, max);

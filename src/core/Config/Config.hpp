@@ -90,8 +90,29 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation
+    struct ValidationRule {
+        std::string key;
+        std::string type;  // "int", "double", "bool", "string", "range"
+        std::string min;   // For range validation
+        std::string max;   // For range validation
+        std::string description;
+        
+        ValidationRule() : key(), type(), description() {}
+        ValidationRule(const std::string& k, const std::string& t, const std::string& minVal, const std::string& maxVal, const std::string& desc)
+            : key(k), type(t), min(minVal), max(maxVal), description(desc) {}
+    };
+    
+    // Add validation rule
+    void addValidationRule(const std::string& key, const std::string& type, 
+                          const std::string& min = "", const std::string& max = "",
+                          const std::string& description = "");
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;
