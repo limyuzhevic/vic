@@ -14,6 +14,10 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize prediction system with configuration
+    void initialize(size_t predictionDepth = 10, float learningRate = 0.01f,
+                   bool enableTemporalAbstraction = true);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -33,6 +37,10 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Get prediction accuracy statistics
+    float getPredictionAccuracy() const;
+    float getTemporalAbstractionScore() const;
     
 private:
     struct Impl;

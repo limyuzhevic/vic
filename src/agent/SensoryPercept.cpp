@@ -1,4 +1,5 @@
 #include "SensoryPercept.hpp"
+#include "../sensory/Audio.hpp"
 
 namespace nlm {
 
@@ -11,7 +12,8 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Initialize audio with reasonable default size for audio processing
+    audio_.resize(1024, 0.0f);  // 1 second of audio at 1024 Hz
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
