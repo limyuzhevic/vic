@@ -38,6 +38,12 @@ struct Phase6IntegrationResult {
     bool checkpointingWorks;
     bool replayWorks;
     
+    // New cognitive systems integration status
+    bool cognitionIntegrated;           // NeuralPlanner, ConceptFormation, SelfModel
+    bool socialLearningIntegrated;      // SocialLearning
+    bool spatialRepresentationIntegrated; // SpatialRepresentation
+    bool temporalRelationIntegrated;     // TemporalRelation
+    
     // Metrics
     float totalReward;
     float avgFiringRate;
@@ -60,6 +66,10 @@ struct Phase6IntegrationResult {
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , cognitionIntegrated(false)
+        , socialLearningIntegrated(false)
+        , spatialRepresentationIntegrated(false)
+        , temporalRelationIntegrated(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)

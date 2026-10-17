@@ -22,7 +22,13 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , persistentActivityThreshold_(0.8f)
+    , maintenanceStrength_(2.5f)
+    , replayEnabled_(true)
+    , consolidationEnabled_(true)
 {
+    // Initialize active trace tracking
+    pImpl->traceAges.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -30,6 +36,11 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Initialize new fields with biologically plausible defaults
+    pImpl->traceAges.clear();
+    pImpl->traceAges.resize(capacity_, 0);
+    
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
@@ -53,19 +64,35 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
             }
         }
         
-        // Update stored activation
+        // Update stored activation and timestamp
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
+            if (i < pImpl->traceAges.size()) {
+                pImpl->traceAges[i] = 0;  // Reset age on storage
+            }
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
+            pImpl->traceAges.push_back(0);
         }
     }
     
-    // Create maintenance connections if needed
+    // Create stronger maintenance connections based on pattern similarity
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        // Create biologically plausible recurrent connections
+        float connStrength = strength * 0.5f;
+        
+        // Add synaptic efficacy based on activation levels
+        if (i < memoryActivations_.size() && (i-1) < memoryActivations_.size()) {
+            float avgActivation = (memoryActivations_[i] + memoryActivations_[i-1]) * 0.5f;
+            if (avgActivation > 0.5f) {
+                // Stronger connections for well-activated patterns
+                connStrength *= (1.0f + avgActivation);
+            }
+        }
+        
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], connStrength);
     }
 }
 
@@ -77,10 +104,14 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        if (idx < pImpl->traceAges.size()) {
+            pImpl->traceAges[idx] = 0;  // Reset age on storage
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        pImpl->traceAges.push_back(0);
     }
     
     // Inject current to maintain activation
@@ -116,20 +147,41 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Update maintenance - reinforce active memory neurons with adaptive strength
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
         if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            // Adaptive maintenance based on trace age and activation level
+            float maintenanceCurrent = activation * maintenanceStrength_;
             
-            // Age the trace
+            // Enhance maintenance for older traces to prevent decay
+            if (pImpl->traceAges[i] > 100) {
+                maintenanceCurrent *= 1.5f;  // Boost maintenance for older traces
+            }
+            
+            // Apply maintenance current
+            brain_->injectCurrent(neuron, maintenanceCurrent);
+            
+            // Age the trace with more sophisticated tracking
+            pImpl->traceAges[i]++;
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
+            // Check if trace needs consolidation (based on activation strength and age)
+            if (consolidationEnabled_ && activation > persistentActivityThreshold_ && pImpl->traceAges[i] > 500) {
+                // Check if episodic memory is available for consolidation
+                if (brain_->getEpisodicMemory()) {
+                    // Mark this trace for consolidation
+                    pImpl->traceAges[i] |= 0x80000000;  // Use MSB as consolidation flag
+                }
+            }
+            
+            // Enhanced decay for very weak traces
+            if (activation < 0.01f && pImpl->traceAges[i] > 50) {
+                activation *= (1.0f - decayRate_ * 2.0f);  // Faster decay for weak traces
+            } else {
+                // Normal decay for moderate traces
                 activation *= (1.0f - decayRate_);
             }
             
@@ -137,10 +189,13 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
+    // Update recurrent connections for better maintenance
+    updateRecurrentConnections();
+    
+    // Decay weak traces with improved criteria
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition to select winners with adaptive threshold
     runCompetition();
 }
 
@@ -244,14 +299,80 @@ void NeuralWorkingMemory::decayWeakTraces() {
     }
 }
 
-// AttentionalSelection Implementation
-struct AttentionalSelection::Impl {
-    // Neuron competition state
-    std::vector<float> competitionStrength;
-    std::vector<float> inhibitionLevel;
+// New methods for enhanced working memory
+
+void NeuralWorkingMemory::rehearseMemories() {
+    if (!replayEnabled_ || !brain_) return;
     
-    Impl() {}
-};
+    // Rehearsal: reactivate recent memories to strengthen them
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Only rehearse recent memories (within last 1000 steps)
+        if (pImpl->traceAges[i] < 1000) {
+            float activation = memoryActivations_[i];
+            if (activation > 0.01f) {
+                // Strong rehearsal boost
+                float rehearsalCurrent = activation * 3.0f;
+                brain_->injectCurrent(memoryNeurons_[i], rehearsalCurrent);
+                
+                // Additional boost for reinforcement learning
+                if (pImpl->traceAges[i] < 100) {
+                    rehearsalCurrent *= 2.0f;  // Stronger boost for very recent traces
+                }
+                
+                // Apply rehearsal
+                brain_->injectCurrent(memoryNeurons_[i], rehearsalCurrent);
+                
+                // Boost activation
+                memoryActivations_[i] = std::min(1.0f, activation * 1.2f);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::consolidateToEpisodic() {
+    if (!consolidationEnabled_ || !brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Find traces that need consolidation
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (needsConsolidation(i)) {
+            float activation = memoryActivations_[i];
+            if (activation > 0.1f) {
+                // Convert to episodic memory item
+                EpisodicMemoryItem episode;
+                episode.timestamp = pImpl->traceAges[i];
+                episode.reward = 0.0f;  // Would be updated by reward signals
+                
+                // Add neuron to episode
+                episode.activeNeurons.push_back(memoryNeurons_[i]);
+                episode.neuronActivations.push_back(activation);
+                
+                // Store in episodic memory
+                brain_->getEpisodicMemory()->storeEpisode(episode);
+                
+                // Remove from working memory after consolidation
+                memoryNeurons_.erase(memoryNeurons_.begin() + i);
+                memoryActivations_.erase(memoryActivations_.begin() + i);
+                memoryTimestamps_.erase(memoryTimestamps_.begin() + i);
+                pImpl->traceAges.erase(pImpl->traceAges.begin() + i);
+                
+                // Adjust indices for next iteration
+                i--;
+            }
+        }
+    }
+}
+
+bool NeuralWorkingMemory::needsConsolidation(size_t traceIndex) const {
+    if (traceIndex >= pImpl->traceAges.size() || traceIndex >= memoryNeurons_.size()) {
+        return false;
+    }
+    
+    size_t age = pImpl->traceAges[traceIndex];
+    float activation = memoryActivations_[traceIndex];
+    
+    // Consolidate if trace is old enough AND strongly activated
+    return (age > 500 && activation > 0.2f) || (age > 1000 && activation > 0.1f);
+}
 
 AttentionalSelection::AttentionalSelection()
     : pImpl(new Impl)

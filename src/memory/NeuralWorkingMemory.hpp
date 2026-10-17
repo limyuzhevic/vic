@@ -74,6 +74,15 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Rehearsal - replay memories to strengthen them
+    void rehearseMemories();
+
+    // Consolidation - transfer strong traces to episodic memory
+    void consolidateToEpisodic();
+
+    // Check if trace needs consolidation
+    bool needsConsolidation(size_t traceIndex) const;
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -81,7 +90,7 @@ private:
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
 
-    // Decay weak memory traces
+    // Decay weak traces
     void decayWeakTraces();
 
     struct Impl;
@@ -91,12 +100,18 @@ private:
     size_t capacity_;
     float decayRate_;
     
+    // New fields for improved working memory
+    float persistentActivityThreshold_;      // Threshold for persistent activity
+    float maintenanceStrength_;              // Base maintenance current strength
+    bool replayEnabled_;                     // Enable replay for rehearsal
+    bool consolidationEnabled_;              // Enable consolidation to episodic memory
+    
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
     
-    // Active memory traces
+    // Active memory traces with age tracking
     std::vector<size_t> activeTraces_;
     
     // Recurrent connections for maintenance

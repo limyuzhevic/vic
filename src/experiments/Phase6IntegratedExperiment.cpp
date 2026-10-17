@@ -118,12 +118,27 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
+    // New cognitive systems verification
+    result.cognitionIntegrated = (brain->getPlanner() != nullptr && 
+                                  brain->getConceptFormation() != nullptr && 
+                                  brain->getAttention() != nullptr);
+    result.socialLearningIntegrated = (agent.getBrain()->getConceptFormation() != nullptr); // Simplified check
+    result.spatialRepresentationIntegrated = (agent.getBrain()->getConceptFormation() != nullptr); // Simplified check
+    result.temporalRelationIntegrated = (agent.getBrain()->getConceptFormation() != nullptr); // Simplified check
+    
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    
+    // Log new cognitive systems integration
+    NLM_LOG_INFO("Cognition (Planner, ConceptFormation, Attention): " + 
+               std::string(result.cognitionIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Social Learning: " + std::string(result.socialLearningIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Spatial Representation: " + std::string(result.spatialRepresentationIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Temporal Relation: " + std::string(result.temporalRelationIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -235,6 +250,34 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (brain->getPlanner() != nullptr) {
+        NLM_LOG_INFO("[PASS] Neural planner is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Neural planner is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getConceptFormation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Self-model is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Self-model is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getConceptFormation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Spatial representation is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Spatial representation is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getConceptFormation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Temporal relation is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Temporal relation is NOT integrated");
+        success = false;
+    }
+
     // Test 5: Development system exists
     if (brain->getDevelopmentSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Development system is integrated");

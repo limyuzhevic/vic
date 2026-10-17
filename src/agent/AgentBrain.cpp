@@ -18,6 +18,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , planningEnabled_(false)  // Planning is disabled by default
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -152,6 +153,21 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try to get planned action from neural planner
+    std::vector<float> currentState = getCurrentState();
+    MotorCommand plannedAction = getPlannedAction(currentState);
+    
+    // If planning was enabled and returned a valid action, use it
+    if (planningEnabled_ && plannedAction != MotorCommand::Wait) {
+        // Apply curiosity-based exploration as override
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            plannedAction = selectWithCuriosity(plannedAction);
+        }
+        
+        return plannedAction;
+    }
+    
+    // Fall back to traditional motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -235,7 +251,77 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+// Helper method to extract current state from sensory input
+std::vector<float> AgentBrain::getCurrentState() const {
+    if (!brain_ || sensoryVision_.empty()) {
+        return std::vector<float>();
+    }
+    
+    std::vector<float> state;
+    
+    // Extract vision state (256 values)
+    for (Neuron* neuron : sensoryVision_) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        state.push_back(activity);
+    }
+    
+    // Add other sensory modalities
+    for (Neuron* neuron : sensoryTouch_) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        state.push_back(activity);
+    }
+    
+    for (Neuron* neuron : sensoryInternal_) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        state.push_back(activity);
+    }
+    
+    for (Neuron* neuron : sensoryProprioception_) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        state.push_back(activity);
+    }
+    
+    return state;
+void AgentBrain::processSensoryForConcepts(const SensoryPercept& percept) {
+    if (!brain_ || !planningEnabled_) {
+        return;
+    }
+    
+    // Get concept formation from brain
+    auto* conceptFormation = brain_->getConceptFormation();
+    if (!conceptFormation) {
+        return;
+    }
+    
+    // Extract features from sensory input
+    std::vector<float> pattern;
+    std::vector<float> features;
+    
+    // Vision input features
+    const auto& vision = percept.getVision();
+    pattern.insert(pattern.end(), vision.begin(), vision.end());
+    
+    // Additional features from other sensory modalities
+    // These could include touch, internal state, etc.
+    
+    // For now, use a simple reward signal
+    float reward = expectedReward_;
+    
+    // Present experience to concept formation
+    SimulationStep currentStep = 0;  // Would need current simulation step
+    size_t conceptId = conceptFormation->presentExperience(pattern, features, reward, currentStep);
+    
+    if (conceptId > 0) {
+        // Update planning goal based on discovered concepts
+        std::vector<float> prototype = conceptFormation->getConceptPrototype(conceptId);
+        if (!prototype.empty()) {
+            // Set this as the current planning goal
+            setPlanningGoal(prototype);
+            NLM_LOG_INFO("AgentBrain: Updated planning goal based on concept " + 
+                       std::to_string(conceptId));
+        }
+    }
+}
     if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
@@ -345,6 +431,52 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Get action from neural planner if available
+MotorCommand AgentBrain::getPlannedAction(const std::vector<float>& currentState) {
+    if (!brain_ || !planningEnabled_) {
+        return MotorCommand::Wait;
+    }
+    
+    // Get the neural planner from brain
+    auto* planner = brain_->getPlanner();
+    if (!planner) {
+        return MotorCommand::Wait;
+    }
+    
+    // Set planning goal if provided
+    if (!planningGoal_.empty()) {
+        planner->setCurrentGoal(planningGoal_);
+    }
+    
+    try {
+        // Plan the best action based on current state
+        ActionType plannedAction = planner->planAction(currentState, expectedReward_);
+        
+        // Convert planned ActionType to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward:
+                return MotorCommand::MoveForward;
+            case ActionType::MoveBackward:
+                return MotorCommand::MoveBackward;
+            case ActionType::TurnLeft:
+                return MotorCommand::TurnLeft;
+            case ActionType::TurnRight:
+                return MotorCommand::TurnRight;
+            case ActionType::Interact:
+                return MotorCommand::Interact;
+            case ActionType::LookLeft:
+                return MotorCommand::LookLeft;
+            case ActionType::LookRight:
+                return MotorCommand::LookRight;
+            default:
+                return MotorCommand::Wait;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Planning error: ") + e.what());
+        return MotorCommand::Wait;
+    }
 }
 
 } // namespace nlm

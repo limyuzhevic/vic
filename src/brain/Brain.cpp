@@ -528,8 +528,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires encoding sensory state as patterns
+        
+        // Get concept formation instance
+        auto* conceptFormation = pImpl->conceptFormation;
+        
+        // Collect current neural activity patterns
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Encode sensory neuron activity as pattern
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activity = std::abs(neuron->getState().membranePotential - 
+                                     neuron->getState().restingPotential);
+            pattern.push_back(activity);
+        }
+        
+        // Get features from attentional selection winners
+        if (pImpl->attention) {
+            const auto& winners = pImpl->attention->getWinners();
+            for (NeuronId winnerId : winners) {
+                // Find corresponding feature vector
+                features.push_back(static_cast<float>(winnerId.getId()));
+            }
+        }
+        
+        // Present experience to concept formation
+        if (!pattern.empty()) {
+            SimulationStep currentTime = static_cast<SimulationStep>(currentTime);
+            size_t conceptId = conceptFormation->presentExperience(pattern, features, 
+                            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentTime);
+            
+            // Log concept formation if successful
+            if (conceptId > 0 && conceptFormation->getConcept(conceptId)) {
+                NLM_LOG_INFO("ConceptFormation: New concept formed or updated (ID: " + 
+                           std::to_string(conceptId) + ")");
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
