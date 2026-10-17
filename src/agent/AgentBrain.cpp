@@ -347,4 +347,124 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+    // ========= ADVANCED SYSTEM ACCESS =========
+    
+    // Get working memory system (advanced usage)
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    
+    // Get episodic memory system (advanced usage)
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    
+    // Get associative memory system (advanced usage)
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    
+    // Get prediction system (advanced usage)
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // Get neuromodulator by type (advanced usage)
+    Neuromodulator* getNeuromodulator(NeuromodulatorType type) {
+        if (!brain_) return nullptr;
+        switch (type) {
+            case NeuromodulatorType::Dopamine: return brain_->getDopamine();
+            case NeuromodulatorType::Curiosity: return brain_->getCuriosity();
+            case NeuromodulatorType::Novelty: return brain_->getNovelty();
+            case NeuromodulatorType::PredictionError: return brain_->getPredictionErrorSignal();
+            default: return nullptr;
+        }
+    }
+    
+    // Get development system (advanced usage)
+    DevelopmentSystem* getDevelopmentSystem() { return brain_ ? brain_->getDevelopmentSystem() : nullptr; }
+    
+    // Get novelty detector (advanced usage)
+    Novelty* getNovelty() { return brain_ ? brain_->getNovelty() : nullptr; }
+    
+    // Get curiosity system (advanced usage)
+    Curiosity* getCuriosity() { return brain_ ? brain_->getCuriosity() : nullptr; }
+    
+    // Get prediction error signal (advanced usage)
+    PredictionError* getPredictionErrorSignal() { return brain_ ? brain_->getPredictionErrorSignal() : nullptr; }
+    
+    // Get dopamine neuromodulator (advanced usage)
+    Dopamine* getDopamine() { return brain_ ? brain_->getDopamine() : nullptr; }
+    
+    // Get acetylcholine neuromodulator (advanced usage)
+    Acetylcholine* getAcetylcholine() { return brain_ ? brain_->getAcetylcholine() : nullptr; }
+    
+    // Get norepinephrine neuromodulator (advanced usage)
+    Norepinephrine* getNorepinephrine() { return brain_ ? brain_->getNorepinephrine() : nullptr; }
+    
+    // Get serotonin neuromodulator (advanced usage)
+    Serotonin* getSerotonin() { return brain_ ? brain_->getSerotonin() : nullptr; }
+    
+    // Get visualization interface (advanced usage)
+    VisualizationInterface* getVisualizer() { return brain_ ? brain_->getVisualizationInterface() : nullptr; }
+    
+    // ==================== STATISTICS ====================
+    
+    // Get comprehensive brain statistics (advanced usage)
+    std::string getBrainStats() const {
+        if (!brain_) return "Brain: Not initialized";
+        return brain_->getBrainStats();
+    }
+    
+    // Get memory system statistics (advanced usage)
+    std::string getMemoryStats() const {
+        if (!brain_) return "Memory: Brain not initialized";
+        return brain_->getMemoryStats();
+    }
+    
+    // Get prediction system statistics (advanced usage)
+    std::string getPredictionStats() const {
+        if (!brain_) return "Prediction: Brain not initialized";
+        return brain_->getPredictionStats();
+    }
+    
+    // Get neuromodulation system statistics (advanced usage)
+    std::string getNeuromodulationStats() const {
+        if (!brain_) return "Neuromodulation: Brain not initialized";
+        return brain_->getNeuromodulationStats();
+    }
+    
+    // Get development system statistics (advanced usage)
+    std::string getDevelopmentStats() const {
+        if (!brain_) return "Development: Brain not initialized";
+        return brain_->getDevelopmentStats();
+    }
+    
+    // Get working memory statistics (advanced usage)
+    std::string getWorkingMemoryStats() const {
+        if (!brain_) return "Working Memory: Brain not initialized";
+        auto* wm = brain_->getWorkingMemory();
+        if (!wm) return "Working Memory: Not available";
+        
+        std::stringstream ss;
+        ss << "Working Memory: " << wm->getActiveTraces() << " active traces\n";
+        ss << "Capacity: " << wm->getCapacity() << " elements\n";
+        return ss.str();
+    }
+    
+    // Get episodic memory statistics (advanced usage)
+    std::string getEpisodicMemoryStats() const {
+        if (!brain_) return "Episodic Memory: Brain not initialized";
+        auto* em = brain_->getEpisodicMemory();
+        if (!em) return "Episodic Memory: Not available";
+        
+        std::stringstream ss;
+        ss << "Episodic Memory: " << em->getEpisodeCount() << " episodes\n";
+        ss << "Max Episodes: " << em->getMaxEpisodes() << "\n";
+        ss << "Available for replay: " << em->getAvailableForReplay() << "\n";
+        return ss.str();
+    }
+    
+    // Get associative memory statistics (advanced usage)
+    std::string getAssociativeMemoryStats() const {
+        if (!brain_) return "Associative Memory: Brain not initialized";
+        auto* am = brain_->getAssociativeMemory();
+        if (!am) return "Associative Memory: Not available";
+        
+        std::stringstream ss;
+        ss << "Associative Memory: Active\n";
+        ss << "Pattern associations: Available\n";
+        return ss.str();
+    }

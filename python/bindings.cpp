@@ -105,6 +105,16 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
+    py::enum_<NeuromodulatorType>(m, "NeuromodulatorType", R"pbdoc(Neuromodulator type enumeration)pbdoc")
+        .value("Dopamine", NeuromodulatorType::Dopamine)
+        .value("Acetylcholine", NeuromodulatorType::Acetylcholine)
+        .value("Norepinephrine", NeuromodulatorType::Norepinephrine)
+        .value("Serotonin", NeuromodulatorType::Serotonin)
+        .value("Novelty", NeuromodulatorType::Novelty)
+        .value("Curiosity", NeuromodulatorType::Curiosity)
+        .value("PredictionError", NeuromodulatorType::PredictionError)
+        .export_values();
+
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
         .value("MoveBackward", ActionType::MoveBackward)
@@ -380,8 +390,20 @@ PYBIND11_MODULE(pynlm, m) {
              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
+.def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getDopamine", &AgentBrain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator (advanced usage)")
+        .def("getAcetylcholine", &AgentBrain::getAcetylcholine,
+             py::return_value_policy::reference_internal,
+             "Get acetylcholine neuromodulator (advanced usage)")
+        .def("getNorepinephrine", &AgentBrain::getNorepinephrine,
+             py::return_value_policy::reference_internal,
+             "Get norepinephrine neuromodulator (advanced usage)")
+        .def("getSerotonin", &AgentBrain::getSerotonin,
+             py::return_value_policy::reference_internal,
+             "Get serotonin neuromodulator (advanced usage)")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
@@ -398,7 +420,55 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced agent features
+        .def("getWorkingMemory", &AgentBrain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system (advanced usage)")
+        .def("getEpisodicMemory", &AgentBrain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system (advanced usage)")
+        .def("getAssociativeMemory", &AgentBrain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system (advanced usage)")
+        .def("getPredictionSystem", &AgentBrain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system (advanced usage)")
+        .def("getNeuromodulator", &AgentBrain::getNeuromodulator,
+             py::arg("type"),
+             "Get neuromodulator by type (advanced usage)")
+        .def("getDevelopmentSystem", &AgentBrain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system (advanced usage)")
+        .def("getNovelty", &AgentBrain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detector (advanced usage)")
+        .def("getCuriosity", &AgentBrain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system (advanced usage)")
+        .def("getPredictionErrorSignal", &AgentBrain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal (advanced usage)")
+        .def("getVisualizer", &AgentBrain::getVisualizer,
+             py::return_value_policy::reference_internal,
+             "Get visualization interface (advanced usage)")
+        .def("getBrainStats", &AgentBrain::getBrainStats,
+             "Get comprehensive brain statistics (advanced usage)")
+        .def("getMemoryStats", &AgentBrain::getMemoryStats,
+             "Get memory system statistics (advanced usage)")
+        .def("getPredictionStats", &AgentBrain::getPredictionStats,
+             "Get prediction system statistics (advanced usage)")
+        .def("getNeuromodulationStats", &AgentBrain::getNeuromodulationStats,
+             "Get neuromodulation system statistics (advanced usage)")
+        .def("getDevelopmentStats", &AgentBrain::getDevelopmentStats,
+             "Get development system statistics (advanced usage)")
+        .def("getWorkingMemoryStats", &AgentBrain::getWorkingMemoryStats,
+             "Get working memory statistics (advanced usage)")
+        .def("getEpisodicMemoryStats", &AgentBrain::getEpisodicMemoryStats,
+             "Get episodic memory statistics (advanced usage)")
+        .def("getAssociativeMemoryStats", &AgentBrain::getAssociativeMemoryStats,
+             "Get associative memory statistics (advanced usage)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

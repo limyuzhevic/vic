@@ -43,12 +43,24 @@ struct Brain::Impl {
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
+    // ========== ADVANCED NEUROMODULATION ==========
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    
+    // ========== VISUALIZATION ==========
+    
+    std::unique_ptr<VisualizationInterface> visualizationInterface;
+    
+    // ========== VISUALIZATION ==========
+    
+    std::unique_ptr<VisualizationInterface> visualizationInterface;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +141,19 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize advanced neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        
+        // ========== VISUALIZATION ==========
+        
+        visualizationInterface = std::make_unique<VisualizationInterface>();
+        
+        // ========== VISUALIZATION ==========
+        
+        visualizationInterface = std::make_unique<VisualizationInterface>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1112,6 +1137,138 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+VisualizationInterface* Brain::getVisualizationInterface() {
+    return pImpl->visualizationInterface.get();
+}
+
+std::string Brain::getBrainStats() const {
+    std::stringstream ss;
+    ss << "=== NLM Brain Status (Phase 6 - Integrated) ===\n";
+    ss << "Regions: " << getRegionCount() << "\n";
+    ss << "Total neurons: " << getTotalNeuronCount() << "\n";
+    ss << "Total synapses: " << getTotalSynapseCount() << "\n";
+    ss << "Active neurons: " << getActiveNeuronCount() << "\n";
+    ss << "Firing neurons (this step): " << getFiringNeuronCount() << "\n";
+    ss << "Total spikes: " << getTotalSpikeCount() << "\n";
+    ss << "Average firing rate: " << getAverageFiringRate() << "\n";
+    ss << "E/I ratio: " << getExcitationInhibitionRatio() << "\n";
+    return ss.str();
+}
+
+std::string Brain::getMemoryStats() const {
+    std::stringstream ss;
+    ss << "=== Memory Systems ===\n";
+    if (pImpl->workingMemory) {
+        ss << "Working Memory: " << pImpl->workingMemory->getActiveTraces() << " active traces\n";
+    }
+    if (pImpl->episodicMemory) {
+        ss << "Episodic Memory: " << pImpl->episodicMemory->getEpisodeCount() << " episodes\n";
+        ss << "Max episodes: " << pImpl->episodicMemory->getMaxEpisodes() << "\n";
+    }
+    if (pImpl->associativeMemory) {
+        ss << "Associative Memory: Enabled\n";
+    }
+    return ss.str();
+}
+
+std::string Brain::getPredictionStats() const {
+    std::stringstream ss;
+    ss << "=== Prediction System ===\n";
+    if (pImpl->predictionSystem) {
+        ss << "Prediction System: Active\n";
+        ss << "Prediction accuracy: Available (advanced statistics)\n";
+    } else {
+        ss << "Prediction System: Not available\n";
+    }
+    return ss.str();
+}
+
+std::string Brain::getNeuromodulationStats() const {
+    std::stringstream ss;
+    ss << "=== Neuromodulation Systems ===\n";
+    if (pImpl->dopamine) {
+        ss << "Dopamine level: " << pImpl->dopamine->getLevel() << " (reward signal)\n";
+    }
+    if (pImpl->curiosity) {
+        ss << "Curiosity level: Available (exploration signal)\n";
+    }
+    if (pImpl->novelty) {
+        ss << "Novelty level: Available (surprise signal)\n";
+    }
+    if (pImpl->predictionError) {
+        ss << "Prediction error: Available (learning signal)\n";
+    }
+    return ss.str();
+}
+
+std::string Brain::getDevelopmentStats() const {
+    std::stringstream ss;
+    ss << "=== Development System ===\n";
+    ss << "Developmental stage: " << static_cast<int>(pImpl->developmentalStage) << " ("
+       << (pImpl->developmentalStage == DevelopmentalStage::Initial ? "Initial" :
+           pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod ? "CriticalPeriod" :
+           pImpl->developmentalStage == DevelopmentalStage::Maturation ? "Maturation" :
+           pImpl->developmentalStage == DevelopmentalStage::Adult ? "Adult" : "Aging") << ")\n";
+    ss << "Developmental age: Available (experience-dependent)\n";
+    return ss.str();
+}
+
+std::string Brain::getWorkingMemoryStats() const {
+    std::stringstream ss;
+    ss << "=== Working Memory Statistics ===\n";
+    if (pImpl->workingMemory) {
+        ss << "Active traces: " << pImpl->workingMemory->getActiveTraces() << "\n";
+        ss << "Working memory capacity: " << pImpl->workingMemory->getCapacity() << " elements\n";
+        ss << "Traces age distribution: Available\n";
+    } else {
+        ss << "Working Memory: Not available\n";
+    }
+    return ss.str();
+}
+
+std::string Brain::getEpisodicMemoryStats() const {
+    std::stringstream ss;
+    ss << "=== Episodic Memory Statistics ===\n";
+    if (pImpl->episodicMemory) {
+        ss << "Total episodes: " << pImpl->episodicMemory->getEpisodeCount() << "\n";
+        ss << "Max episodes: " << pImpl->episodicMemory->getMaxEpisodes() << "\n";
+        ss << "Episodes available for replay: " << pImpl->episodicMemory->getAvailableForReplay() << "\n";
+        ss << "Replay interval: " << pImpl->replayInterval << " steps\n";
+    } else {
+        ss << "Episodic Memory: Not available\n";
+    }
+    return ss.str();
+}
+
+std::string Brain::getAssociativeMemoryStats() const {
+    std::stringstream ss;
+    ss << "=== Associative Memory Statistics ===\n";
+    if (pImpl->associativeMemory) {
+        ss << "Associative Memory: Active\n";
+        ss << "Pattern associations: Available\n";
+        ss << "Memory consolidation: Enabled\n";
+    } else {
+        ss << "Associative Memory: Not available\n";
+    }
+    return ss.str();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+VisualizationInterface* Brain::getVisualizationInterface() {
+    return pImpl->visualizationInterface.get();
 }
 
 } // namespace nlm

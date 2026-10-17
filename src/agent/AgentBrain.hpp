@@ -55,19 +55,67 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
+    // Get underlying brain (advanced usage)
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Memory system access (advanced usage)
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Prediction system access (advanced usage)
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // Neuromodulator access (advanced usage)
+    Neuromodulator* getNeuromodulator(NeuromodulatorType type);
+    Dopamine* getDopamine() { return brain_ ? brain_->getDopamine() : nullptr; }
+    Novelty* getNovelty() { return brain_ ? brain_->getNovelty() : nullptr; }
+    Curiosity* getCuriosity() { return brain_ ? brain_->getCuriosity() : nullptr; }
+    PredictionError* getPredictionErrorSignal() { return brain_ ? brain_->getPredictionErrorSignal() : nullptr; }
+    
+    // Prediction-based action selection (enhanced)
+    MotorCommand decodeMotorCommandWithPrediction();
+    
+    // Get prediction error for learning
+    float getPredictionErrorSignal() const { return predictionError_; }
+    
+    // Enable prediction-based action selection
+    void enablePredictionBasedSelection(bool enable) { predictionBasedSelectionEnabled_ = enable; }
+    
+    // Check if prediction-based selection is enabled
+    bool isPredictionBasedSelectionEnabled() const { return predictionBasedSelectionEnabled_; }
+    
+    // Set prediction horizon for planning
+    void setPredictionHorizon(int horizon) { predictionHorizon_ = horizon; }
+    int getPredictionHorizon() const { return predictionHorizon_; }
+    
+    // Get action value estimates (Q-values for actions)
+    std::vector<float> getActionValueEstimates() const;
+    
+    // Get expected rewards for actions
+    std::vector<float> getExpectedRewards() const;
+    
+    // Get exploration bonus based on prediction uncertainty
+    float getExplorationBonus() const;
+    
+    // Get action diversity (how different actions are from expected)
+    float getActionDiversity() const;
+
+    // Development system access (advanced usage)
+    DevelopmentSystem* getDevelopmentSystem() { return brain_ ? brain_->getDevelopmentSystem() : nullptr; }
+    
+    // Visualization interface (advanced usage)
+    VisualizationInterface* getVisualizer() { return brain_ ? brain_->getVisualizationInterface() : nullptr; }
+    
+    // Statistics and monitoring (advanced usage)
+    std::string getBrainStats() const;
+    std::string getMemoryStats() const;
+    std::string getPredictionStats() const;
+    std::string getNeuromodulationStats() const;
+    std::string getDevelopmentStats() const;
+    std::string getWorkingMemoryStats() const;
+    std::string getEpisodicMemoryStats() const;
+    std::string getAssociativeMemoryStats() const;
     
 private:
     // Motor decoding: convert neural activity to motor command

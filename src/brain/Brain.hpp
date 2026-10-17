@@ -24,24 +24,19 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+// Neuromodulator type enumeration
+enum class NeuromodulatorType {
+    Dopamine,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin,
+    Novelty,
+    Curiosity,
+    PredictionError
 };
 
 // Brain: The central coordinator of the neural system
@@ -178,11 +173,45 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+// Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // ========== VISUALIZATION ==========
+    
+    // Visualization interface for debugging and analysis
+    class VisualizationInterface* getVisualizationInterface();
+    
+    // ================ STATISTICS ============
+    
+    // Get comprehensive brain statistics
+    std::string getBrainStats() const;
+    
+    // Get memory system statistics
+    std::string getMemoryStats() const;
+    
+    // Get prediction system statistics
+    std::string getPredictionStats() const;
+    
+    // Get neuromodulation system statistics
+    std::string getNeuromodulationStats() const;
+    
+    // Get development system statistics
+    std::string getDevelopmentStats() const;
+    
+    // Get working memory statistics
+    std::string getWorkingMemoryStats() const;
+    
+    // Get episodic memory statistics
+    std::string getEpisodicMemoryStats() const;
+    
+    // Get associative memory statistics
+    std::string getAssociativeMemoryStats() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
