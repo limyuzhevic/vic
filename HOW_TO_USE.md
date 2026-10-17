@@ -11,16 +11,16 @@ This document covers:
 
 ---
 
-## Part 1: Building the C++ Project from Source
+### Building the C++ Project from Source
 
-### Prerequisites
+#### Prerequisites
 
 - **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
 - **CMake**: Version 3.16 or higher
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
 
-### Build Steps
+#### Build Steps
 
 ```bash
 # Navigate to the project directory
@@ -40,7 +40,7 @@ make -j$(nproc)
 ctest --output-on-failure
 ```
 
-### Build Outputs
+#### Build Outputs
 
 After successful compilation, you will have:
 
@@ -54,7 +54,7 @@ After successful compilation, you will have:
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
 
-### Build Options
+#### Build Options
 
 ```bash
 # Debug build (with symbols and assertions)
@@ -67,6 +67,200 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
+
+### Running the NLM Simulator
+
+The NLM simulator provides a comprehensive command-line interface for configuring and running neural simulations.
+
+#### Basic Usage
+
+```bash
+# Run with default configuration
+./nlm
+
+# Run with custom configuration file
+./nlm --config=my_config.cfg
+
+# Run with specific test
+./nlm --test=plasticity
+
+# Run with verbose logging
+./nlm --verbose
+
+# Run with benchmarking
+./nlm --benchmark
+```
+
+#### Configuration Options
+
+The simulator supports various configuration options via command-line arguments:
+
+**Basic Settings:**
+- `--random_seed=<value>` - Set random seed for reproducible experiments
+- `--neuron_count=<value>` - Set number of neurons in the brain
+- `--region_count=<value>` - Set number of brain regions
+- `--connection_probability=<value>` - Set connection probability
+
+**Plasticity Settings:**
+- `--stdp_ltp_weight=<value>` - Set STDP LTP weight
+- `--stdp_ltd_weight=<value>` - Set STDP LTD weight
+- `--stdp_tau=<value>` - Set STDP time constant
+- `--synaptogenesis_rate=<value>` - Set structural synaptogenesis rate
+- `--pruning_rate=<value>` - Set structural pruning rate
+
+**Simulation Settings:**
+- `--simulation_timestep=<value>` - Set simulation timestep in seconds
+- `--log_level=<level>` - Set log level (DEBUG, INFO, WARNING, ERROR)
+- `--verbose` - Enable verbose logging
+
+**Test Selection:**
+- `--test=<name>` - Run specific test (all, basic, plasticity, stdp)
+
+#### Configuration File Format
+
+Configuration files use a simple key=value format:
+
+```ini
+# NLM Configuration File
+# Basic settings
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+
+# Connectivity
+connection_probability = 0.1
+
+# Plasticity
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+synaptogenesis_rate = 0.001
+pruning_rate = 0.0001
+
+# Logging
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+
+# Environment
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+```
+
+#### Command Line Examples
+
+```bash
+# Run with custom configuration
+./nlm --config=experiments/config1.cfg --neuron_count=2000
+
+# Run plasticity experiment with specific settings
+./nlm --test=plasticity --stdp_ltp_weight=0.05 --stdp_ltd_weight=0.04
+
+# Debug run with maximum logging
+./nlm --log_level=DEBUG --verbose
+
+# Benchmark performance
+./nlm --benchmark --random_seed=12345
+
+# Run only basic connectivity test
+./nlm --test=basic
+
+# Check help information
+./nlm --help
+
+# Check version information
+./nlm --version
+```
+
+#### Configuration Validation
+
+The configuration system includes comprehensive validation:
+
+1. **Type Validation**: Ensures configuration values match expected types
+2. **Range Validation**: Validates numeric ranges for important parameters
+3. **Format Validation**: Checks string values for correct format
+4. **Dependency Validation**: Ensures required configurations are present
+
+Example validation errors:
+```
+ERROR: Invalid integer value for neuron_count: -100
+ERROR: log_level must be one of: DEBUG, INFO, WARNING, ERROR
+ERROR: random_seed must be non-negative
+```
+
+#### Performance Tips
+
+1. **Memory Management**: Monitor synapse and neuron counts
+2. **Timestep Tuning**: Adjust simulation timestep for accuracy/performance balance
+3. **Connectivity**: Use appropriate connection probability based on network size
+4. **Plasticity**: Balance learning rates to prevent runaway potentiation or depression
+5. **Checkpointing**: Use checkpointing for long-running experiments
+
+#### Troubleshooting
+
+**Common Issues:**
+
+1. **"No neurons found" error**
+   - Check neuron_count configuration
+   - Ensure region_count is set appropriately
+   - Verify configuration file syntax
+
+2. **"Configuration file not found"**
+   - Use absolute paths for configuration files
+   - Ensure file exists and is readable
+   - Check file permissions
+
+3. **"Invalid log level"**
+   - Use DEBUG, INFO, WARNING, or ERROR (case-insensitive)
+   - Example: `--log_level=info` or `--log_level=DEBUG`
+
+4. **Memory issues**
+   - Reduce neuron_count or connection_probability
+   - Use structural plasticity to manage synapse count
+   - Consider using checkpointing for long experiments
+
+5. **Performance issues**
+   - Increase simulation_timestep
+   - Reduce test duration
+   - Use more efficient network topology
+
+#### Advanced Configuration
+
+For advanced users, consider these configuration options:
+
+```ini
+# Advanced plasticity configuration
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 30.0
+synaptogenesis_rate = 0.0005
+pruning_rate = 0.000001
+
+# Environment configuration
+environment_name = ContinuousWorld
+environment_width = 100
+environment_height = 100
+reward_discount_factor = 0.95
+
+# Logging configuration
+log_to_file = true
+log_filename = experiments/experiment1.log
+max_log_file_size = 10485760  # 10 MB
+```
+
+#### Configuration File Examples
+
+Complete configuration examples are available in the `configs/` directory:
+
+- `configs/default.cfg` - Default configuration
+- `configs/experiment1.cfg` - Experiment configuration
+- `configs/benchmark.cfg` - Benchmark configuration
+
+You can create your own configuration files using the format shown above or by using the `--config` option.
+
+---
 
 ---
 

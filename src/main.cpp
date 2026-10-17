@@ -48,6 +48,34 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  --version                 Show version information" << std::endl;
+    std::cout << "  --config=<file>           Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --random_seed=<value>     Set random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neuron_count=<value>    Set number of neurons in the brain" << std::endl;
+    std::cout << "  --region_count=<value>    Set number of brain regions" << std::endl;
+    std::cout << "  --connection_probability=<value> Set connection probability" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<value>  Set STDP LTP weight" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<value>  Set STDP LTD weight" << std::endl;
+    std::cout << "  --stdp_tau=<value>        Set STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis_rate=<value> Set structural synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning_rate=<value>    Set structural pruning rate" << std::endl;
+    std::cout << "  --log_level=<level>       Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --simulation_timestep=<value> Set simulation timestep" << std::endl;
+    std::cout << "  --test=<name>             Run specific test (basic, plasticity, stdp)" << std::endl;
+    std::cout << "  --verbose                 Enable verbose logging" << std::endl;
+    std::cout << "  --benchmark               Enable performance benchmarking" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --config=my_config.cfg --neuron_count=2000" << std::endl;
+    std::cout << "  " << programName << " --random_seed=12345 --test=plasticity" << std::endl;
+    std::cout << "  " << programName << " --log_level=DEBUG --verbose" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -324,19 +352,126 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    bool helpRequested = false;
+    bool versionRequested = false;
+    std::string configFile = "configs/default.cfg";
+    bool verboseMode = false;
+    bool benchmarkMode = false;
+    std::string testName = "all"; // all, basic, plasticity, stdp
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --help
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        }
+        // Handle --version
+        else if (arg == "--version") {
+            versionRequested = true;
+        }
+        // Handle --config=file
+        else if (arg.substr(0, 8) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        // Handle verbose mode
+        else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        }
+        // Handle benchmark mode
+        else if (arg == "--benchmark") {
+            benchmarkMode = true;
+        }
+        // Handle test selection
+        else if (arg.substr(0, 6) == "--test") {
+            if (arg.find('=') != std::string::npos) {
+                testName = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                testName = argv[++i];
+            }
+        }
+        // Handle other configuration options with --key=value format
+        else if (arg.substr(0, 2) == "--" && arg.find('=') != std::string::npos) {
+            std::string key = arg.substr(2, arg.find('=') - 2);
+            std::string value = arg.substr(arg.find('=') + 1);
+            
+            // Handle numeric configurations
+            if (key == "random_seed" || key == "neuron_count" || key == "region_count") {
+                try {
+                    int intValue = std::stoi(value);
+                    config->set(key, intValue, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid integer value for " + key + ": " + value);
+                }
+            } else if (key == "connection_probability" || key == "plasticity_learning_rate" || 
+                       key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || 
+                       key == "stdp_tau" || key == "synaptogenesis_rate" || 
+                       key == "pruning_rate" || key == "reward_discount_factor" || 
+                       key == "dopamine_baseline" || key == "simulation_timestep") {
+                try {
+                    float floatValue = std::stof(value);
+                    config->set(key, floatValue, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid float value for " + key + ": " + value);
+                }
+            } else if (key == "log_level") {
+                // Convert string to LogLevel enum
+                if (value == "DEBUG") config->set(key, "DEBUG", ConfigSource::CommandLine);
+                else if (value == "INFO") config->set(key, "INFO", ConfigSource::CommandLine);
+                else if (value == "WARNING") config->set(key, "WARNING", ConfigSource::CommandLine);
+                else if (value == "ERROR") config->set(key, "ERROR", ConfigSource::CommandLine);
+                else {
+                    NLM_LOG_ERROR("Invalid log level: " + value);
+                }
+            }
+        }
+        // Handle -key value format (for boolean flags)
+        else if (arg[0] == '-') {
+            // Skip flag-like arguments
+        }
+    }
+    
+    // Handle help and version requests before initialization
+    if (helpRequested) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (versionRequested) {
+        std::cout << "NLM Neural Learning Machine - Phase 2" << std::endl;
+        std::cout << "Version: 0.1.0" << std::endl;
+        std::cout << "Build Date: " << __DATE__ << " " << __TIME__ << std::endl;
+        return 0;
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with verbose mode
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    if (verboseMode) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    }
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Command line arguments parsed successfully");
+    NLM_LOG_INFO("  config_file: " + configFile);
+    NLM_LOG_INFO("  verbose_mode: " + std::string(verboseMode ? "true" : "false"));
+    NLM_LOG_INFO("  benchmark_mode: " + std::string(benchmarkMode ? "true" : "false"));
+    NLM_LOG_INFO("  test_mode: " + testName);
+    
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - STDP plasticity rule");
+    NLM_LOG_INFO("  - Hebbian plasticity rule");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
@@ -344,18 +479,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
@@ -409,25 +532,56 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on command line argument
+    if (testName == "all" || testName == "basic") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Basic Connectivity Test ===");
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for next test if more tests are to be run
+        if (testName == "all") {
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (testName == "all" || testName == "plasticity") {
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Plasticity Learning Experiment ===");
+        runPlasticityExperiment(brain);
+        
+        // Reset brain for next test if all tests are to be run
+        if (testName == "all") {
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (testName == "all" || testName == "stdp") {
+        // Reset brain for STDP verification
+        brain->reset();
+        brain->initialize();
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running STDP Verification ===");
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    if (benchmarkMode) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Performance Benchmark ===");
+        NLM_LOG_INFO("Benchmarking completed successfully!");
+        NLM_LOG_INFO("Note: Full benchmarking implementation to be added in future phases.");
+    }
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");

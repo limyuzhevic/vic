@@ -84,11 +84,7 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     
     // Search all regions for the synapse
     for (auto& region : brain->getRegions()) {
-        Synapse* syn = region->getSynapse(synapse);
-        if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
+        if (region->removeSynapse(synapse)) {
             ++pImpl->totalSynapsesPruned;
             return true;
         }
@@ -228,7 +224,12 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             }
             
             if (shouldPrune) {
-                removeSynapse(brain, syn->getId());
+                if (removeSynapse(brain, syn->getId())) {
+                    NLM_LOG_DEBUG("Pruned synapse " + std::to_string(syn->getId()) + 
+                                 " (weight: " + std::to_string(syn->getWeight()) + ")");
+                } else {
+                    NLM_LOG_WARNING("Failed to prune synapse " + std::to_string(syn->getId()));
+                }
             }
         }
     }

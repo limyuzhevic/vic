@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +101,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void validateConfigKey(const std::string& key, const ConfigValue& value);
+    static std::string getDefaultDescription(const std::string& key);
 };
 
 } // namespace nlm
