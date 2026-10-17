@@ -19,8 +19,359 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <stdexcept>
 
 namespace nlm {
+
+// Configuration parameter validation and extraction
+namespace brain_config {
+
+    // Validate configuration and extract parameters with defaults
+    struct ValidatedConfig {
+        // Core brain parameters
+        size_t neuronCount;
+        size_t regionCount;
+        float connectionProbability;
+        double simulationTimestep;
+        uint64_t randomSeed;
+        
+        // STDP plasticity parameters
+        float stdpLtpWeight;
+        float stdpLtdWeight;
+        float stdpTau;
+        
+        // Structural plasticity parameters
+        float synaptogenesisRate;
+        float pruningRate;
+        
+        // Integration intervals
+        size_t replayInterval;
+        size_t consolidationInterval;
+        
+        // Neural dynamics parameters
+        float neuronAdaptationRate;
+        float neuronAdaptationDecay;
+        float synapticWeightPositiveBound;
+        float synapticWeightNegativeBound;
+        size_t defaultSynapticDelay;
+        
+        // Memory system parameters
+        size_t workingMemoryCapacity;
+        size_t maxEpisodicEpisodes;
+        float memoryConsolidationThreshold;
+        
+        // Neuromodulation parameters
+        float noveltyDetectionThreshold;
+        float curiosityStrength;
+        float dopamineDecayRate;
+        
+        // Cognitive system parameters
+        size_t planningDepth;
+        float attentionInhibitionStrength;
+        float attentionExcitationStrength;
+        
+        // Development system parameters
+        double initialPlasticityRate;
+        double criticalPeriodThreshold;
+        double maturationThreshold;
+        
+        // Performance parameters
+        size_t spikeSystemQueueSize;
+        size_t checkpointMaxFiles;
+        double checkpointMaxSizeMB;
+    };
+
+    ValidatedConfig validateAndExtract(const std::shared_ptr<Config>& config) {
+        ValidatedConfig validated;
+        
+        // Core brain parameters
+        if (config->has("neuron_count")) {
+            validated.neuronCount = config->get<size_t>("neuron_count");
+            if (validated.neuronCount < 10 || validated.neuronCount > 1000000) {
+                throw ConfigError("neuron_count must be between 10 and 1,000,000");
+            }
+        } else {
+            validated.neuronCount = 1000;
+        }
+        
+        if (config->has("region_count")) {
+            validated.regionCount = config->get<size_t>("region_count");
+            if (validated.regionCount < 1 || validated.regionCount > 1000) {
+                throw ConfigError("region_count must be between 1 and 1000");
+            }
+        } else {
+            validated.regionCount = 1;
+        }
+        
+        if (config->has("connection_probability")) {
+            validated.connectionProbability = config->get<float>("connection_probability");
+            if (validated.connectionProbability < 0.0f || validated.connectionProbability > 1.0f) {
+                throw ConfigError("connection_probability must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.connectionProbability = 0.1f;
+        }
+        
+        if (config->has("simulation_timestep")) {
+            validated.simulationTimestep = config->get<double>("simulation_timestep");
+            if (validated.simulationTimestep <= 0.0 || validated.simulationTimestep > 1.0) {
+                throw ConfigError("simulation_timestep must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.simulationTimestep = 0.001;
+        }
+        
+        if (config->has("random_seed")) {
+            validated.randomSeed = config->get<uint64_t>("random_seed");
+        } else {
+            validated.randomSeed = 42ull;
+        }
+        
+        // STDP plasticity parameters
+        if (config->has("stdp_ltp_weight")) {
+            validated.stdpLtpWeight = config->get<float>("stdp_ltp_weight");
+            if (validated.stdpLtpWeight < 0.0f || validated.stdpLtpWeight > 1.0f) {
+                throw ConfigError("stdp_ltp_weight must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.stdpLtpWeight = 0.01f;
+        }
+        
+        if (config->has("stdp_ltd_weight")) {
+            validated.stdpLtdWeight = config->get<float>("stdp_ltd_weight");
+            if (validated.stdpLtdWeight < 0.0f || validated.stdpLtdWeight > 1.0f) {
+                throw ConfigError("stdp_ltd_weight must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.stdpLtdWeight = 0.012f;
+        }
+        
+        if (config->has("stdp_tau")) {
+            validated.stdpTau = config->get<float>("stdp_tau");
+            if (validated.stdpTau <= 0.0f) {
+                throw ConfigError("stdp_tau must be positive");
+            }
+        } else {
+            validated.stdpTau = 20.0f;
+        }
+        
+        // Structural plasticity parameters
+        if (config->has("synaptogenesis_rate")) {
+            validated.synaptogenesisRate = config->get<float>("synaptogenesis_rate");
+            if (validated.synaptogenesisRate < 0.0f || validated.synaptogenesisRate > 1.0f) {
+                throw ConfigError("synaptogenesis_rate must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.synaptogenesisRate = 0.0001f;
+        }
+        
+        if (config->has("pruning_rate")) {
+            validated.pruningRate = config->get<float>("pruning_rate");
+            if (validated.pruningRate < 0.0f || validated.pruningRate > 1.0f) {
+                throw ConfigError("pruning_rate must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.pruningRate = 0.00001f;
+        }
+        
+        // Neural dynamics parameters
+        if (config->has("neuron_adaptation_rate")) {
+            validated.neuronAdaptationRate = config->get<float>("neuron_adaptation_rate");
+            if (validated.neuronAdaptationRate < 0.0f) {
+                throw ConfigError("neuron_adaptation_rate must be positive");
+            }
+        } else {
+            validated.neuronAdaptationRate = 0.01f;
+        }
+        
+        if (config->has("neuron_adaptation_decay")) {
+            validated.neuronAdaptationDecay = config->get<float>("neuron_adaptation_decay");
+            if (validated.neuronAdaptationDecay < 0.0f || validated.neuronAdaptationDecay > 1.0f) {
+                throw ConfigError("neuron_adaptation_decay must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.neuronAdaptationDecay = 0.95f;
+        }
+        
+        if (config->has("synaptic_weight_positive_bound")) {
+            validated.synapticWeightPositiveBound = config->get<float>("synaptic_weight_positive_bound");
+            if (validated.synapticWeightPositiveBound <= 0.0f) {
+                throw ConfigError("synaptic_weight_positive_bound must be positive");
+            }
+        } else {
+            validated.synapticWeightPositiveBound = 0.01f;
+        }
+        
+        if (config->has("synaptic_weight_negative_bound")) {
+            validated.synapticWeightNegativeBound = config->get<float>("synaptic_weight_negative_bound");
+            if (validated.synapticWeightNegativeBound >= 0.0f) {
+                throw ConfigError("synaptic_weight_negative_bound must be negative");
+            }
+        } else {
+            validated.synapticWeightNegativeBound = -0.01f;
+        }
+        
+        if (config->has("default_synaptic_delay")) {
+            validated.defaultSynapticDelay = config->get<size_t>("default_synaptic_delay");
+            if (validated.defaultSynapticDelay < 1) {
+                throw ConfigError("default_synaptic_delay must be at least 1");
+            }
+        } else {
+            validated.defaultSynapticDelay = 1;
+        }
+        
+        // Memory system parameters
+        if (config->has("working_memory_capacity")) {
+            validated.workingMemoryCapacity = config->get<size_t>("working_memory_capacity");
+            if (validated.workingMemoryCapacity < 10) {
+                throw ConfigError("working_memory_capacity must be at least 10");
+            }
+        } else {
+            validated.workingMemoryCapacity = 100;
+        }
+        
+        if (config->has("max_episodic_episodes")) {
+            validated.maxEpisodicEpisodes = config->get<size_t>("max_episodic_episodes");
+            if (validated.maxEpisodicEpisodes < 10) {
+                throw ConfigError("max_episodic_episodes must be at least 10");
+            }
+        } else {
+            validated.maxEpisodicEpisodes = 1000;
+        }
+        
+        if (config->has("memory_consolidation_threshold")) {
+            validated.memoryConsolidationThreshold = config->get<float>("memory_consolidation_threshold");
+            if (validated.memoryConsolidationThreshold < 0.0f || validated.memoryConsolidationThreshold > 1.0f) {
+                throw ConfigError("memory_consolidation_threshold must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.memoryConsolidationThreshold = 0.3f;
+        }
+        
+        // Neuromodulation parameters
+        if (config->has("novelty_detection_threshold")) {
+            validated.noveltyDetectionThreshold = config->get<float>("novelty_detection_threshold");
+            if (validated.noveltyDetectionThreshold < 0.0f || validated.noveltyDetectionThreshold > 1.0f) {
+                throw ConfigError("novelty_detection_threshold must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.noveltyDetectionThreshold = 0.1f;
+        }
+        
+        if (config->has("curiosity_strength")) {
+            validated.curiosityStrength = config->get<float>("curiosity_strength");
+            if (validated.curiosityStrength < 0.0f || validated.curiosityStrength > 1.0f) {
+                throw ConfigError("curiosity_strength must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.curiosityStrength = 0.5f;
+        }
+        
+        if (config->has("dopamine_decay_rate")) {
+            validated.dopamineDecayRate = config->get<float>("dopamine_decay_rate");
+            if (validated.dopamineDecayRate < 0.0f || validated.dopamineDecayRate > 1.0f) {
+                throw ConfigError("dopamine_decay_rate must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.dopamineDecayRate = 0.1f;
+        }
+        
+        // Cognitive system parameters
+        if (config->has("planning_depth")) {
+            validated.planningDepth = config->get<size_t>("planning_depth");
+            if (validated.planningDepth < 1) {
+                throw ConfigError("planning_depth must be at least 1");
+            }
+        } else {
+            validated.planningDepth = 5;
+        }
+        
+        if (config->has("attention_inhibition_strength")) {
+            validated.attentionInhibitionStrength = config->get<float>("attention_inhibition_strength");
+            if (validated.attentionInhibitionStrength < 0.0f) {
+                throw ConfigError("attention_inhibition_strength must be positive");
+            }
+        } else {
+            validated.attentionInhibitionStrength = 0.5f;
+        }
+        
+        if (config->has("attention_excitation_strength")) {
+            validated.attentionExcitationStrength = config->get<float>("attention_excitation_strength");
+            if (validated.attentionExcitationStrength < 0.0f) {
+                throw ConfigError("attention_excitation_strength must be positive");
+            }
+        } else {
+            validated.attentionExcitationStrength = 1.5f;
+        }
+        
+        // Development system parameters
+        if (config->has("initial_plasticity_rate")) {
+            validated.initialPlasticityRate = config->get<double>("initial_plasticity_rate");
+            if (validated.initialPlasticityRate < 0.0 || validated.initialPlasticityRate > 1.0) {
+                throw ConfigError("initial_plasticity_rate must be between 0.0 and 1.0");
+            }
+        } else {
+            validated.initialPlasticityRate = 1.0;
+        }
+        
+        if (config->has("critical_period_threshold")) {
+            validated.criticalPeriodThreshold = config->get<double>("critical_period_threshold");
+            if (validated.criticalPeriodThreshold < 0.0) {
+                throw ConfigError("critical_period_threshold must be positive");
+            }
+        } else {
+            validated.criticalPeriodThreshold = 60.0;
+        }
+        
+        if (config->has("maturation_threshold")) {
+            validated.maturationThreshold = config->get<double>("maturation_threshold");
+            if (validated.maturationThreshold < 0.0) {
+                throw ConfigError("maturation_threshold must be positive");
+            }
+        } else {
+            validated.maturationThreshold = 300.0;
+        }
+        
+        // Performance parameters
+        if (config->has("spike_system_queue_size")) {
+            validated.spikeSystemQueueSize = config->get<size_t>("spike_system_queue_size");
+            if (validated.spikeSystemQueueSize < 100) {
+                throw ConfigError("spike_system_queue_size must be at least 100");
+            }
+        } else {
+            validated.spikeSystemQueueSize = 10000;
+        }
+        
+        if (config->has("checkpoint_max_files")) {
+            validated.checkpointMaxFiles = config->get<size_t>("checkpoint_max_files");
+            if (validated.checkpointMaxFiles < 1) {
+                throw ConfigError("checkpoint_max_files must be at least 1");
+            }
+        } else {
+            validated.checkpointMaxFiles = 5;
+        }
+        
+        if (config->has("checkpoint_max_size_mb")) {
+            validated.checkpointMaxSizeMB = config->get<double>("checkpoint_max_size_mb");
+            if (validated.checkpointMaxSizeMB < 1.0) {
+                throw ConfigError("checkpoint_max_size_mb must be at least 1.0");
+            }
+        } else {
+            validated.checkpointMaxSizeMB = 100.0;
+        }
+        
+        return validated;
+    }
+
+    // Get checkpoint directory from config
+    std::string getCheckpointDir(const std::shared_ptr<Config>& config) {
+        if (config->has("checkpoint_dir")) {
+            return config->get<std::string>("checkpoint_dir");
+        }
+        return "./checkpoints";
+    }
+
+} // namespace brain_config
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -93,12 +444,11 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Validate configuration
+        auto validatedConfig = brain_config::validateAndExtract(config);
+        
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
+        rng = std::make_unique<RandomGenerator>(validatedConfig.randomSeed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -106,51 +456,83 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Configure plasticity systems
+        stdp->configure(validatedConfig.stdpLtpWeight, validatedConfig.stdpLtdWeight, validatedConfig.stdpTau);
+        structuralPlasticity->setSynaptogenesisRate(validatedConfig.synaptogenesisRate);
+        structuralPlasticity->setPruningRate(validatedConfig.pruningRate);
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+        // Set timestep and intervals
+        timestep = validatedConfig.simulationTimestep;
+        replayInterval = validatedConfig.replayInterval;
+        consolidationInterval = validatedConfig.consolidationInterval;
         
         // Initialize neuromodulation systems
+        initializeNeuromodulationSystems();
+        
+        // Initialize integrated systems
+        initializeMemorySystems();
+        initializePredictionSystem();
+        initializeCognitionSystems();
+        initializeDevelopmentSystem();
+        
+        // Initialize checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+        std::string checkpointDir = brain_config::getCheckpointDir(config);
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
+    
+    void initializeNeuromodulationSystems() {
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+    }
+    
+    void initializeMemorySystems() {
+        workingMemory = std::make_unique<NeuralWorkingMemory>();
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    }
+    
+    void initializePredictionSystem() {
+        predictionSystem = std::make_unique<PredictionSystem>();
+    }
+    
+    void initializeCognitionSystems() {
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+    }
+    
+    void initializeDevelopmentSystem() {
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+    }
+    
+    void configurePlasticityFromConfig() {
+        if (config->has("stdp_ltp_weight")) {
+            float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+            stdp->configure(ltpWeight, stdp->getLTDWeight(), stdp->getTimeConstant());
+        }
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        if (config->has("stdp_ltd_weight")) {
+            float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+            stdp->configure(stdp->getLTPWeight(), ltdWeight, stdp->getTimeConstant());
+        }
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        if (config->has("stdp_tau")) {
+            float tau = config->getOr<float>("stdp_tau", 20.0f);
+            stdp->configure(stdp->getLTPWeight(), stdp->getLTDWeight(), tau);
+        }
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (config->has("synaptogenesis_rate")) {
+            float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+            structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        }
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        if (config->has("pruning_rate")) {
+            float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+            structuralPlasticity->setPruningRate(pruningRate);
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -177,28 +559,93 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
-    
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
-    
-    // Create regions
+    try {
+        auto validatedConfig = brain_config::validateAndExtract(pImpl->config);
+        
+        // Get configuration values with validation
+        size_t neuronCount = validatedConfig.neuronCount;
+        size_t regionCount = validatedConfig.regionCount;
+        float connectionProbability = validatedConfig.connectionProbability;
+        
+        // Validate derived parameters
+        if (neuronCount == 0) {
+            throw ConfigError("neuron_count cannot be zero");
+        }
+        if (regionCount == 0) {
+            throw ConfigError("region_count cannot be zero");
+        }
+        if (neuronCount / regionCount < 4) {
+            NLM_LOG_WARNING("Low neuron density: " + std::to_string(neuronCount / regionCount) + 
+                          " neurons per region. This may affect network dynamics.");
+        }
+        
+        NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                     std::to_string(regionCount) + " regions, " +
+                     std::to_string(connectionProbability) + " connection probability");
+        
+        // Create regions
+        createRegions(regionCount);
+        
+        // Create neurons across regions
+        createNeurons(neuronCount, regionCount);
+        
+        // Initialize connectivity with random weights
+        initializeConnectivity(connectionProbability);
+        
+        // Initialize all integrated systems
+        initializeIntegratedSystems(validatedConfig);
+        
+        // Configure plasticity from config
+        pImpl->configurePlasticityFromConfig();
+        
+        // Configure checkpoint manager with validated parameters
+        std::string checkpointDir = brain_config::getCheckpointDir(pImpl->config);
+        pImpl->checkpointManager->configure(checkpointDir, validatedConfig.spikeSystemQueueSize, 
+                                           validatedConfig.checkpointMaxFiles, true);
+        
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+        NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+        
+        return true;
+        
+    } catch (const ConfigError& e) {
+        NLM_LOG_ERROR(std::string("Configuration error during brain initialization: ") + e.what());
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during brain initialization: ") + e.what());
+        return false;
+    }
+}
+
+void Brain::createRegions(size_t regionCount) {
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
-    
-    // Create neurons across regions
+}
+
+void Brain::createNeurons(size_t neuronCount, size_t regionCount) {
     size_t neuronsPerRegion = neuronCount / regionCount;
+    // Ensure minimum neurons per region
+    if (neuronsPerRegion < 4) {
+        neuronsPerRegion = 4;
+    }
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            // Calculate population sizes with validation
+            size_t sensoryNeurons = std::max<size_t>(neuronsPerRegion / 4, 1);
+            size_t internalNeurons = neuronsPerRegion - sensoryNeurons - std::max<size_t>(neuronsPerRegion / 4, 1);
+            if (internalNeurons < 1) internalNeurons = 1;
+            size_t motorNeurons = std::max<size_t>(neuronsPerRegion / 4, 1);
+            
+            // Add populations with validation
+            auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -219,25 +666,26 @@ bool Brain::initialize() {
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
-    
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
+}
+
+void Brain::initializeConnectivity(float connectionProbability) {
+    for (size_t i = 0; i < pImpl->regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
         }
     }
-    
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
+}
+
+void Brain::initializeIntegratedSystems(const brain_config::ValidatedConfig& validatedConfig) {
+    // Initialize working memory with validated capacity
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(validatedConfig.workingMemoryCapacity);
     
-    // Initialize episodic memory
+    // Initialize episodic memory with validated capacity
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(validatedConfig.maxEpisodicEpisodes);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -245,19 +693,22 @@ bool Brain::initialize() {
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
-    // Initialize cognition systems
+    // Initialize cognition systems with validated parameters
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(validatedConfig.planningDepth);
     
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(validatedConfig.attentionInhibitionStrength);
+    pImpl->attention->setExcitationStrength(validatedConfig.attentionExcitationStrength);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation with validated parameters
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Configure neuromodulation thresholds
+    // (Assuming neuromodulation systems have configuration methods)
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -273,8 +724,8 @@ bool Brain::initialize() {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    // Apply synaptic weight as current (using validated synaptic bound)
+                    float synapticCurrent = event.weight * (pImpl->spikeSystem->getMaxWeightPerSpike() / 10.0f);
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {
@@ -285,18 +736,6 @@ bool Brain::initialize() {
             }
         }
     });
-    
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -325,14 +764,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
-    pImpl->currentStep = currentStep;
-    pImpl->currentTime = currentTime;
-    pImpl->totalSpikesThisStep = 0;
-    
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    try {
+        // Update simulation time
+        pImpl->currentStep = currentStep;
+        pImpl->currentTime = currentTime;
+        pImpl->totalSpikesThisStep = 0;
+        
+        // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+        processDelayedSpikes(currentStep, currentTime);
+        
+        // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+        updateNeurons(currentStep, currentTime);
+        
+        // ========== STEP 3: Detect spikes and schedule spike events ==========
+        detectAndProcessSpikes(currentStep, currentTime);
+        
+        // ========== STEP 4: Update working memory ==========
+        updateWorkingMemory(currentTime);
+        
+        // ========== STEP 5: Apply neuromodulation effects ==========
+        applyNeuromodulationEffects(currentTime);
+        
+        // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+        applyPlasticityRules(currentTime);
+        
+        // ========== STEP 7: Update episodic memory ==========
+        updateEpisodicMemory(currentStep, currentTime);
+        
+        // ========== STEP 8: Update prediction system ==========
+        updatePredictionSystem(currentTime);
+        
+        // ========== STEP 9: Update attention system ==========
+        updateAttentionSystem(currentTime);
+        
+        // ========== STEP 10: Update concept formation ==========
+        updateConceptFormation(currentTime);
+        
+        // ========== STEP 11: Apply structural plasticity periodically ==========
+        applyStructuralPlasticity(currentStep, currentTime);
+        
+        // ========== STEP 12: Replay important memories ==========
+        replayImportantMemories(currentStep, currentTime);
+        
+        // ========== STEP 13: Apply development effects ==========
+        applyDevelopmentEffects(currentStep, currentTime);
+        
+        // ========== STEP 14: Periodic memory consolidation ==========
+        consolidateMemories(currentStep);
+        
+        // ========== STEP 15: Checkpoint management ==========
+        manageCheckpoints(currentStep, currentTime);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error in brain step: ") + e.what());
+        // Continue with reset even if error occurs
+        pImpl->currentStep = 0;
+        pImpl->currentTime = 0.0;
+        pImpl->totalSpikesThisStep = 0;
+    }
+}
+
+void Brain::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+}
+
+void Brain::updateNeurons(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -340,8 +836,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+}
+
+void Brain::detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -400,13 +897,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
+}
+
+void Brain::updateWorkingMemory(Timestamp currentTime) {
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+}
+
+void Brain::applyNeuromodulationEffects(Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -438,8 +937,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+}
+
+void Brain::applyPlasticityRules(Timestamp currentTime) {
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -476,8 +976,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             syn->step(currentTime);
         }
     }
-    
-    // ========== STEP 7: Update episodic memory ==========
+}
+
+void Brain::updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -508,14 +1009,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
-    
-    // ========== STEP 8: Update prediction system ==========
+}
+
+void Brain::updatePredictionSystem(Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
-    // ========== STEP 9: Update attention system ==========
+}
+
+void Brain::updateAttentionSystem(Timestamp currentTime) {
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -525,19 +1028,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
-    // ========== STEP 10: Update concept formation ==========
+}
+
+void Brain::updateConceptFormation(Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+}
+
+void Brain::applyStructuralPlasticity(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
-    // ========== STEP 12: Replay important memories ==========
+}
+
+void Brain::replayImportantMemories(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -545,8 +1051,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
+}
+
+void Brain::applyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -575,14 +1082,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
+}
+
+void Brain::consolidateMemories(SimulationStep currentStep) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
-    // ========== STEP 15: Checkpoint management ==========
+}
+
+void Brain::manageCheckpoints(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -865,39 +1374,9 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
-            }
-        }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
+        // Apply neuron states - this is complex because we need to find matching synapses
         // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        NLM_LOG_INFO("Loaded " + std::to_string(neuronData.membranePotential.size()) + " neurons");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
