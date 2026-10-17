@@ -124,7 +124,30 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
-private:
+    // Calculate episode importance for consolidation and replay
+    float calculateEpisodeImportance(const EpisodicMemoryItem* episode) const;
+
+    // Get episodes for replay based on importance (enhanced)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(
+        size_t count, bool duringRest) const;
+
+    // Enhanced replay with importance and neuromodulation
+    void replayEpisodeEnhanced(const EpisodicMemoryItem* episode,
+                              bool duringRest = false,
+                              float neuromodulationFactor = 1.0f);
+
+    // Validate replay with enhanced criteria
+    bool validateReplayEnhanced(const EpisodicMemoryItem* episode,
+                               bool duringRest = false,
+                               float importance = 0.0f) const;
+
+    // Trigger replay-dependent learning
+    void triggerReplayDependentLearningEnhanced(const EpisodicMemoryItem* episode,
+                                                float replayStrength,
+                                                bool duringRest = false);
+
+    // Get episode relevance (placeholder for future implementation)
+    float getEpisodeRelevance(size_t episodeIndex) const;
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
                           const EpisodicMemoryItem& episode) const;

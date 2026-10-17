@@ -274,6 +274,142 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
     }
 }
 
+// Calculate episode importance for consolidation and replay
+float NeuralEpisodicMemory::calculateEpisodeImportance(const EpisodicMemoryItem* episode) const {
+    if (!episode) return 0.0f;
+    
+    float importance = 0.0f;
+    
+    // Recency factor
+    float recencyFactor = 1.0f / (episode->age + 1);
+    importance += recencyFactor * 0.3f;
+    
+    // Reward factor
+    float rewardFactor = std::min(1.0f, episode->reward / 10.0f);
+    importance += rewardFactor * 0.3f;
+    
+    // Novelty factor
+    float noveltyFactor = std::min(1.0f, episode->novelty / 5.0f);
+    importance += noveltyFactor * 0.2f;
+    
+    // Energy factor
+    float energyFactor = std::min(1.0f, episode->energy / 100.0f);
+    importance += energyFactor * 0.2f;
+    
+    return importance;
+}
+
+// Get episodes for replay based on importance
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
+    size_t count, bool duringRest) const {
+    
+    std::vector<std::tuple<float, float, size_t>> scored;  // (score, importance, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float rewardScore = episodes_[i].reward;
+        
+        // Calculate importance
+        float importance = calculateEpisodeImportance(&episodes_[i]);
+        
+        // Adjust score based on whether during rest
+        float recencyWeight = duringRest ? 0.3f : 0.6f;  // Less emphasis on recency during rest
+        float rewardWeight = 0.4f;
+        
+        float score = recencyScore * recencyWeight + rewardScore * rewardWeight;
+        
+        // Add importance boost
+        score += importance * 0.3f;
+        
+        scored.emplace_back(score, importance, i);
+    }
+    
+    // Sort by score
+    std::sort(scored.begin(), scored.end(),
+              [](const auto& a, const auto& b) {
+                  return std::get<0>(a) > std::get<0>(b);
+              });
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
+        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    }
+    
+    return results;
+}
+
+// Enhanced replay with importance and neuromodulation
+void NeuralEpisodicMemory::replayEpisodeEnhanced(const EpisodicMemoryItem* episode, 
+                                                bool duringRest,
+                                                float neuromodulationFactor) {
+    if (!episode || !brain_) return;
+    
+    // Calculate replay strength based on importance and neuromodulation
+    float importance = calculateEpisodeImportance(episode);
+    float replayStrength = importance * neuromodulationFactor * 1.5f;
+    replayStrength = std::min(2.0f, replayStrength);  // Cap at 2x
+    
+    // Validate replay opportunity
+    if (!validateReplayEnhanced(episode, duringRest, importance)) {
+        NLM_LOG_INFO("Enhanced replay validation failed for episode " + 
+                    std::to_string(episode->timestamp));
+        return;
+    }
+    
+    // Perform replay with enhanced strength
+    replayEpisode(episode, replayStrength);
+    
+    // Trigger replay-dependent learning
+    triggerReplayDependentLearningEnhanced(episode, replayStrength, duringRest);
+    
+    // Update episode relevance based on replay
+    updateRelevance(episode->timestamp, importance * 0.1f * replayStrength);
+}
+
+// Validate replay with enhanced criteria
+bool NeuralEpisodicMemory::validateReplayEnhanced(const EpisodicMemoryItem* episode,
+                                                 bool duringRest,
+                                                 float importance) const {
+    if (!episode) return false;
+    
+    bool valid = true;
+    
+    // Check if episode is still relevant
+    if (episode->age > 1000) {  // Too old
+        valid = false;
+    }
+    
+    // Check if episode has sufficient reward for replay
+    if (episode->reward < 0.1f) {  // Low reward
+        valid = false;
+    }
+    
+    // During rest, prioritize high importance episodes
+    if (duringRest && importance < 0.3f) {
+        // Only replay very important episodes during rest
+        valid = false;
+    }
+    
+    return valid;
+}
+
+// Trigger replay-dependent learning
+void NeuralEpisodicMemory::triggerReplayDependentLearningEnhanced(
+    const EpisodicMemoryItem* episode,
+    float replayStrength,
+    bool duringRest) {
+    if (!episode || !brain_ || !brain_->getSTDP()) return;
+    
+    // The enhanced replay already triggers plasticity through neural reactivation
+    // Additional learning can be triggered here if needed
+    
+    // During rest, replay-dependent learning is stronger
+    if (duringRest) {
+        // Enhance learning effects during rest
+        // This would involve strengthening relevant synapses more
+    }
+}
+
 float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
                                              const EpisodicMemoryItem& episode) const {
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;

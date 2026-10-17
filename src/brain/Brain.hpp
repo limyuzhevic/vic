@@ -25,9 +25,16 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SleepConsolidationSystem;
+class ReplaySystem;
+class NeuromodulatorMemoryIntegration;
+class DevelopmentalMemoryIntegration;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -115,12 +122,16 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
+    // Get region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
+    
+    // Get current simulation state
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
     
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
@@ -170,10 +181,19 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -183,6 +203,23 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== ENHANCED MEMORY SYSTEMS ==========
+    
+    // Sleep consolidation system
+    SleepConsolidationSystem* getSleepConsolidationSystem();
+    
+    // Replay system
+    ReplaySystem* getReplaySystem();
+    
+    // Neuromodulator-memory integration
+    NeuromodulatorMemoryIntegration* getNeuromodulatorMemoryIntegration();
+    
+    // Developmental memory integration
+    DevelopmentalMemoryIntegration* getDevelopmentalMemoryIntegration();
+    
+    // Check if resting/sleep state
+    bool isResting() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

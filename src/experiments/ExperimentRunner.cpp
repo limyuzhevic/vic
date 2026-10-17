@@ -1,4 +1,7 @@
 #include "ExperimentRunner.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <filesystem>
 
 namespace nlm {
 
@@ -64,6 +67,62 @@ bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
     }
     
     experiment->setEndStep(maxSteps);
+    
+    // Save checkpoint after experiment
+    saveExperimentCheckpoint(experiment, brain, environment);
+    
+    return true;
+}
+
+bool ExperimentRunner::saveExperimentCheckpoint(std::shared_ptr<Experiment> experiment,
+                                                std::shared_ptr<Brain> brain,
+                                                std::shared_ptr<Environment> environment) {
+    // Create checkpoint directory if it doesn't exist
+    std::string checkpointDir = "./experiment_checkpoints";
+    std::filesystem::path dir(checkpointDir);
+    if (!std::filesystem::exists(dir)) {
+        std::filesystem::create_directories(dir);
+    }
+    
+    std::string checkpointPath = checkpointDir + "/" + experiment->getName() + 
+                                 "_step_" + std::to_string(experiment->getEndStep()) + ".bin";
+    
+    // Save brain state
+    bool brainSaved = brain->save(checkpointPath);
+    if (!brainSaved) {
+        NLM_LOG_ERROR("Failed to save brain checkpoint for experiment: " + experiment->getName());
+        return false;
+    }
+    
+    // Save experiment metrics
+    bool metricsSaved = saveExperimentMetrics(experiment, checkpointPath);
+    
+    NLM_LOG_INFO("Checkpoint saved for experiment: " + experiment->getName() + 
+                 " at step " + std::to_string(experiment->getEndStep()));
+    
+    return brainSaved && metricsSaved;
+}
+
+bool ExperimentRunner::saveExperimentMetrics(std::shared_ptr<Experiment> experiment,
+                                             const std::string& checkpointPath) {
+    std::string metricsPath = checkpointPath + ".metrics.txt";
+    
+    std::ofstream file(metricsPath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open metrics file for writing: " + metricsPath);
+        return false;
+    }
+    
+    file << "Experiment: " << experiment->getName() << std::endl;
+    file << "Start Step: " << experiment->getStartStep() << std::endl;
+    file << "End Step: " << experiment->getEndStep() << std::endl;
+    file << "Final Neuron Count: " << experiment->getMetric("neuron_count") << std::endl;
+    file << "Final Synapse Count: " << experiment->getMetric("synapse_count") << std::endl;
+    file << "Final Firing Neuron Count: " << experiment->getMetric("firing_neuron_count") << std::endl;
+    file << "Final Average Firing Rate: " << experiment->getMetric("avg_firing_rate") << std::endl;
+    file << "Total Reward: " << experiment->getMetric("total_reward") << std::endl;
+    
+    file.close();
     return true;
 }
 

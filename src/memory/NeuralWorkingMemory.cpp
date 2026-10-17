@@ -8,13 +8,16 @@ namespace nlm {
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    // Importance-based consolidation
+    std::vector<float> memoryImportances;
     
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
+    // Multi-stage consolidation
+    std::vector<SimulationStep> consolidationStage;
     
-    Impl() : brain(nullptr) {}
+    // Neuromodulator-based consolidation triggers
+    float consolidationThreshold;
+    
+    Impl() : brain(nullptr), consolidationThreshold(0.5f) {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -56,10 +59,17 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         // Update stored activation
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
+            // Track importance for consolidation
+            if (i < pImpl->memoryImportances.size()) {
+                pImpl->memoryImportances[i] = strength * 0.5f;  // Importance based on strength
+            } else {
+                pImpl->memoryImportances.push_back(strength * 0.5f);
+            }
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
+            pImpl->memoryImportances.push_back(strength * 0.5f);
         }
     }
     
@@ -77,40 +87,21 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        // Update importance based on activation
+        if (idx < pImpl->memoryImportances.size()) {
+            pImpl->memoryImportances[idx] = activation * 0.5f;
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        pImpl->memoryImportances.push_back(activation * 0.5f);
     }
     
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
-}
-
-std::vector<float> NeuralWorkingMemory::retrieve() const {
-    std::vector<float> result;
-    result.reserve(memoryActivations_.size());
-    
-    for (float activation : memoryActivations_) {
-        result.push_back(activation);
-    }
-    
-    return result;
-}
-
-bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
-}
-
-float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
-    }
-    return 0.0f;
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
@@ -142,7 +133,112 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Check for importance-based consolidation
+    checkForConsolidation();
 }
+
+void NeuralWorkingMemory::decayWeakTraces() {
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        memoryActivations_[i] *= (1.0f - decayRate_);
+        
+        if (memoryActivations_[i] < 0.01f) {
+            toRemove.push_back(i);
+        }
+    }
+    
+    // Remove weak traces (in reverse order to maintain indices)
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
+        memoryActivations_.erase(memoryActivations_.begin() + *it);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+        if (*it < pImpl->memoryImportances.size()) {
+            pImpl->memoryImportances.erase(pImpl->memoryImportances.begin() + *it);
+        }
+    }
+}
+
+void NeuralWorkingMemory::checkForConsolidation() {
+    if (!brain_) return;
+    
+    // Check neuromodulator levels for consolidation trigger
+    float dopamineLevel = 0.0f;
+    float acetylcholineLevel = 0.0f;
+    
+    if (brain_->getDopamine()) {
+        dopamineLevel = brain_->getDopamine()->getLevel();
+    }
+    
+    if (brain_->getAcetylcholine()) {
+        acetylcholineLevel = brain_->getAcetylcholine()->getLevel();
+    }
+    
+    // Consolidation is triggered by neuromodulator levels
+    float consolidationNeed = dopamineLevel * 0.5f + acetylcholineLevel * 0.5f;
+    
+    if (consolidationNeed > pImpl->consolidationThreshold) {
+        // Perform importance-based consolidation
+        importanceBasedConsolidation();
+    }
+}
+
+void NeuralWorkingMemory::importanceBasedConsolidation() {
+    if (!brain_ || memoryActivations_.empty()) return;
+    
+    // Sort memories by importance
+    std::vector<size_t> indices(memoryActivations_.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    
+    std::sort(indices.begin(), indices.end(),
+              [this](size_t a, size_t b) {
+                  float importanceA = (a < pImpl->memoryImportances.size()) ? 
+                                     pImpl->memoryImportances[a] : 0.0f;
+                  float importanceB = (b < pImpl->memoryImportances.size()) ? 
+                                     pImpl->memoryImportances[b] : 0.0f;
+                  return importanceA > importanceB;
+              });
+    
+    // Strengthen most important memories
+    size_t strengthenCount = std::min(size_t(5), memoryNeurons_.size());
+    for (size_t i = 0; i < strengthenCount; ++i) {
+        size_t idx = indices[i];
+        if (memoryActivations_[idx] > 0.0f) {
+            // Increase activation of important memories
+            float currentActivation = memoryActivations_[idx];
+            memoryActivations_[idx] = std::min(1.0f, currentActivation * 1.2f);
+            
+            // Inject stronger current for important memories
+            brain_->injectCurrent(memoryNeurons_[idx], memoryActivations_[idx] * 3.0f);
+        }
+    }
+    
+    // Remove least important memories if over capacity
+    while (memoryNeurons_.size() > capacity_ * 0.8f) {
+        // Remove the least important memory
+        size_t removeIdx = indices.back();
+        
+        // Remove from all vectors
+        memoryNeurons_.erase(memoryNeurons_.begin() + removeIdx);
+        memoryActivations_.erase(memoryActivations_.begin() + removeIdx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + removeIdx);
+        if (removeIdx < pImpl->memoryImportances.size()) {
+            pImpl->memoryImportances.erase(pImpl->memoryImportances.begin() + removeIdx);
+        }
+        
+        // Update indices
+        for (auto& idx : indices) {
+            if (idx > removeIdx) idx--;
+        }
+        indices.pop_back();
+    }
+    
+    NLM_LOG_INFO("Importance-based consolidation completed. Capacity: " + 
+                std::to_string(memoryNeurons_.size()) + "/" + std::to_string(capacity_));
+}
+
+} // namespace nlm
 
 void NeuralWorkingMemory::clear() {
     memoryNeurons_.clear();

@@ -48,6 +48,9 @@ struct EpisodicMemoryItem {
     std::vector<float> values;
     std::string metadata;
     
+    // Store concept IDs for integration with concept formation
+    std::vector<size_t> conceptIds;
+    
     EpisodicMemoryItem() : timestamp(0) {}
 };
 

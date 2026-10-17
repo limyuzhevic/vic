@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -68,20 +70,35 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize neural planner with brain reference
+    if (brain_) {
+        auto* neuralPlanner = brain_->getPlanner();
+        if (neuralPlanner) {
+            neuralPlanner->initialize(brain_.get());
+            neuralPlanner->setPlanningDepth(3);
+            NLM_LOG_INFO("Neural planner initialized with brain reference");
+        }
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+// Helper function to convert MotorCommand to string for metadata
+std::string actionToString(MotorCommand action) {
+    switch (action) {
+        case MotorCommand::MoveForward: return "MoveForward";
+        case MotorCommand::MoveBackward: return "MoveBackward";
+        case MotorCommand::TurnLeft: return "TurnLeft";
+        case MotorCommand::TurnRight: return "TurnRight";
+        case MotorCommand::Interact: return "Interact";
+        case MotorCommand::LookLeft: return "LookLeft";
+        case MotorCommand::LookRight: return "LookRight";
+        case MotorCommand::Wait: return "Wait";
+        default: return "Unknown";
+    }
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -94,6 +111,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+            
+            // Also store in working memory
+            if (current > 0.5f) {
+                auto* workingMemory = brain_->getWorkingMemory();
+                if (workingMemory) {
+                    workingMemory->storeToNeuron(sensoryVision_[i]->getId(), current / 10.0f);
+                }
+            }
         }
     }
     
@@ -103,6 +128,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+            
+            // Also store in working memory
+            if (current > 0.5f) {
+                auto* workingMemory = brain_->getWorkingMemory();
+                if (workingMemory) {
+                    workingMemory->storeToNeuron(sensoryTouch_[i]->getId(), current / 10.0f);
+                }
+            }
         }
     }
     
@@ -112,6 +145,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+            
+            // Also store in working memory
+            if (std::abs(current) > 0.5f) {
+                auto* workingMemory = brain_->getWorkingMemory();
+                if (workingMemory) {
+                    workingMemory->storeToNeuron(sensoryInternal_[i]->getId(), std::abs(current) / 10.0f);
+                }
+            }
         }
     }
     
@@ -121,6 +162,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+            
+            // Also store in working memory
+            if (std::abs(current) > 0.5f) {
+                auto* workingMemory = brain_->getWorkingMemory();
+                if (workingMemory) {
+                    workingMemory->storeToNeuron(sensoryProprioception_[i]->getId(), std::abs(current) / 10.0f);
+                }
+            }
         }
     }
     
@@ -147,12 +196,103 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update episodic memory with agent experience
+    updateEpisodicMemory(percept, decodeMotorCommand());
+}
+
+void AgentBrain::updateEpisodicMemory(const SensoryPercept& percept, MotorCommand action) {
+    if (!brain_) return;
+    
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (!episodicMemory) return;
+    
+    // Create episodic memory item
+    EpisodicMemoryItem episode;
+    episode.timestamp = brain_->getCurrentStep();
+    
+    // Store sensory state
+    episode.sensoryState = percept.getVision();
+    episode.resultingSensoryState = percept.getVision();  // Will be updated after action
+    
+    // Store action
+    episode.action = action;
+    
+    // Store reward (use current prediction error)
+    episode.reward = predictionError_;
+    episode.energy = std::abs(predictionError_) * 10.0f;
+    episode.novelty = noveltyLevel_ * 5.0f;
+    
+    // Store additional metadata
+    std::string actionStr = actionToString(action);
+    episode.metadata = "Action: " + actionStr + " | Novelty: " + 
+                      std::to_string(noveltyLevel_) + 
+                      " | Curiosity: " + std::to_string(curiosityLevel_);
+    
+    // Record current neural state for episodic memory
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Capture activation level
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential);
+                
+                if (activation > 0.1f) {
+                    episode.activeNeurons.push_back(neuron->getId());
+                    episode.neuronActivations.push_back(activation);
+                }
+            }
+        }
+    }
+    
+    // Set position (simplified - would come from world state in real implementation)
+    episode.positionX = 0.0f;
+    episode.positionY = 0.0f;
+    episode.orientation = 0.0f;
+    
+    // Store the episode
+    episodicMemory->storeEpisode(episode);
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand decoded = MotorCommand::Wait;
+    
+    // Try neural planner first if available
+    auto* neuralPlanner = brain_->getPlanner();
+    if (neuralPlanner) {
+        // Create current state representation from sensory input
+        std::vector<float> currentState;
+        
+        // Extract vision state (256 values)
+        currentState.reserve(256 + 8 + 4 + 6); // Vision + touch + internal + proprioception
+        
+        // Get current vision percept (simplified - in reality this would be stored)
+        const auto& vision = previousVision_; // Using previous vision as current state
+        currentState.insert(currentState.end(), vision.begin(), vision.end());
+        
+        // Create a simple internal state representation
+        std::vector<float> internalState(8, 0.0f); // 4 internal + 4 proprioception
+        currentState.insert(currentState.end(), internalState.begin(), internalState.end());
+        
+        // Get target reward from agent's internal state (using prediction error)
+        float targetReward = 0.5f + predictionError_ * 0.1f; // Scale prediction error
+        targetReward = std::clamp(targetReward, 0.0f, 1.0f);
+        
+        // Use neural planner to select action
+        decoded = neuralPlanner->planAction(currentState, targetReward);
+        
+        // Update planner quality based on actual outcomes
+        if (decoded != MotorCommand::Wait) {
+            neuralPlanner->setActionQuality(decoded, 0.5f); // Start with neutral quality
+        }
+    }
+    
+    // Fall back to motor neuron decoding if planner not available or gives wait
+    if (decoded == MotorCommand::Wait) {
+        decoded = decodeFromMotorNeurons();
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
@@ -249,6 +389,26 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Pass prediction error to prediction system for training
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        // Convert prediction error to a simple observation for training
+        // In a real implementation, this would include the full sensory context
+        class SimpleSensoryInput {
+        public:
+            std::vector<float> data;
+            SimpleSensoryInput(float error) {
+                data = std::vector<float>(1, error);  // Store error in single value
+            }
+        };
+        
+        SimpleSensoryInput errorInput(predictionError_);
+        predictionSystem->train(errorInput);
+        
+        // Also update prediction system with error
+        predictionSystem->updatePredictions(errorInput, errorInput);
+    }
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {

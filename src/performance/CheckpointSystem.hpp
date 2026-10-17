@@ -346,6 +346,20 @@ public:
     }
     
     /**
+     * Set brain state providers
+     */
+    void setBrainProvider(std::function<bool(const std::string&)>) {
+        brainProvider_ = provider;
+    }
+    
+    /**
+     * Set metadata providers
+     */
+    void setMetadataProvider(std::function<void(CheckpointHeader&)>) {
+        metadataProvider_ = provider;
+    }
+    
+    /**
      * Update checkpoint state (call each simulation step)
      */
     bool update(uint64_t currentStep, double currentTime);
@@ -369,8 +383,15 @@ public:
         double simulationTime;
         uint64_t neuronCount;
         uint64_t synapseCount;
+        uint64_t regionCount;
         uint64_t fileSize;
         time_t timestamp;
+        uint32_t versionMajor;
+        uint32_t versionMinor;
+        uint32_t versionPatch;
+        std::string compressionType;
+        uint64_t checksum;
+        double validationScore;
     };
     
     std::vector<CheckpointInfo> listCheckpoints() const;
@@ -395,6 +416,56 @@ public:
      */
     bool shouldSave(uint64_t currentStep) const;
     
+    /**
+     * Validate checkpoint before loading
+     */
+    bool validateCheckpoint(const std::string& filepath);
+    
+    /**
+     * Create backup of checkpoint
+     */
+    bool createBackup(const std::string& sourcePath, const std::string& backupName = "");
+    
+    /**
+     * Get checkpoint statistics
+     */
+    struct CheckpointStats {
+        uint64_t totalCheckpoints = 0;
+        uint64_t totalBytesSaved = 0;
+        uint64_t averageCheckpointSize = 0;
+        double compressionRatio = 0.0;
+        uint64_t lastCheckpointStep = 0;
+        double lastCheckpointTime = 0.0;
+        uint64_t validationFailures = 0;
+        uint64_t loadSuccesses = 0;
+        uint64_t loadFailures = 0;
+    };
+    
+    CheckpointStats getStats() const;
+    
+    /**
+     * Reset statistics
+     */
+    void resetStats();
+    
+    /**
+     * Set checkpoint version
+     */
+    void setVersion(uint32_t major, uint32_t minor, uint32_t patch) {
+        versionMajor_ = major;
+        versionMinor_ = minor;
+        versionPatch_ = patch;
+    }
+    
+    /**
+     * Get checkpoint version
+     */
+    void getVersion(uint32_t& major, uint32_t& minor, uint32_t& patch) const {
+        major = versionMajor_;
+        minor = versionMinor_;
+        patch = versionPatch_;
+    }
+    
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
@@ -405,6 +476,22 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(const std::string&)> brainProvider_;
+    std::function<void(CheckpointHeader&)> metadataProvider_;
+    
+    // Statistics
+    mutable uint64_t totalCheckpoints_;
+    mutable uint64_t totalBytesSaved_;
+    mutable uint64_t validationFailures_;
+    mutable uint64_t loadSuccesses_;
+    mutable uint64_t loadFailures_;
+    
+    // Version
+    uint32_t versionMajor_;
+    uint32_t versionMinor_;
+    uint32_t versionPatch_;
+    
+    mutable std::mutex statsMutex_;
 };
 
 // Checksum implementation
