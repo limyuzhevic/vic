@@ -2,21 +2,22 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
-
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+> **NEW: Enhanced Python Bindings Available!**
+> The project now includes `pynlm_enhanced` with a simplified, user-friendly API for rapid prototyping and machine learning tasks.
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+## What is NLM?
+
+NLM is a brain simulator for computers that lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+
+Think of it like this:
+- **Neurons** = Brain cells that send signals to each other
+- **Synapses** = Connections between brain cells
+- **Learning** = When connections get stronger or weaker based on what happens
+- **Memory** = The brain remembering patterns
+
+That's it! NLM simulates all of this.
 
 ## Current Phase
 
@@ -73,14 +74,64 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Building Enhanced Python Bindings
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4 pynlm_enhanced
+```
+
+The enhanced Python bindings are built as a separate module `pynlm_enhanced` alongside the original `pynlm`.
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Usage Examples
+
+**Basic Python (Original Bindings)**
+
+```python
+import pynlm as nlm
+
+# Create a brain
+config = nlm.createDefaultConfig()
+brain = nlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+
+print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+```
+
+**Enhanced Python (New Simplified API)**
+
+```python
+import pynlm_enhanced as nlm
+
+# Create a brain easily
+brain = nlm.createSimpleBrain(neuron_count=100)
+
+# Run simulation easily
+brain.simulate(50)
+
+# Get status easily
+status = brain.getStatus()
+print(f"Your brain has {status['neuron_count']} neurons")
+print(f"Total spikes: {status['total_spikes']}")
+print(f"Average firing rate: {status['firing_rate']:.2f} Hz")
+print(f"Learning detected: {status['learning_detected']}")
+```
 
 ## Project Structure
 
@@ -109,7 +160,7 @@ NLM/
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
@@ -162,64 +213,63 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
-## Scientific Limitations
+## Enhanced Features
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### New Python API (pynlm_enhanced)
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+#### Simplified Brain Interface
+- `createSimpleBrain()` - Easy brain creation with sensible defaults
+- `brain.simulate(steps)` - Simple simulation without manual stepping
+- `brain.getStatus()` - Comprehensive status information
+- `brain.checkLearning()` - Simple learning detection
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+#### Neural Network Tools
+- `createNeuralNetwork()` - Simple neural network implementation
+- `trainAndEvaluate()` - Train and evaluate neural networks
+- `batchSimulate()` - Run simulations on multiple brains
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+#### Enhanced Configuration
+- Method chaining for configuration
+- Type-safe getters and setters
+- Preset configurations (basic/advanced)
+- JSON export/import
 
-## Architecture Philosophy
+### Code Quality Improvements
 
-The NLM brain operates as a closed-loop system:
+#### C++ Core
+- Modernized code structure
+- Fixed memory management issues
+- Improved error handling
+- Enhanced documentation
+- Better testing coverage
 
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+#### Python Bindings
+- Simplified API for common use cases
+- Enhanced error handling with Python exceptions
+- Type safety and validation
+- Better documentation and examples
+
+### Advanced Tools
+
+#### Command Line Tools
+- Brain configuration tools
+- Simulation control tools
+- Performance monitoring
+- Checkpoint management
+
+#### Visualization Tools
+- Real-time brain state visualization
+- Spike train visualization
+- Network topology visualization
+- Performance monitoring dashboards
+
+## Enhanced API Documentation
+
+For complete API documentation, see:
+- `docs/ENHANCED_API.md` - Full enhanced API reference
+- `python/bindings_enhanced.cpp` - Enhanced bindings source
+- `easy_usage.md` - Easy usage guide (updated)
+- `HOW_TO_USE.md` - Comprehensive usage guide
 
 ## License
 
