@@ -59,8 +59,12 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
-    
-    auto result = experiment.run(config);
+    config.workingMemoryCapacity = 1000;
+    config.episodicMemoryMaxEpisodes = 10000;
+    config.predictionUpdateInterval = 10;
+    config.conceptFormationEnabled = true;
+    config.replayInterval = 100;
+    config.consolidationInterval = 1000;
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

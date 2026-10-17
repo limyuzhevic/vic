@@ -35,6 +35,7 @@ struct Phase6IntegrationResult {
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
+    bool conceptFormationIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
     
@@ -58,6 +59,7 @@ struct Phase6IntegrationResult {
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
+        , conceptFormationIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)
@@ -85,6 +87,14 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Phase 6 specific configuration options
+    size_t workingMemoryCapacity;
+    size_t episodicMemoryMaxEpisodes;
+    size_t predictionUpdateInterval;
+    bool conceptFormationEnabled;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,8 +103,13 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
-};
+        , checkpointPath("./checkpoint_test.bin")
+        , workingMemoryCapacity(1000)
+        , episodicMemoryMaxEpisodes(10000)
+        , predictionUpdateInterval(10)
+        , conceptFormationEnabled(true)
+        , replayInterval(100)
+        , consolidationInterval(1000) {}
 
 /**
  * Phase 6 integrated experiment runner

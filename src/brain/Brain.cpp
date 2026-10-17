@@ -75,6 +75,20 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Phase 6 integration state
+    size_t predictionUpdateCounter;
+    size_t conceptFormationCounter;
+    size_t workingMemoryDecayCounter;
+    
+    // Phase 6 integration configuration
+    size_t workingMemoryCapacity;
+    size_t episodicMemoryMaxEpisodes;
+    size_t predictionUpdateInterval;
+    bool conceptFormationEnabled;
+    size_t predictionUpdateCounter;
+    size_t conceptFormationCounter;
+    size_t workingMemoryDecayCounter;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -142,12 +156,20 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Phase 6 integration configuration
+        workingMemoryCapacity = config->getOr<size_t>("working_memory_capacity", 1000);
+        episodicMemoryMaxEpisodes = config->getOr<size_t>("episodic_memory_max_episodes", 10000);
+        predictionUpdateInterval = config->getOr<size_t>("prediction_update_interval", 10);
+        conceptFormationEnabled = config->getOr<bool>("concept_formation_enabled", true);
+        
+        // Initialize phase 6 counters
+        predictionUpdateCounter = 0;
+        conceptFormationCounter = 0;
+        workingMemoryDecayCounter = 0;
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -510,7 +532,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
+    if (pImpl->predictionSystem && ++pImpl->predictionUpdateCounter >= pImpl->predictionUpdateInterval) {
+        pImpl->predictionUpdateCounter = 0;
+        
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
@@ -527,9 +551,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->conceptFormationEnabled && ++pImpl->conceptFormationCounter >= 50) {
+        pImpl->conceptFormationCounter = 0;
+        
+        // Concept formation would process current neural activity patterns to form concepts
+        // This requires sensory state encoding and episodic memory integration
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

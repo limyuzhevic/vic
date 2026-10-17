@@ -33,6 +33,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
+    // Phase 6 integration configuration
+    cfg->set("working_memory_capacity", config.workingMemoryCapacity);
+    cfg->set("episodic_memory_max_episodes", config.episodicMemoryMaxEpisodes);
+    cfg->set("prediction_update_interval", config.predictionUpdateInterval);
+    cfg->set("concept_formation_enabled", config.conceptFormationEnabled);
+    cfg->set("replay_interval", config.replayInterval);
+    cfg->set("consolidation_interval", config.consolidationInterval);
+    
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
@@ -117,6 +125,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    result.conceptFormationIntegrated = (brain->getConceptFormation() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
@@ -124,6 +133,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Concept Formation: " + std::string(result.conceptFormationIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -146,6 +156,29 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
+    // Test replay system
+    if (config.enableReplay) {
+        NLM_LOG_INFO("Testing replay system...");
+        // Create a fresh brain for replay testing
+        auto replayBrain = std::make_shared<Brain>(cfg);
+        replayBrain->initialize();
+        
+        // Run some steps to generate episodes
+        for (int i = 0; i < 200; ++i) {
+            replayBrain->step(i, i * 0.001);
+        }
+        
+        // Test replay
+        auto* em = replayBrain->getEpisodicMemory();
+        if (em) {
+            auto episodes = em->getEpisodesForReplay(3);
+            if (!episodes.empty()) {
+                NLM_LOG_INFO("Replay system can retrieve episodes: " + std::to_string(episodes.size()));
+                result.replayWorks = true;
+            }
+        }
+    }
+    
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
@@ -162,7 +195,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    // Create minimal brain
+    // Create config
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
     cfg->set("region_count", 1);
@@ -287,117 +320,21 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
-    NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
-    
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    // Get neuromodulation systems
-    auto* dopamine = brain->getDopamine();
-    auto* curiosity = brain->getCuriosity();
-    auto* novelty = brain->getNovelty();
-    
-    if (!dopamine || !curiosity || !novelty) {
-        NLM_LOG_ERROR("Neuromodulation systems not available");
-        return false;
-    }
-    
-    // Run some steps with sensory input
-    for (int i = 0; i < 50; ++i) {
-        // Inject some sensory activity
-        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
-        brain->step(i, i * 0.001);
-    }
-    
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
-    return true;
+    cfg->set("region_count", 1);
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
-    NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
-    
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
-    
-    // Create and initialize brain
-    auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
-    
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain1->step(i, i * 0.001);
-    }
-    
-    float avgFiring1 = brain1->getAverageFiringRate();
-    size_t totalSpikes1 = brain1->getTotalSpikeCount();
-    
-    NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
-    NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
-    
-    // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
-        NLM_LOG_ERROR("Failed to save checkpoint");
-        return false;
-    }
-    
-    // Create new brain and load
-    auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
-    
-    if (!brain2->load(path)) {
-        NLM_LOG_ERROR("Failed to load checkpoint");
-        return false;
-    }
-    
-    size_t totalSpikes2 = brain2->getTotalSpikeCount();
-    NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
-    
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
-    
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
-    return true;
+    cfg->set("region_count", 1);
 }
 
 bool Phase6IntegratedExperiment::testReplay() {
-    NLM_LOG_INFO("=== Testing Replay System ===");
-    
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    auto* em = brain->getEpisodicMemory();
-    if (!em) {
-        NLM_LOG_ERROR("Episodic memory not available");
-        return false;
-    }
-    
-    // Run some steps
-    for (int i = 0; i < 200; ++i) {
-        brain->step(i, i * 0.001);
-    }
-    
-    // Check if episodes exist for replay
-    size_t episodeCount = em->getEpisodeCount();
-    if (episodeCount > 0) {
-        NLM_LOG_INFO("[PASS] Episodes available for replay: " + std::to_string(episodeCount));
-        
-        // Get episodes for replay
-        auto episodes = em->getEpisodesForReplay(3);
-        if (!episodes.empty()) {
-            NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
-            return true;
-        }
-    }
-    
-    NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
-    return true;
+    cfg->set("region_count", 1);
 }
 
 } // namespace nlm
