@@ -10,14 +10,29 @@ namespace nlm {
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
+    std::string colorScheme = "default";  // default, monochrome, bold, custom
     std::ofstream fileOut;
+    std::string logFilePath;
     std::mutex mutex;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->level = LogLevel::Info;  // Default level
+    pImpl->useColors = true;
+    pImpl->colorScheme = "default";
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    pImpl->useColors = true;
+    pImpl->colorScheme = "default";
+}
+
+ConsoleLogger::ConsoleLogger(LogLevel level, bool useColors, const std::string& colorScheme) 
+    : pImpl(std::make_unique<Impl>()) {
+    pImpl->level = level;
+    pImpl->useColors = useColors;
+    pImpl->colorScheme = colorScheme;
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
@@ -40,10 +55,12 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
-    // Console output
-    if (pImpl->useColors) {
+    // Console output with improved color handling
+    if (pImpl->useColors && pImpl->colorScheme != "monochrome") {
+        // Use color scheme
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
+        // No colors or monochrome
         std::cout << output << "\n";
     }
     
@@ -70,7 +87,16 @@ bool ConsoleLogger::getUseColors() const {
     return pImpl->useColors;
 }
 
+void ConsoleLogger::setColorScheme(const std::string& scheme) {
+    pImpl->colorScheme = scheme;
+}
+
+std::string ConsoleLogger::getColorScheme() const {
+    return pImpl->colorScheme;
+}
+
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    pImpl->logFilePath = filepath;
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
@@ -92,14 +118,36 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
 }
 
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
+    if (!pImpl->useColors) {
+        return "\033[0m";
     }
+    
+    if (pImpl->colorScheme == "monochrome") {
+        return "";  // No color codes
+    } else if (pImpl->colorScheme == "bold") {
+        // Make all output bold
+        return "\033[1m";
+    } else if (pImpl->colorScheme == "custom") {
+        // Custom color scheme with better contrast
+        switch (level) {
+            case LogLevel::Debug: return "\033[36;1m";    // Cyan bold
+            case LogLevel::Info: return "\033[32;1m";      // Green bold
+            case LogLevel::Warning: return "\033[33;1m";   // Yellow bold
+            case LogLevel::Error: return "\033[31;1m";     // Red bold
+            case LogLevel::Critical: return "\033[35;1m";  // Magenta bold
+            default: return "\033[0m";
+        }
+    } else {  // default
+        switch (level) {
+            case LogLevel::Debug: return "\033[36m";    // Cyan
+            case LogLevel::Info: return "\033[32m";      // Green
+            case LogLevel::Warning: return "\033[33m";   // Yellow
+            case LogLevel::Error: return "\033[31m";     // Red
+            case LogLevel::Critical: return "\033[35m";  // Magenta
+            default: return "\033[0m";
+        }
+    }
+}
 }
 
 // Logger class implementation

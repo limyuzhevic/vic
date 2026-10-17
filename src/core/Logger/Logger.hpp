@@ -42,6 +42,7 @@ class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
     explicit ConsoleLogger(LogLevel level);
+    ConsoleLogger(LogLevel level, bool useColors, const std::string& colorScheme);
     ~ConsoleLogger() override;
     
     void log(const LogEntry& entry) override;
@@ -51,6 +52,10 @@ public:
     // Enable/disable colors
     void setUseColors(bool useColors);
     bool getUseColors() const;
+    
+    // Set color scheme for enhanced output
+    void setColorScheme(const std::string& scheme);
+    std::string getColorScheme() const;
     
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);

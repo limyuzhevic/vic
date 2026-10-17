@@ -55,13 +55,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and legacy key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Load from specific formats
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to file (automatically detects format based on extension)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +104,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format conversion helpers
+    std::string valueToJSON(const ConfigValue& value) const;
+    std::string valueToYAML(const ConfigValue& value) const;
+    std::string toJSON() const;
+    std::string toYAML() const;
 };
 
 } // namespace nlm
