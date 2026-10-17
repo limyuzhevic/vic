@@ -63,24 +63,433 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
+## Installation
 
-## Building
+### Quick Start
+
+For most users, the easiest way to get started is to install the Python package, which includes the core C++ libraries and provides the main user interface.
+
+#### Python Installation (Recommended)
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Install the NLM Python package
+pip install .
+
+# For development, install in editable mode
+pip install -e .
+
+# Verify installation
+python -c "import pynlm; brain = pynlm.createBrain(pynlm.createDefaultConfig()); print('NLM successfully installed!')"
 ```
 
-## Running
+#### System Dependencies
 
-### Phase 6 Demo (Integration Test)
+The Python package includes the core C++ libraries, but for advanced development or standalone use, you'll need:
+
 ```bash
+# Install system dependencies
+# On Ubuntu/Debian:
+apt-get update
+apt-get install build-essential cmake git
+
+# On macOS:
+brew install cmake
+
+# On Windows:
+# Install from https://visualstudio.microsoft.com/vs/community/
+```
+
+### Building from Source
+
+For those who need to build the C++ libraries directly:
+
+#### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **pybind11**: Version 2.11.0+ (for Python bindings)
+
+#### Build Steps
+
+```bash
+# Clone the repository (if you haven't already)
+git clone https://github.com/nlm-project/nlm.git
+cd nlm
+
+# Create build directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+#### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
+| `nlm_test` | Executable | Unit test suite |
+
+#### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Build with custom install prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+
+# Build with specific features
+# Example: Enable visualization
+cmake .. -DENABLE_VISUALIZATION=ON
+```
+
+### Python Package Installation
+
+The recommended way to use NLM is through the Python package, which includes all the core functionality and provides a user-friendly interface.
+
+#### Using pip (Recommended)
+
+```bash
+# Install the latest release
+pip install pynlm
+
+# Install from source
+pip install .
+```
+
+#### From PyPI (for binary distributions)
+
+```bash
+pip install pynlm
+```
+
+#### Development Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/nlm-project/nlm.git
+cd nlm
+
+# Install in development mode (recommended for development)
+pip install -e .
+
+# Build documentation
+pip install -e .[docs]
+```
+
+### Testing and Verification
+
+After installation, you can verify that everything works correctly:
+
+```python
+# Test basic functionality
+import pynlm
+
+# Create a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+print("✓ Brain created and initialized")
+print(f"✓ Brain has {brain.getTotalNeuronCount()} neurons")
+
+# Test world interaction
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+
+print("✓ World configured")
+
+# Test agent functionality
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+print("✓ Agent created and initialized")
+
+# Run a simple simulation
+for step in range(10):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print(f"✓ Simulation completed with {brain.getTotalSpikeCount()} total spikes")
+print("✓ All basic functionality tests passed!")
+```
+
+### System Requirements
+
+#### Minimum Requirements
+
+- **Operating System**: Linux, macOS, or Windows
+- **Python**: 3.8 or higher
+- **Memory**: 2GB RAM minimum (4GB+ recommended for simulations)
+- **Disk Space**: 500MB for the package (additional space for simulations)
+
+#### Recommended Hardware
+
+For large-scale simulations:
+
+- **Memory**: 8GB+ RAM
+- **CPU**: Multi-core processor (4+ cores recommended)
+- **Disk Space**: 2GB+ for simulation data and checkpoints
+
+### Troubleshooting
+
+#### Installation Issues
+
+**"pip install . failed"**
+
+```bash
+# Try with verbose output
+pip install -v .
+
+# Clear pip cache
+pip cache purge
+pip install --no-cache-dir .
+```
+
+**Missing dependencies**:
+
+```bash
+# On Ubuntu/Debian
+apt-get install build-essential cmake git
+
+# On macOS with Homebrew
+brew install cmake
+
+# On Windows (if needed)
+choco install cmake
+```
+
+#### Runtime Issues
+
+**"ImportError: libname not found: libpynlm.so"**
+
+```bash
+# On Linux, you may need to set the library path
+export LD_LIBRARY_PATH=/path/to/nlm/lib:$LD_LIBRARY_PATH
+
+# Or install system-wide
+pip install . --user
+```
+
+**"Python bindings not working"**
+
+```python
+# Check Python path
+import sys
+print(sys.path)
+
+# Try to import pybind11 directly
+import pybind11
+print("Pybind11 version:", pybind11.__version__)
+```
+
+#### Build Issues
+
+**CMake configuration fails**:
+
+```bash
+# Try different CMake version
+cmake .. -DCMAKE_CXX_STANDARD=17
+
+# Or clean build directory
+cd build
+rm -rf *
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+```
+
+### Development Setup
+
+For developers who want to contribute to NLM:
+
+#### Clone Repository
+
+```bash
+git clone https://github.com/nlm-project/nlm.git
+cd nlm
+```
+
+#### Create Development Branch
+
+```bash
+# Create and switch to a development branch
+git checkout -b feature/your-feature-name
+```
+
+#### Install Development Dependencies
+
+```bash
+# Install Python development tools
+pip install -e .[dev]
+
+# Install documentation tools
+pip install -e .[docs]
+
+# Install testing tools
+pip install -e .[test]
+```
+
+#### Running Tests
+
+```bash
+# Run unit tests
+cd build
+ctest --output-on-failure
+
+# Or run Python tests
+pytest tests/
+```
+
+#### Running Demos
+
+```bash
+# Run Phase 3 demo (if built)
+./nlm_phase3_demo
+
+# Run Phase 4 demo (if built)
+./nlm_phase4_demo
+
+# Run Phase 6 demo (if built)
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Post-Installation Setup
+
+After installation, you may want to set up some additional configuration:
+
+#### Create Configuration Directory
+
+```bash
+mkdir -p ~/.nlm
+```
+
+#### Create Example Configuration File
+
+```bash
+cat > ~/.nlm/nlm_config.json << EOF
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.15,
+    "simulation_timestep": 0.001,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012
+}
+EOF
+```
+
+#### Set Environment Variables
+
+```bash
+# Add NLM to Python path
+export PYTHONPATH="/path/to/nlm:$PYTHONPATH"
+
+# Set NLM home directory
+export NLM_HOME="/path/to/nlm"
+```
+
+### Documentation
+
+After installation, you can access documentation:
+
+```bash
+# View documentation in terminal
+pydoc pynlm
+
+# Or browse online documentation
+# Visit https://nlm.readthedocs.io
+```
+
+### Support
+
+If you encounter issues during installation or usage:
+
+#### Common Issues
+
+1. **ModuleNotFoundError**: Ensure you're using the correct Python environment
+2. **ImportError**: Check that the C++ libraries are properly built
+3. **Configuration errors**: Check your configuration files for syntax errors
+
+#### Getting Help
+
+- **GitHub Issues**: https://github.com/nlm-project/nlm/issues
+- **Community Forum**: https://community.nlm-project.org
+- **Documentation**: https://nlm.readthedocs.io
+- **Email Support**: support@nlm-project.org
+
+### Upgrading
+
+To upgrade to a newer version:
+
+```bash
+# Upgrade from pip
+pip install --upgrade pynlm
+
+# Upgrade from source
+cd /path/to/nlm
+pip install -U -e .
+```
+
+### Uninstalling
+
+To remove NLM:
+
+```bash
+# Uninstall Python package
+pip uninstall pynlm
+
+# Remove system-wide installation (if applicable)
+sudo make uninstall
+
+# Clean up configuration files
+rm -rf ~/.nlm
+```
+
+---
+
+## Conclusion
+
+NLM is a comprehensive neural simulation framework that provides both C++ and Python interfaces for building and simulating artificial brains. Whether you're a beginner looking to understand basic concepts or an advanced researcher wanting to push the boundaries of neural simulation, NLM offers the tools you need.
+
+**Key Features**:
+- **Modular Architecture**: Separate components for memory, prediction, cognition, and development
+- **Python Interface**: High-level, user-friendly API for rapid prototyping
+- **C++ Core**: High-performance implementation for large-scale simulations
+- **Learning Capabilities**: Multiple plasticity mechanisms including STDP and Hebbian learning
+- **Development System**: Artificial development with age-dependent plasticity
+- **Checkpoint System**: Ability to save and load simulation state
+- **Replay System**: Memory consolidation and replay functionality
+
+**For more information:**
+- Visit the documentation website: https://nlm.readthedocs.io
+- Join the NLM community forum: https://community.nlm-project.org
+- Explore example projects and tutorials in the repository
+- Check out the Phase 6 integration demo for a complete example
+
+That's it! You're now ready to use NLM for neural simulation and research.
 
 ## Project Structure
 

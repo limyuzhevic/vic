@@ -99,6 +99,389 @@ python -m build
 pip install dist/*.whl
 ```
 
+### Quick Verification
+
+After installation, you can test that everything works:
+
+```python
+import pynlm
+
+# Test basic functionality
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+print("Python bindings loaded successfully!")
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+---
+
+## Part 3: Using the NLM Python API
+
+### Overview
+
+The NLM Python API provides a high-level interface to the C++ neural simulation framework. It allows you to:
+
+1. **Create and configure virtual brains**
+2. **Simulate brain activity over time**
+3. **Interact with simulated environments**
+4. **Use agents to connect brains to worlds**
+5. **Enable learning and development features**
+
+### Core Classes
+
+| Python Class | C++ Equivalent | Purpose |
+|-------------|----------------|---------|
+| `pynlm.Config` | `Config` | Brain configuration |
+| `pynlm.Brain` | `Brain` | Neural simulation engine |
+| `pynlm.SimpleWorld` | `SimpleWorld` | Simulation environment |
+| `pynlm.AgentBrain` | `AgentBrain` | Brain-world interface |
+| `pynlm.Vision` | `Vision` | Visual sensory input |
+| `pynlm.Action` | `Action` | Motor output commands |
+
+### Advanced Features
+
+#### 1. Using Neuromodulation
+
+```python
+import pynlm
+
+# Create brain and agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run simulation with learning
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+#### 2. Working with Different Neuron Types
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Inject current into specific neuron types
+brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 5.0f)
+brain.injectCurrentToNeurons(pynlm.NeuronType.Excitatory, 2.0f)
+brain.injectCurrentToNeurons(pynlm.NeuronType.Inhibitory, 1.0f)
+
+# Check brain statistics
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate()}")
+```
+
+#### 3. Configuration and Customization
+
+```python
+import pynlm
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+
+# Customize settings
+config.set("neuron_count", 2000)
+config.set("region_count", 3)
+config.set("connection_probability", 0.2)
+config.set("stdp_ltp_weight", 0.025)
+config.set("stdp_ltd_weight", 0.02)
+
+# Save configuration to file
+config.saveToFile("my_config.json")
+
+# Create brain with custom config
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### 4. Advanced Agent Features
+
+```python
+import pynlm
+
+# Create agent with advanced features
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True, 0.5)  # Learning rate
+agent.enableCuriosity(True, 0.3)         # Exploration drive
+agent.enableDevelopment(True)            # Brain maturation
+agent.enableStructuralPlasticity(True, 0.001)  # Synapse growth
+
+# Run enhanced simulation
+for step in range(2000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Check neuromodulation levels
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Reward modulation: {agent.getNeuromodulationLevel()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel()}")
+        print(f"  Novelty level: {agent.getNoveltyLevel()}")
+        print(f"  Prediction error: {agent.getPredictionError()}")
+        print(f"  Developmental stage: {agent.getDevelopmentalStage()}")
+```
+
+---
+
+## Part 4: Building for Advanced Users
+
+### C++ Development
+
+For C++ developers, NLM provides extensive APIs and flexibility:
+
+#### Direct Brain Access
+
+```cpp
+#include "brain/Brain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "agent/AgentBrain.hpp"
+
+// Create brain with custom config
+auto config = std::make_shared<nlm::Config>();
+config->set("neuron_count", 5000);
+auto brain = std::make_shared<nlm::Brain>(config);
+
+if (brain->initialize()) {
+    // Access neural components directly
+    auto spikeSystem = brain->getSpikeSystem();
+    auto workingMemory = brain->getWorkingMemory();
+    auto dopamine = brain->getDopamine();
+    
+    // Run simulation with direct control
+    for (int step = 0; step < 10000; ++step) {
+        brain->step(step, step * 0.001);
+        // Custom intervention logic here
+    }
+}
+```
+
+#### Environment Customization
+
+```cpp
+#include "world/GridWorldEnvironment.hpp"
+
+// Create custom environment
+auto env = std::make_unique<nlm::GridWorldEnvironment>(20, 20);
+env->reset();
+
+// Custom reward function
+float customReward = env->computeCustomReward(agentState);
+env->applyAction(agentAction);
+```
+
+### Python Extension Development
+
+For those interested in extending the Python API, NLM uses pybind11, making it easy to add custom functionality:
+
+```python
+# Example: Custom sensor wrapper
+import pynlm
+
+class CustomSensor:
+    def __init__(self, world):
+        self.world = world
+        self.customData = []
+    
+    def getEnhancedPercept(self):
+        percept = self.world.getSensoryPercept()
+        # Add custom processing
+        enhanced = percept.clone()
+        enhanced.addCustomSignal(self.getCustomValue())
+        return enhanced
+
+# Use custom sensor
+agent.processSensoryInput(customSensor.getEnhancedPercept())
+```
+
+---
+
+## Part 5: Troubleshooting
+
+### Common Issues and Solutions
+
+#### "Brain not doing anything"
+
+**Problem**: Brain appears inactive during simulation.
+
+**Solution**:
+- Ensure `brain.initialize()` is called before simulation
+- Check that `brain.step()` is being called in the loop
+- Verify that neurons have appropriate parameters
+- Consider increasing simulation steps
+
+#### "Agent not moving"
+
+**Problem**: Agent doesn't respond to sensory input or produce actions.
+
+**Solution**:
+- Ensure `world.update()` is called before getting percept
+- Check that `agent.processSensoryInput()` is called
+- Verify that `agent.decodeMotorCommand()` is working
+- Make sure `world.applyMotorCommand()` is called
+
+#### "Everything is 0"
+
+**Problem**: All values are zero, no activity observed.
+
+**Solution**:
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+- Check configuration parameters (neuron_count, connection_probability)
+- Enable neuromodulation for better exploration
+
+### Debug Commands
+
+```python
+# Enable verbose logging
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Check brain configuration
+brain.logStatus()
+
+# Monitor system state
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
+```
+
+---
+
+## Part 6: Performance Optimization
+
+### For Large-Scale Simulations
+
+#### 1. Use Appropriate Configuration
+
+```python
+# For large simulations, consider these settings
+config.set("neuron_count", 10000)
+config.set("region_count", 5)
+config.set("connection_probability", 0.05)  # Less dense connections
+config.set("simulation_timestep", 0.0005)   # Smaller time steps
+```
+
+#### 2. Parallel Processing
+
+```cpp
+// Use SIMD optimizations where available
+#pragma GCC optimize("O3")
+#pragma GCC target("avx2")
+```
+
+#### 3. Memory Management
+
+```python
+# For long simulations, consider checkpointing
+brain.save("checkpoint_1000.bin")
+# Later...
+brain.load("checkpoint_1000.bin")
+```
+
+### Monitoring Tools
+
+```python
+# Add performance monitoring
+import time
+
+start_time = time.time()
+for step in range(10000):
+    brain.step(step)
+    
+end_time = time.time()
+print(f"Simulation time: {end_time - start_time:.2f}s")
+print(f"Steps per second: {10000 / (end_time - start_time):.0f}")
+```
+
+---
+
+## Part 7: Advanced Topics
+
+### 1. Memory Management
+
+```python
+# Manual memory management for advanced users
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Save checkpoints regularly
+brain.save("checkpoint_500.bin")
+
+# Load from checkpoint if needed
+brain2 = pynlm.createBrain(pynlm.createDefaultConfig())
+brain2.initialize()
+brain2.load("checkpoint_500.bin")
+```
+
+### 2. Custom Actions
+
+```python
+import pynlm
+
+# Create custom action types
+custom_action = pynlm.Action(pynlm.ActionType.Custom)
+custom_action.setParameters([0.5, 0.3, 0.8])
+
+# Use custom action
+world.applyMotorCommand(custom_action, world.getSimulationTime())
+```
+
+### 3. Sensory Input Processing
+
+```python
+import pynlm
+
+# Create custom vision input
+vision = pynlm.Vision(32, 32, 3)
+# Fill with custom data
+vision_data = [0.1] * 32 * 32 * 3
+vision.setData(vision_data)
+
+# Process through agent
+agent.processSensoryInput(vision)
+```
+
+---
+
+## Conclusion
+
+NLM provides a comprehensive framework for building and simulating artificial brains. Whether you're a beginner looking to understand basic concepts or an advanced user wanting to push the boundaries of neural simulation, NLM offers the tools you need.
+
+**For more information:**
+- Visit the documentation website
+- Join the NLM community forum
+- Check out example projects and tutorials
+
+That's it! You're now ready to use NLM for neural simulation and research.
+
 ### Verifying Installation
 
 ```python
