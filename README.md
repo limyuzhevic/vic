@@ -75,12 +75,29 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Main Demo (Recommended)
+
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the comprehensive Phase 6 integration test verifying all brain systems are connected.
+
+### Advanced Options
+
+```bash
+# Show help
+./nlm --help
+
+# Custom configuration
+./nlm --neuron-count=5000 --max-steps=5000 --enable-development
+
+# Use JSON configuration file
+./nlm --config=myconfig.json
+
+# Disable specific features
+./nlm --no-curiosity --no-novelty
+```
 
 ## Project Structure
 
@@ -220,6 +237,169 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Configuration System Improvements
+
+Phase 6 introduces an enhanced configuration system with:
+
+### Type-Safe Configuration
+- Strongly typed parameters with validation
+- JSON support for configuration files
+- Command-line argument parsing with validation
+- Configuration parameter metadata and descriptions
+
+### Enhanced Configuration Options
+```bash
+--neuron-count=N          Number of neurons (default: 1000)
+--region-count=N          Number of brain regions (default: 1)
+--max-steps=N             Maximum simulation steps (default: 10000)
+--timestep=T              Simulation timestep in seconds (default: 0.001)
+--seed=N                  Random seed for reproducibility (default: 42)
+--enable-development      Enable developmental stages
+--enable-curiosity        Enable curiosity-driven exploration
+--enable-novelty          Enable novelty detection
+--enable-reward-mod       Enable reward modulation
+--enable-structural-plasticity Enable structural plasticity
+--checkpoint=file         Enable checkpointing with specified file
+```
+
+## Configuration Files
+
+### Default Configuration
+The project includes example configuration files in the `configs/` directory:
+
+- `configs/default.cfg` - Basic configuration
+- `configs/experiment.cfg` - Experiment settings
+- `configs/performance.cfg` - Performance-optimized settings
+
+### JSON Configuration
+For more complex configurations, use JSON format:
+
+```json
+{
+    "brain.neuron_count": 5000,
+    "brain.region_count": 2,
+    "brain.connection_probability": 0.15,
+    "plasticity.stdp.enable": true,
+    "plasticity.hebbian.enable": true,
+    "neuromod.curiosity.enable": true,
+    "development.enable": true,
+    "simulation.timestep": 0.001,
+    "simulation.max_steps": 10000
+}
+```
+
+## Running Experiments
+
+### Quick Integration Test
+
+```bash
+# Run the Phase 6 integration demo with default settings
+./nlm
+
+# Run with custom settings
+./nlm --neuron-count=5000 --max-steps=5000 --enable-development --enable-curiosity
+
+# Load from JSON configuration
+./nlm --config=custom_config.json
+
+# Show help
+./nlm --help
+```
+
+### Python Integration (Future)
+
+Phase 7 will introduce full Python bindings with:
+
+```python
+import pynlm
+
+# Create enhanced configuration
+config = pynlm.Config.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("development.enable", True)
+config.set("neuromod.curiosity.enable", True)
+
+# Create and initialize brain
+brain = pynlm.Brain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+```
+
+## Performance Considerations
+
+### Resource Requirements
+- **Memory**: ~50-100MB per 1000 neurons
+- **CPU**: ~10-50ms per simulation step for 1000 neurons
+- **Storage**: Checkpoint files ~1-10MB per brain state
+
+### Optimization Flags
+```bash
+# Release build (recommended)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Debug build (for development)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Performance optimizations
+cmake .. -DCMAKE_CXX_FLAGS="-O3 -march=native"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+
+**"The simulation is too slow"**
+- Use fewer neurons for testing
+- Enable performance optimizations
+- Consider using the `--performance` flag
+
+**"Configuration errors"**
+- Check that configuration files have correct syntax
+- Use `--help` for valid parameter names
+- Validate configuration with `./nlm --config=file.json`
+
+**"Memory usage is high"**
+- Monitor memory usage with system tools
+- Use `--performance` mode for memory efficiency
+- Consider running on systems with more RAM
+
+### Build Issues
+
+**CMake cannot find Python:**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+## Further Reading
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
 
 ## License
 
