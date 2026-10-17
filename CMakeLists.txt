@@ -18,9 +18,6 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -29,6 +26,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/DependencyInjection/DependencyInjection.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -43,6 +41,11 @@ add_library(nlm_core STATIC
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/AdvancedPlasticityRules.cpp
+    src/plasticity/AntiHebbianRule.cpp
+    src/plasticity/BCMRule.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/CompetitionRule.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
@@ -55,13 +58,10 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/EnhancedMemoryManager.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -83,8 +83,8 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Modern C++20 features
+    src/modern_cpp20/ModernCpp20Features.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -140,12 +140,7 @@ add_executable(nlm_phase4_demo
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
-enable_testing()
-add_subdirectory(tests)
+    src/testing/ComprehensiveTestFramework.cpp
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Documentation
+    docs/AdvancedUsageGuide.md
