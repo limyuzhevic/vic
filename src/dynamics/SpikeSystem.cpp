@@ -66,12 +66,17 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - use swap-erase for O(1) removal
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Swap the first element with the last, then erase the last
+            // Ensure spikeHistory is not empty before accessing back
+            if (!pImpl->spikeHistory.empty()) {
+                std::swap(pImpl->spikeHistory[0], pImpl->spikeHistory.back());
+                pImpl->spikeHistory.pop_back();
+            }
         }
         
-        // Call handlers
+        // Call handlers safely
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }

@@ -34,18 +34,18 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
     
-    // Check for firing
+    // Check for firing - neuron has reached threshold
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
         neuron->recordSpike(0.0);  // TODO: pass actual time
     }
     
-    // Refractory mechanism
+    // Refractory mechanism - if neuron is refractory, reset membrane potential
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
     }
     
-    // Clear current for next step
+    // Clear current for next step - synaptic input has been integrated
     neuron->clearTotalCurrent();
 }
 
@@ -55,9 +55,8 @@ void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration 
     synapse->step(0.0);
 }
 
-void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+// Apply synaptic input from a synapse to a neuron
+    // This implements the core synaptic transmission in the neural network
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);

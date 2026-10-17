@@ -16,13 +16,25 @@ struct Curiosity::Impl {
         , noveltyWeight(0.5f)
         , predictionErrorWeight(0.5f)
         , decayRate(0.05f) {}
+    
+    ~Impl() {
+        // No ownership of brain, so no deletion needed
+        // Brain pointer is set by initialize() and should be managed by caller
+    }
 };
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
 
-Curiosity::~Curiosity() = default;
+Curiosity::~Curiosity() {
+    // No explicit cleanup needed - pImpl contains a raw pointer to Brain
+    // which is owned by the caller, not by this Curiosity instance
+}
 
 void Curiosity::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize Curiosity with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
