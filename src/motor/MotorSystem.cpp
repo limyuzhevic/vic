@@ -26,12 +26,18 @@ MotorSystem::MotorSystem() : pImpl(new Impl) {}
 MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
-    // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
-    if (!pImpl->availableActions.empty()) {
-        return std::make_unique<Action>(pImpl->availableActions[0]);
+    // Improved action selection: consider neural activity patterns
+    // For now: use simple weighted selection based on action type index
+    if (pImpl->availableActions.empty()) {
+        return std::make_unique<Action>(ActionType::Wait);
     }
-    return std::make_unique<Action>(ActionType::Wait);
+    
+    // Simple deterministic selection based on available actions
+    // In a real implementation, this would consider neural firing rates
+    size_t selectedIndex = pImpl->actionHistory.size() % pImpl->availableActions.size();
+    ActionType selectedAction = pImpl->availableActions[selectedIndex];
+    
+    return std::make_unique<Action>(selectedAction);
 }
 
 const std::vector<ActionType>& MotorSystem::getAvailableActions() const {

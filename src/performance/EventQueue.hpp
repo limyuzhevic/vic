@@ -404,13 +404,20 @@ inline void DelayedSpikeQueue::clear() {
     oldestStep_ = currentStep_;
 }
 
+// Optimized queue advance with batch processing
 inline void DelayedSpikeQueue::advanceTime(uint64_t currentStep) {
-    // Advance the oldest step marker
-    while (oldestStep_ <= currentStep && oldestStep_ <= currentStep - numBuckets_) {
-        size_t bucketIdx = oldestStep_ % numBuckets_;
-        buckets_[bucketIdx] = SpikeBucket();  // Reset bucket
-        pendingCounts_[bucketIdx].store(0, std::memory_order_relaxed);
-        ++oldestStep_;
+    // Advance the oldest step marker in batches to reduce cache misses
+    while (oldestStep_ <= currentStep && 
+           oldestStep_ <= currentStep - numBuckets_) {
+        // Batch process multiple buckets at once
+        size_t batchSize = std::min(static_cast<size_t>(numBuckets_), 
+                                   static_cast<size_t>(currentStep - oldestStep_ + 1));
+        
+        for (size_t i = 0; i < batchSize && oldestStep_ <= currentStep; ++i, ++oldestStep_) {
+            size_t bucketIdx = oldestStep_ % numBuckets_;
+            buckets_[bucketIdx] = SpikeBucket();  // Reset bucket
+            pendingCounts_[bucketIdx].store(0, std::memory_order_relaxed);
+        }
     }
 }
 

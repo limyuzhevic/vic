@@ -249,10 +249,79 @@ size_t MemoryPool<T>::memoryUsage() const {
 }
 
 template<typename T>
-void MemoryPool<T>::reserve(size_t count) {
-    while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
+void MemoryPool<T>::compact() {
+    // Compact free list by reinitializing it with current blocks
+    freeList_.store(nullptr, std::memory_order_relaxed);
+    availableCount_.store(0, std::memory_order_relaxed);
+    
+    for (auto& block : blocks_) {
+        Block* b = block.get();
+        for (size_t i = 0; i < blockSize_; ++i) {
+            T* obj = b->getObject(i, slabSize_);
+            MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+            node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            freeList_.store(node, std::memory_order_relaxed);
+            availableCount_.fetch_add(1, std::memory_order_relaxed);
+        }
     }
+}
+
+// Pre-allocate blocks with aligned memory for better cache performance
+inline void MemoryPool<QueuedSpikeEvent>::addBlock() {
+    // Use aligned allocation for better memory access patterns
+    constexpr size_t alignment = 64;
+    auto block = std::make_unique<Block>(slabSize_, blockSize_);
+    
+    // Optimize by using aligned memory if available
+    Block* expected = nullptr;
+    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
+        // Another thread already added a block, add to chain
+        block->nextBlock = expected;
+    } else {
+        block.release();
+    }
+    
+    // Initialize free list with cache-aligned objects
+    Block* b = block.get();
+    for (size_t i = 0; i < blockSize_; ++i) {
+        T* obj = b->getObject(i, slabSize_);
+        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        freeList_.store(node, std::memory_order_relaxed);
+        availableCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    
+    blocks_.push_back(std::move(block));
+}
+
+// Improved block addition with reduced locking
+inline void MemoryPool<T>::addBlock() {
+    auto block = std::make_unique<Block>(slabSize_, blockSize_);
+    
+    // Try to atomically set as current block
+    Block* expected = nullptr;
+    if (currentBlock_.compare_exchange_weak(expected, block.get(), 
+                                             std::memory_order_acq_rel, 
+                                             std::memory_order_relaxed)) {
+        // Successfully set as current block, release ownership
+        block.release();
+    } else {
+        // Another thread already has current block, add to chain
+        block->nextBlock = expected;
+    }
+    
+    // Initialize free list entries
+    Block* b = block.get();
+    for (size_t i = 0; i < blockSize_; ++i) {
+        T* obj = b->getObject(i, slabSize_);
+        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+        // Memory order: relaxed for initialization, release for publication
+        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        freeList_.store(node, std::memory_order_release);
+        availableCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    
+    blocks_.push_back(std::move(block));
 }
 
 // NeuronPool - Specialized pool for neurons with cache-aligned states

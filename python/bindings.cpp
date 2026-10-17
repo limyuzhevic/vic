@@ -420,6 +420,186 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Advanced simulation and research functions for expert users
+    
+    // Advanced world configuration for research
+    m.def("createResearchWorld", [](int width, int height, int visionWidth, int visionHeight,
+                                   float maxEnergy, float energyDecay, uint64_t randomSeed) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecay);
+        world->setRandomSeed(randomSeed);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20,
+       py::arg("visionWidth") = 10, py::arg("visionHeight") = 10,
+       py::arg("maxEnergy") = 100.0f, py::arg("energyDecay") = 0.01f,
+       py::arg("randomSeed") = 42,
+       "Create an advanced research world with custom parameters");
+    
+    // Advanced brain configuration for research experiments
+    m.def("createResearchConfig", [](int neuronCount, int regionCount, float connectionProb,
+                                    float stdpLtpWeight, float stdpLtdWeight, float stdpTau,
+                                    float synaptogenesisRate, float pruningRate) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", connectionProb, ConfigSource::Default);
+        config->set("stdp_ltp_weight", stdpLtpWeight, ConfigSource::Default);
+        config->set("stdp_ltd_weight", stdpLtdWeight, ConfigSource::Default);
+        config->set("stdp_tau", stdpTau, ConfigSource::Default);
+        config->set("synaptogenesis_rate", synaptogenesisRate, ConfigSource::Default);
+        config->set("pruning_rate", pruningRate, ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 2,
+       py::arg("connectionProb") = 0.1f, py::arg("stdpLtpWeight") = 0.01f,
+       py::arg("stdpLtdWeight") = 0.012f, py::arg("stdpTau") = 20.0f,
+       py::arg("synaptogenesisRate") = 0.001f, py::arg("pruningRate") = 0.0001f,
+       "Create a research-grade configuration for scientific experiments");
+    
+    // Advanced agent brain with enhanced capabilities
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain, bool enableDevelopment,
+                                        bool enableCuriosity, bool enableStructuralPlasticity,
+                                        bool enableRewardModulation, float noveltyThreshold) {
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->enableDevelopment(enableDevelopment);
+        agentBrain->enableCuriosity(enableCuriosity);
+        agentBrain->enableStructuralPlasticity(enableStructuralPlasticity);
+        agentBrain->enableRewardModulation(enableRewardModulation);
+        
+        // Set up advanced configuration
+        agentBrain->getBrain()->getConfig()->set("novelty_threshold", noveltyThreshold, ConfigSource::Default);
+        
+        return agentBrain;
+    }, py::arg("brain"), py::arg("enableDevelopment") = true,
+       py::arg("enableCuriosity") = true, py::arg("enableStructuralPlasticity") = true,
+       py::arg("enableRewardModulation") = true, py::arg("noveltyThreshold") = 0.3f,
+       "Create an advanced agent brain with enhanced capabilities");
+    
+    // Neural activity recording and analysis
+    m.def("recordNeuralActivity", [](std::shared_ptr<Brain> brain, size_t numNeurons,
+                                   size_t durationSteps) {
+        std::vector<std::vector<float>> activityRecord;
+        activityRecord.reserve(durationSteps);
+        
+        for (size_t step = 0; step < durationSteps; ++step) {
+            brain->step(static_cast<SimulationStep>(step));
+            
+            std::vector<float> stepActivity;
+            // Record activity from most active neurons
+            auto mostActive = brain->getSpikeSystem()->getMostActiveNeurons(numNeurons);
+            
+            for (NeuronId id : mostActive) {
+                if (auto neuron = brain->getNeuron(id)) {
+                    stepActivity.push_back(neuron->getCurrentMembranePotential());
+                }
+            }
+            
+            // Pad with zeros if needed
+            while (stepActivity.size() < numNeurons) {
+                stepActivity.push_back(0.0f);
+            }
+            
+            activityRecord.push_back(std::move(stepActivity));
+        }
+        
+        return activityRecord;
+    }, py::arg("brain"), py::arg("numNeurons") = 10, py::arg("durationSteps") = 100,
+       "Record neural activity over time for analysis");
+    
+    // Performance metrics calculator
+    m.def("calculatePerformanceMetrics", [](std::shared_ptr<Brain> brain,
+                                           const std::vector<std::shared_ptr<SimpleWorld>>& worlds,
+                                           size_t stepsPerWorld) {
+        struct PerformanceMetrics {
+            float averageReward;
+            float averageSpeed;
+            float explorationRate;
+            float learningRate;
+            float successRate;
+        };
+        
+        PerformanceMetrics metrics;
+        metrics.averageReward = 0.0f;
+        metrics.averageSpeed = 0.0f;
+        metrics.explorationRate = 0.0f;
+        metrics.learningRate = 0.0f;
+        metrics.successRate = 0.0f;
+        
+        if (worlds.empty() || brain == nullptr) {
+            return metrics;
+        }
+        
+        float totalReward = 0.0f;
+        float totalSpeed = 0.0f;
+        float totalExploration = 0.0f;
+        float totalLearning = 0.0f;
+        int worldCount = 0;
+        
+        for (auto& world : worlds) {
+            if (!world) continue;
+            
+            float worldReward = 0.0f;
+            float worldSpeed = 0.0f;
+            float worldExploration = 0.0f;
+            
+            // Run simulation for this world
+            for (size_t step = 0; step < stepsPerWorld; ++step) {
+                // Get current state
+                auto percept = world->getSensoryPercept();
+                auto body = world->getAgentBody();
+                
+                // Calculate metrics based on world state
+                if (body) {
+                    // Speed metric
+                    float speed = std::sqrt(body->velocityX * body->velocityX + 
+                                          body->velocityY * body->velocityY);
+                    worldSpeed += speed;
+                    
+                    // Exploration (movement in new areas)
+                    if (body->isMoving && body->age > 10) {
+                        worldExploration += 1.0f;
+                    }
+                }
+                
+                world->update(0.001); // Default timestep
+                
+                // Simple reward calculation based on agent performance
+                if (body) {
+                    // Positive reward for reaching goals or avoiding hazards
+                    // This is a placeholder - real implementations would be more sophisticated
+                    worldReward += std::max(0.0f, body->energy / 100.0f);
+                }
+            }
+            
+            // Average metrics for this world
+            size_t steps = stepsPerWorld > 0 ? stepsPerWorld : 1;
+            worldReward /= static_cast<float>(steps);
+            worldSpeed /= static_cast<float>(steps);
+            worldExploration /= static_cast<float>(steps);
+            
+            totalReward += worldReward;
+            totalSpeed += worldSpeed;
+            totalExploration += worldExploration;
+            totalLearning += std::min(1.0f, worldReward / 10.0f); // Simple learning proxy
+            
+            worldCount++;
+        }
+        
+        if (worldCount > 0) {
+            metrics.averageReward = totalReward / worldCount;
+            metrics.averageSpeed = totalSpeed / worldCount;
+            metrics.explorationRate = totalExploration / worldCount;
+            metrics.learningRate = totalLearning / worldCount;
+            metrics.successRate = std::min(1.0f, metrics.averageReward / 5.0f); // Simple success metric
+        }
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("worlds"), py::arg("stepsPerWorld") = 100,
+       "Calculate comprehensive performance metrics from simulation runs");
 }
 
 } // namespace nlm

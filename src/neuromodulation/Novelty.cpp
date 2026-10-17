@@ -33,11 +33,30 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
+void Novelty::detectNovelty(const Observation& observation,
                             const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
+    // Extract features from observations and compute novelty
+    const std::vector<float>* currentData = observation.getSensoryInput()->getData();
+    const std::vector<float>* previousData = previousObservation.getSensoryInput()->getData();
+    
+    if (!currentData || !previousData || currentData->empty() || previousData->empty()) {
+        pImpl->level = 0.0f;
+        pImpl->history.push_back(pImpl->level);
+        return;
+    }
+    
+    // Compute difference between current and previous observation patterns
+    float totalDiff = 0.0f;
+    size_t compareLen = std::min(currentData->size(), previousData->size());
+    
+    for (size_t i = 0; i < compareLen; ++i) {
+        float diff = std::abs((*currentData)[i] - (*previousData)[i]);
+        totalDiff += diff;
+    }
+    
+    // Normalize by pattern size and apply novelty threshold
+    float avgDiff = totalDiff / static_cast<float>(compareLen);
+    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
 }
 
