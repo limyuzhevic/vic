@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
 
 namespace nlm {
 
@@ -43,6 +44,18 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Type validation function
+using ConfigTypeValidator = std::function<bool(const ConfigValue& value)>;
+
+// Validation result
+struct ValidationResult {
+    bool isValid;
+    std::string errorMessage;
+    
+    ValidationResult() : isValid(true) {}
+    ValidationResult(bool valid, const std::string& error) : isValid(valid), errorMessage(error) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +68,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +106,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    ValidationResult validate() const;
+    ValidationResult validateKey(const std::string& key) const;
+    
+    // Configuration file management
+    static std::vector<std::string> getAvailableConfigFiles(const std::string& directory = ".");
+    static bool mergeConfigFiles(const std::vector<std::string>& files, std::string& outputFile);
+    
+    // Configuration export/import
+    std::string exportToJson() const;
+    bool importFromJson(const std::string& json);
+    
+    // Helper methods for common configuration patterns
+    void registerValidator(const std::string& key, const ConfigTypeValidator& validator);
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +129,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parser interface
+    class JsonParser;
+    class ConfigValidator;
 };
 
 } // namespace nlm

@@ -3,11 +3,26 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstdint>
+#include <cmath>
+#include <limits>
+#include <regex>
+#include <unordered_map>
+
+// Simple JSON parsing implementation
+// Note: For production use, consider integrating with a proper JSON library like nlohmann::json
+
+namespace nlm {
+
+namespace nlm {
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, ConfigTypeValidator> validators;
+    
+    Impl() : entries(), validators() {}
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,9 +34,19 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    if (JsonParser::parseJsonFile(filepath, *pImpl)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        
+        // Validate after loading
+        std::string validationError;
+        if (!ConfigValidator::validateConfig(*pImpl, validationError)) {
+            NLM_LOG_WARNING("Configuration validation failed: " + validationError);
+        }
+        return true;
+    }
     
+    // If JSON parsing failed, try simple key=value format as fallback
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,117 +111,201 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << '"' << arg[i] << '"';
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+ValidationResult Config::validate() const {
+    std::string error;
+    if (!ConfigValidator::validateConfig(*pImpl, error)) {
+        return ValidationResult(false, error);
+    }
+    return ValidationResult();
+}
+
+ValidationResult Config::validateKey(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
-        return std::nullopt;
+        return ValidationResult(false, "Key not found: " + key);
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    std::string error;
+    if (!ConfigValidator::validateEntry(*it, error)) {
+        return ValidationResult(false, error);
     }
+    return ValidationResult();
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+std::vector<std::string> Config::getAvailableConfigFiles(const std::string& directory) {
+    std::vector<std::string> files;
+    std::error_code ec;
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    if (!std::filesystem::exists(directory, ec)) {
+        return files;
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
+        if (entry.is_regular_file(ec)) {
+            std::string filename = entry.path().filename().string();
+            if (filename.length() >= 4) {
+                std::string ext = filename.substr(filename.length() - 4);
+                if (ext == ".cfg" || ext == ".json" || ext == ".yaml" || ext == ".yml") {
+                    files.push_back(filename);
+                }
+            }
+        }
     }
-    return keys;
+    
+    return files;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+bool Config::mergeConfigFiles(const std::vector<std::string>& files, std::string& outputFile) {
+    if (files.empty()) {
+        return false;
+    }
+    
+    // Create a temporary Config and load all files
+    Config merged;
+    for (const auto& filename : files) {
+        if (!merged.loadFromFile(filename)) {
+            return false;
+        }
+    }
+    
+    // Save to output file
+    if (outputFile.empty()) {
+        outputFile = "merged_config.cfg";
+    }
+    
+    return merged.saveToFile(outputFile);
 }
 
-std::string Config::summary() const {
+std::string Config::exportToJson() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "{\n";
+    
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        if (!first) oss << ",\n";
+        first = false;
+        
+        oss << "  \"" << entry.key << "\": ";
+        
+        // Format value based on type
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
+            if constexpr (std::is_same_v<T, int>) {
                 oss << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                oss << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                // Escape JSON special characters
+                std::string escaped = arg;
+                replaceJsonSpecialChars(escaped);
+                oss << "\"" << escaped << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::setprecision(6) << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    std::string escaped = arg[i];
+                    replaceJsonSpecialChars(escaped);
+                    oss << "\"" << escaped << "\"";
+                }
+                oss << "]";
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
+    
+    oss << "\n}";
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::importFromJson(const std::string& json) {
+    // Clear existing config
+    clear();
+    
+    // Parse JSON
+    if (!JsonParser::parseJsonObject(json, *pImpl)) {
+        return false;
+    }
+    
+    return true;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+void Config::registerValidator(const std::string& key, const ConfigTypeValidator& validator) {
+    pImpl->validators[key] = validator;
+}
+
+bool Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    auto it = pImpl->validators.find(key);
+    if (it != pImpl->validators.end()) {
+        return it->second(value);
+    }
+    
+    // Default validation
+    std::string error;
+    return ConfigValidator::validateEntry(ConfigEntry(key, value, ConfigSource::Runtime), error);
 }
 
 // Explicit template instantiations
