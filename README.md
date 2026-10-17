@@ -82,7 +82,18 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+### Example Usage
+
+```bash
+# Create brain with custom configuration
+./nlm --config my_config.cfg
+
+# Run with verbose logging
+./nlm --log-level=DEBUG
+
+# Save brain state after simulation
+./nlm --config demo.cfg --save-brain demo_checkpoint.bin
+```
 
 ```
 NLM/
@@ -111,7 +122,9 @@ NLM/
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
 ├── tests/
-└── configs/
+├── configs/
+│   └── default.cfg
+└── easy_usage.md
 ```
 
 ## Phase Summary
