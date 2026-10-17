@@ -9,6 +9,8 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Reward.hpp"
+#include "../neuromodulation/novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -49,6 +51,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +134,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +266,12 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
+    // Initialize attention-based neuromodulators (ACh, NE, 5-HT)
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -404,6 +418,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with episodic memory
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty() &&
+            pImpl->episodicMemory && !pImpl->workingMemory->isWinning(NeuronId())) {
+            
+            // Create episode from working memory content
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active neurons and their activation levels from working memory
+            episode.activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (const auto& neuronId : episode.activeNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                if (activation > 0.1f) {  // Only store significant activations
+                    episode.neuronActivations.push_back(activation);
+                }
+            }
+            
+            // Only store if we have meaningful memory content
+            if (!episode.activeNeurons.empty()) {
+                // Store episode and reset counter
+                pImpl->stepsSinceLastEpisode = 0;
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -510,9 +550,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !currentState.empty()) {
+        // Update prediction system with current state
+        // This enables predictive coding and error signals
+        pImpl->predictionSystem->train(currentState);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +569,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation extracts patterns from working memory and episodic memory
+        
+        // Get current working memory content
+        std::vector<float> workingMemoryPattern = pImpl->workingMemory ? 
+                                                  pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        // Get recent episodic memory patterns
+        std::vector<const EpisodicMemoryItem*> recentEpisodes = 
+            pImpl->episodicMemory ? pImpl->episodicMemory->getRecentEpisodes(5) : 
+            std::vector<const EpisodicMemoryItem*>();
+        
+        // Update concept formation with current activity patterns
+        if (!workingMemoryPattern.empty()) {
+            pImpl->conceptFormation->update(workingMemoryPattern, 
+                                           pImpl->timestep, 
+                                           recentEpisodes);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,9 +666,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Store to working memory if significant input
+        if (pImpl->workingMemory && std::abs(normalizedValue) > 1.0f) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), 
+                                               std::abs(normalizedValue) / 20.0f);
         }
     }
 }
