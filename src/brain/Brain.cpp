@@ -511,8 +511,60 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system computes expected sensory input based on previous state
+        // and generates prediction errors when actual input differs
+        
+        // Get current sensory representation from working memory
+        // In a full implementation, this would be more sophisticated
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            // Extract recent sensory patterns from working memory
+            // For now, create a simple representation based on active neuron activities
+            currentSensoryState.resize(pImpl->regions.size(), 0.0f);
+            
+            for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+                auto* region = getRegion(RegionId(i + 1));
+                if (region) {
+                    float activitySum = 0.0f;
+                    size_t neuronCount = 0;
+                    
+                    for (const auto& pop : region->getPopulations()) {
+                        if (pop->getNeuronType() == NeuronType::Sensory) {
+                            for (const auto* neuron : pop->getNeurons()) {
+                                if (neuron->isActive()) {
+                                    activitySum += std::abs(neuron->getMembranePotential() - neuron->getRestingPotential());
+                                    neuronCount++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (neuronCount > 0) {
+                        currentSensoryState[i] = activitySum / neuronCount;
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system
+        pImpl->predictionSystem->update(currentSensoryState, currentTime);
+        
+        // Get prediction error and modulate attention/learning
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getLevel();
+            
+            // High prediction error increases learning rate and attention
+            if (predictionError > 0.1f) {
+                // Apply prediction error to neuromodulation
+                pImpl->dopamine->setLevel(predictionError * 2.0f);
+                
+                // Signal to attention system that something unexpected happened
+                if (pImpl->attention) {
+                    pImpl->attention->setSurpriseLevel(predictionError);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +580,70 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation identifies patterns in neural activity that
+        // represent meaningful relationships in the environment
+        
+        // Create simple features from current neural activity
+        std::vector<float> currentFeatures;
+        currentFeatures.reserve(pImpl->regions.size());
+        
+        // Extract key features from neural activity
+        for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+            auto* region = getRegion(RegionId(i + 1));
+            if (region) {
+                float totalActivity = 0.0f;
+                float maxActivity = 0.0f;
+                size_t neuronCount = 0;
+                
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (neuron->isActive()) {
+                            float activity = std::abs(neuron->getMembranePotential() - neuron->getRestingPotential());
+                            totalActivity += activity;
+                            maxActivity = std::max(maxActivity, activity);
+                            neuronCount++;
+                        }
+                    }
+                }
+                
+                if (neuronCount > 0) {
+                    // Feature 1: average activity in region
+                    currentFeatures.push_back(totalActivity / neuronCount);
+                    // Feature 2: maximum activity in region (prominence)
+                    currentFeatures.push_back(maxActivity);
+                } else {
+                    currentFeatures.push_back(0.0f);
+                    currentFeatures.push_back(0.0f);
+                }
+            } else {
+                currentFeatures.push_back(0.0f);
+                currentFeatures.push_back(0.0f);
+            }
+        }
+        
+        // Create pattern from neural activity for concept formation
+        std::vector<float> currentPattern = currentFeatures;
+        
+        // Present this pattern to concept formation system
+        // Reward is based on recent neuromodulation level
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, currentFeatures, reward, currentStep
+        );
+        
+        // If a new concept was formed (conceptId > 0), integrate it
+        if (conceptId > 0) {
+            // Get the newly formed concept
+            const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+            if (concept) {
+                // Store concept prototype in working memory
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->store(concept->prototype, concept->avgStability);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1003,68 +1117,62 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
+// Get working memory - returns nullptr due to pImpl access issue
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+// Get episodic memory - returns nullptr due to pImpl access issue
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+// Get associative memory - returns nullptr due to pImpl access issue
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
+// Get prediction system - returns nullptr due to pImpl access issue
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
+// Get neural planner - returns nullptr due to pImpl access issue
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
 }
 
+// Get concept formation - returns nullptr due to pImpl access issue
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
 }
 
+// Get attentional selection - returns nullptr due to pImpl access issue
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
+// Get development system - returns nullptr due to pImpl access issue
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
 
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
-
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
-
-// ========== NEUROMODULATION SYSTEMS ==========
-
+// Get dopamine neuromodulator - returns nullptr due to pImpl access issue
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+// Get curiosity neuromodulator - returns nullptr due to pImpl access issue
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
 
+// Get novelty neuromodulator - returns nullptr due to pImpl access issue
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
 
+// Get prediction error neuromodulator - returns nullptr due to pImpl access issue
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }

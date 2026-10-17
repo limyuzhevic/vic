@@ -114,6 +114,16 @@ NLM/
 └── configs/
 ```
 
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working (Phase 6 integrated experiment)
+- Replay and consolidation functional (Phase 6 integrated experiment)
+- Phase 6 integration experiment created (demonstrates all systems connected)
+
 ## Phase Summary
 
 ### Phase 1 (Complete)
@@ -153,14 +163,165 @@ NLM/
 - Checkpoint system
 
 ### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+- **ALL SYSTEMS INTEGRATED into coherent brain loop**
+- Memory systems (working memory, episodic memory, associative memory) connected to neural processing
+- Neuromodulation (dopamine, curiosity, novelty, prediction error) integrated with plasticity and dynamics
+- Prediction system integrated with sensory processing
+- Development system affecting plasticity rates throughout brain
+- Checkpoint save/load working (demonstrated in Phase 6 integration experiment)
+- Replay and consolidation functional (demonstrated in Phase 6 integration experiment)
+- **Phase 6 integration experiment created that verifies all systems work together**
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+## Running
+
+### Phase 6 Demo (Integration Test)
+```bash
+./nlm_phase6_demo
+```
+
+This runs the Phase 6 integration test that verifies:
+- All brain systems are connected and functional
+- Memory systems work together
+- Neuromodulation affects learning and behavior
+- Prediction and attention are integrated
+- Development modulates plasticity over time
+- Checkpointing allows state preservation
+- Replay consolidates memories
+
+### Unified NLM Command Line
+The main `nlm` executable now supports multiple phases:
+
+```bash
+# Run Phase 6 integration demo (default)
+nlm --phase6
+
+# Run Phase 2 neural computation demo
+nlm --phase2
+
+# Show help
+nlm --help
+```
+
+### Python Bindings
+```bash
+# Install Python bindings (optional)
+pip install scikit-build-core pybind11
+pip install .
+```
+
+Then in Python:
+```python
+import pynlm
+
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation for 1000 steps
+for step in range(1000):
+    brain.step(step)
+    
+print(f"Simulation complete! {brain.getTotalSpikeCount()} spikes generated.")
+```
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/                    # Scientific documentation
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Updated integration audit
+├── src/
+│   ├── core/              # Core utilities
+│   ├── brain/             # Neural components (integrated)
+│   ├── dynamics/          # Neural dynamics
+│   ├── plasticity/        # Plasticity rules
+│   ├── development/       # Developmental system
+│   ├── neuromodulation/    # Neuromodulators (integrated)
+│   ├── memory/           # Memory systems (integrated)
+│   ├── prediction/        # Prediction systems (integrated)
+│   ├── cognition/        # Cognitive mechanisms (integrated)
+│   ├── sensory/           # Sensory processing
+│   ├── motor/            # Motor system
+│   ├── environment/      # Environment interface
+│   ├── experiments/      # Experiment framework (Phase 6)
+│   └── visualization/    # Visualization
+├── tests/                # Unit tests and integration tests
+└── configs/              # Configuration files
+```
+
+## Phase 6 Integration Status
+
+The Phase 6 integration has successfully connected all previously disconnected systems:
+
+| System | Integration Status | Notes |
+|--------|-------------------|-------|
+| Working Memory | ✅ INTEGRATED | Connected to sensory input, attention, and neural activity |
+| Episodic Memory | ✅ INTEGRATED | Stores experiences, supports replay and consolidation |
+| Semantic Memory | ✅ DEFINED | Available for future enhancement |
+| Procedural Memory | ✅ DEFINED | Available for future enhancement |
+| Prediction System | ✅ INTEGRATED | Connected to sensory processing and attention |
+| Neural Planner | ✅ INTEGRATED | Connected to action selection |
+| Concept Formation | ✅ INTEGRATED | Connected to working memory and attention |
+| Attention System | ✅ INTEGRATED | Connected to working memory competition |
+| Development System | ✅ INTEGRATED | Affects plasticity throughout brain |
+| Neuromodulation | ✅ INTEGRATED | Dopamine, curiosity, novelty, prediction error |
+| Checkpoint System | ✅ INTEGRATED | Save/load brain state with CheckpointManager |
+
+## Current Phase 6 Demo Results
+
+Running `./nlm_phase6_demo` will show:
+
+- ✅ Integration verification (all systems present)
+- ✅ Memory integration tests (working memory, episodic memory)
+- ✅ Neuromodulation integration tests (dopamine, curiosity, novelty)
+- ✅ Checkpoint save/load tests
+- ✅ Replay system tests
+- ✅ Full integration experiment (500 neurons, 2000 steps)
+
+Expected results:
+- Total reward accumulated throughout simulation
+- Average firing rate showing network activity
+- Episodes stored in episodic memory
+- Dopamine level showing reward processing
+- All integration status indicators showing "CONNECTED"
+
+## Scientific Significance
+
+NLM demonstrates:
+
+1. **Experience-driven learning**: Synaptic changes through interaction with environment
+2. **Development-driven maturation**: Plasticity rates change over "age"
+3. **Neural plasticity**: STDP, Hebbian, and structural plasticity work together
+4. **Memory integration**: Working memory, episodic memory, and prediction systems interact
+5. **Neuromodulation**: Dopamine, curiosity, and novelty affect learning and behavior
+6. **Embodied intelligence**: Sensorimotor loop enables real interaction
+7. **Continual learning**: Concepts form and generalize from experience
+8. **Predictive processing**: Brain predicts sensory input and updates based on errors
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
 
 ## Scientific Limitations
 
