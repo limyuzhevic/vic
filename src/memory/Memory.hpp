@@ -12,7 +12,7 @@ namespace nlm {
 class WorkingMemory {
 public:
     WorkingMemory();
-    ~WorkingMemory();
+    ~WorkingMemory() noexcept;
     
     // Store item
     // TODO PHASE 2: Implement real storage
@@ -36,7 +36,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
@@ -54,7 +54,7 @@ struct EpisodicMemoryItem {
 class EpisodicMemory {
 public:
     EpisodicMemory();
-    ~EpisodicMemory();
+    ~EpisodicMemory() noexcept;
     
     // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
@@ -76,7 +76,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Semantic memory: gradually acquired knowledge
@@ -85,7 +85,7 @@ private:
 class SemanticMemory {
 public:
     SemanticMemory();
-    ~SemanticMemory();
+    ~SemanticMemory() noexcept;
     
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
@@ -104,7 +104,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits
@@ -121,7 +121,7 @@ struct Skill {
 class ProceduralMemory {
 public:
     ProceduralMemory();
-    ~ProceduralMemory();
+    ~ProceduralMemory() noexcept;
     
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
@@ -140,7 +140,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Associative memory: relationships between representations
@@ -149,7 +149,7 @@ private:
 class AssociativeMemory {
 public:
     AssociativeMemory();
-    ~AssociativeMemory();
+    ~AssociativeMemory() noexcept;
     
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
@@ -168,7 +168,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

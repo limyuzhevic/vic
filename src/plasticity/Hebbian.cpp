@@ -14,9 +14,9 @@ struct Hebbian::Impl {
              covarianceThreshold(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+Hebbian::Hebbian() : pImpl(std::make_unique<Impl>()) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::~Hebbian() noexcept = default;
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,

@@ -21,9 +21,9 @@ struct MotorSystem::Impl {
     }
 };
 
-MotorSystem::MotorSystem() : pImpl(new Impl) {}
+MotorSystem::MotorSystem() : pImpl(std::make_unique<Impl>()) {}
 
-MotorSystem::~MotorSystem() = default;
+MotorSystem::~MotorSystem() noexcept = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
     // TODO PHASE 2: Implement real action selection based on neural activity

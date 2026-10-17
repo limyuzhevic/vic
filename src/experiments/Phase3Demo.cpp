@@ -1,15 +1,17 @@
-#include "Phase3Experiment.hpp"
+// Update Phase3Demo.cpp to use the new CLI framework
+#include "Phase3Demo.hpp"
 #include "../agent/AgentBrain.hpp"
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/CLI/CLIFramework.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
-namespace nlm {
+using namespace nlm;
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
@@ -240,22 +242,7 @@ private:
     }
 };
 
-} // namespace nlm
-
-// Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
-    
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
-    
-    return 0;
+    // Use the new CLI framework
+    return nlm::CLIAdapter::adaptPhase3Demo(argc, argv);
 }

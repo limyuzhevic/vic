@@ -26,9 +26,9 @@ struct StructuralPlasticity::Impl {
              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
 };
 
-StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
+StructuralPlasticity::StructuralPlasticity() : pImpl(std::make_unique<Impl>()) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+StructuralPlasticity::~StructuralPlasticity() noexcept = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {

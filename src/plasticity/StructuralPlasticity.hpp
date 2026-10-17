@@ -11,7 +11,7 @@ namespace nlm {
 class StructuralPlasticity {
 public:
     StructuralPlasticity();
-    ~StructuralPlasticity();
+    ~StructuralPlasticity() noexcept;
     
     // Create new synapse
     // TODO PHASE 2: Implement real synapse creation
@@ -43,7 +43,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -18,6 +18,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Optional: Find nlohmann_json (header-only)
+# find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -29,6 +32,10 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # CLI Framework
+    src/core/CLI/CLIFramework.cpp
+    src/core/CLI/CLIAdapter.cpp
+    src/core/CLI/CLIMacros.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -83,8 +90,17 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Demo.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/AdvancedVisualization.cpp
+    src/performance/PerformanceAnalysis.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -121,30 +137,65 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Script processing system
+add_library(nlm_script
+    src/script/ScriptProcessor.cpp
+    src/script/ScriptParser.cpp
+    src/script/ScriptConfig.cpp
+    src/script/ParameterTemplate.cpp
+)
+target_include_directories(nlm_script PUBLIC src)
+target_link_libraries(nlm_script PUBLIC nlm_core)
+
+# Batch execution system
+add_library(nlm_batch
+    src/batch/BatchExecutor.cpp
+    src/batch/ParameterSweeper.cpp
+    src/batch/ExperimentChainer.cpp
+)
+target_include_directories(nlm_batch PUBLIC src)
+target_link_libraries(nlm_batch PUBLIC nlm_core nlm_script)
+
+# Result management system
+add_library(nlm_results
+    src/results/ResultCollector.cpp
+    src/results/ResultExporter.cpp
+)
+target_include_directories(nlm_results PUBLIC src)
+target_link_libraries(nlm_results PUBLIC nlm_core nlm_batch)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_script nlm_batch nlm_results)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_script nlm_batch nlm_results)
+target_include_directories(nlm_phase6_demo PUBLIC src)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Visualization and performance executables
+add_executable(nlm_visualize
+    src/tools/VisualizationTool.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_visualize PUBLIC nlm_core nlm_script nlm_batch nlm_results)
+target_include_directories(nlm_visualize PUBLIC src)
+
+add_executable(nlm_profile
+    src/tools/ProfileTool.cpp
+)
+target_link_libraries(nlm_profile PUBLIC nlm_core nlm_script nlm_batch nlm_results)
+target_include_directories(nlm_profile PUBLIC src)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_script nlm_batch nlm_results
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

@@ -16,9 +16,9 @@ struct HebbianRule::Impl {
     Impl() : learningRate(0.01f) {}
 };
 
-HebbianRule::HebbianRule() : pImpl(new Impl) {}
+HebbianRule::HebbianRule() : pImpl(std::make_unique<Impl>()) {}
 
-HebbianRule::~HebbianRule() = default;
+HebbianRule::~HebbianRule() noexcept = default;
 
 void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,

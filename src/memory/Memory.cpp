@@ -11,9 +11,9 @@ struct WorkingMemory::Impl {
     Impl(size_t cap) : capacity(cap) {}
 };
 
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
+WorkingMemory::WorkingMemory() : pImpl(std::make_unique<Impl>(100)) {}
 
-WorkingMemory::~WorkingMemory() = default;
+WorkingMemory::~WorkingMemory() noexcept = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
@@ -72,9 +72,9 @@ struct EpisodicMemory::Impl {
     Impl(size_t max) : maxEpisodes(max) {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory() : pImpl(std::make_unique<Impl>(1000)) {}
 
-EpisodicMemory::~EpisodicMemory() = default;
+EpisodicMemory::~EpisodicMemory() noexcept = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
@@ -116,9 +116,9 @@ struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory() : pImpl(std::make_unique<Impl>()) {}
 
-SemanticMemory::~SemanticMemory() = default;
+SemanticMemory::~SemanticMemory() noexcept = default;
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
     for (auto& fact : pImpl->facts) {
@@ -161,9 +161,9 @@ struct ProceduralMemory::Impl {
     std::vector<Skill> skills;
 };
 
-ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
+ProceduralMemory::ProceduralMemory() : pImpl(std::make_unique<Impl>()) {}
 
-ProceduralMemory::~ProceduralMemory() = default;
+ProceduralMemory::~ProceduralMemory() noexcept = default;
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
     for (auto& skill : pImpl->skills) {
@@ -214,9 +214,9 @@ struct AssociativeMemory::Impl {
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
 };
 
-AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
+AssociativeMemory::AssociativeMemory() : pImpl(std::make_unique<Impl>()) {}
 
-AssociativeMemory::~AssociativeMemory() = default;
+AssociativeMemory::~AssociativeMemory() noexcept = default;
 
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
     for (auto& assoc : pImpl->associations) {
