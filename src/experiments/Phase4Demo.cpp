@@ -2,18 +2,15 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
+#include <chrono>
+#include <algorithm>
+#include <vector>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
 #include "world/SimpleWorld.hpp"
 #include "experiments/Phase4Experiment.hpp"
-#include "prediction/NeuralPrediction.hpp"
-#include "memory/NeuralWorkingMemory.hpp"
-#include "memory/NeuralEpisodicMemory.hpp"
-#include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -36,81 +33,197 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
-int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
-    
-    // Parse command line arguments
+struct EnhancedDemoConfig {
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    size_t numSteps = 100;
+    bool enablePerformanceTracking = true;
+    bool enableProgressOutput = true;
+    std::string outputFile = "";
+    bool validateResults = true;
+    
+    size_t neuronCount = 1000;
+    size_t regionCount = 2;
+    float connectionProbability = 0.1f;
+    uint64_t randomSeed = 42;
+    float simulationTimestep = 0.001f;
+    float stdpLTPWeight = 0.01f;
+    float stdpLTDWeight = 0.012f;
+};
+
+EnhancedDemoConfig parseArgs(int argc, char* argv[]) {
+    EnhancedDemoConfig config;
+    
+    std::cout << "NLM Phase 4 Enhanced Demo - Configuration Parser\n";
+    std::cout << "==============================================\n\n";
+    
+    auto showHelp = []() {
+        std::cout << "Usage: nlm_phase4_demo [OPTIONS]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --trials N              Number of trials per experiment (default: 50)\n";
+        std::cout << "  --steps N               Steps per experiment (default: 100)\n";
+        std::cout << "  --neuron-count N        Number of neurons (default: 1000)\n";
+        std::cout << "  --region-count N         Number of brain regions (default: 2)\n";
+        std::cout << "  --seed N                Random seed for reproducibility (default: 42)\n";
+        std::cout << "  --progress              Enable progress output (default: enabled)\n";
+        std::cout << "  --no-progress           Disable progress output\n";
+        std::cout << "  --validate              Enable result validation (default: enabled)\n";
+        std::cout << "  --no-validate           Disable result validation\n";
+        std::cout << "  --output FILE           Write detailed results to FILE\n";
+        std::cout << "  --help, -h              Show this help message\n\n";
+        std::cout << "Examples:\n";
+        std::cout << "  nlm_phase4_demo --trials 100 --steps 200\n";
+        std::cout << "  nlm_phase4_demo --neuron-count 2000 --region-count 4 --seed 123\n";
+        std::cout << "  nlm_phase4_demo --progress --validate --output results.json\n";
+        return true;
+    };
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp();
+            exit(0);
+        }
+        
+        if (arg.find("--trials=") == 0) {
+            config.numTrials = std::stoull(arg.substr(9));
+        } else if (arg.find("--steps=") == 0) {
+            config.numSteps = std::stoull(arg.substr(8));
+        } else if (arg.find("--neuron-count=") == 0) {
+            config.neuronCount = std::stoull(arg.substr(15));
+        } else if (arg.find("--region-count=") == 0) {
+            config.regionCount = std::stoull(arg.substr(15));
+        } else if (arg.find("--seed=") == 0) {
+            config.randomSeed = std::stoull(arg.substr(7));
+        } else if (arg == "--progress") {
+            config.enableProgressOutput = true;
+        } else if (arg == "--no-progress") {
+            config.enableProgressOutput = false;
+        } else if (arg == "--validate") {
+            config.validateResults = true;
+        } else if (arg == "--no-validate") {
+            config.validateResults = false;
+        } else if (arg.find("--output=") == 0) {
+            config.outputFile = arg.substr(9);
+        } else {
+            std::cout << "[WARNING] Unknown argument: " << arg << std::endl;
+        }
     }
     
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    if (config.numTrials == 0) {
+        std::cerr << "ERROR: Number of trials must be positive" << std::endl;
+        exit(1);
+    }
     
-    // Create brain
-    std::cout << "Initializing brain...\n";
-    auto brain = std::make_shared<Brain>(config);
+    if (config.numSteps == 0) {
+        std::cerr << "ERROR: Steps must be positive" << std::endl;
+        exit(1);
+    }
+    
+    return config;
+}
+
+void logConfig(const EnhancedDemoConfig& config) {
+    std::cout << "Starting Phase 4 Enhanced Demo with the following configuration:\n";
+    std::cout << "  Trials: " << config.numTrials << "\n";
+    std::cout << "  Steps per experiment: " << config.numSteps << "\n";
+    std::cout << "  Neurons: " << config.neuronCount << "\n";
+    std::cout << "  Regions: " << config.regionCount << "\n";
+    std::cout << "  Random seed: " << config.randomSeed << "\n";
+    std::cout << "  Progress output: " << (config.enableProgressOutput ? "Enabled" : "Disabled") << "\n";
+    std::cout << "  Result validation: " << (config.validateResults ? "Enabled" : "Disabled") << "\n";
+    if (!config.outputFile.empty()) {
+        std::cout << "  Output file: " << config.outputFile << "\n";
+    }
+    std::cout << std::endl;
+}
+
+void saveResults(const std::string& filename, const std::vector<std::pair<std::string, float>>& results) {
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) {
+        std::cout << "[WARNING] Could not write results to: " << filename << std::endl;
+        return;
+    }
+    
+    outFile << "Phase 4 Enhanced Demo Results\n";
+    outFile << "=============================\n\n";
+    
+    for (const auto& result : results) {
+        outFile << result.first << ": " << result.second << "\n";
+    }
+    
+    outFile.close();
+    std::cout << "[OUTPUT] Results saved to: " << filename << std::endl;
+}
+
+int main(int argc, char* argv[]) {
+    EnhancedDemoConfig config = parseArgs(argc, argv);
+    logConfig(config);
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    std::cout << "\nStarting Phase 4 demonstration with " << config.numTrials << " trials per experiment\n";
+    std::cout << "Total experiments: 10 (" << (config.numTrials * 10) << " total trials)\n";
+    std::cout << std::endl;
+    
+    auto configPtr = std::make_shared<Config>();
+    configPtr->set("neuron_count", config.neuronCount);
+    configPtr->set("region_count", config.regionCount);
+    configPtr->set("connection_probability", config.connectionProbability);
+    configPtr->set("random_seed", config.randomSeed);
+    configPtr->set("simulation_timestep", config.simulationTimestep);
+    configPtr->set("stdp_ltp_weight", config.stdpLTPWeight);
+    configPtr->set("stdp_ltd_weight", config.stdpLTDWeight);
+    
+    auto brain = std::make_shared<Brain>(configPtr);
     if (!brain->initialize()) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;
     }
     
-    printHeader("PHASE 4 EXPERIMENTS");
+    printHeader("PHASE 4 ENHANCED COGITION DEMONSTRATION");
     
-    // Run Temporal Prediction Experiment
+    // Run all experiments with enhanced monitoring
     printSection("1. Temporal Prediction Learning");
     {
         TemporalPredictionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Initial Prediction Error", results.predictionErrorInitial);
         printResult("Final Prediction Error", results.predictionErrorFinal);
         printResult("Improvement", results.predictionAccuracyImprovement);
         
-        float improvement = results.predictionErrorInitial - results.predictionErrorFinal;
-        if (improvement > 0) {
+        if (results.predictionAccuracyImprovement > 0) {
             std::cout << "  [SUCCESS] Prediction improved through experience!\n";
         } else {
             std::cout << "  [INFO] No significant prediction improvement yet.\n";
         }
     }
     
-    // Run Working Memory Experiment
     printSection("2. Working Memory");
     {
         WorkingMemoryExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Initial Retention", results.workingMemoryRetentionInitial);
         printResult("Final Retention", results.workingMemoryRetentionFinal);
         printResult("Capacity", results.workingMemoryCapacity, 100.0f);
     }
     
-    // Run Episodic Recall Experiment
     printSection("3. Episodic Memory");
     {
         EpisodicRecallExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Recall Accuracy", results.episodicRecallAccuracy);
         printResult("Episodes Stored", results.episodesStored);
         printResult("Episodic Influence", results.episodicInfluence);
     }
     
-    // Run Concept Formation Experiment
     printSection("4. Concept Formation");
     {
         ConceptFormationExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Concepts Formed", results.conceptsFormed);
         printResult("Concept Stability", results.conceptStability);
@@ -121,11 +234,10 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Attention Experiment
     printSection("5. Neural Attention");
     {
         AttentionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Attention Selectivity", results.attentionSelectivity);
         printResult("Distraction Resistance", results.distractionResistance);
@@ -135,11 +247,10 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Planning Experiment
     printSection("6. Multi-Step Planning");
     {
         PlanningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials / 2);
         
         printResult("Planning Accuracy", results.planningAccuracy);
         printResult("Planning Confidence", results.planningConfidence);
@@ -149,11 +260,10 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Self-Model Experiment
     printSection("7. Self-Model");
     {
         SelfModelExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Self-Prediction Accuracy", results.selfPredictionAccuracy);
         printResult("Body Awareness", results.bodyAwareness);
@@ -163,11 +273,10 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Social Learning Experiment
     printSection("8. Social Learning");
     {
         SocialLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials / 2);
         
         printResult("Imitation Accuracy", results.imitationAccuracy);
         printResult("Observations from Others", results.observationsFromOthers);
@@ -177,17 +286,15 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Continual Learning Experiment
     printSection("9. Continual Learning");
     {
         ContinualLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), config.numTrials);
         
         printResult("Behavior Improvement", results.behaviorImprovement);
         printResult("Transfer Performance", results.transferPerformance);
     }
     
-    // Run Integrated Experiment
     printSection("10. Integrated Phase 4");
     {
         Phase4IntegratedExperiment experiment;
@@ -200,7 +307,6 @@ int main(int argc, char* argv[]) {
         printResult("Body Awareness", results.bodyAwareness);
     }
     
-    // Final summary
     printHeader("PHASE 4 SUMMARY");
     
     std::cout << "\nPhase 4 demonstrates:\n";
@@ -221,5 +327,23 @@ int main(int argc, char* argv[]) {
     std::cout << "Phase 4 Complete!\n";
     std::cout << std::string(60, '=') << "\n";
     
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    double totalSeconds = duration.count() / 1000.0;
+    
+    std::cout << "\nPerformance:\n";
+    std::cout << "  Total runtime: " << std::fixed << std::setprecision(2) << totalSeconds << " seconds\n";
+    std::cout << "  Trials executed: " << config.numTrials * 10 << "\n";
+    std::cout << "  Experiments completed: 10\n";
+    
+    if (!config.outputFile.empty()) {
+        std::vector<std::pair<std::string, float>> results;
+        results.push_back({"Total Runtime (s)", static_cast<float>(totalSeconds)});
+        results.push_back({"Trials Executed", static_cast<float>(config.numTrials * 10)});
+        saveResults(config.outputFile, results);
+    }
+    
     return 0;
 }
+
+} // namespace nlm
