@@ -5,6 +5,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <unordered_map>
+#include <map>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,19 +21,464 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/EpisodicMemory.hpp"
+#include "../src/memory/AssociativeMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/environment/Environment.hpp"
+#include "../src/environment/Observation.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Forward declarations for enhanced features
+class ConfigTemplate;
+class ParameterSweep;
+class PerformanceMonitor;
+class StatisticalAnalyzer;
+class MemoryManager;
+class SimulationController;
+class VisualizationManager;
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Enhanced Python binding for the NLM C++ neural simulation framework.
+        Provides comprehensive classes for brain simulation, configuration management,
+        agent control, world environments, and advanced neural computation features.
+        
+        Key features:
+        - Enhanced configuration with templates and validation
+        - Advanced brain manipulation with neural populations
+        - Rich agent system with curiosity-driven exploration
+        - Multiple world environments (SimpleWorld, DynamicWorld, etc.)
+        - Visualization and debugging tools
+        - Performance monitoring and statistical analysis
+        - Context managers for automatic resource cleanup
+        - Parameter sweeps and experiment automation
+        - Reinforcement learning integration
+        - Memory management utilities
+        - Advanced plasticity control
+        
+        Usage examples:
+        ```python
+        import pynlm
+        
+        # Create brain with enhanced configuration
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 1000)
+        brain = pynlm.createBrain(config)
+        
+        # Run simulation with monitoring
+        with pynlm.SimulationContext(config) as sim:
+            brain.initialize()
+            for step in range(1000):
+                brain.step(step)
+        ```
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+
+    // Enhanced Configuration Templates
+    py::class_<ConfigTemplate>(m, "ConfigTemplate", R"pbdoc(Neural network configuration template)pbdoc")
+        .def(py::init<>())
+        .def("createConfig", &ConfigTemplate::createConfig,
+             "Create configuration from template")
+        .def("validate", &ConfigTemplate::validate,
+             "Validate template against configuration")
+        .def("getTemplateParameters", &ConfigTemplate::getTemplateParameters,
+             "Get template parameters")
+        .def("addParameter", &ConfigTemplate::addParameter,
+             py::arg("name"), py::arg("value"), py::arg("description"),
+             "Add parameter to template")
+        .def("setParameterRange", &ConfigTemplate::setParameterRange,
+             py::arg("name"), py::arg("min"), py::arg("max"),
+             "Set parameter range for sweep");
+
+    // Configuration Validation System
+    py::class_<ConfigValidationResult>(m, "ConfigValidationResult", R"pbdoc(Configuration validation result)pbdoc")
+        .def_readwrite("is_valid", &ConfigValidationResult::isValid)
+        .def_readwrite("errors", &ConfigValidationResult::errors)
+        .def_readwrite("warnings", &ConfigValidationResult::warnings)
+        .def("getSuggestions", &ConfigValidationResult::getSuggestions);
+
+    // Parameter Sweep System
+    py::class_<ParameterSweep>(m, "ParameterSweep", R"pbdoc(Parameter sweep for experiments)pbdoc")
+        .def(py::init<>())
+        .def("addParameter", &ParameterSweep::addParameter,
+             py::arg("name"), py::arg("values"),
+             "Add parameter with possible values")
+        .def("addContinuousParameter", &ParameterSweep::addContinuousParameter,
+             py::arg("name"), py::arg("min"), py::arg("max"), py::arg("steps"),
+             "Add continuous parameter for sweep")
+        .def("setObjectiveFunction", &ParameterSweep::setObjectiveFunction,
+             py::arg("func"),
+             "Set objective function for optimization")
+        .def("runSweep", &ParameterSweep::runSweep,
+             py::arg("steps_per_parameter"), py::arg("parallel"),
+             "Run parameter sweep")
+        .def("getResults", &ParameterSweep::getResults,
+             "Get sweep results")
+        .def("getBestParameters", &ParameterSweep::getBestParameters,
+             "Get best parameters found")
+        .def("saveResults", &ParameterSweep::saveResults,
+             py::arg("filename"),
+             "Save sweep results to file");
+
+    // Neural Population Management
+    py::class_<NeuralPopulation>(m, "NeuralPopulation", R"pbdoc(Neural population with shared properties)pbdoc")
+        .def(py::init<>())
+        .def("setType", &NeuralPopulation::setType,
+             py::arg("type"), "Set neuron type")
+        .def("getType", &NeuralPopulation::getType,
+             "Get neuron type")
+        .def("setCount", &NeuralPopulation::setCount,
+             py::arg("count"), "Set neuron count")
+        .def("getCount", &NeuralPopulation::getCount,
+             "Get neuron count")
+        .def("addSynapticConnection", &NeuralPopulation::addSynapticConnection,
+             py::arg("target"), py::arg("weight"),
+             "Add synaptic connection to target population")
+        .def("getConnections", &NeuralPopulation::getConnections,
+             "Get outgoing connections")
+        .def("calculateStats", &NeuralPopulation::calculateStats,
+             "Calculate population statistics")
+        .def("__repr__", &NeuralPopulation::toString,
+             "String representation");
+
+    // Enhanced Plasticity Control
+    py::class_<PlasticityController>(m, "PlasticityController", R"pbdoc(Advanced plasticity control system)pbdoc")
+        .def(py::init<>())
+        .def("enableRule", &PlasticityController::enableRule,
+             py::arg("rule_type"), py::arg("enabled"),
+             "Enable/disable plasticity rule")
+        .def("configureRule", &PlasticityController::configureRule,
+             py::arg("rule_type"), py::arg("params"),
+             "Configure plasticity rule parameters")
+        .def("getRuleState", &PlasticityController::getRuleState,
+             py::arg("rule_type"),
+             "Get plasticity rule state")
+        .def("addCustomRule", &PlasticityController::addCustomRule,
+             py::arg("name"), py::arg("condition"), py::arg("update"),
+             "Add custom plasticity rule")
+        .def("getCurrentState", &PlasticityController::getCurrentState,
+             "Get current plasticity state");
+
+    // Enhanced Agent Behaviors
+    py::class_<AgentBehaviorManager>(m, "AgentBehaviorManager", R"pbdoc(Advanced agent behavior management)pbdoc")
+        .def(py::init<>())
+        .def("enableBehavior", &AgentBehaviorManager::enableBehavior,
+             py::arg("behavior_type"), py::arg("params"),
+             "Enable agent behavior with parameters")
+        .def("disableBehavior", &AgentBehaviorManager::disableBehavior,
+             py::arg("behavior_type"),
+             "Disable agent behavior")
+        .def("configureBehavior", &AgentBehaviorManager::configureBehavior,
+             py::arg("behavior_type"), py::arg("config"),
+             "Configure agent behavior configuration")
+        .def("getBehaviorState", &AgentBehaviorManager::getBehaviorState,
+             py::arg("behavior_type"),
+             "Get agent behavior state")
+        .def("updateBehaviors", &AgentBehaviorManager::updateBehaviors,
+             py::arg("timestep"),
+             "Update all agent behaviors")
+        .def("getBehaviorStats", &AgentBehaviorManager::getBehaviorStats,
+             "Get agent behavior statistics");
+
+    // Advanced World Environments
+    py::class_<DynamicWorld>(m, "DynamicWorld", R"pbdoc(Dynamic world with moving objects and environmental factors)pbdoc")
+        .def(py::init<>())
+        .def("configure", &DynamicWorld::configure,
+             py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure dynamic world")
+        .def("addMovingObject", &DynamicWorld::addMovingObject,
+             py::arg("x"), py::arg("y"), py::arg("type"),
+             py::arg("velocity_x") = 0.0f, py::arg("velocity_y") = 0.0f,
+             "Add moving object to world")
+        .def("addDynamicObject", &DynamicWorld::addDynamicObject,
+             py::arg("x"), py::arg("y"), py::arg("type"),
+             py::arg("radius") = 0.5f, py::arg("dynamic") = true,
+             "Add dynamic object to world")
+        .def("updateObject", &DynamicWorld::updateObject,
+             py::arg("index"), py::arg("x"), py::arg("y"),
+             "Update object position")
+        .def("setEnvironmentalFactor", &DynamicWorld::setEnvironmentalFactor,
+             py::arg("factor"), py::arg("value"),
+             "Set environmental factor")
+        .def("getEnvironmentalFactor", &DynamicWorld::getEnvironmentalFactor,
+             py::arg("factor"),
+             "Get environmental factor value")
+        .def("getWorldStats", &DynamicWorld::getWorldStats,
+             "Get world statistics");
+
+    // Visualization Manager
+    py::class_<VisualizationManager>(m, "VisualizationManager", R"pbdoc(Advanced visualization and debugging tools)pbdoc")
+        .def(py::init<>())
+        .def("enableVisualization", &VisualizationManager::enableVisualization,
+             py::arg("enabled"), "Enable/disable visualization")
+        .def("setVisualizationOutput", &VisualizationManager::setVisualizationOutput,
+             py::arg("output_type"), "Set visualization output type")
+        .def("captureFrame", &VisualizationManager::captureFrame,
+             py::arg("filename") = "",
+             "Capture visualization frame")
+        .def("createAnimation", &VisualizationManager::createAnimation,
+             py::arg("filename"), py::arg("fps"), py::arg("duration"),
+             "Create animation from frames")
+        .def("generateReport", &VisualizationManager::generateReport,
+             "Generate visualization report")
+        .def("getVisualizationData", &VisualizationManager::getVisualizationData,
+             "Get current visualization data")
+        .def("exportData", &VisualizationManager::exportData,
+             py::arg("filename"), "Export visualization data");
+
+    // Performance Monitoring
+    py::class_<PerformanceMonitor>(m, "PerformanceMonitor", R"pbdoc(Performance monitoring and analysis)pbdoc")
+        .def(py::init<>())
+        .def("startMonitoring", &PerformanceMonitor::startMonitoring,
+             "Start performance monitoring")
+        .def("stopMonitoring", &PerformanceMonitor::stopMonitoring,
+             "Stop performance monitoring")
+        .def("recordStep", &PerformanceMonitor::recordStep,
+             py::arg("step"),
+             "Record step performance")
+        .def("getReport", &PerformanceMonitor::getReport,
+             "Get performance report")
+        .def("getBottlenecks", &PerformanceMonitor::getBottlenecks,
+             "Get performance bottlenecks")
+        .def("getRecommendations", &PerformanceMonitor::getRecommendations,
+             "Get optimization recommendations")
+        .def("configure", &PerformanceMonitor::configure,
+             py::arg("config"),
+             "Configure performance monitoring");
+
+    // Statistical Analysis
+    py::class_<StatisticalAnalyzer>(m, "StatisticalAnalyzer", R"pbdoc(Statistical analysis of simulation data)pbdoc")
+        .def(py::init<>())
+        .def("analyzeDataFrame", &StatisticalAnalyzer::analyzeDataFrame,
+             py::arg("data"),
+             "Analyze statistical data")
+        .def("detectOutliers", &StatisticalAnalyzer::detectOutliers,
+             py::arg("data"), py::arg("method") = "zscore",
+             "Detect outliers in data")
+        .def("calculateCorrelation", &StatisticalAnalyzer::calculateCorrelation,
+             py::arg("data1"), py::arg("data2"),
+             "Calculate correlation between datasets")
+        .def("performHypothesisTest", &StatisticalAnalyzer::performHypothesisTest,
+             py::arg("data1"), py::arg("data2"), py::arg("test_type") = "t_test",
+             "Perform hypothesis test")
+        .def("getNormalityTest", &StatisticalAnalyzer::getNormalityTest,
+             py::arg("data"),
+             "Perform normality test");
+
+    // Memory Manager
+    py::class_<MemoryManager>(m, "MemoryManager", R"pbdoc(Memory management and optimization)pbdoc")
+        .def(py::init<>())
+        .def("getMemoryUsage", &MemoryManager::getMemoryUsage,
+             "Get current memory usage")
+        .def("getMemoryStats", &MemoryManager::getMemoryStats,
+             "Get memory statistics")
+        .def("optimizeMemory", &MemoryManager::optimizeMemory,
+             "Optimize memory usage")
+        .def("getOptimizationSuggestions", &MemoryManager::getOptimizationSuggestions,
+             "Get memory optimization suggestions")
+        .def("trackAllocation", &MemoryManager::trackAllocation,
+             py::arg("size"), py::arg("type"),
+             "Track memory allocation")
+        .def("trackDeallocation", &MemoryManager::trackDeallocation,
+             py::arg("size"), py::arg("type"),
+             "Track memory deallocation");
+
+    // Simulation Controller
+    py::class_<SimulationController>(m, "SimulationController", R"pbdoc(Advanced simulation control and automation)pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimulationController::configure,
+             py::arg("config"),
+             "Configure simulation controller")
+        .def("runSimulation", &SimulationController::runSimulation,
+             py::arg("brain"), py::arg("world"), py::arg("steps"),
+             py::arg("on_step_callback") = nullptr,
+             py::arg("checkpoint_interval") = 100,
+             "Run controlled simulation")
+        .def("runEpisode", &SimulationController::runEpisode,
+             py::arg("agent"), py::arg("num_steps"),
+             py::arg("reward_threshold") = 0.0,
+             "Run agent episode")
+        .def("pauseSimulation", &SimulationController::pauseSimulation,
+             "Pause simulation")
+        .def("resumeSimulation", &SimulationController::resumeSimulation,
+             "Resume simulation")
+        .def("stopSimulation", &SimulationController::stopSimulation,
+             "Stop simulation")
+        .def("getStatistics", &SimulationController::getStatistics,
+             "Get simulation statistics")
+        .def("saveSimulation", &SimulationController::saveSimulation,
+             py::arg("filename"),
+             "Save simulation state")
+        .def("loadSimulation", &SimulationController::loadSimulation,
+             py::arg("filename"),
+             "Load simulation state");
+
+    // Resource Management Utilities
+    py::class_<ResourceManager>(m, "ResourceManager", R"pbdoc(Resource management and cleanup utilities)pbdoc")
+        .def(py::init<>())
+        .def("registerResource", &ResourceManager::registerResource,
+             py::arg("name"), py::arg("deleter"),
+             "Register resource with cleanup function")
+        .def("cleanupResources", &ResourceManager::cleanupResources,
+             "Clean up all resources")
+        .def("getResourceStats", &ResourceManager::getResourceStats,
+             "Get resource usage statistics")
+        .def("trackUsage", &ResourceManager::trackUsage,
+             py::arg("resource_name"), py::arg("size"),
+             "Track resource usage");
+
+    // Context Manager for automatic resource cleanup
+    py::class_<SimulationContext>(m, "SimulationContext", R"pbdoc(Context manager for simulation resource cleanup)pbdoc")
+        .def(py::init<>())
+        .def("__enter__", &SimulationContext::enter)
+        .def("__exit__", &SimulationContext::exit)
+        .def("addResource", &SimulationContext::addResource,
+             py::arg("resource"),
+             "Add resource to context")
+        .def("cleanup", &SimulationContext::cleanup,
+             "Cleanup all resources");
+
+    // Batch Simulation Context
+    py::class_<BatchSimulationContext>(m, "BatchSimulationContext", R"pbdoc(Context manager for batch simulation processing)pbdoc")
+        .def(py::init<>())
+        .def("__enter__", &BatchSimulationContext::enter)
+        .def("__exit__", &BatchSimulationContext::exit)
+        .def("recordProgress", &BatchSimulationContext::recordProgress,
+             py::arg("current"), py::arg("total"),
+             "Record batch progress")
+        .def("getProgress", &BatchSimulationContext::getProgress,
+             "Get current progress");
+
+    // Utility Functions for Enhanced API
+    m.def("createConfigTemplate", &createConfigTemplate,
+         py::arg("name"),
+         "Create configuration template");
+
+    m.def("createParameterSweep", &createParameterSweep,
+         "Create parameter sweep controller");
+
+    m.def("createPerformanceMonitor", &createPerformanceMonitor,
+         "Create performance monitor");
+
+    m.def("createStatisticalAnalyzer", &createStatisticalAnalyzer,
+         "Create statistical analyzer");
+
+    m.def("createMemoryManager", &createMemoryManager,
+         "Create memory manager");
+
+    m.def("createSimulationController", &createSimulationController,
+         "Create simulation controller");
+
+    m.def("createResourceManager", &createResourceManager,
+         "Create resource manager");
+
+    m.def("createVisualizationManager", &createVisualizationManager,
+         "Create visualization manager");
+
+    m.def("createAgentBehaviorManager", &createAgentBehaviorManager,
+         "Create agent behavior manager");
+
+    m.def("createPlasticityController", &createPlasticityController,
+         "Create plasticity controller");
+
+    m.def("createDynamicWorld", &createDynamicWorld,
+         "Create dynamic world environment");
+
+    // Enhanced Error Types
+    py::register_exception<InvalidConfigurationError>(m, "InvalidConfigurationError");
+    py::register_exception<SimulationError>(m, "SimulationError");
+    py::register_exception<VisualizationError>(m, "VisualizationError");
+    py::register_exception<PerformanceError>(m, "PerformanceError");
+
+    // Additional utility functions
+    m.def("run_parameter_sweep", &runParameterSweep,
+         py::arg("param_space"), py::arg("objective_function"),
+         py::arg("max_evaluations") = 100, py::arg("parallel") = False,
+         "Run parameter sweep optimization");
+
+    m.def("analyze_simulation_data", &analyzeSimulationData,
+         py::arg("data"), py::arg("analysis_type") = "comprehensive",
+         "Analyze simulation data with statistical tools");
+
+    m.def("generate_performance_report", &generatePerformanceReport,
+         py::arg("monitor"),
+         "Generate performance report from monitor data");
+
+    m.def("validate_configuration", &validateConfiguration,
+         py::arg("config"), py::arg("strict") = True,
+         "Validate configuration with optional strict checking");
+
+    m.def("get_api_info", &getApiInfo,
+         "Get API version and feature information");
+
+    m.def("get_system_info", &getSystemInfo,
+         "Get system information and capabilities");
+
+    // Version and metadata
+    m.attr("__version__") = "2.0.0";
+    m.attr("__description__") = "Enhanced NLM Python bindings with advanced features";
+    m.attr("__api_version__") = "2.0";
+
+    // Example function for demonstration
+    m.def("create_example_brain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000, nlm::ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1, nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        return brain;
+    }, "Create example brain for demonstration");
+
+    // Example agent function
+    m.def("create_example_agent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("agent.reward_shaping", 0.1, nlm::ConfigSource::Default);
+        config->set("agent.curiosity.enabled", true, nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        return agent;
+    }, "Create example agent for demonstration");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
