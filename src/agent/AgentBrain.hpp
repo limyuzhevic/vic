@@ -2,9 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
+#include "../cognition/NeuralPlanner.hpp"
 #include <vector>
 
 namespace nlm {
@@ -37,26 +35,23 @@ public:
     // Update development system
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
-    float getCuriosityLevel() const;
-    
-    // Get novelty level
-    float getNoveltyLevel() const;
-    
-    // Get prediction error
-    float getPredictionError() const;
+    // Helper methods for neural planning integration
+    bool hasRecentExperience() const;
+    std::vector<float> getCurrentStateFromSensoryInput() const;
     
     // Reset agent for new episode
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Neural planning integration
+    void setNeuralPlanner(std::shared_ptr<NeuralPlanner> planner) { 
+        neuralPlanner_ = planner; 
+    }
+    
+    // Get neural planning status
+    bool hasNeuralPlanner() const { return neuralPlanner_ != nullptr; }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -77,6 +72,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<NeuralPlanner> neuralPlanner_;  // For action planning integration
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

@@ -61,19 +61,10 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Development effects
+    float developmentExcitabilityModifier;
+    float developmentAttentionModifier;
+    float developmentConsolidationThreshold;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -406,18 +397,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
+    // ========== STEP 6: Apply neuromodulation effects ==========
+    // - Dopamine affects neural excitability
+    // - Novelty detection updates
+    // - Curiosity computation
+    
+    // Update neuromodulation systems
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -528,8 +521,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes sensory experiences to discover recurring patterns
+        // This helps with generalization, categorization, and understanding of environmental structure
+        
+        // Concept formation accumulates experiences over time
+        // To be fully integrated, it would need access to current sensory patterns
+        // This is a placeholder for the full integration that would happen in Phase 6
+        
+        NLM_LOG_DEBUG("Concept formation would process sensory patterns for abstraction");
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -546,7 +545,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+        // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -573,6 +572,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neural excitability modulation
+        auto* dopamine = pImpl->dopamine;
+        if (dopamine) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float excitabilityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    excitabilityMod = 1.2f;  // Higher excitability, more responsive
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    excitabilityMod = 1.0f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    excitabilityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    excitabilityMod = 0.6f;  // Lower excitability, stable
+                    break;
+                case DevelopmentalStage::Aging:
+                    excitabilityMod = 0.4f;  // Reduced responsiveness
+                    break;
+            }
+            
+            // Store development modifier for dopamine to use
+            pImpl->developmentExcitabilityModifier = excitabilityMod;
+        }
+        
+        // Development affects attention system
+        auto* attention = pImpl->attention;
+        if (attention) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float attentionMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    attentionMod = 1.5f;  // Sharper attention, focus on salient stimuli
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    attentionMod = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    attentionMod = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    attentionMod = 0.8f;  // Broader attention, more flexible
+                    break;
+                case DevelopmentalStage::Aging:
+                    attentionMod = 0.6f;  // Reduced attention span
+                    break;
+            }
+            
+            attention->setInhibitionStrength(1.0f / attentionMod);
+            attention->setExcitationStrength(1.5f * attentionMod);
+        }
+        
+        // Development affects memory consolidation
+        auto* episodicMem = pImpl->episodicMemory;
+        if (episodicMem) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float consolidationThreshold = 0.3f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    consolidationThreshold = 0.2f;  // Keep more memories during learning
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    consolidationThreshold = 0.3f;  // Standard consolidation
+                    break;
+                case DevelopmentalStage::Maturation:
+                    consolidationThreshold = 0.4f;  // Be more selective
+                    break;
+                case DevelopmentalStage::Adult:
+                    consolidationThreshold = 0.5f;  // Strong consolidation, remove weaker memories
+                    break;
+                case DevelopmentalStage::Aging:
+                    consolidationThreshold = 0.6f;  // Be more selective, remove older memories
+                    break;
+            }
+            
+            // Note: consolidate() method exists but takes a relevance threshold
+            // Instead of modifying the method, we'll adjust the threshold used in consolidation
+            episodicMem->consolidate(consolidationThreshold);
         }
     }
     

@@ -7,6 +7,7 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , neuralPlanner_(nullptr)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -152,6 +153,30 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // First try NeuralPlanner if available (provides goal-directed planning)
+    if (neuralPlanner_ && hasRecentExperience()) {
+        // Get current sensory state for planning
+        std::vector<float> currentState = getCurrentStateFromSensoryInput();
+        
+        // Plan action based on current state and goals
+        // For now, use a simple target reward based on current situation
+        float targetReward = 10.0f - curiosityLevel_;  // Higher curiosity = more exploration needed
+        MotorCommand plannedAction = neuralPlanner_->planAction(currentState, targetReward);
+        
+        // If neural planner gives a reasonable action (not just wait), use it
+        if (plannedAction != MotorCommand::Wait) {
+            // Apply curiosity-based exploration to the planned action
+            if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                plannedAction = selectWithCuriosity(plannedAction);
+            }
+            
+            // Update neural planner quality based on how well the action worked
+            // (This would normally happen after the action is executed in the world)
+            return plannedAction;
+        }
+    }
+    
+    // Fallback to traditional motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -332,6 +357,39 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+// Helper methods for neural planning integration
+
+bool AgentBrain::hasRecentExperience() const {
+    // Check if episodic memory has recent episodes
+    if (!brain_ || !brain_->getEpisodicMemory()) return false;
+    
+    // For now, assume we have experience if we've run for some time
+    // In a full implementation, this would check actual episodic memory
+    return !previousVision_.empty();
+}
+
+std::vector<float> AgentBrain::getCurrentStateFromSensoryInput() const {
+    // Construct a state vector from sensory input for planning
+    std::vector<float> state;
+    
+    // Add previous vision to state (current sensory input)
+    state.insert(state.end(), previousVision_.begin(), previousVision_.end());
+    
+    // Add current novelty level
+    state.push_back(noveltyLevel_);
+    
+    // Add current curiosity level
+    state.push_back(curiosityLevel_);
+    
+    // Add expected reward
+    state.push_back(expectedReward_);
+    
+    // Add developmental age
+    state.push_back(static_cast<float>(developmentalAge_));
+    
+    return state;
 }
 
 void AgentBrain::reset() {
