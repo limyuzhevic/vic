@@ -12,7 +12,11 @@ struct NeuronId {
     uint64_t value;
     
     constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
+    explicit constexpr NeuronId(uint64_t v) : value(v) {
+        if (v >= UINT64_MAX) {
+            throw std::invalid_argument("NeuronId value cannot be UINT64_MAX");
+        }
+    }
     
     constexpr bool operator==(const NeuronId& other) const = default;
     constexpr bool operator!=(const NeuronId& other) const = default;
@@ -26,7 +30,11 @@ struct SynapseId {
     uint64_t value;
     
     constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
+    explicit constexpr SynapseId(uint64_t v) : value(v) {
+        if (v >= UINT64_MAX) {
+            throw std::invalid_argument("SynapseId value cannot be UINT64_MAX");
+        }
+    }
     
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
@@ -40,7 +48,11 @@ struct RegionId {
     uint64_t value;
     
     constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
+    explicit constexpr RegionId(uint64_t v) : value(v) {
+        if (v >= UINT64_MAX) {
+            throw std::invalid_argument("RegionId value cannot be UINT64_MAX");
+        }
+    }
     
     constexpr bool operator==(const RegionId& other) const = default;
     constexpr bool operator!=(const RegionId& other) const = default;
@@ -54,7 +66,11 @@ struct PopulationId {
     uint64_t value;
     
     constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
+    explicit constexpr PopulationId(uint64_t v) : value(v) {
+        if (v >= UINT64_MAX) {
+            throw std::invalid_argument("PopulationId value cannot be UINT64_MAX");
+        }
+    }
     
     constexpr bool operator==(const PopulationId& other) const = default;
     constexpr bool operator!=(const PopulationId& other) const = default;

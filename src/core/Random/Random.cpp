@@ -1,5 +1,5 @@
 #include "Random.hpp"
-#include <stdexcept>
+#include "../ErrorHandling.hpp"
 
 namespace nlm {
 
@@ -39,9 +39,7 @@ uint64_t RandomGenerator::getSeed() const {
 }
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
+    NLM_VALIDATE_PARAM(min <= max, "min must be <= max");
     if (min == max) {
         return min;
     }
@@ -50,9 +48,7 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
+    NLM_VALIDATE_PARAM(min <= max, "min must be <= max");
     if (min == max) {
         return min;
     }
@@ -61,42 +57,43 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
+    NLM_VALIDATE_PARAM(min < max, "min must be < max");
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
+    NLM_VALIDATE_PARAM(min < max, "min must be < max");
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::normal(double mean, double stddev) {
+    NLM_VALIDATE_PARAM(stddev >= 0.0, "standard deviation must be non-negative");
     std::normal_distribution<double> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::normal(float mean, float stddev) {
+    NLM_VALIDATE_PARAM(stddev >= 0.0f, "standard deviation must be non-negative");
     std::normal_distribution<float> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 bool RandomGenerator::bernoulli(double p) {
+    NLM_VALIDATE_PARAM(p >= 0.0 && p <= 1.0, "probability must be in [0, 1]");
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    NLM_VALIDATE_PARAM(lambda >= 0.0, "lambda must be non-negative");
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    NLM_VALIDATE_PARAM(lambda >= 0.0, "lambda must be non-negative");
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }
@@ -110,13 +107,13 @@ uint32_t RandomGenerator::randomBit() {
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
-    if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
-    }
+    NLM_VALIDATE_PARAM(n > 0, "Cannot pick from zero items");
     return uniformInt(0, n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
+    NLM_CHECK_NULL(data, "data pointer cannot be null");
+    NLM_VALIDATE_PARAM(size > 0, "size must be positive");
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
         bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));

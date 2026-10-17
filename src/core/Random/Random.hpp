@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
+#include <vector>
+#include <algorithm>
 
 namespace nlm {
 
@@ -92,19 +95,23 @@ private:
 };
 
 // Template implementations
-template<typename Container>
-void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
-}
-
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+inline namespace error_handling {
+    // Template implementations
+    template<typename Container>
+    void RandomGenerator::shuffle(Container& container) {
+        NLM_VALIDATE_OPERATION(container.size() > 0, "Cannot shuffle empty container");
+        std::shuffle(container.begin(), container.end(), engine());
     }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
+
+    template<typename Container>
+    auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
+        NLM_CHECK_NOT_EMPTY(container, "Cannot pick from empty container");
+        auto it = container.begin();
+        std::advance(it, pickRandomIndex(container.size()));
+        return *it;
+    }
+
+} // inline namespace error_handling
 
 } // namespace nlm
+

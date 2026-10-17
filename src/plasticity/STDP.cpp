@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/ErrorHandling.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -52,10 +53,10 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
+    NLM_VALIDATE_PARAM(isNotNull(synapse), "Synapse pointer cannot be null");
+    NLM_CHECK_NOT_EMPTY(preSpikes, "Pre-spike vector cannot be empty");
+    NLM_CHECK_NOT_EMPTY(postSpikes, "Post-spike vector cannot be empty");
+
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
@@ -94,7 +95,7 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    NLM_CHECK_NULL(synapse, "Synapse pointer cannot be null");
     
     // Clamp weight to bounds
     float newWeight = synapse->getWeight() + delta;
@@ -107,7 +108,8 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    NLM_VALIDATE_PARAM(weight >= 0.0f && weight <= 1.0f, "LTP weight must be in [0, 1]");
+    pImpl->ltpWeight = weight;
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +117,8 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    NLM_VALIDATE_PARAM(weight >= 0.0f && weight <= 1.0f, "LTD weight must be in [0, 1]");
+    pImpl->ltdWeight = weight;
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +126,8 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    NLM_VALIDATE_PARAM(tau >= 1.0f && tau <= 100.0f, "Time constant must be in [1, 100]");
+    pImpl->timeConstant = tau;
 }
 
 float STDP::getTimeConstant() const {
