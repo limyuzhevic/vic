@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
 
 namespace nlm {
 
@@ -18,41 +19,127 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Add JSON parsing function before loadFromFile
+bool Config::parseJSON(const std::string& jsonStr) {
+    try {
+        if (jsonStr.empty() || jsonStr[0] != '{') {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        size_t pos = 1;
+        while (pos < jsonStr.size() && jsonStr[pos] != '}') {
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
             }
             
-            set(key, value, ConfigSource::File);
+            if (pos >= jsonStr.size() || jsonStr[pos] == '}') {
+                break;
+            }
+            
+            size_t keyStart = jsonStr.find('"', pos);
+            if (keyStart == std::string::npos) {
+                return false;
+            }
+            
+            size_t keyEnd = jsonStr.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) {
+                return false;
+            }
+            
+            std::string key = jsonStr.substr(keyStart + 1, keyEnd - keyStart - 1);
+            pos = keyEnd + 1;
+            
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+                return false;
+            }
+            
+            pos++;
+            
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size()) {
+                return false;
+            }
+            
+            if (jsonStr[pos] == '"') {
+                size_t valueEnd = jsonStr.find('"', pos + 1);
+                if (valueEnd == std::string::npos) {
+                    return false;
+                }
+                std::string value = jsonStr.substr(pos + 1, valueEnd - pos - 1);
+                set(key, value, ConfigSource::File);
+                pos = valueEnd + 2;
+            } else if (jsonStr[pos] == 't' || jsonStr[pos] == 'f') {
+                if (jsonStr.substr(pos, 5) == "true") {
+                    set(key, true, ConfigSource::File);
+                    pos += 5;
+                } else if (jsonStr.substr(pos, 4) == "false") {
+                    set(key, false, ConfigSource::File);
+                    pos += 4;
+                } else {
+                    return false;
+                }
+            } else if (jsonStr[pos] == '-' || (jsonStr[pos] >= '0' && jsonStr[pos] <= '9')) {
+                size_t numEnd = pos;
+                while (numEnd < jsonStr.size() && (jsonStr[numEnd] == '-' || jsonStr[numEnd] == '.' || 
+                    (jsonStr[numEnd] >= '0' && jsonStr[numEnd] <= '9') || jsonStr[numEnd] == 'e' || jsonStr[numEnd] == 'E')) {
+                    numEnd++;
+                }
+                std::string numStr = jsonStr.substr(pos, numEnd - pos);
+                
+                try {
+                    double doubleVal = std::stod(numStr);
+                    if (numStr.find('.') == std::string::npos && numStr.find('e') == std::string::npos && numStr.find('E') == std::string::npos) {
+                        try {
+                            int64_t intVal = std::stoll(numStr);
+                            set(key, intVal, ConfigSource::File);
+                        } catch (...) {
+                            set(key, doubleVal, ConfigSource::File);
+                        }
+                    } else {
+                        set(key, doubleVal, ConfigSource::File);
+                    }
+                } catch (...) {
+                    return false;
+                }
+                
+                pos = numEnd;
+            } else if (jsonStr[pos] == '[') {
+                pos = jsonStr.find(']', pos);
+                if (pos == std::string::npos) {
+                    return false;
+                }
+                pos++;
+            } else {
+                return false;
+            }
+            
+            while (pos < jsonStr.size() && (std::isspace(jsonStr[pos]) || jsonStr[pos] == ',')) {
+                pos++;
+            }
         }
+        
+        return true;
+    } catch (...) {
+        return false;
     }
-    
-    return true;
+}
+
+// Initialize the global logger
+inline Logger& getLogger() {
+    static Logger logger;
+    static bool initialized = false;
+    if (!initialized) {
+        logger.setLevel(LogLevel::Info);
+        initialized = true;
+    }
+    return logger;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +173,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -177,6 +275,8 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
             } else {
                 oss << arg;
             }
@@ -213,3 +313,159 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
+namespace nlm {
+
+// Helper function to trim whitespace from both ends of a string
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+// Helper function to convert string to lowercase
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Parse JSON string (simplified implementation)
+bool Config::parseJSON(const std::string& jsonStr) {
+    try {
+        // Simple JSON parser for basic key-value pairs
+        // This handles objects like: {"key": "value", "number": 42}
+        if (jsonStr.empty() || jsonStr[0] != '{') {
+            return false;
+        }
+        
+        size_t pos = 1;
+        while (pos < jsonStr.size() && jsonStr[pos] != '}') {
+            // Skip whitespace
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size() || jsonStr[pos] == '}') {
+                break;
+            }
+            
+            // Find key (string in quotes)
+            size_t keyStart = jsonStr.find('"', pos);
+            if (keyStart == std::string::npos) {
+                return false;
+            }
+            
+            size_t keyEnd = jsonStr.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) {
+                return false;
+            }
+            
+            std::string key = jsonStr.substr(keyStart + 1, keyEnd - keyStart - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace and colon
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+                return false;
+            }
+            
+            pos++; // Skip colon
+            
+            // Skip whitespace
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size()) {
+                return false;
+            }
+            
+            // Parse value based on its type
+            if (jsonStr[pos] == '"') {
+                // String value
+                size_t valueEnd = jsonStr.find('"', pos + 1);
+                if (valueEnd == std::string::npos) {
+                    return false;
+                }
+                std::string value = jsonStr.substr(pos + 1, valueEnd - pos - 1);
+                set(key, value, ConfigSource::File);
+                pos = valueEnd + 2; // +1 for quote, +1 for comma/space
+            } else if (jsonStr[pos] == 't' || jsonStr[pos] == 'f') {
+                // Boolean value (true/false)
+                if (jsonStr.substr(pos, 5) == "true") {
+                    set(key, true, ConfigSource::File);
+                    pos += 5;
+                } else if (jsonStr.substr(pos, 4) == "false") {
+                    set(key, false, ConfigSource::File);
+                    pos += 4;
+                } else {
+                    return false;
+                }
+            } else if (jsonStr[pos] == '-' || (jsonStr[pos] >= '0' && jsonStr[pos] <= '9')) {
+                // Number value (integer or float)
+                size_t numEnd = pos;
+                while (numEnd < jsonStr.size() && (jsonStr[numEnd] == '-' || jsonStr[numEnd] == '.' || 
+                    (jsonStr[numEnd] >= '0' && jsonStr[numEnd] <= '9') || jsonStr[numEnd] == 'e' || jsonStr[numEnd] == 'E')) {
+                    numEnd++;
+                }
+                std::string numStr = jsonStr.substr(pos, numEnd - pos);
+                
+                // Try to parse as double first
+                try {
+                    double doubleVal = std::stod(numStr);
+                    // Check if it looks like an integer
+                    if (numStr.find('.') == std::string::npos && numStr.find('e') == std::string::npos && numStr.find('E') == std::string::npos) {
+                        // Try to parse as int64_t to preserve integer type
+                        try {
+                            int64_t intVal = std::stoll(numStr);
+                            set(key, intVal, ConfigSource::File);
+                        } catch (...) {
+                            set(key, doubleVal, ConfigSource::File);
+                        }
+                    } else {
+                        set(key, doubleVal, ConfigSource::File);
+                    }
+                } catch (...) {
+                    return false;
+                }
+                
+                pos = numEnd;
+            } else if (jsonStr[pos] == '[') {
+                // Array value - for now, skip and store as string
+                // TODO: Implement proper array parsing
+                pos = jsonStr.find(']', pos);
+                if (pos == std::string::npos) {
+                    return false;
+                }
+                pos++; // Skip closing bracket
+            } else {
+                return false; // Unsupported value type
+            }
+            
+            // Skip comma or whitespace
+            while (pos < jsonStr.size() && (std::isspace(jsonStr[pos]) || jsonStr[pos] == ',')) {
+                pos++;
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// Initialize the global logger
+inline Logger& getLogger() {
+    static Logger logger;
+    static bool initialized = false;
+    if (!initialized) {
+        logger.setLevel(LogLevel::Info);
+        initialized = true;
+    }
+    return logger;
+}
