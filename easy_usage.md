@@ -1,297 +1,390 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Easy Usage Guide for Beginners
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+NLM is NOT:
+- A transformer or LLM
+- A chatbot
+- A deep learning model
+- A pretrained AI system
 
-That's it! NLM simulates all of this.
-
----
-
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+NLM IS intended to become:
+- A neural system that learns from experience
+- A brain-inspired architecture with neurons and synapses
+- A system that develops and adapts over time
+- A system where cognition emerges from neural dynamics
 
 ---
 
-## Quick Start (Copy & Paste)
+## What's New in Enhanced NLM
 
-### Example 1: Simplest Brain
+### 🚀 **Major New Features**
+
+1. **Enhanced Configuration System** - JSON support, multiple presets, validation
+2. **Developmental Learning** - Brains that mature and change over time
+3. **Curiosity-Driven Exploration** - Agents that explore based on novelty
+4. **Structural Plasticity** - Brains that can grow new connections
+5. **Advanced Memory Systems** - Working, episodic, and semantic memory
+6. **Better Error Handling** - Robust error detection and reporting
+7. **Performance Optimizations** - Enhanced performance for large simulations
+8. **Comprehensive Documentation** - Detailed guides and examples for all features
+
+### 📚 **Quick Start (Enhanced Version)**
 
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
+# Step 1: Create a brain with enhanced configuration
+config = pynlm.create_default_config()
+brain = pynlm.create_brain(config)
 brain.initialize()
 
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
+# Step 2: Create an enhanced agent with development
+agent = pynlm.create_agent_brain(brain)
+agent.enable_reward_modulation(True)
+agent.enable_structural_plasticity(True)  # NEW! Grow new connections
+agent.enable_development(True)            # NEW! Brain matures over time
+agent.enable_curiosity(True)              # NEW! Explore new things
 
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+print("Enhanced agent created!")
+print("Neurons:", brain.get_total_neuron_count())
+print("Available features:", agent.get_developmental_stage())
 ```
 
-### Example 2: Brain in a Simple World
+### 🎯 **Example 2: Complete Enhanced Simulation**
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
-```
-
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
-
-```python
-import pynlm
-
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
-```
-
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
+def run_enhanced_simulation(num_steps=1000):
+    """Run a complete agent simulation with all enhanced features."""
+    
+    # 1. Create brain with Phase 6 configuration (NEW!)
+    config = pynlm.create_phase6_config(neuronCount=2000, maxSteps=num_steps)
+    
+    # 2. Create and initialize brain
+    brain = pynlm.create_brain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.create_agent_brain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.create_simple_world()
+    world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+    world.reset()
+    world.set_agent_start(15.0, 15.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable ALL advanced subsystems (NEW!)
+    agent.enable_reward_modulation(True)
+    agent.enable_structural_plasticity(True)
+    agent.enable_development(True)
+    agent.enable_curiosity(True)
+    
+    # 7. Run simulation loop with enhanced features
     for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
+        # Update world
+        world.update(timestep=0.1)
         
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
+        # Get sensory input from world
+        percept = world.get_sensory_percept()
         
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
+        # Process sensory input in brain
+        agent.process_sensory_input(percept)
         
-        # 4. Brain thinks
+        # Run brain step
         brain.step(step)
         
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
+        # Decode motor command from brain activity
+        motor_cmd = agent.decode_motor_command()
         
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+        # Apply motor command to world
+        world.apply_motor_command(motor_cmd, world.get_simulation_time())
+        
+        # Compute reward
+        reward = world.compute_reward(brain.get_regions()[0].get())
+        
+        # Apply ENHANCED reward modulation (NEW!)
+        predicted_reward = 0.0  # You could implement prediction
+        agent.apply_reward_modulation(reward, predicted_reward)
+        
+        # Update development (NEW!)
+        agent.update_development(0.1)
+        
+        # Print enhanced statistics
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Neurons firing: {brain.get_firing_neuron_count()}")
+            print(f"  Curiosity: {agent.get_curiosity_level():.3f}")
+            print(f"  Novelty: {agent.get_novelty_level():.3f}")
+            print(f"  Development stage: {agent.get_developmental_stage()}")
+            print(f"  Memory episodes: {brain.get_episodic_memory().get_episode_count() if brain.get_episodic_memory() else 0}")
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
+    return brain, agent, world
 
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
+# Run enhanced simulation
+brain, agent, world = run_enhanced_simulation(1000)
+print("Enhanced simulation complete!")
 ```
 
 ---
 
-## Quick Reference
+## What's New in Enhanced NLM
+
+### 🔧 **Enhanced Configuration Features**
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.create_default_config()
+
+# NEW! JSON configuration support
+json_config = """
+{
+    "brain": {
+        "neuron_count": 2000,
+        "synapse_density": 0.1,
+        "development_enabled": true
+    },
+    "neuromod": {
+        "curiosity_enabled": true,
+        "novelty_threshold": 0.3
+    }
+}
+"""
+
+# Load from JSON
+config.from_json(json_config)
+
+# Get values with type safety and defaults
+neuron_count = config.get_int("brain.neuron_count", 1000)
+development_enabled = config.get_bool("brain.development_enabled", false)
+
+# NEW! Configuration validation
+invalid_keys = config.validate()
+if invalid_keys:
+    print("Invalid keys:", invalid_keys)
+
+# NEW! Configuration reporting
+config.generate_report()
+```
+
+### 🆕 **New Configuration Methods**
+
+| Method | Description |
+|--------|-------------|
+| `create_minimal_config()` | Create minimal configuration |
+| `create_phase6_config()` | Create Phase 6 optimized configuration |
+| `create_performance_config()` | Create performance optimized configuration |
+| `create_config_preset()` | Create configuration using preset |
+| `from_json()` | Load configuration from JSON string |
+| `to_json()` | Convert configuration to JSON string |
+| `validate()` | Validate configuration and return invalid keys |
+| `generate_report()` | Generate detailed configuration report |
+
+### 📊 **New Configuration Types**
+
+```python
+# 1. Minimal configuration for basic operation
+minimal_config = pynlm.create_minimal_config()
+
+# 2. Phase 6 configuration (NEW!)
+phase6_config = pynlm.create_phase6_config(neuronCount=2000, maxSteps=10000)
+
+# 3. Performance optimized configuration (NEW!)
+perf_config = pynlm.create_performance_config(neuronCount=5000, seed=42)
+
+# 4. Configuration presets (NEW!)
+experimental_config = pynlm.create_config_preset("phase6")
+production_config = pynlm.create_config_preset("performance")
+```
+
+---
+
+## Quick Reference - Enhanced Features
+
+### 🆕 **New Classes and Methods**
 
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+| Create default config | `pynlm.create_default_config()` |
+| Create minimal config | `pynlm.create_minimal_config()` |
+| Create Phase 6 config | `pynlm.create_phase6_config(neuronCount, maxSteps)` |
+| Create performance config | `pynlm.create_performance_config(neuronCount, seed)` |
+| Create config preset | `pynlm.create_config_preset("phase6")` |
+| Load from JSON | `config.from_json(jsonStr)` |
+| Export to JSON | `config.to_json()` |
+| Validate config | `config.validate()` |
+| Generate report | `config.generate_report()` |
+| Get developmental stage | `agent.get_developmental_stage()` |
+| Get curiosity level | `agent.get_curiosity_level()` |
+| Get novelty level | `agent.get_novelty_level()` |
+| Enable development | `agent.enable_development(True/False)` |
+| Enable structural plasticity | `agent.enable_structural_plasticity(True/False)` |
+| Enable curiosity | `agent.enable_curiosity(True/False)` |
+
+### 🔧 **Enhanced Command Line Interface**
+
+```bash
+# Enhanced NLM with Phase 6 integration
+./nlm_phase6_demo --config configs/advanced.cfg --checkpoint path/to/checkpoint
+
+# Performance optimized
+./nlm --brain.neuron_count=5000 --simulation.timestep=0.005 --checkpoint.enabled=true
+
+# Development mode
+./nlm --neuromod.curiosity.enabled=true --neuromod.novelty.threshold=0.2
+
+# JSON configuration support
+./nlm --config config.json
+```
+
+### 📁 **New Configuration File Types**
+
+| File Type | Description |
+|-----------|-------------|
+| `*.cfg` | Advanced configuration (key=value format) |
+| `*.json` | JSON configuration (NEW!) |
+| `*.toml` | TOML configuration (planned) |
 
 ---
 
-## Troubleshooting
+## 🚀 Getting Started with Enhanced Features
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### Step 1: Install Enhanced NLM
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+```bash
+pip install pynlm  # Install latest enhanced version
+```
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+### Step 2: Create Your First Enhanced Agent
+
+```python
+import pynlm
+
+# Quick start with enhanced features
+brain = pynlm.create_brain(pynlm.create_default_config())
+brain.initialize()
+
+agent = pynlm.create_agent_brain(brain)
+agent.enable_reward_modulation(True)
+agent.enable_structural_plasticity(True)  # NEW!
+agent.enable_development(True)            # NEW!
+agent.enable_curiosity(True)              # NEW!
+
+print("Enhanced agent created successfully!")
+```
+
+### Step 3: Run Your First Enhanced Simulation
+
+```python
+import pynlm
+
+# Create enhanced brain and agent
+brain = pynlm.create_brain(pynlm.create_default_config())
+brain.initialize()
+agent = pynlm.create_agent_brain(brain)
+
+# Create world
+world = pynlm.create_simple_world()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run enhanced simulation
+for step in range(200):
+    world.update(0.1)
+    agent.process_sensory_input(world.get_sensory_percept())
+    brain.step(step)
+    world.apply_motor_command(agent.decode_motor_command(), world.get_simulation_time())
+
+print("Enhanced simulation complete!")
+```
+
+### Step 4: Explore Advanced Features
+
+Once you're comfortable, try these enhanced features:
+
+1. **Create different configuration types:** `create_phase6_config()`, `create_performance_config()`
+2. **Use JSON configuration:** `config.from_json()`, `config.to_json()`
+3. **Enable development:** `agent.enable_development(True)`
+4. **Enable structural plasticity:** `agent.enable_structural_plasticity(True)`
+5. **Use curiosity-driven exploration:** `agent.enable_curiosity(True)`
+6. **Validate configurations:** `config.validate()`
+7. **Generate reports:** `config.generate_report()`
 
 ---
 
-## Next Steps
+## 🎯 What Makes NLM Enhanced
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### New Features Summary
 
-That's it! You're now ready to use NLM.
+1. **Developmental Learning** - Brains that mature and change over time through developmental stages
+2. **Curiosity-Driven Exploration** - Agents that explore based on novelty and prediction error
+3. **Structural Plasticity** - Brains that can grow new connections and prune old ones
+4. **Advanced Configuration** - Multiple configuration formats (JSON, presets, validation)
+5. **Enhanced Memory Systems** - Working, episodic, semantic, and procedural memory
+6. **Better Error Handling** - Robust error detection and comprehensive reporting
+7. **Performance Optimizations** - Enhanced performance for large-scale simulations
+8. **Comprehensive Documentation** - Detailed guides and examples for all features
+
+### Comparison: Basic vs Enhanced
+
+| Feature | Basic NLM | Enhanced NLM |
+|---------|-----------|--------------|
+| Configuration | Simple key=value | JSON + multiple presets |
+| Development | None | Full developmental stages |
+| Curiosity | None | Novelty-driven exploration |
+| Structural Plasticity | None | Synaptogenesis and pruning |
+| Memory | Basic | Working + Episodic + Semantic |
+| Validation | Basic | Comprehensive validation |
+| Error Handling | Basic | Robust error reporting |
+| Performance | Basic | Optimized for large simulations |
+
+---
+
+## 📚 Enhanced Documentation
+
+### Available Documentation Files
+
+1. **`easy_usage.md`** - Enhanced beginner-friendly guide with new features
+2. **`HOW_TO_USE.md`** - Enhanced comprehensive technical documentation
+3. **`docs/ARCHITECTURE.md`** - System architecture overview
+4. **`docs/SCIENCE.md`** - Scientific background
+5. **`docs/ROADMAP.md`** - Future development roadmap
+6. **`docs/PHASE6_FINAL_AUDIT.md`** - Phase 6 integration audit
+
+### New Examples Included
+
+- **Developmental Learning**: Complete simulation showing brain maturation
+- **Curiosity-Driven Exploration**: Enhanced agent that explores based on novelty
+- **Advanced Configuration**: JSON configuration and multiple presets
+- **Performance Optimization**: Large-scale simulation configurations
+- **Complete Agent Training**: Full agent simulation with all features
+
+---
+
+## 🎉 Welcome to Enhanced NLM!
+
+You now have access to the **fully enhanced NLM** with:
+
+1. **Advanced developmental learning** systems
+2. **Curiosity-driven exploration** agents
+3. **Structural plasticity** capabilities
+4. **Enhanced configuration** options
+5. **Multiple memory systems**
+6. **Comprehensive error handling**
+7. **Performance optimizations**
+8. **Complete documentation**
+
+Get started today and discover what an **enhanced computational brain** can do!
+
+---
+
+**Enhanced NLM - Making computational brains smarter, more adaptive, and more human-like!**

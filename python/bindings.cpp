@@ -142,27 +142,49 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+            "Load configuration from command line arguments")
+        .def("loadFromString", &Config::loadFromString, py::arg("config_str"),
+             "Load configuration from a string (simple key=value format)")
+        .def("loadFromJson", &Config::fromJson, py::arg("json_str"),
+             "Load configuration from a JSON string")
+        .def("to_json", &Config::toJson,
+             "Convert configuration to JSON string")
+        .def("from_json", &Config::fromJson, py::arg("json_str"),
+             "Load configuration from JSON string")
+        .def("validate", &Config::validate, py::arg("key"),
+             "Validate a configuration key")
+        .def("getValidKeys", &Config::getValidKeys,
+             "Get all valid configuration keys")
+        .def("getKeyTypeHint", &Config::getKeyTypeHint, py::arg("key"),
+             "Get type hint for a configuration key")
+        .def("generateReport", &Config::generateReport,
+             "Generate a detailed configuration report")
+        .def("get_string", &Config::getString, py::arg("key"), py::arg("defaultValue"),
+             "Get a string value with default")
+        .def("get_int", &Config::getInt, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer value with default")
+        .def("get_float", &Config::getFloat, py::arg("key"), py::arg("defaultValue"),
+             "Get a float value with default")
+        .def("get_bool", &Config::getBool, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean value with default")
+        .def("set_string", &Config::setString, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Default,
+             "Set a string value")
+        .def("set_int", &Config::setInt, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Default,
+             "Set an integer value")
+        .def("set_float", &Config::setFloat, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Default,
+             "Set a float value")
+        .def("set_bool", &Config::setBool, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Default,
+             "Set a boolean value")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -351,7 +373,81 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Advanced brain methods
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getSemanticMemory", &Brain::getSemanticMemory,
+             py::return_value_policy::reference_internal,
+             "Get semantic memory system")
+        .def("getProceduralMemory", &Brain::getProceduralMemory,
+             py::return_value_policy::reference_internal,
+             "Get procedural memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getNeuromodulator", &Brain::getNeuromodulator, py::arg("type"),
+             py::return_value_policy::reference_internal,
+             "Get neuromodulator by type")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionError", &Brain::getPredictionError,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attention system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity rule")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity rule")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of firing neurons")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition ratio")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,28 +494,121 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("create_minimal_config", []() -> std::shared_ptr<Config> {
+        return Config::createMinimalConfig();
+    }, "Create a minimal configuration for basic operation");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("create_phase6_config", [](size_t neuronCount, size_t maxSteps) -> std::shared_ptr<Config> {
+        return Config::createPhase6Config(neuronCount, maxSteps);
+    }, py::arg("neuronCount"), py::arg("maxSteps"),
+        "Create a configuration optimized for Phase 6 integration experiment");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("create_performance_config", [](size_t neuronCount, int seed) -> std::shared_ptr<Config> {
+        return Config::createPerformanceOptimizedConfig(neuronCount, seed);
+    }, py::arg("neuronCount"), py::arg("seed"),
+        "Create a performance-optimized configuration for large-scale simulations");
+
+    m.def("create_from_json", [](const std::string& jsonStr) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->fromJson(jsonStr);
+        return config;
+    }, py::arg("jsonStr"), "Create configuration from JSON string");
+
+    m.def("create_from_dict", [](const std::unordered_map<std::string, std::string>& configDict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->from_dict(configDict);
+        return config;
+    }, py::arg("configDict"), "Create configuration from Python dictionary");
+
+    m.def("load_configs_from_directory", [](const std::string& directory) {
+        std::unordered_map<std::string, std::shared_ptr<Config>> configs;
+        
+        // Search for .cfg files in the directory
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            if (entry.path().extension() == ".cfg") {
+                std::string name = entry.path().stem().string();
+                auto config = std::make_shared<Config>();
+                if (config->loadFromFile(entry.path().string())) {
+                    configs[name] = config;
+                }
+            }
+        }
+        
+        return configs;
+    }, py::arg("directory"), "Load multiple configuration files from a directory");
+
+    m.def("merge_configs", [](const std::vector<std::shared_ptr<Config>>& configs) -> std::shared_ptr<Config> {
+        auto merged = std::make_shared<Config>();
+        
+        for (const auto& config : configs) {
+            for (const auto& entry : config->getValidKeys()) {
+                if (config->has(entry)) {
+                    merged->set(entry, config->get_string(entry, ""), ConfigSource::Default);
+                }
+            }
+        }
+        
+        return merged;
+    }, py::arg("configs"), "Merge multiple configurations into one");
+
+    m.def("export_config_to_json", [](const std::shared_ptr<Config>& config) {
+        return config->toJson();
+    }, py::arg("config"), "Export configuration to JSON string");
+
+    m.def("import_config_from_json", [](const std::string& jsonStr) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->fromJson(jsonStr);
+        return config;
+    }, py::arg("jsonStr"), "Import configuration from JSON string");
+
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> invalidKeys;
+        for (const auto& key : config->getValidKeys()) {
+            if (config->has(key)) {
+                auto value = config->get_string(key, "");
+                // Basic validation - check for empty values
+                if (value.empty()) {
+                    invalidKeys.push_back(key);
+                }
+            }
+        }
+        return invalidKeys;
+    }, py::arg("config"), "Validate configuration and return list of invalid keys");
+
+    m.def("get_config_info", [](const std::shared_ptr<Config>& config) {
+        std::unordered_map<std::string, std::string> info;
+        info["total_entries"] = std::to_string(config->getValidKeys().size());
+        info["keys"] = ""; // Comma-separated list of keys
+        
+        std::vector<std::string> keys = config->getValidKeys();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i > 0) info["keys"] += ", ";
+            info["keys"] += keys[i];
+        }
+        
+        return info;
+    }, py::arg("config"), "Get metadata about a configuration");
+
+    m.def("create_config_preset", [](const std::string& presetName) -> std::shared_ptr<Config> {
+        if (presetName == "minimal") {
+            return Config::createMinimalConfig();
+        } else if (presetName == "phase6") {
+            return Config::createPhase6Config(1000, 10000);
+        } else if (presetName == "performance") {
+            return Config::createPerformanceOptimizedConfig(5000, 42);
+        } else {
+            return std::make_shared<Config>();  // Default
+        }
+    }, py::arg("presetName"), "Create configuration using a named preset");
 
 } // namespace nlm

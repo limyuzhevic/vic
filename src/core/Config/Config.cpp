@@ -55,41 +55,138 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+bool Config::loadFromString(const std::string& configStr) {
+    // Parse JSON format configuration
+    // Simple JSON parser for basic key-value pairs
+    size_t pos = 0;
+    while (pos < configStr.size()) {
+        // Find opening brace or quote
+        if (configStr[pos] == '{' || configStr[pos] == '"') {
+            // Find closing brace or quote
+            size_t endPos = configStr.find_first_of('}', '"', pos + 1);
+            if (endPos == std::string::npos) break;
+            
+            // Extract content between braces/quotes
+            std::string content = configStr.substr(pos + 1, endPos - pos - 1);
+            
+            // Try to parse as key=value pair
+            size_t equalPos = content.find('=');
+            if (equalPos != std::string::npos) {
+                std::string key = trim(content.substr(0, equalPos));
+                std::string value = trim(content.substr(equalPos + 1));
+                
+                // Remove surrounding quotes from value
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        pos = configStr.find_first_not_of(' ', endPos + 1);
+        if (pos == std::string::npos) break;
+    }
+    
+    return true;
+}
+
+std::unordered_map<std::string, std::string> Config::to_dict() const {
+    std::unordered_map<std::string, std::string> result;
+    for (const auto& entry : pImpl->entries) {
+        result[entry.key] = entry.value;
+    }
+    return result;
+}
+
+bool Config::from_dict(const std::unordered_map<std::string, std::string>& configDict) {
+    clear();
+    for (const auto& pair : configDict) {
+        set(pair.first, pair.second, ConfigSource::Default);
     }
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+bool Config::validate(const std::string& key) const {
+    if (key.empty()) {
         return false;
     }
     
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });n    
+    return it != pImpl->entries.end();
+}
+
+std::vector<std::string> Config::getValidKeys() const {
+    std::vector<std::string> validKeys;
+    
+    // Define valid configuration keys based on system requirements
+    std::vector<std::string> systemKeys = {
+        "random_seed", "simulation_timestep", "neuron_count", "region_count",
+        "connection_probability", "stdp_ltp_weight", "stdp_ltd_weight", "stdp_tau",
+        "synaptogenesis_rate", "pruning_rate", "dopamine_baseline", "curiosity_baseline",
+        "reward_discount_factor", "environment_name", "environment_width", "environment_height",
+        "log_level", "log_to_file", "log_filename", "max_simulation_steps",
+        "simulation_time_limit", "visualization_enabled", "visualization_update_rate"
+    };
+    
+    // Phase 6 specific keys
+    std::vector<std::string> phase6Keys = {
+        "max_steps", "neuron_count", "region_count", "connection_probability",
+        "enable_checkpointing", "enable_replay", "enable_development",
+        "checkpoint_path", "novelty_threshold", "curiosity_threshold",
+        "prediction_confidence", "memory_decay_rate"
+    };
+    
+    // Add all valid keys
+    validKeys.insert(validKeys.end(), systemKeys.begin(), systemKeys.end());
+    validKeys.insert(validKeys.end(), phase6Keys.begin(), phase6Keys.end());
+    
+    // Sort and remove duplicates
+    std::sort(validKeys.begin(), validKeys.end());
+    validKeys.erase(std::unique(validKeys.begin(), validKeys.end()), validKeys.end());
+    
+    return validKeys;
+}
+
+std::string Config::generateReport() const {
+    std::stringstream report;
+    report << "=== NLM Configuration Report ===\n\n";
+    report << "Total configuration entries: " << pImpl->entries.size() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        report << "Key: " << entry.key << "\n";
+        report << "Value: " << entry.value << "\n";
+        report << "Source: " << configSourceToString(entry.source) << "\n";
+        if (!entry.description.empty()) {
+            report << "Description: " << entry.description << "\n";
+        }
+        report << "\n";
     }
     
-    return true;
+    report << "=== End Configuration Report ===\n";
+    return report.str();
+}
+
+// Helper function to trim whitespace
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\n\r");
+    if (start == std::string::npos) return "";
+    
+    size_t end = str.find_last_not_of(" \t\n\r");
+    return str.substr(start, end - start + 1);
+}
+
+// Helper function to convert ConfigSource to string
+std::string Config::configSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        default: return "Unknown";
+    }
 }
 
 template<typename T>
