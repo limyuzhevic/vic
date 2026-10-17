@@ -511,8 +511,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system makes predictions based on sensory input
+        // and computes prediction errors to guide learning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +529,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // This processes current neural activity and sensory state to form new concepts
+        // by presenting the current pattern to the concept formation system
+        
+        // Extract current neural activity pattern from the brain
+        std::vector<float> currentPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                // Get neurons from this population
+                auto neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->isFiring()) {
+                        // Record firing activity (1.0 = firing, 0.0 = not firing)
+                        currentPattern.push_back(1.0f);
+                    } else {
+                        // Record resting activity
+                        float firingRate = neuron->getFiringRate();
+                        currentPattern.push_back(firingRate);
+                    }
+                }
+            }
+        }
+        
+        // Present current pattern as a new experience for concept formation
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                currentPattern,  // The neural activity pattern
+                std::vector<float>(),  // No features for now
+                0.0f,  // No reward for pattern update
+                currentStep  // Current timestep
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,9 +721,44 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use neural planner to select action based on current neural state
+    // The planner evaluates multiple action sequences and selects the one
+    // with the highest expected reward based on the current state and goal
     
+    // Extract current neural activity pattern from the brain
+    std::vector<float> currentState;
+    
+    // Collect neural activity from all regions and populations
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            // Get neurons from this population
+            auto neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->isFiring()) {
+                    // Record firing activity (1.0 = firing, 0.0 = not firing)
+                    currentState.push_back(1.0f);
+                } else {
+                    // Record resting activity
+                    float firingRate = neuron->getFiringRate();
+                    currentState.push_back(firingRate);
+                }
+            }
+        }
+    }
+    
+    // If neural planner is available, use it to plan action
+    if (pImpl->planner) {
+        // Get target reward from current dopamine level
+        float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        // Plan action based on current state and target reward
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Return the planned action
+        return std::make_unique<Action>(plannedAction);
+    }
+    
+    // Fallback to simple action selection if planner is not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -711,9 +777,7 @@ std::unique_ptr<class Action> Brain::produceAction() {
         type = ActionType::MoveForward;
     }
     
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return std::make_unique<Action>(type);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {

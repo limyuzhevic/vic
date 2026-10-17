@@ -25,6 +25,25 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
+struct NeuralEpisodicMemory::Impl {
+    Brain* brain;
+    
+    // Pattern neurons for episodic recall
+    std::vector<NeuronId> episodeNeurons;
+    
+    Impl() : brain(nullptr) {}
+};
+
+NeuralEpisodicMemory::NeuralEpisodicMemory()
+    : pImpl(new Impl)
+    , brain_(nullptr)
+    , maxEpisodes_(1000)
+    , replayEnabled_(true)
+{
+}
+
+NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
+
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
@@ -61,6 +80,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     }
 }
 
+// Retrieve episodes similar to a query pattern
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     const std::vector<float>& sensoryPattern,
     size_t maxResults) const {
@@ -87,6 +107,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     return results;
 }
 
+// Retrieve episodes from a specific time window
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveTemporal(
     SimulationStep startTime,
     SimulationStep endTime,
@@ -113,6 +134,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveTemporal(
     return results;
 }
 
+// Retrieve episodes by location
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
     float x, float y, float radius, size_t maxResults) const {
     
@@ -140,6 +162,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
     return results;
 }
 
+// Retrieve episodes following a specific action
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction(
     ActionType action, size_t maxResults) const {
     
@@ -164,6 +187,8 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
     return results;
 }
 
+// Replay an episode - reactivates the neural patterns associated with it
+// This allows the brain to "relive" the experience
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
@@ -183,6 +208,7 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     }
 }
 
+// Update episode relevance based on recent use
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
     if (episodeId < episodes_.size()) {
         // In a full implementation, episodes would have a relevance field
@@ -190,6 +216,7 @@ void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relev
     }
 }
 
+// Get episode by index
 const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
     if (index < episodes_.size()) {
         return &episodes_[index];
@@ -197,6 +224,12 @@ const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
     return nullptr;
 }
 
+// Get total number of episodes
+const std::deque<EpisodicMemoryItem>& NeuralEpisodicMemory::getAllEpisodes() const {
+    return episodes_;
+}
+
+// Get recent episodes
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<const EpisodicMemoryItem*> results;
     
@@ -208,6 +241,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(s
     return results;
 }
 
+// Get average reward from episodes
 float NeuralEpisodicMemory::getAverageReward() const {
     if (episodes_.empty()) return 0.0f;
     
@@ -218,6 +252,7 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+// Clear old episodes
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
     // In a full implementation, episodes would have relevance scores
@@ -227,11 +262,17 @@ void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     }
 }
 
+// Clear all episodes
 void NeuralEpisodicMemory::clear() {
     episodes_.clear();
     pImpl->episodeNeurons.clear();
 }
 
+// Enable/disable replay
+void NeuralEpisodicMemory::enableReplay(bool enable) { replayEnabled_ = enable; }
+bool NeuralEpisodicMemory::isReplayEnabled() const { return replayEnabled_; }
+
+// Get episodes for replay (selection based on relevance and recency)
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     
@@ -263,6 +304,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForRepla
     return results;
 }
 
+// Replay multiple episodes (for sleep-like consolidation)
 void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
     for (size_t id : episodeIds) {
         if (id < episodes_.size()) {
