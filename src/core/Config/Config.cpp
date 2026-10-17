@@ -3,12 +3,167 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <map>
+#include <vector>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// Forward declarations for internal use
+static std::map<std::string, std::string> parseJsonFile(const std::string& filepath);
+static std::string trim(const std::string& str);
+static std::string toLower(const std::string& str);
+
+// Parse JSON file and extract key-value pairs
+std::map<std::string, std::string> parseJsonFile(const std::string& filepath) {
+    std::map<std::string, std::string> result;
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return result;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)),
+                       std::istreambuf_iterator<char>());
+    
+    // Simple JSON parsing for key=value pairs
+    // This handles basic JSON objects with string keys and various value types
+    size_t pos = 0;
+    
+    // Skip whitespace
+    while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+        pos++;
+    }
+    
+    if (pos >= content.length() || content[pos] != '{') {
+        // Not a JSON object, fall back to simple parsing
+        return result;
+    }
+    
+    pos++; // Skip '{'
+    
+    while (pos < content.length()) {
+        // Skip whitespace
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        // Find key
+        if (content[pos] != '"') {
+            // Not a JSON object
+            break;
+        }
+        
+        size_t keyStart = pos;
+        pos++; // Skip opening quote
+        while (pos < content.length() && content[pos] != '"') {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        size_t keyEnd = pos;
+        pos++; // Skip closing quote
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Skip whitespace after key
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length() || content[pos] != ':') {
+            break;
+        }
+        
+        pos++; // Skip colon
+        
+        // Skip whitespace after colon
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        // Parse value
+        if (content[pos] == '"') {
+            // String value
+            size_t valueStart = pos;
+            pos++; // Skip opening quote
+            while (pos < content.length() && content[pos] != '"') {
+                pos++;
+            }
+            size_t valueEnd = pos;
+            if (pos < content.length()) pos++; // Skip closing quote
+            
+            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            result[key] = value;
+        } else if (content[pos] == '{') {
+            // Object - skip for now
+            size_t braceCount = 1;
+            pos++;
+            while (pos < content.length() && braceCount > 0) {
+                if (content[pos] == '{') braceCount++;
+                else if (content[pos] == '}') braceCount--;
+                pos++;
+            }
+        } else if (content[pos] == '[') {
+            // Array - skip for now
+            size_t bracketCount = 1;
+            pos++;
+            while (pos < content.length() && bracketCount > 0) {
+                if (content[pos] == '[') bracketCount++;
+                else if (content[pos] == ']') bracketCount--;
+                pos++;
+            }
+        } else if (std::isdigit(content[pos]) || content[pos] == '-' || content[pos] == '+') {
+            // Number
+            size_t valueStart = pos;
+            while (pos < content.length() && (std::isdigit(content[pos]) || content[pos] == '-' || content[pos] == '+' || content[pos] == '.' || content[pos] == 'e' || content[pos] == 'E')) {
+                pos++;
+            }
+            size_t valueEnd = pos;
+            std::string value = content.substr(valueStart, valueEnd - valueStart);
+            result[key] = value;
+        } else if (content[pos] == 't' || content[pos] == 'f') {
+            // Boolean
+            size_t valueStart = pos;
+            if (content.compare(pos, 4, "true") == 0) {
+                pos += 4;
+            } else if (content.compare(pos, 5, "false") == 0) {
+                pos += 5;
+            }
+            size_t valueEnd = pos;
+            std::string value = content.substr(valueStart, valueEnd - valueStart);
+            result[key] = value;
+        } else {
+            // Skip unknown value type
+            while (pos < content.length() && content[pos] != ',' && content[pos] != '}') {
+                pos++;
+            }
+        }
+        
+        // Skip whitespace and comma
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+            pos++;
+        }
+        
+        if (pos < content.length() && content[pos] == ',') {
+            pos++; // Skip comma
+            continue;
+        }
+        
+        // Check for closing brace
+        if (pos < content.length() && content[pos] == '}') {
+            break;
+        }
+    }
+    
+    return result;
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,36 +174,54 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Uses a hybrid approach that supports both JSON and legacy key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Try to parse as JSON first (check for JSON characteristics)
+    std::string firstLine;
+    file.seekg(0, std::ios::beg);
+    std::getline(file, firstLine);
+    file.seekg(0, std::ios::beg);
+    
+    bool isJson = firstLine.find('{') != std::string::npos || 
+                  firstLine.find('"') != std::string::npos;
+    
+    if (isJson) {
+        // Parse as JSON
+        auto jsonData = parseJsonFile(filepath);
+        for (const auto& pair : jsonData) {
+            set(pair.first, pair.second, ConfigSource::File);
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    } else {
+        // Parse legacy key=value format
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     

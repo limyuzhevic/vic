@@ -401,9 +401,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // ========== STEP 4: Enhanced working memory integration ==========
     if (pImpl->workingMemory) {
+        // Store active neural patterns to working memory for immediate access
+        // This creates short-term memory traces of current network activity
+        size_t maxWorkingMemoryTraces = pImpl->config->getOr<size_t>("working_memory_capacity", 1000);
+        
+        // Clear old traces to maintain capacity
+        pImpl->workingMemory->clear();
+        
+        // Store current neural activity patterns to working memory
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Store neuron activation level in working memory
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    if (activation > 0.1f) {  // Only store significant activations
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                    }
+                }
+            }
+        }
+        
+        // Update working memory with decay and competition
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Get the most active working memory traces
+        auto activeTraces = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Feed working memory activity back to the network through attention mechanism
+        if (!activeTraces.empty() && pImpl->attention) {
+            pImpl->attention->processWorkingMemory(activeTraces);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -477,59 +506,173 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
+    // ========== STEP 7: Enhanced episodic memory integration ==========
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    
+    // Dynamic episode capture based on novelty and learning signals
+    float episodeCaptureThreshold = pImpl->config->getOr<float>("episodic_capture_threshold", 2.0f);
+    
+    // Check if we should capture an episode based on novelty and plasticity activity
+    float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+    float plasticityActivity = 0.0f;
+    
+    // Calculate overall plasticity activity in the network
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            float weightChange = syn->getWeight() - syn->getWeight() * 0.5f;  // Simplified weight change
+            plasticityActivity += std::abs(weightChange);
+        }
+    }
+    
+    // Capture episode if there's sufficient novelty or plasticity activity
+    if (noveltyLevel > 0.5f || plasticityActivity > episodeCaptureThreshold || 
+        pImpl->stepsSinceLastEpisode >= 10) {
+        
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Capture current brain state as a rich episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Set episode position (if available)
+            episode.positionX = 0.0f;
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Set action (if any)
+            episode.action = ActionType::Wait;
+            
+            // Set internal state
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = 1.0f;
+            episode.novelty = noveltyLevel;
+            
+            // Store sensory state
+            episode.sensoryState.resize(pImpl->regions.size() * 2, 0.0f);  // Simplified
+            for (size_t i = 0; i < std::min(size_t(10), pImpl->regions.size()); ++i) {
+                episode.sensoryState[i] = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            }
+            
+            // Store neural activity patterns
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        if (activation > 0.1f) {
                             episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            episode.neuronActivations.push_back(activation);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Set resulting sensory state
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            episode.age = 0;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Trigger attention system to prioritize this new episode
+            if (pImpl->attention) {
+                pImpl->attention->onNewEpisodeStored();
+            }
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8: Enhanced prediction system integration ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input and neural activity
+        // This creates a forward model of expected sensory consequences
+        
+        // Get current sensory predictions from the prediction system
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update prediction error signal if available
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(predictionError, currentStep);
+        }
+        
+        // Use prediction error to guide learning and attention
+        if (pImpl->attention) {
+            // High prediction error increases attention to novel inputs
+            if (std::abs(predictionError) > 0.1f) {
+                pImpl->attention->increaseAlertLevel(0.5f);
+            }
+        }
+        
+        // Use prediction error to modulate plasticity
+        if (pImpl->dopamine) {
+            // Prediction error modulates dopamine release
+            float modulatedError = predictionError * pImpl->dopamine->getPlasticityFactor();
+            pImpl->dopamine->update(modulatedError);
+        }
+        
+        // Store prediction state for later episodic integration
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->updatePredictionState(predictionError, currentStep);
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 9: Enhanced cognition systems integration ==========
+    
+    // ========== 9a: Enhanced attention system integration ==========
     if (pImpl->attention) {
+        // Update attention with current working memory and prediction error
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            
+            // Get prediction error to modulate attention competition
+            float predictionError = 0.0f;
+            if (pImpl->predictionSystem) {
+                predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            
+            // Get novelty level to bias attention toward novel items
+            float noveltyLevel = 0.0f;
+            if (pImpl->novelty) {
+                noveltyLevel = pImpl->novelty->getLevel();
+            }
+            
+            pImpl->attention->processCompetition(competitors, predictionError, noveltyLevel);
+            
+            // Update attention based on working memory content
+            pImpl->attention->processWorkingMemory( competitors);
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== 9b: Enhanced concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes current neural patterns to form abstract representations
+        // This requires integration with working memory and episodic memory
+        
+        // Get current working memory patterns
+        std::vector<NeuronId> memoryNeurons;
+        if (pImpl->workingMemory) {
+            memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Get recent episodic patterns
+        std::vector<EpisodicMemoryItem*> recentEpisodes;
+        if (pImpl->episodicMemory) {
+            recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        }
+        
+        // Update concept formation with current neural activity
+        pImpl->conceptFormation->update(currentStep, memoryNeurons, recentEpisodes);
+        
+        // Get formed concepts to influence attention and planning
+        auto formedConcepts = pImpl->conceptFormation->getCurrentConcepts();
+        
+        // Apply concepts to attention system for biased processing
+        if (!formedConcepts.empty() && pImpl->attention) {
+            pImpl->attention->applyConcepts(formedConcepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
