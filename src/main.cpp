@@ -26,7 +26,61 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+// Fallback error log function in case NLM_LOG_ERROR isn't defined
+void logError(const std::string& message) {
+    std::cerr << "ERROR: " << message << std::endl;
+}
+
+// Simple command-line argument parser
+struct CommandLineArgs {
+    std::string configFile = "configs/default.cfg";
+    bool enableVisualization = false;
+    bool enableProfiling = false;
+    bool enableDebug = false;
+    SimulationStep customSteps = 0;
+};
+
+CommandLineArgs parseCommandLineArgs(int argc, char** argv) {
+    CommandLineArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: nlm_demo [options]\n";
+            std::cout << "Options:\n";
+            std::cout << "  --help, -h          Show this help message\n";
+            std::cout << "  --config=FILE       Load configuration from FILE\n";
+            std::cout << "  --config FILE       Load configuration from FILE\n";
+            std::cout << "  --visualization      Enable visualization output\n";
+            std::cout << "  --profile           Enable performance profiling\n";
+            std::cout << "  --debug             Enable debug output\n";
+            std::cout << "  --steps=N           Run custom number of steps\n";
+            std::cout << "  --neuron-count=N    Override neuron count\n";
+            std::cout << "  --region-count=N    Override region count\n";
+            std::cout << "  --connection-prob=N Override connection probability\n";
+            return args; // Help mode
+        }
+        
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg == "--visualization") {
+            args.enableVisualization = true;
+        } else if (arg == "--profile") {
+            args.enableProfiling = true;
+        } else if (arg == "--debug") {
+            args.enableDebug = true;
+        } else if (arg.find("--steps=") == 0) {
+            args.customSteps = std::stoi(arg.substr(8));
+        }
+    }
+    
+    return args;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -39,9 +93,89 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+// Constants for simulation parameters
+const float DEFAULT_CURRENT_INJECTION = 50.0f;
+const float SENSORY_INPUT_CURRENT = 30.0f;
+const float STDP_INPUT_CURRENT = 60.0f;
+const SimulationStep BASIC_CONNECTIVITY_STEPS = 50;
+const SimulationStep PLASTICITY_EXPERIMENT_STEPS = 1000;
+const SimulationStep STDP_VERIFICATION_STEPS = 50;
+const float DEFAULT_TIMESTEP = 0.001f;
+const size_t SPARK_TEST_NEURON_COUNT = 10;
+// Simple command-line argument parser
+struct CommandLineArgs {
+    std::string configFile = "configs/default.cfg";
+    bool enableVisualization = false;
+    bool enableProfiling = false;
+    bool enableDebug = false;
+    SimulationStep customSteps = 0;
+};
+
+CommandLineArgs parseCommandLineArgs(int argc, char** argv) {
+    CommandLineArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: nlm_demo [options]\n";
+            std::cout << "Options:\n";
+            std::cout << "  --help, -h          Show this help message\n";
+            std::cout << "  --config=FILE       Load configuration from FILE\n";
+            std::cout << "  --config FILE       Load configuration from FILE\n";
+            std::cout << "  --visualization      Enable visualization output\n";
+            std::cout << "  --profile           Enable performance profiling\n";
+            std::cout << "  --debug             Enable debug output\n";
+            std::cout << "  --steps=N           Run custom number of steps\n";
+            std::cout << "  --neuron-count=N    Override neuron count\n";
+            std::cout << "  --region-count=N    Override region count\n";
+            std::cout << "  --connection-prob=N Override connection probability\n";
+            return args; // Help mode
+        }
+        
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg == "--visualization") {
+            args.enableVisualization = true;
+        } else if (arg == "--profile") {
+            args.enableProfiling = true;
+        } else if (arg == "--debug") {
+            args.enableDebug = true;
+        } else if (arg.find("--steps=") == 0) {
+            args.customSteps = std::stoi(arg.substr(8));
+        }
+    }
+    
+    return args;
+}
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
@@ -159,13 +293,27 @@ struct LearningExperiment {
     }
 };
 
+// Constants for simulation parameters
+const float DEFAULT_CURRENT_INJECTION = 50.0f;
+const float SENSORY_INPUT_CURRENT = 30.0f;
+const float STDP_INPUT_CURRENT = 60.0f;
+const SimulationStep BASIC_CONNECTIVITY_STEPS = 50;
+const SimulationStep PLASTICITY_EXPERIMENT_STEPS = 1000;
+const SimulationStep STDP_VERIFICATION_STEPS = 50;
+const float DEFAULT_TIMESTEP = 0.001f;
+const size_t SPARK_TEST_NEURON_COUNT = 10;
+const float NEURON_PARAMETER_THRESHOLD_CHECK = 5.0f;
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -178,13 +326,13 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    for (size_t i = 0; i < std::min(SPARK_TEST_NEURON_COUNT, neurons.size()); ++i) {
+        neurons[i]->injectCurrent(DEFAULT_CURRENT_INJECTION);  // Strong excitatory input
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    for (SimulationStep step = 0; step < BASIC_CONNECTIVITY_STEPS; ++step) {
+        brain->step(step, step * DEFAULT_TIMESTEP);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -222,13 +370,13 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < PLASTICITY_EXPERIMENT_STEPS; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, SENSORY_INPUT_CURRENT);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * DEFAULT_TIMESTEP);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -250,7 +398,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found!");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -274,7 +425,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
-    for (int trial = 0; trial < 50; ++trial) {
+    for (int trial = 0; trial < STDP_VERIFICATION_STEPS; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
@@ -287,12 +438,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            preNeuron->injectCurrent(STDP_INPUT_CURRENT);
+            brain->step(trial * 2, trial * 2 * DEFAULT_TIMESTEP);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            postNeuron->injectCurrent(STDP_INPUT_CURRENT);
+            brain->step(trial * 2 + 1, (trial * 2 + 1) * DEFAULT_TIMESTEP);
         }
     }
     
@@ -326,6 +477,29 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Parse command line arguments
+    CommandLineArgs args = parseCommandLineArgs(argc, argv);
+    
+    // Show help if requested
+    if (args.customSteps == 0 && (args.enableDebug || args.enableProfiling || args.enableVisualization)) {
+        std::cout << "Usage: nlm_demo [options]\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -h          Show this help message\n";
+        std::cout << "  --config=FILE       Load configuration from FILE\n";
+        std::cout << "  --config FILE       Load configuration from FILE\n";
+        std::cout << "  --visualization      Enable visualization output\n";
+        std::cout << "  --profile           Enable performance profiling\n";
+        std::cout << "  --debug             Enable debug output\n";
+        std::cout << "  --steps=N           Run custom number of steps\n";
+        std::cout << "  --neuron-count=N    Override neuron count\n";
+        std::cout << "  --region-count=N    Override region count\n";
+        std::cout << "  --connection-prob=N Override connection probability\n";
+        return 0;
+    }
+    
+    // Use parsed command line args
+    std::string configFile = args.configFile;
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -344,7 +518,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -368,7 +541,7 @@ int main(int argc, char** argv) {
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("simulation_timestep", DEFAULT_TIMESTEP, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
@@ -393,17 +566,20 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    double timestep = config->getOr<double>("simulation_timestep", DEFAULT_TIMESTEP);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
     // Initialize brain
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    // Create brain with configuration
     auto brain = std::make_shared<Brain>(config);
     
+    // Check brain initialization result with better error handling
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("This could be due to invalid configuration, memory issues, or corrupted data.");
+        NLM_LOG_ERROR("Please check your configuration file and system resources.");
         return 1;
     }
     

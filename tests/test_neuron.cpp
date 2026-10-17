@@ -3,6 +3,7 @@
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 namespace test_neuron {
 
@@ -147,6 +148,114 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+// NEW COMPREHENSIVE TESTS
+
+void testNeuronBoundaryConditions() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test extreme membrane potential values
+    neuron.setMembranePotential(100.0f);  // Above normal clamp
+    assert(neuron.getMembranePotential() == 100.0f);
+    
+    neuron.setMembranePotential(-200.0f); // Below normal clamp
+    assert(neuron.getMembranePotential() == -200.0f);
+    
+    // Test refractory period boundaries
+    neuron.setRefractoryPeriod(0);
+    assert(!neuron.isRefractory());
+    
+    neuron.setRefractoryPeriod(UINT32_MAX);
+    assert(neuron.isRefractory());
+    
+    neuron.decrementRefractory(); // Should not crash
+    
+    // Test synaptic input boundaries
+    neuron.clearTotalCurrent();
+    neuron.receiveExcitatoryInput(0.0f); // Zero input
+    assert(neuron.getTotalCurrent() == 0.0f);
+    
+    neuron.receiveInhibitoryInput(-100.0f); // Extreme negative
+    assert(neuron.getTotalCurrent() == -100.0f);
+    
+    std::cout << "    testNeuronBoundaryConditions passed" << std::endl;
+}
+
+void testNeuronPlasticityFlags() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test plasticity flag defaults
+    const auto& flags = neuron.getPlasticityFlags();
+    assert(!flags.hebbian);
+    assert(!flags.stdp);
+    assert(!flags.reward_modulated);
+    
+    // Test enabling plasticity
+    neuron.enablePlasticity(true, true, false);
+    const auto& flagsAfter = neuron.getPlasticityFlags();
+    assert(flagsAfter.hebbian);
+    assert(flagsAfter.stdp);
+    assert(!flagsAfter.reward_modulated);
+    
+    // Test disabling plasticity
+    neuron.enablePlasticity(false, false, false);
+    const auto& flagsDisabled = neuron.getPlasticityFlags();
+    assert(!flagsDisabled.hebbian);
+    assert(!flagsDisabled.stdp);
+    assert(!flagsDisabled.reward_modulated);
+    
+    std::cout << "    testNeuronPlasticityFlags passed" << std::endl;
+}
+
+void testNeuronStateConsistency() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Record initial state
+    auto initialState = neuron.getState();
+    
+    // Modify state
+    neuron.setMembranePotential(-50.0f);
+    neuron.setThreshold(-40.0f);
+    neuron.setRefractoryPeriod(20);
+    neuron.setFiringState(nlm::FiringState::Active);
+    
+    // Check consistency
+    auto modifiedState = neuron.getState();
+    assert(modifiedState.membranePotential == -50.0f);
+    assert(modifiedState.threshold == -40.0f);
+    assert(modifiedState.refractoryPeriod == 20);
+    assert(modifiedState.firingState == nlm::FiringState::Active);
+    
+    // Reset and check consistency
+    neuron.reset();
+    auto resetState = neuron.getState();
+    assert(resetState.membranePotential == -70.0f);  // Default
+    assert(resetState.threshold == -55.0f);  // Default
+    assert(resetState.refractoryPeriod == 5);  // Default
+    assert(resetState.firingState == nlm::FiringState::Resting);  // Default
+    
+    std::cout << "    testNeuronStateConsistency passed" << std::endl;
+}
+
+void testNeuronSpikeHandling() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test spike recording with timestamps
+    neuron.recordSpike(0.0);
+    neuron.recordSpike(0.001);
+    neuron.recordSpike(0.002);
+    
+    assert(neuron.getSpikeHistory().size() == 3);
+    
+    // Test spike history size limit (should not exceed 100)
+    for (size_t i = 3; i < 150; ++i) {
+        neuron.recordSpike(static_cast<float>(i) * 0.001f);
+    }
+    
+    assert(neuron.getSpikeHistory().size() == 100);  // Should be clamped to max
+    
+    std::cout << "    testNeuronSpikeHandling passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +267,10 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNeuronBoundaryConditions();
+    testNeuronPlasticityFlags();
+    testNeuronStateConsistency();
+    testNeuronSpikeHandling();
 }
 
 } // namespace test_neuron

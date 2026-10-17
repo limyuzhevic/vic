@@ -174,8 +174,107 @@ void testSynapsePlasticityFlags() {
     std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
 }
 
+// NEW COMPREHENSIVE TESTS
+
+void testSynapseExtremeValues() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test extreme weight values
+    synapse.setWeight(999.0f);
+    assert(synapse.getWeight() <= 1.0f);  // Should be clamped to max
+    
+    synapse.setWeight(-999.0f);
+    assert(synapse.getWeight() >= -1.0f);  // Should be clamped to min
+    
+    // Test extreme efficacy values
+    synapse.setEfficacy(999.0f);
+    assert(synapse.getEfficacy() <= 2.0f);  // Should be clamped
+    
+    // Test extreme delay values
+    synapse.setDelay(0);  // Min delay
+    assert(synapse.getDelay() == 0);
+    
+    synapse.setDelay(100);  // Large delay (not clamped in current implementation)
+    assert(synapse.getDelay() == 100);
+    
+    std::cout << "    testSynapseExtremeValues passed" << std::endl;
+}
+
+void testSynapseStateConsistency() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Record initial spike history
+    synapse.recordPreSpike(0.0);
+    synapse.recordPostSpike(0.0);
+    
+    // Modify state
+    synapse.setWeight(0.7f);
+    synapse.setEfficacy(1.5f);
+    synapse.setEligibilityTrace(0.3f);
+    
+    // Check consistency
+    assert(synapse.getPreSpikeHistory().size() == 1);
+    assert(synapse.getPostSpikeHistory().size() == 1);
+    assert(synapse.getWeight() == 0.7f);
+    assert(synapse.getEfficacy() == 1.5f);
+    assert(synapse.getEligibilityTrace() == 0.3f);
+    
+    // Reset and check consistency
+    synapse.reset();
+    assert(synapse.getPreSpikeHistory().empty());
+    assert(synapse.getPostSpikeHistory().empty());
+    assert(synapse.getWeight() == 0.0f);
+    assert(synapse.getEfficacy() == 1.0f);  // Default
+    assert(synapse.getEligibilityTrace() == 0.0f);
+    
+    std::cout << "    testSynapseStateConsistency passed" << std::endl;
+}
+
+void testSynapseSpikeHistoryManagement() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Add many spikes (should be limited by MAX_SPIKE_HISTORY = 100)
+    for (int i = 0; i < 150; ++i) {
+        synapse.recordPreSpike(static_cast<float>(i) * 0.001f);
+        synapse.recordPostSpike(static_cast<float>(i) * 0.001f);
+    }
+    
+    // Should be clamped to max size
+    assert(synapse.getPreSpikeHistory().size() <= 100);
+    assert(synapse.getPostSpikeHistory().size() <= 100);
+    
+    // Test clear history
+    synapse.clearHistory();
+    assert(synapse.getPreSpikeHistory().empty());
+    assert(synapse.getPostSpikeHistory().empty());
+    
+    std::cout << "    testSynapseSpikeHistoryManagement passed" << std::endl;
+}
+
+void testSynapseEligibilityTraceDecay() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Set eligibility trace
+    synapse.setEligibilityTrace(0.8f);
+    assert(synapse.getEligibilityTrace() == 0.8f);
+    
+    // Decay multiple times
+    synapse.decayEligibilityTrace(0.1f);  // 10% decay
+    float afterFirstDecay = synapse.getEligibilityTrace();
+    assert(afterFirstDecay < 0.8f);
+    
+    synapse.decayEligibilityTrace(0.5f);  // 50% decay
+    assert(synapse.getEligibilityTrace() < afterFirstDecay);
+    
+    // Set to zero and test decay doesn't go negative
+    synapse.setEligibilityTrace(0.0f);
+    synapse.decayEligibilityTrace(0.1f);
+    assert(synapse.getEligibilityTrace() == 0.0f);
+    
+    std::cout << "    testSynapseEligibilityTraceDecay passed" << std::endl;
+}
+
 void runAll() {
-    std::cout << "Running Synapse tests..." << std::endl;
     testSynapseCreation();
     testSynapseWeight();
     testSynapseWeightBounds();
@@ -187,6 +286,10 @@ void runAll() {
     testSynapseRandomInitialization();
     testSynapseReset();
     testSynapsePlasticityFlags();
+    testSynapseExtremeValues();
+    testSynapseStateConsistency();
+    testSynapseSpikeHistoryManagement();
+    testSynapseEligibilityTraceDecay();
 }
 
 } // namespace test_synapse
