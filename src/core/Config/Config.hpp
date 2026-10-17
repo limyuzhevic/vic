@@ -90,8 +90,17 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate configuration values
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    
+    // Get configuration errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Clear validation errors
+    void clearValidationErrors();
+    
+    // Get current timestamp for file headers
+    static std::string getCurrentTimestamp();
     
 private:
     struct Impl;
@@ -100,6 +109,20 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool isJsonContent(const std::string& content) const;
+    bool isYamlContent(const std::string& content) const;
+    bool loadFromJson(const std::string& content, const std::string& filepath);
+    bool loadFromYaml(const std::string& content, const std::string& filepath);
+    bool loadFromKeyValue(const std::string& content, const std::string& filepath);
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    bool isJsonContent(const std::string& content) const;
+    bool isYamlContent(const std::string& content) const;
+    bool loadFromJson(const std::string& content, const std::string& filepath);
+    bool loadFromYaml(const std::string& content, const std::string& filepath);
+    bool loadFromKeyValue(const std::string& content, const std::string& filepath);
 };
 
 } // namespace nlm

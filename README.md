@@ -82,36 +82,67 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 2 Basic Test
+```bash
+./nlm
+```
+
+This runs the basic connectivity and plasticity tests.
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This runs the Phase 3 world interaction demo.
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+This runs the Phase 4 cognitive capabilities demo.
+
+### Performance Benchmark
+```bash
+./nlm_benchmark
+```
+
+This runs performance benchmarks for different network sizes.
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── configs/                    # Configuration files
+│   └── default.cfg
+├── docs/                       # Documentation (140+ files)
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── src/                        # Source code
+│   ├── core/                   # Core utilities
+│   ├── brain/                  # Neural components
+│   ├── dynamics/               # Neural dynamics
+│   ├── plasticity/             # Plasticity rules
+│   ├── neuromodulation/        # Neuromodulators
+│   ├── memory/                # Memory systems
+│   ├── prediction/             # Prediction systems
+│   ├── cognition/             # Cognitive mechanisms
+│   ├── sensory/               # Sensory processing
+│   ├── motor/                 # Motor system
+│   ├── environment/           # Environment interface
+│   ├── agent/                 # Agent-brain interface
+│   ├── experiments/           # Experiment framework
+│   └── visualization/         # Visualization
+├── python/                     # Python bindings
+├── tests/                     # Test suite
+└── examples/                  # Usage examples
 ```
 
 ## Phase Summary
