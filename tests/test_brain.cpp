@@ -1,6 +1,7 @@
 // Brain Tests
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
+#include "core/Error/ErrorHandling.hpp"
 #include <cassert>
 #include <iostream>
 

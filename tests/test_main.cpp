@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Enhanced with tests for optimized code
 
 #include <iostream>
 #include <cassert>
@@ -35,6 +36,10 @@ namespace test_stdp {
 
 namespace test_brain {
     void runAll();
+}
+
+namespace test_optimized_code {
+    void runAllOptimizedTests();
 }
 
 int main() {
@@ -113,6 +118,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Optimized Code tests..." << std::endl;
+    try {
+        test_optimized_code::runAllOptimizedTests();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

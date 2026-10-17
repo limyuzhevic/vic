@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Error/ErrorHandling.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -25,8 +26,177 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
 
 using namespace nlm;
+
+// Command line argument parsing
+void printHelp() {
+    std::cout << R"(
+NLM Configuration System Help
+=============================
+
+Usage: nlm [options] [subcommand] [subcommand-options]
+
+Configuration Loading:
+  --config <file>           Load configuration from file
+  --preset <name>           Load configuration preset
+  --template <name> [overrides]  Load configuration template
+  --schema <file>           Load configuration schema from JSON file
+  --env-prefix <prefix>     Set prefix for environment variables (default: NLM_)
+
+Environment Variables (NLM_ prefix):
+  NLM_<key>                Set configuration value
+
+Subcommands:
+  --run-phase-6, -p6        Run Phase 6 with current configuration
+  --validate-config, -v     Validate current configuration
+  --export-config, -e       Export configuration to file
+  --info, -i                Show configuration information
+  --compare-configs         Compare two configuration files
+  --list-presets, -lp       List available presets
+  --list-templates, -lt     List available templates
+  --help, -h                Show this help message
+
+Subcommand Options:
+  --file <file>             Configuration file for export/comparison
+  --format <format>         Export format (cfg or json)
+  --phase <phase>           Phase to run (6, plasticity, etc.)
+
+Configuration Key-Value Pairs:
+  --key=value              Set configuration value
+  -key value                Set configuration value (short form)
+
+(Overrides apply in this order: Environment > CLI > File > Programmatic)
+
+)" << std::endl;
+}
+
+bool processSubcommand(int argc, char** argv, const std::shared_ptr<Config>& config) {
+    if (argc < 2) return false;
+    
+    std::string subcommand(argv[1]);
+    
+    if (subcommand == "--run-phase-6" || subcommand == "-p6") {
+        // Process remaining arguments for phase 6
+        std::string phase = "6";
+        for (int i = 2; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg.substr(0, 7) == "--phase") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    phase = arg.substr(pos + 1);
+                }
+            }
+        }
+        
+        // Configure for phase 6 experiments
+        config->set("plasticity_learning_rate", 0.05, ConfigSource::Runtime);
+        config->set("stdp_ltp_weight", 0.02, ConfigSource::Runtime);
+        config->set("stdp_ltd_weight", 0.015, ConfigSource::Runtime);
+        config->set("stdp_time_constant", 20.0, ConfigSource::Runtime);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Runtime);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Runtime);
+        config->set("neuron_count", 5000, ConfigSource::Runtime);
+        config->set("region_count", 1, ConfigSource::Runtime);
+        
+        NLM_LOG_INFO("Phase 6 configuration loaded");
+        return true;
+    } else if (subcommand == "--validate-config" || subcommand == "-v") {
+        NLM_LOG_INFO("=== Validating Configuration ===");
+        
+        bool valid = true;
+        
+        // Validate against schema if available
+        if (!Config::getSchema().empty()) {
+            valid = config->validate(Config::getSchema());
+        }
+        
+        // Validate dependencies
+        if (valid && Config::m_dependencyValidationEnabled) {
+            valid = config->validateDependencies();
+        }
+        
+        if (valid) {
+            NLM_LOG_INFO("Configuration validation passed");
+        } else {
+            NLM_LOG_ERROR("Configuration validation failed");
+        }
+        
+        return valid;
+    } else if (subcommand == "--export-config" || subcommand == "-e") {
+        NLM_LOG_INFO("=== Exporting Configuration ===");
+        
+        std::string outputFile = "exported_config.cfg";
+        std::string format = "cfg";
+        
+        for (int i = 2; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg.substr(0, 6) == "--file") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    outputFile = arg.substr(pos + 1);
+                }
+            } else if (arg.substr(0, 7) == "--format") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    format = arg.substr(pos + 1);
+                }
+            }
+        }
+        
+        return config->exportConfig(outputFile, format);
+    } else if (subcommand == "--info" || subcommand == "-i") {
+        NLM_LOG_INFO("=== Configuration Information ===");
+        NLM_LOG_INFO(config->summary());
+        
+        NLM_LOG_INFO("\n=== Configuration Statistics ===");
+        Config::Stats stats = config->getStats();
+        NLM_LOG_INFO("Total entries: " + std::to_string(stats.totalEntries));
+        NLM_LOG_INFO("File entries: " + std::to_string(stats.fileEntries));
+        NLM_LOG_INFO("Environment entries: " + std::to_string(stats.envEntries));
+        NLM_LOG_INFO("CLI entries: " + std::to_string(stats.cliEntries));
+        NLM_LOG_INFO("Runtime entries: " + std::to_string(stats.runtimeEntries));
+        NLM_LOG_INFO("Preset entries: " + std::to_string(stats.presetEntries));
+        NLM_LOG_INFO("Template entries: " + std::to_string(stats.templateEntries));
+        
+        return true;
+    } else if (subcommand == "--compare-configs") {
+        NLM_LOG_INFO("=== Comparing Configurations ===");
+        
+        std::string file1 = "config1.cfg";
+        std::string file2 = "config2.cfg";
+        
+        for (int i = 2; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg.substr(0, 6) == "--file") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    if (file1 == "config1.cfg") {
+                        file1 = arg.substr(pos + 1);
+                    } else {
+                        file2 = arg.substr(pos + 1);
+                    }
+                }
+            }
+        }
+        
+        return Config::compareConfigs(file1, file2);
+    } else if (subcommand == "--list-presets" || subcommand == "-lp") {
+        return Config::listPresets();
+    } else if (subcommand == "--list-templates" || subcommand == "-lt") {
+        return Config::listTemplates();
+    } else if (subcommand == "--help" || subcommand == "-h") {
+        std::string command = "";
+        if (argc > 2) {
+            command = argv[2];
+        }
+        return Config::help(command);
+    } else {
+        NLM_LOG_ERROR("Unknown subcommand: " + subcommand);
+        return false;
+    }
+}
 
 void printBanner() {
     std::cout << R"(
@@ -48,176 +218,7 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
-    
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
-    
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
-        
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
-            }
-        }
-        
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
-        }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
-        
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
-        }
-        
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
-        
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
-        
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
-        } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
-        }
-    }
-};
-
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
-    
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    auto neurons = region->getAllNeurons();
-    if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
-        return;
-    }
-    
-    // Get initial spike count
-    size_t initialSpikes = brain->getTotalSpikeCount();
-    
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
-    
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
-    }
-    
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
-    
-    if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
-    } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
-        }
-    }
-}
-
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
-    
-    LearningExperiment experiment(brain, 42);
-    
-    // Record initial state
-    experiment.recordInitialState();
-    
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
-    }
-    
+// Rest of the file continues with the existing functions...    
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");

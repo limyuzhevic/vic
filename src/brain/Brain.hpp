@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -42,6 +43,18 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Firing info for tracking spike events
+struct FiringInfo {
+    Neuron* neuron;
+    Timestamp currentTime;
+    SimulationStep currentStep;
+    NeuronState state;
+    
+    FiringInfo() : neuron(nullptr), currentTime(0.0), currentStep(0) {}
+    FiringInfo(Neuron* n, Timestamp t, SimulationStep s, const NeuronState& st)
+        : neuron(n), currentTime(t), currentStep(s), state(st) {}
 };
 
 // Brain: The central coordinator of the neural system
@@ -194,6 +207,64 @@ public:
     void logStatus() const;
     
 private:
+    // Helper methods for refactored step function
+    struct FiringInfo;
+    
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(Timestamp currentTime);
+    void updateNeuronPopulation(const std::vector<std::unique_ptr<NeuralPopulation>>& populations,
+                               Timestamp currentTime);
+    void handleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void collectFiringNeurons(const std::vector<std::unique_ptr<NeuralPopulation>>& populations,
+                              std::vector<FiringInfo>& firingNeurons,
+                              Timestamp currentTime);
+    bool isNeuronJustFired(const NeuronState& state, Timestamp currentTime) const;
+    void processFiringNeurons(const std::vector<FiringInfo>& firingNeurons,
+                              SimulationStep currentStep, Timestamp currentTime);
+    void handleNeuronalFiring(Neuron* neuron, const FiringInfo& firing,
+                              SimulationStep currentStep, Timestamp currentTime);
+    void recordPostSynapticPlasticity(NeuralRegion* region, NeuronId neuronId, Timestamp currentTime);
+    void scheduleDelayedSpikes(NeuralRegion* region, Neuron* neuron,
+                               SimulationStep neuronStep, Timestamp neuronTime,
+                               SimulationStep currentStep, Timestamp currentTime);
+    void ScheduleDelayedSpike(NeuralRegion* region, Synapse* syn, Neuron* neuron,
+                             SimulationStep neuronStep, Timestamp neuronTime,
+                             SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemoryWithFiredNeuron(Neuron* neuron, const NeuronState& state);
+    NeuralRegion* getRegionFromNeuron(Neuron* neuron);
+    
+    void updateMemorySystems();
+    void updateNeuromodulation();
+    void updateNoveltySystem();
+    void updateCuriositySystem();
+    void updateDopamineSystem();
+    void modulateNeuralExcitability(float dopamineLevel);
+    
+    void applyPlasticity();
+    float getPlasticityModulator() const;
+    void applyPlasticityToRegion(NeuralRegion* region, float plasticityMod);
+    void applyPlasticityToSynapse(Synapse* syn, float plasticityMod);
+    void applySTDPWithModulation(Synapse* syn, float plasticityMod);
+    void applyHebbianLearning(Synapse* syn);
+    
+    void updateEpisodicMemory();
+    void storeCurrentEpisodicMemory();
+    void collectActiveNeurons(EpisodicMemoryItem& episode);
+    
+    void updatePredictionSystem();
+    void updateCognitionSystems();
+    void updateAttentionSystem();
+    void updateConceptFormationSystem();
+    
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopment(SimulationStep currentStep);
+    void updateDevelopmentPlasticityRates();
+    float getDevelopmentPlasticityModifier(DevelopmentalStage stage) const;
+    
+    void consolidateMemories(SimulationStep currentStep);
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    
     struct Impl;
     Impl* pImpl;
 };
