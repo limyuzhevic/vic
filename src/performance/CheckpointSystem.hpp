@@ -405,6 +405,8 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    
+    mutable std::string error_;  // For error reporting
 };
 
 // Checksum implementation

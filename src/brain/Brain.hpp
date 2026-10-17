@@ -184,14 +184,61 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+// Checkpoint-related methods
+    void saveNeurons(NeuronCheckpointData& data) const;
+    void saveSynapses(SynapseCheckpointData& data) const;
+    void saveWorkingMemory(NeuralWorkingMemory& memory) const;
+    void saveEpisodicMemory(NeuralEpisodicMemory& memory) const;
+    void saveAssociativeMemory(NeuralAssociativeMemory& memory) const;
+    void savePredictionSystem(PredictionSystem& system) const;
+    void saveNeuralPlanner(NeuralPlanner& planner) const;
+    void saveConceptFormation(ConceptFormation& formation) const;
+    void saveAttention(AttentionalSelection& attention) const;
+    void saveDevelopmentSystem(DevelopmentSystem& system) const;
+    void saveDopamine(Dopamine& dopamine) const;
+    void saveCuriosity(Curiosity& curiosity) const;
+    void saveNovelty(Novelty& novelty) const;
+    void savePredictionError(PredictionError& error) const;
+    void saveSimulationState() const;
+    void saveRandomState(RandomGenerator& rng) const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Load methods
+    void loadNeurons(const NeuronCheckpointData& data);
+    void loadSynapses(const SynapseCheckpointData& data);
+    void loadWorkingMemory(NeuralWorkingMemory& memory);
+    void loadEpisodicMemory(NeuralEpisodicMemory& memory);
+    void loadAssociativeMemory(NeuralAssociativeMemory& memory);
+    void loadPredictionSystem(PredictionSystem& system);
+    void loadNeuralPlanner(NeuralPlanner& planner);
+    void loadConceptFormation(ConceptFormation& formation);
+    void loadAttention(AttentionalSelection& attention);
+    void loadDevelopmentSystem(DevelopmentSystem& system);
+    void loadDopamine(Dopamine& dopamine);
+    void loadCuriosity(Curiosity& curiosity);
+    void loadNovelty(Novelty& novelty);
+    void loadPredictionError(PredictionError& error);
+    void loadSimulationState();
+    void loadRandomState(RandomGenerator& rng);
     
-    // Logging
-    void logStatus() const;
+    // Prediction system integration methods
+    void applyPredictionsToNetwork(const std::vector<float>& predictions);
+    void computePredictionErrors(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                 const std::vector<float>& predictions,
+                                 std::vector<float>& errors);
+    void applyPredictionErrorsToPlasticity(const std::vector<float>& errors);
+    void computePredictionErrors(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                 const std::vector<float>& predictions,
+                                 std::vector<float>& errors);
+    void applyPredictionErrorsToPlasticity(const std::vector<float>& errors);
+    void extractSensoryContext(std::vector<float>& context);
+    
+    // Neural planning and action selection methods
+    void extractPlanningState(std::vector<float>& state);
+    ActionType getImmediateAction();
+    float evaluateActionWithPrediction(ActionType action, const std::vector<float>& state);
+    float calculateActionSuccessProbability(ActionType action);
+    float getNeuromodulationActionBias();
+    ActionType selectBestAction(const std::vector<std::pair<ActionType, float>>& options);
     
 private:
     struct Impl;
