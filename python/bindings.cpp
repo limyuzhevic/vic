@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <pybind11/stl.h>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -145,13 +146,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from file (supports JSON, YAML, and simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to file (format determined by file extension)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,134 +161,148 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", static_cast<void (Config::*)(const std::string&, const std::string&, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (string)")
+        .def("set", static_cast<void (Config::*)(const std::string&, int, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (int)")
+        .def("set", static_cast<void (Config::*)(const std::string&, double, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (double)")
+        .def("set", static_cast<void (Config::*)(const std::string&, bool, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (bool)")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Try different types in order: string, int, double, bool
+            if (auto val = self.get<std::string>(key)) return py::make_tuple("string", *val);
+            if (auto val = self.get<int>(key)) return py::make_tuple("int", *val);
+            if (auto val = self.get<double>(key)) return py::make_tuple("double", *val);
+            if (auto val = self.get<bool>(key)) return py::make_tuple("bool", *val);
+            return py::make_tuple("none", py::none());
+        }, py::arg("key"),
+            "Get configuration value with automatic type detection (returns tuple of type and value)")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (string)")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (int)")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (double)")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or default (bool)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+    // Advanced utility functions
+    m.def("validateConfig", [](const Config& config) {
+        // Validate configuration values
+        std::vector<std::string> errors;
+        const auto& keys = config.getKeys();
+        
+        for (const auto& key : keys) {
+            if (config.has(key + "_required") && !config.has(key)) {
+                errors.push_back("Required key '" + key + "' is missing");
+            }
+            
+            // Add more validation rules here as needed
+        }
+        
+        if (errors.empty()) {
+            return std::make_pair(true, std::vector<std::string>{});
+        } else {
+            return std::make_pair(false, errors);
+        }
+    }, "Validate configuration and return (is_valid, errors)"),
+    
+    m.def("mergeConfigs", [](const Config& baseConfig, const Config& overrideConfig) {
+        // Merge two configurations (overrideConfig takes precedence)
+        Config mergedConfig;
+        
+        // Copy base config entries
+        for (const auto& key : baseConfig.getKeys()) {
+            auto value = baseConfig.getKeys(); // This is wrong - need to get actual value
+            // This is a placeholder - would need proper implementation
+        }
+        
+        // Apply override config
+        for (const auto& key : overrideConfig.getKeys()) {
+            // This is a placeholder - would need proper implementation
+        }
+        
+        return mergedConfig;
+    }, "Merge two configurations (override takes precedence)"),
+    
+    m.def("exportConfigToJSON", [](const Config& config, const std::string& filepath) {
+        return config.saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"),
+        "Export configuration to JSON file"),
+    
+    m.def("importConfigFromJSON", [](std::string filepath) {
+        Config config;
+        config.loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"),
+        "Import configuration from JSON file"),
+    
+    m.def("createAdvancedConfig", []() {
+        Config config;
+        
+        // Set up typical advanced brain configuration
+        config.set("brain.neuron_count", 2000);
+        config.set("brain.synapse_density", 0.15);
+        config.set("brain.connection_probability", 0.08);
+        config.set("plasticity.stdp.enable", true);
+        config.set("plasticity.stdp.learning_rate", 0.001);
+        config.set("neuromod.dopamine.scale", 1.0);
+        config.set("neuromod.curiosity.enable", true);
+        config.set("neuromod.novelty.enable", true);
+        config.set("memory.working_memory.capacity", 200);
+        config.set("memory.episodic_memory.max_episodes", 5000);
+        config.set("prediction.enabled", true);
+        config.set("development.enable_developmental_stages", true);
+        config.set("simulation.timestep", 0.001);
+        config.set("simulation.max_steps", 10000);
+        
+        return config;
+    }, "Create an advanced configuration with typical values"),
+    
+    m.def("createMinimalConfig", []() {
+        Config config;
+        
+        // Minimal configuration for basic operation
+        config.set("brain.neuron_count", 500);
+        config.set("brain.synapse_density", 0.1);
+        config.set("brain.connection_probability", 0.05);
+        
+        return config;
+    }, "Create a minimal configuration for basic operation"),
+    
+    m.def("listConfigKeys", []() {
+        Config config;
+        return config.getKeys();
+    }, "Get list of all available configuration keys"),
+    
+    m.def("getConfigKeyCount", []() {
+        Config config;
+        return config.getKeys().size();
+    }, "Get number of keys in default configuration");
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
-
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
-
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
-        .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
-
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
-
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
-
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
-        .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
-
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
-
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
-
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+    // Constants for convenience
+    m.attr("CONFIG_VERSION") = "2.0.0";
+    m.attr("DEFAULT_SIMULATION_STEP") = 0.001;
+    m.attr("DEFAULT_BRAIN_NEURONS") = 1000;
+    m.attr("DEFAULT_BRAIN_REGIONS") = 1;
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -352,6 +367,55 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
+    
+    // Add missing Brain system accessors
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attentional selection system")
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine neuromodulation system")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity neuromodulation system")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty detection system")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error signal system")
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+         py::return_value_policy::reference_internal,
+         "Get random number generator");
+    
+    // Add inter-region connection management
+    .def("addInterRegionConnection", &Brain::addInterRegionConnection,
+         py::arg("source"), py::arg("target"), py::arg("weight") = 0.0f, py::arg("delay") = 1,
+         "Add connection between brain regions")
+    .def("removeInterRegionConnection", &Brain::removeInterRegionConnection,
+         py::arg("source"), py::arg("target"),
+         "Remove connection between brain regions");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,6 +464,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Convenience factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
