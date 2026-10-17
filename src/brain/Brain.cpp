@@ -528,8 +528,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract patterns from sensory input and neural activity
+        
+        // Get recent sensory activity patterns from working memory
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Create concept from active neural patterns
+            // Concept formation abstracts from specific patterns to general principles
+            std::vector<float> currentStatePattern;
+            
+            // Sample neural activation levels to form concept representation
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (std::find(memoryNeurons.begin(), memoryNeurons.end(), neuron->getId()) != memoryNeurons.end()) {
+                            float activation = neuron->getMembranePotential();
+                            if (activation > 0.0f) {  // Only include active neurons
+                                currentStatePattern.push_back(activation);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!currentStatePattern.empty()) {
+                // Form concept by processing the neural pattern
+                // This uses the brain's experience to create abstract concepts
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    currentStatePattern,  // Neural activation pattern
+                    std::vector<float>(),  // Features (could extract from sensory)
+                    0.0f,  // Neutral reward for concept formation
+                    pImpl->currentTime
+                );
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

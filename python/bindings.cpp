@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <any>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -261,7 +264,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Advanced percept analysis
+        .def("getDominantSignal", &SensoryPercept::getDominantSignal)
+        .def("hasVision", &SensoryPercept::hasVision)
+        .def("hasTouch", &SensoryPercept::hasTouch)
+        .def("hasInternal", &SensoryPercept::hasInternal)
+        .def("hasAudio", &SensoryPercept::hasAudio);
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -347,11 +356,329 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
+        // ========== ADVANCED BRAIN FUNCTIONALITY ==========
+        
+        // Access to integrated memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Get working memory system for active information storage")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system for experience storage")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system for pattern associations")
+        
+        // Access to prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system for forward modeling and error computation")
+        
+        // Access to cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner for action planning")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system for abstract pattern discovery")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system for competitive focus")
+        
+        // Access to development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system for age-based plasticity modulation")
+        
+        // Advanced control and analysis functions
+        .def("getAllNeurons", [](Brain& self) {
+            std::vector<NeuronId> neuronIds;
+            for (const auto& region : self.getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (const auto& neuron : neurons) {
+                    neuronIds.push_back(neuron->getId());
+                }
+            }
+            return neuronIds;
+        }, "Get all neuron IDs in the brain")
+        
+        .def("getAllSynapses", [](Brain& self) {
+            std::vector<SynapseId> synapseIds;
+            for (const auto& region : self.getRegions()) {
+                auto synapses = region->getSynapses();
+                for (const auto& synapse : synapses) {
+                    synapseIds.push_back(synapse->getId());
+                }
+            }
+            return synapseIds;
+        }, "Get all synapse IDs in the brain")
+        
+        // Advanced simulation control
+        .def("runEpisode", [](Brain& self, AgentBrain& agent, SimpleWorld& world, int numSteps) {
+            // Run a complete episode simulation
+            for (int step = 0; step < numSteps; ++step) {
+                world.update(0.1);  // Default timestep
+                auto percept = world.getSensoryPercept();
+                agent.processSensoryInput(percept);
+                self.step(step);
+                auto action = agent.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+            }
+        }, py::arg("agent"), py::arg("world"), py::arg("numSteps"),
+             "Run a complete simulation episode")
+        
+        // Advanced analysis and debugging
+        .def("analyzeNetwork", [](Brain& self) {
+            std::map<std::string, float> stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["firing_rate"] = self.getAverageFiringRate();
+            stats["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["spike_count"] = self.getFiringNeuronCount();
+            return stats;
+        }, "Get comprehensive network statistics")
+        
+        .def("getMemoryStats", [](Brain& self) {
+            std::map<std::string, std::any> stats;
+            if (auto* wm = self.getWorkingMemory()) {
+                stats["working_memory_capacity"] = wm->getCapacity();
+                stats["working_memory_size"] = wm->getCurrentSize();
+            }
+            if (auto* em = self.getEpisodicMemory()) {
+                stats["episodic_memory_episodes"] = em->getEpisodeCount();
+            }
+            return stats;
+        }, "Get memory system statistics")
+        
+        .def("getPredictionStats", [](Brain& self) {
+            std::map<std::string, float> stats;
+            if (auto* ps = self.getPredictionSystem()) {
+                stats["prediction_error"] = ps->getPredictionError();
+                stats["prediction_confidence"] = ps->getConfidence();
+                stats["error_history_size"] = ps->getErrorHistory().size();
+            }
+            return stats;
+        }, "Get prediction system statistics")
+        
+        .def("getCognitionStats", [](Brain& self) {
+            std::map<std::string, std::any> stats;
+            if (auto* cf = self.getConceptFormation()) {
+                stats["concept_count"] = cf->getConceptCount();
+                // Get stability of concepts
+                std::vector<float> stabilities;
+                for (size_t i = 0; i < cf->getConceptCount(); ++i) {
+                    if (auto* concept = cf->getConcept(i)) {
+                        stabilities.push_back(cf->getConceptStability(i));
+                    }
+                }
+                if (!stabilities.empty()) {
+                    float avgStability = std::accumulate(stabilities.begin(), stabilities.end(), 0.0f) / stabilities.size();
+                    stats["avg_concept_stability"] = avgStability;
+                }
+            }
+            if (auto* planner = self.getPlanner()) {
+                stats["planning_depth"] = planner->getPlanningDepth();
+                stats["planning_confidence"] = planner->getPlanningConfidence();
+            }
+            return stats;
+        }, "Get cognition system statistics")
+        
+        .def("logDetailedStatus", [](Brain& self) {
+            std::stringstream ss;
+            ss << "=== DETAILED NLM BRAIN STATUS ===\n";
+            
+            ss << "Neural Statistics:\n";
+            ss << "  Total Neurons: " << self.getTotalNeuronCount() << "\n";
+            ss << "  Total Synapses: " << self.getTotalSynapseCount() << "\n";
+            ss << "  Active Neurons: " << self.getActiveNeuronCount() << "\n";
+            ss << "  Firing Neurons: " << self.getFiringNeuronCount() << "\n";
+            ss << "  Average Firing Rate: " << self.getAverageFiringRate() << " Hz\n";
+            ss << "  E/I Ratio: " << self.getExcitationInhibitionRatio() << "\n";
+            ss << "  Total Spikes: " << self.getTotalSpikeCount() << "\n";
+            
+            ss << "\nDevelopmental State:\n";
+            ss << "  Stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+            ss << "  Region Count: " << self.getRegionCount() << "\n";
+            
+            ss << "\nMemory System Status:\n";
+            if (auto* wm = self.getWorkingMemory()) {
+                ss << "  Working Memory: " << wm->getCurrentSize() << "/" << wm->getCapacity() << " active\n";
+            }
+            if (auto* em = self.getEpisodicMemory()) {
+                ss << "  Episodic Memory: " << em->getEpisodeCount() << " episodes\n";
+            }
+            
+            ss << "\nPrediction System:\n";
+            if (auto* ps = self.getPredictionSystem()) {
+                ss << "  Prediction Error: " << ps->getPredictionError() << "\n";
+                ss << "  Confidence: " << ps->getConfidence() << "\n";
+            }
+            
+            ss << "\nCognition Systems:\n";
+            if (auto* cf = self.getConceptFormation()) {
+                ss << "  Concepts: " << cf->getConceptCount() << " discovered\n";
+            }
+            
+            ss << "\n=== END DETAILED STATUS ===\n";
+            return ss.str();
+        }, "Get detailed brain status information")
+        
+        // Advanced debugging and analysis tools
+        .def("debugAnalyzeNetwork", [](Brain& self) {
+            std::map<std::string, std::any> analysis;
+            
+            // Neural network analysis
+            analysis["neuron_count"] = self.getTotalNeuronCount();
+            analysis["synapse_count"] = self.getTotalSynapseCount();
+            analysis["firing_rate"] = self.getAverageFiringRate();
+            analysis["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            analysis["total_spikes"] = self.getTotalSpikeCount();
+            
+            // Memory system analysis
+            if (auto* wm = self.getWorkingMemory()) {
+                analysis["working_memory_utilization"] = 
+                    static_cast<double>(wm->getCurrentSize()) / wm->getCapacity();
+            }
+            
+            if (auto* em = self.getEpisodicMemory()) {
+                analysis["episodic_memory_episodes"] = em->getEpisodeCount();
+            }
+            
+            // Prediction system analysis
+            if (auto* ps = self.getPredictionSystem()) {
+                analysis["prediction_error"] = ps->getPredictionError();
+                analysis["prediction_confidence"] = ps->getConfidence();
+                analysis["error_history_size"] = ps->getErrorHistory().size();
+                if (!ps->getErrorHistory().empty()) {
+                    double sum = std::accumulate(ps->getErrorHistory().begin(), 
+                                                ps->getErrorHistory().end(), 0.0);
+                    analysis["average_prediction_error"] = sum / ps->getErrorHistory().size();
+                }
+            }
+            
+            // Cognition system analysis
+            if (auto* cf = self.getConceptFormation()) {
+                analysis["concept_count"] = cf->getConceptCount();
+                if (cf->getConceptCount() > 0) {
+                    double total_stability = 0.0;
+                    for (size_t i = 0; i < cf->getConceptCount(); ++i) {
+                        total_stability += cf->getConceptStability(i);
+                    }
+                    analysis["average_concept_stability"] = total_stability / cf->getConceptCount();
+                }
+            }
+            
+            return analysis;
+        }, "Perform detailed network analysis and return comprehensive statistics")
+        
+        .def("simulateEpisode", [](Brain& self, AgentBrain& agent, SimpleWorld& world, 
+                                 int numSteps, bool verbose = false) {
+            std::map<std::string, std::any> episodeStats;
+            
+            // Store initial state
+            episodeStats["initial_neurons"] = self.getTotalNeuronCount();
+            episodeStats["initial_synapses"] = self.getTotalSynapseCount();
+            episodeStats["initial_spikes"] = self.getTotalSpikeCount();
+            
+            // Run simulation
+            std::vector<float> firingRates;
+            for (int step = 0; step < numSteps; ++step) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                agent.processSensoryInput(percept);
+                self.step(step);
+                firingRates.push_back(self.getAverageFiringRate());
+                
+                auto action = agent.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+                
+                if (verbose && step % 100 == 0) {
+                    // Log progress every 100 steps
+                    NLM_LOG_INFO("Episode step " + std::to_string(step) +
+                                ": " + std::to_string(self.getAverageFiringRate()) + " Hz firing rate");
+                }
+            }
+            
+            // Calculate episode statistics
+            episodeStats["final_neurons"] = self.getTotalNeuronCount();
+            episodeStats["final_synapses"] = self.getTotalSynapseCount();
+            episodeStats["final_spikes"] = self.getTotalSpikeCount();
+            episodeStats["total_spike_increase"] = 
+                self.getTotalSpikeCount() - episodeStats["initial_spikes"].get<size_t>();
+            
+            // Calculate firing rate statistics
+            if (!firingRates.empty()) {
+                double sum = std::accumulate(firingRates.begin(), firingRates.end(), 0.0);
+                episodeStats["average_firing_rate"] = sum / firingRates.size();
+                double sumSq = std::inner_product(firingRates.begin(), firingRates.end(), 
+                                                 firingRates.begin(), 0.0);
+                episodeStats["firing_rate_variance"] = 
+                    (sumSq / firingRates.size()) - std::pow(episodeStats["average_firing_rate"].get<double>(), 2);
+            }
+            
+            return episodeStats;
+        }, py::arg("agent"), py::arg("world"), py::arg("numSteps"), py::arg("verbose") = false,
+             "Run a complete episode simulation and return detailed statistics")
+        
+        .def("extractNetworkFeatures", [](Brain& self) {
+            std::map<std::string, std::vector<float>> features;
+            
+            // Extract neural features
+            std::vector<float> neuronFeatures;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        neuronFeatures.push_back(neuron->getMembranePotential());
+                        neuronFeatures.push_back(neuron->getThreshold());
+                        neuronFeatures.push_back(neuron->getFiringState() == FiringState::Active ? 1.0f : 0.0f);
+                    }
+                }
+            }
+            features["neuron_states"] = neuronFeatures;
+            
+            // Extract synaptic features
+            std::vector<float> synapseFeatures;
+            for (const auto& region : self.getRegions()) {
+                for (const auto* synapse : region->getSynapses()) {
+                    synapseFeatures.push_back(synapse->getWeight());
+                    synapseFeatures.push_back(synapse->getDelay());
+                    synapseFeatures.push_back(synapse->getEligibilityTrace());
+                }
+            }
+            features["synapse_properties"] = synapseFeatures;
+            
+            return features;
+        }, "Extract detailed network features for machine learning or analysis")
+        
+        .def("getSystemHealth", [](Brain& self) {
+            std::map<std::string, std::string> health;
+            
+            // Check system health indicators
+            health["neural_stability"] = self.getTotalSpikeCount() > 1000 ? "healthy" : "low_activity";
+            health["memory_function"] = (self.getTotalNeuronCount() > 100) ? "operational" : "underdeveloped";
+            
+            if (auto* ps = self.getPredictionSystem()) {
+                health["prediction_stability"] = (ps->getConfidence() > 0.1f) ? "stable" : "unstable";
+            }
+            
+            if (auto* cf = self.getConceptFormation()) {
+                health["cognitive_development"] = (cf->getConceptCount() > 0) ? "developing" : "initial";
+            }
+            
+            float firingRate = self.getAverageFiringRate();
+            if (firingRate < 1.0f) {
+                health["overall_status"] = "low_activity";
+            } else if (firingRate < 10.0f) {
+                health["overall_status"] = "normal";
+            } else if (firingRate < 50.0f) {
+                health["overall_status"] = "high_activity";
+            } else {
+                health["overall_status"] = "overload";
+            }
+            
+            return health;
+        }, "Get overall system health status and stability indicators")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
