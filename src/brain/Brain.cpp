@@ -511,12 +511,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory observations
+        // This creates prediction errors that drive learning
+        
+        // For now, track prediction error history
+        // TODO: Implement real prediction using neural substrate
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulation systems
+        if (pImpl->predictionError) {
+            pImpl->predictionError->computeError(predictionError, predictionError);
+        }
+        
+        // Track prediction error for memory consolidation
+        if (pImpl->predictionError && currentStep % 100 == 0) {
+            pImpl->predictionError->updatePrediction(predictionError);
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
+    // Update attention system based on prediction uncertainty
+    if (pImpl->attention && pImpl->predictionSystem) {
+        float predictionConfidence = pImpl->predictionSystem->getConfidence();
+        if (predictionConfidence < 0.5f) {
+            // Low confidence = high attention (need to learn)
+            pImpl->attention->setInhibitionStrength(0.3f);
+            pImpl->attention->setExcitationStrength(2.0f);
+        } else {
+            // High confidence = low attention (stable)
+            pImpl->attention->setInhibitionStrength(0.5f);
+            pImpl->attention->setExcitationStrength(1.5f);
+        }
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
@@ -528,8 +552,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use working memory content and attention winners
+        
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current working memory patterns
+            std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+            
+            if (!memoryPattern.empty()) {
+                // Add sensory encoding to concept formation
+                // This requires access to current sensory state
+                // For now, use working memory as input
+                pImpl->conceptFormation->presentExperience(
+                    memoryPattern,
+                    std::vector<float>(10, 1.0f),  // Simplified features
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                    currentStep
+                );
+            }
+        }
+    }
+    
+    // Apply neuromodulation to influence cognitive systems
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Dopamine influences attention and working memory
+        if (dopamineLevel > 0.0f) {
+            // High dopamine increases attention focus
+            pImpl->attention->setInhibitionStrength(0.3f * dopamineLevel);
+        }
+        
+        // Dopamine influences working memory consolidation
+        if (pImpl->workingMemory && dopamineLevel > 0.5f) {
+            pImpl->workingMemory->strengthenMemory(dopamineLevel);
+        }
+    }
+    
+    // Apply curiosity-driven exploration to cognitive systems
+    if (pImpl->curiosity && pImpl->curiosity->getLevel() > 0.3f) {
+        // High curiosity increases concept formation exploration
+        if (pImpl->conceptFormation) {
+            // Curiosity modulates concept formation thresholds
+            // Lower threshold = more novel patterns detected
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

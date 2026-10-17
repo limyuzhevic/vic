@@ -139,21 +139,12 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();

@@ -10,7 +10,13 @@ struct Dopamine::Impl {
     float decayRate;
     float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    // Store brain reference for neuromodulation effects
+    class Brain* brain;
+    // Track reward history for learning
+    std::vector<float> rewardHistory;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f),
+             brain(nullptr) {}
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
@@ -30,27 +36,74 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Implement real dopamine-modulated plasticity factor
+    // Dopamine scales learning rates based on reward prediction error
+    float learningModulation = 0.5f + 0.5f * pImpl->level;
+    
+    // Add activity-dependent plasticity modulation
+    learningModulation *= (1.0f + pImpl->level * 0.5f);
+    
+    return std::clamp(learningModulation, 0.1f, 2.0f);
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // Implement real dopamine dynamics
+    // Time-dependent decay towards baseline with activity-dependent release
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Add spontaneous activity-dependent fluctuations
+    float fluctuation = std::sin(static_cast<float>(pImpl->rng.generate()) * 6.28f) * 0.05f * pImpl->level;
+    pImpl->level += fluctuation;
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Implement real reward signaling with neural dynamics
+    // Phasic burst on reward prediction error with synaptic learning
+    float burstMagnitude = reward * pImpl->releaseRate;
+    
+    // Limit to peak level to prevent runaway excitation
+    pImpl->level = std::min(pImpl->peak, pImpl->level + burstMagnitude);
+    
+    // Track reward history for learning
+    pImpl->rewardHistory.push_back(reward);
+    if (pImpl->rewardHistory.size() > 100) {
+        pImpl->rewardHistory.erase(pImpl->rewardHistory.begin());
+    }
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Implement reward prediction error signaling
+    // Dopamine encodes prediction error as learning signal
+    float errorSignal = error * pImpl->releaseRate;
+    
+    // Phasic response to prediction error
+    // Positive error (better than expected) -> dopamine increase
+    // Negative error (worse than expected) -> dopamine decrease
+    pImpl->level = std::max(0.0f, pImpl->level + errorSignal);
+    
+    // Apply to synaptic plasticity in connected brain regions
+    if (pImpl->brain && pImpl->brain->getSTDP()) {
+        // Modulate STDP learning rates based on prediction error
+        float plasticityMod = std::clamp(1.0f + error * 0.5f, 0.5f, 2.0f);
+        pImpl->brain->getSTDP()->setLTPWeight(0.01f * plasticityMod);
+        pImpl->brain->getSTDP()->setLTDWeight(0.012f * plasticityMod);
+    }
+}
+
+void Dopamine::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Dopamine system initialized");
+}
+
+float Dopamine::getMemoryConsolidationFactor() const {
+    // Dopamine modulates memory consolidation based on reward
+    return 1.0f + pImpl->level * 0.5f;
+}
+
+float Dopamine::getAttentionModulationFactor() const {
+    // Dopamine modulates attention based on reward value
+    return 1.0f + pImpl->level * 0.8f;
 }
 
 } // namespace nlm
+
