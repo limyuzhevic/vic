@@ -130,24 +130,48 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
+        // Configure STDP parameters with validation
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
+        
+        // Validate STDP parameters
+        if (ltpWeight < 0.0f || ltdWeight < 0.0f || tau <= 0.0f) {
+            NLM_LOG_WARNING("Invalid STDP parameters, using defaults");
+            ltpWeight = 0.01f;
+            ltdWeight = 0.012f;
+            tau = 20.0f;
+        }
+        
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
+        // Configure structural plasticity with validation
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        
+        // Validate plasticity rates
+        if (synaptogenesisRate < 0.0f || pruningRate < 0.0f) {
+            NLM_LOG_WARNING("Invalid plasticity rates, using defaults");
+            synaptogenesisRate = 0.0001f;
+            pruningRate = 0.00001f;
+        }
+        
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            NLM_LOG_WARNING("Invalid timestep, using default");
+            timestep = 0.001;
+        }
         
-        // Get integration intervals from config
+        // Get integration intervals from config with validation
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        if (replayInterval == 0) replayInterval = 100;
+        if (consolidationInterval == 0) consolidationInterval = 1000;
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -156,6 +180,13 @@ struct Brain::Impl {
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
+
+// Add explicit destructor for Impl struct to ensure proper cleanup
+Brain::Impl::~Impl() {
+    // All unique_ptr members are automatically cleaned up by C++
+    // This destructor is kept for potential future extensions
+    // or if we ever add raw pointer members
+}
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -286,18 +317,30 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
-}
+    // Configure checkpoint manager with error checking
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        // Validate neuron count
+        size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        if (neuronCount == 0 || neuronCount > 100000) {
+            NLM_LOG_WARNING("Invalid neuron count, using default: 1000");
+            neuronCount = 1000;
+        }
+        
+        // Validate region count
+        size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        if (regionCount == 0) {
+            NLM_LOG_WARNING("Invalid region count, using default: 1");
+            regionCount = 1;
+        }
+        
+        // Validate connection probability
+        float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+            NLM_LOG_WARNING("Invalid connection probability, using default: 0.1");
+            connectionProbability = 0.1f;
+        }
 
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
