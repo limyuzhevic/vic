@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace nlm {
 
@@ -16,7 +17,7 @@ struct Novelty::Impl {
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::Novelty() : pImpl(std::make_unique<Impl>()) {}
 
 Novelty::~Novelty() = default;
 

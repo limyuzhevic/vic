@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include <memory>
 
 namespace nlm {
 
@@ -11,6 +12,12 @@ class Reward {
 public:
     Reward();
     ~Reward();
+    
+    // Disable copying, enable moving
+    Reward(const Reward&) = delete;
+    Reward& operator=(const Reward&) = delete;
+    Reward(Reward&&) noexcept;
+    Reward& operator=(Reward&&) noexcept;
     
     // Get current reward value
     float getValue() const;
@@ -32,7 +39,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
