@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,6 +21,60 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception types for better error handling in Python
+class PyNLMError : public std::runtime_error {
+public:
+    explicit PyNLMError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigurationError : public PyNLMError {
+public:
+    explicit ConfigurationError(const std::string& message) : PyNLMError("Configuration error: " + message) {}
+};
+
+class SimulationError : public PyNLMError {
+public:
+    explicit SimulationError(const std::string& message) : PyNLMError("Simulation error: " + message) {}
+};
+
+class InitializationError : public PyNLMError {
+public:
+    explicit InitializationError(const std::string& message) : PyNLMError("Initialization error: " + message) {}
+};
+
+// Helper functions for Python
+inline std::string to_hex_string(const NeuronId& id) {
+    std::stringstream ss;
+    ss << "0x" << std::hex << id.value;
+    return ss.str();
+}
+
+inline std::string to_hex_string(const SynapseId& id) {
+    std::stringstream ss;
+    ss << "0x" << std::hex << id.value;
+    return ss.str();
+}
+
+inline std::string to_hex_string(const RegionId& id) {
+    std::stringstream ss;
+    ss << "0x" << std::hex << id.value;
+    return ss.str();
+}
+
+inline std::string to_hex_string(const PopulationId& id) {
+    std::stringstream ss;
+    ss << "0x" << std::hex << id.value;
+    return ss.str();
+}
+
+// Initialize error handling
+inline void initialize_error_handling() {
+    py::register_exception<PyNLMError>(m, "NLMError");
+    py::register_exception<ConfigurationError>(m, "ConfigurationError");
+    py::register_exception<SimulationError>(m, "SimulationError");
+    py::register_exception<InitializationError>(m, "InitializationError");
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -27,13 +83,15 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    initialize_error_handling();
 
+    // Neuron ID with enhanced Python features
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
         .def("index", &NeuronId::index)
+        .def("hex", &to_hex_string<NeuronId>, "Get neuron ID as hexadecimal string")
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -416,6 +474,87 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(std::make_shared<Config>());
+    }, "Create a new brain with default configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Create convenience functions for brain initialization and step
+    m.def("run_brain_step", [](std::shared_ptr<Brain> brain, SimulationStep step) {
+        brain->step(step);
+    }, py::arg("brain"), py::arg("step"), "Run a single brain step");
+
+    m.def("run_brain_steps", [](std::shared_ptr<Brain> brain, SimulationStep start, size_t count) {
+        for (size_t i = 0; i < count; ++i) {
+            brain->step(start + i);
+        }
+    }, py::arg("brain"), py::arg("start"), py::arg("count"), "Run multiple brain steps");
+
+    // Safe configuration loading with error checking
+    m.def("load_config_from_file", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw ConfigurationError("Failed to load configuration from file: " + filepath);
+        }
+        return config;
+    }, py::arg("filepath"), "Load configuration from file with error checking");
+
+    // Simulation utilities
+    m.def("create_and_initialize_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw InitializationError("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("config"), "Create and initialize a brain with error checking");
+
+    m.def("create_and_initialize_brain", []() -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        if (!brain->initialize()) {
+            throw InitializationError("Failed to initialize brain");
+        }
+        return brain;
+    }, "Create and initialize a brain with default config");
+
+    // Configuration helper functions
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        auto keys = config->getKeys();
+        if (keys.empty()) {
+            throw ConfigurationError("Configuration contains no keys");
+        }
+        
+        // Check for required keys
+        std::vector<std::string> required_keys = {"neuron_count", "region_count"};
+        std::string missing_keys;
+        for (const auto& key : required_keys) {
+            if (!config->has(key)) {
+                if (!missing_keys.empty()) missing_keys += ", ";
+                missing_keys += key;
+            }
+        }
+        if (!missing_keys.empty()) {
+            throw ConfigurationError("Missing required configuration keys: " + missing_keys);
+        }
+        
+        return true;
+    }, py::arg("config"), "Validate configuration and return True if valid");
+
+    // Constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

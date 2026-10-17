@@ -321,10 +321,118 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+bool printUsage() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 6: Final Integration" << std::endl;
+    std::cout << "============================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h           Show this help message" << std::endl;
+    std::cout << "  --config=<file>      Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron_count=<N>   Set number of neurons" << std::endl;
+    std::cout << "  --region_count=<N>   Set number of brain regions" << std::endl;
+    std::cout << "  --simulation_timestep=<T>  Set simulation timestep in seconds" << std::endl;
+    std::cout << "  --random_seed=<S>    Set random seed for reproducible experiments" << std::endl;
+    std::cout << "  --connection_probability=<P>  Set synaptic connection probability" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<W>  Set STDP LTP weight" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<W>  Set STDP LTD weight" << std::endl;
+    std::cout << "  --stdp_tau=<T>        Set STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis_rate=<R>  Set structural plasticity rate" << std::endl;
+    std::cout << "  --pruning_rate=<R>    Set structural plasticity pruning rate" << std::endl;
+    std::cout << "  --help_experiments    Show available experiment modes" << std::endl;
+    std::cout << "  --experiment=<mode>   Run specific experiment (connectivity, plasticity, stdp, all)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --help                                  Show help" << std::endl;
+    std::cout << "  nlm --config=myconfig.cfg                  Load custom config" << std::endl;
+    std::cout << "  nlm --neuron_count=1000 --region_count=2    Configure brain size" << std::endl;
+    std::cout << "  nlm --experiment=connectivity               Run basic connectivity test" << std::endl;
+    std::cout << "  nlm --experiment=plasticity                Run plasticity learning experiment" << std::endl;
+    std::cout << "  nlm --experiment=stdp                      Run STDP verification" << std::endl;
+    std::cout << "  nlm --experiment=all                      Run all experiments (default)" << std::endl;
+    std::cout << std::endl;
+    return true;
+}
+
+bool printExperimentHelp() {
+    std::cout << "Available Experiment Modes:" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  connectivity   Basic neural connectivity test" << std::endl;
+    std::cout << "                Injects current into neurons and verifies spikes propagate" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  plasticity     Plasticity learning experiment" << std::endl;
+    std::cout << "                Applies repeated input patterns to stimulate learning through" << std::endl;
+    std::cout << "                STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  stdp           STDP verification experiment" << std::endl;
+    std::cout << "                Creates correlated pre-post spike patterns to test" << std::endl;
+    std::cout << "                spike-timing dependent plasticity (LTP/LTD)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  all            Run all experiments in sequence (default)" << std::endl;
+    std::cout << std::endl;
+    return true;
+}
+
+void runExperiment(std::shared_ptr<Brain> brain, const std::string& experimentName) {
+    if (experimentName == "connectivity" || experimentName == "all") {
+        runBasicConnectivityTest(brain);
+        if (experimentName == "connectivity") return;
+    }
+    
+    if (experimentName == "plasticity" || experimentName == "all") {
+        // Reset for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        if (experimentName == "plasticity") return;
+    }
+    
+    if (experimentName == "stdp" || experimentName == "all") {
+        // Reset for STDP experiment
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
+}
+
 int main(int argc, char** argv) {
+    // Check for help request
+    bool showHelp = false;
+    bool showExperimentHelp = false;
+    std::string experimentMode = "all";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--help_experiments") {
+            showExperimentHelp = true;
+        } else if (arg == "--experiment") {
+            if (i + 1 < argc) {
+                experimentMode = argv[++i];
+            }
+        } else if (arg.find("--experiment=") == 0) {
+            experimentMode = arg.substr(13);
+        }
+    }
+    
+    if (showHelp || argc == 1) {
+        printBanner();
+        printUsage();
+        printExperimentHelp();
+        return 0;
+    }
+    
+    if (showExperimentHelp) {
+        printExperimentHelp();
+        return 0;
+    }
+    
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6: Integrated Artificial Brain...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +440,18 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Integrated Artificial Brain ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Working memory and episodic memory systems");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity, novelty)");
+    NLM_LOG_INFO("  - Prediction system and reward processing");
+    NLM_LOG_INFO("  - Attention and concept formation");
+    NLM_LOG_INFO("  - Development stages and plasticity modulation");
+    NLM_LOG_INFO("  - Checkpoint save/load and replay capabilities");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -366,7 +480,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 6
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -409,20 +523,28 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Validate experiment mode
+    std::vector<std::string> validModes = {"connectivity", "plasticity", "stdp", "all"};
+    bool validMode = false;
+    for (const auto& mode : validModes) {
+        if (experimentMode == mode) {
+            validMode = true;
+            break;
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (!validMode) {
+        NLM_LOG_ERROR("Invalid experiment mode: " + experimentMode);
+        printExperimentHelp();
+        return 1;
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Running experiment: " + experimentMode);
+    NLM_LOG_INFO("");
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run the selected experiment
+    runExperiment(brain, experimentMode);
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -430,17 +552,9 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Phase 6 Complete ===");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Experiment completed successfully!");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");

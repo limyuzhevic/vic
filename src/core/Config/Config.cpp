@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <chrono>
 
 namespace nlm {
 
@@ -66,13 +68,20 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                // Handle --key value format (separate args)
+                std::string key = arg.substr(2);
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        // Handle -k value format (short options)
+        else if (arg.size() > 1 && arg[0] == '-' && arg[1] != '-') {
+            if (i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -84,9 +93,35 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Saved from memory at " << std::chrono::system_clock::now() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add comment if description exists
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write the key-value pair with proper formatting
+        file << entry.key << " = ";
+        
+        // Format based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Use sufficient precision for floating point
+                file << std::fixed << std::setprecision(6) << arg;
+            } else {
+                // For integers and other types, just output the value
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -186,17 +221,94 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validate() const {
+    bool allValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        bool entryValid = true;
+        std::string errorMsg;
+        
+        // Type-specific validation
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                if (arg.empty()) {
+                    entryValid = false;
+                    errorMsg = "String value cannot be empty";
+                }
+            } else if constexpr (std::is_same_v<T, int>) {
+                if (arg < std::numeric_limits<int>::min() || arg > std::numeric_limits<int>::max()) {
+                    entryValid = false;
+                    errorMsg = "Integer value out of range";
+                }
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                if (arg < std::numeric_limits<int64_t>::min() || arg > std::numeric_limits<int64_t>::max()) {
+                    entryValid = false;
+                    errorMsg = "64-bit integer value out of range";
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                if (std::isnan(arg) || std::isinf(arg)) {
+                    entryValid = false;
+                    errorMsg = "Double value is NaN or infinite";
+                }
+            } else if constexpr (std::is_same_v<T, float>) {
+                if (std::isnan(arg) || std::isinf(arg)) {
+                    entryValid = false;
+                    errorMsg = "Float value is NaN or infinite";
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                // Boolean values are always valid
+            }
+        }, entry.value);
+        
+        if (!entryValid) {
+            NLM_LOG_WARNING("Invalid configuration value for key '" + entry.key + "': " + errorMsg);
+            allValid = false;
+        }
+    }
+    
+    // Validate specific configuration relationships
+    // For example, timestep should be positive, neuron_count should be reasonable, etc.
+    auto timestepOpt = get<double>("simulation_timestep");
+    if (timestepOpt.has_value()) {
+        if (timestepOpt.value() <= 0.0) {
+            NLM_LOG_WARNING("Invalid simulation timestep: must be positive");
+            allValid = false;
+        }
+    }
+    
+    auto neuronCountOpt = get<int64_t>("neuron_count");
+    if (neuronCountOpt.has_value()) {
+        if (neuronCountOpt.value() <= 0 || neuronCountOpt.value() > 1000000) {
+            NLM_LOG_WARNING("Invalid neuron count: must be between 1 and 1,000,000");
+            allValid = false;
+        }
+    }
+    
+    auto regionCountOpt = get<int64_t>("region_count");
+    if (regionCountOpt.has_value()) {
+        if (regionCountOpt.value() <= 0 || regionCountOpt.value() > 1000) {
+            NLM_LOG_WARNING("Invalid region count: must be between 1 and 1,000");
+            allValid = false;
+        }
+    }
+    
+    auto connProbOpt = get<float>("connection_probability");
+    if (connProbOpt.has_value()) {
+        if (connProbOpt.value() < 0.0f || connProbOpt.value() > 1.0f) {
+            NLM_LOG_WARNING("Invalid connection probability: must be between 0.0 and 1.0");
+            allValid = false;
+        }
+    }
+    
+    if (allValid) {
+        NLM_LOG_INFO("Configuration validation passed");
+    } else {
+        NLM_LOG_WARNING("Configuration validation failed");
+    }
+    
+    return allValid;
 }
 
 // Explicit template instantiations

@@ -92,6 +92,8 @@ public:
     // Statistics
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
+    
+    // Pending spike event count (for debugging/monitoring)
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
