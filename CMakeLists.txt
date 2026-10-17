@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+project(NLM VERSION 2.0.0 LANGUAGES CXX)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
@@ -20,6 +20,20 @@ endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find Python and dependencies
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
+# Find nlohmann_json
+find_package(nlohmann_json 3.11.0 REQUIRED)
+
+# Find scikit-build-core
+find_package(scikit-build-core REQUIRED)
+
+# Option for enhanced Python bindings
+option(NLM_ENABLE_ENHANCED_PYTHON_BINDINGS "Enable enhanced Python bindings" ON)
+option(NLM_ENABLE_PYTHON_BINDINGS "Enable Python bindings" ON)
 
 # Core library
 add_library(nlm_core STATIC
@@ -92,6 +106,40 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Python bindings
+if(NLM_ENABLE_PYTHON_BINDINGS)
+    pybind11_add_module(pynlm
+        python/bindings.cpp
+    )
+    target_link_libraries(pynlm PRIVATE nlm_core)
+    target_include_directories(pynlm PRIVATE
+        ${Python3_INCLUDE_DIRS}
+        ${pybind11_INCLUDE_DIR}
+    )
+    set_target_properties(pynlm PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "pynlm"
+        SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    )
+endif()
+
+# Enhanced Python bindings
+if(NLM_ENABLE_ENHANCED_PYTHON_BINDINGS)
+    pybind11_add_module(pynlm_enhanced
+        python/enhanced_bindings.cpp
+    )
+    target_link_libraries(pynlm_enhanced PRIVATE nlm_core)
+    target_include_directories(pynlm_enhanced PRIVATE
+        ${Python3_INCLUDE_DIRS}
+        ${pybind11_INCLUDE_DIR}
+    )
+    set_target_properties(pynlm_enhanced PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "pynlm_enhanced"
+        SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    )
+endif()
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -119,7 +167,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm

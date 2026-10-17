@@ -1,10 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann-json>=3.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
+version = "2.0.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -12,10 +12,11 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience", "machine-learning"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,39 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+[dependencies]
+numpy = ">=1.20"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "plotly>=5.0.0",
+    "jupyter>=1.0.0",
+]
+extended = [
+    "scikit-learn>=1.0.0",
+    "tensorflow>=2.8.0",
+    "torch>=1.9.0",
+]
+docs = [
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.15.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+Examples = "https://github.com/nlm-project/nlm/tree/main/examples"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +67,43 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_ENHANCED_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = "ON"
+NLM_ENABLE_ENHANCED_PYTHON_BINDINGS = "ON"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["*Test"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "-x"
+]
+
+[tool.coverage.run]
+source = ["src/"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[project.scripts]
+# CLI commands for NLM
+nlm-info = "scripts.cli:main"
+nlm-run = "scripts.cli:run_experiment"
+nlm-config = "scripts.cli:configure"
+
+[tool.setuptools.package-data]
+pynlm = ["*.py", "*.pxd", "*.hpp"]
+pynlm_enhanced = ["*.py", "*.pxd", "*.hpp"]
