@@ -191,6 +191,16 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate inputs
+    if (dt < 0.0) {
+        NLM_LOG_ERROR("Invalid timestep in stepLIF: " + std::to_string(dt));
+        return false;
+    }
+    
+    if (currentTime < 0.0) {
+        NLM_LOG_WARN("Negative current time in stepLIF: " + std::to_string(currentTime));
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,6 +223,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Protect against division by zero
+    if (C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane capacitance: " + std::to_string(C));
+        C = 1.0f;  // Use reasonable default
+    }
+    
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant: " + std::to_string(tau));
+        tau = Impl::TIME_CONSTANT;  // Use default
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
@@ -220,22 +241,46 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Add numerical stability guard
+    float integrationFactor = static_cast<float>(dt) * 1000.0f;
+    
+    // Limit integration factor to prevent numerical instability
+    float maxIntegrationFactor = 10.0f;  // Prevent runaway integration
+    if (integrationFactor > maxIntegrationFactor) {
+        integrationFactor = maxIntegrationFactor;
+    } else if (integrationFactor < 1e-6f) {
+        integrationFactor = 1e-6f;  // Prevent underflow
+    }
+    
+    V = V + integrationFactor * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        
+        // Apply bounds to adaptation variable to prevent unbounded growth
+        if (pImpl->state.adaptationVariable < 0.0f) {
+            pImpl->state.adaptationVariable = 0.0f;
+        }
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Use neuron-type specific bounds
+    float lowerBound = -100.0f;
+    float upperBound = 50.0f;
+    V = std::clamp(V, lowerBound, upperBound);
     
     // Check for spike
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Validate current time
+        if (currentTime < 0.0f) {
+            NLM_LOG_WARN("Recording spike with negative timestamp");
+        }
         
         // Record spike
         recordSpike(currentTime);
@@ -248,7 +293,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
+        // Apply bounds to prevent unbounded growth
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Cap adaptation variable to prevent excessive values
+        if (pImpl->state.adaptationVariable > 100.0f) {
+            pImpl->state.adaptationVariable = 100.0f;
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }

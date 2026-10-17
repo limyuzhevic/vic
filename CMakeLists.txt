@@ -92,7 +92,14 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Enhanced Agent system (body, sensory percept, agent-brain interface)
+add_library(nlm_agent_enhanced STATIC
+    src/agent/EnhancedAgentBrain.cpp
+)
+target_include_directories(nlm_agent_enhanced PUBLIC src/agent)
+target_link_libraries(nlm_agent_enhanced PUBLIC nlm_core)
+
+# Legacy Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
@@ -119,7 +126,42 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 enhanced configuration
+add_library(nlm_phase6_config STATIC
+    src/experiments/Phase6EnhancedConfig.cpp
+)
+target_include_directories(nlm_phase6_config PUBLIC src)
+target_link_libraries(nlm_phase6_config PUBLIC nlm_core)
+
+# Enhanced logging system
+add_library(nlm_enhanced_logging STATIC
+    src/core/EnhancedLogger.cpp
+)
+target_include_directories(nlm_enhanced_logging PUBLIC src/core)
+target_link_libraries(nlm_enhanced_logging PUBLIC nlm_core)
+
+# Performance optimizations
+add_library(nlm_performance STATIC
+    src/performance/PerformanceOptimizations.cpp
+)
+target_include_directories(nlm_performance PUBLIC src/performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
@@ -139,12 +181,19 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/nlm_phase6_demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase6_config nlm_enhanced_logging nlm_performance)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase6_config nlm_enhanced_logging nlm_performance
+    nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
