@@ -110,6 +110,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
+    src/experiments/AdvancedFeatures.hpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
