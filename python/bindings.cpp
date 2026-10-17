@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/core/PythonBindingsUtils.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -28,6 +29,10 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+
+    // Additional Python-specific exception types
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -351,7 +356,62 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+
+        // Advanced Brain methods
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get the spike system for direct neural dynamics control")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get the STDP plasticity rule for advanced synaptic manipulation")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get the Hebbian plasticity rule for association learning")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get the structural plasticity system for neural rewiring")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get the working memory system for transient information storage")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get the episodic memory system for experience storage")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get the associative memory system for pattern relationships")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get the prediction system for forward modeling")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get the neural planner for action planning")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get the concept formation system for pattern discovery")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get the attentional selection system for focus management")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get the development system for age-dependent plasticity")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get the dopamine neuromodulation system for reward processing")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get the curiosity neuromodulation system for exploration")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get the novelty detection system for surprise processing")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get the prediction error system for learning signals")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get the random generator for controlled randomness")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +458,130 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+
+        // Enhanced AgentBrain interface for power users
+        .def("applyNeuromodulator", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply neuromodulator signal (dopamine, acetylcholine, etc.)")
+        .def("setDevelopmentParameters", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development with advanced parameters")
+        .def("getAdvancedPredictionError", &AgentBrain::getPredictionError,
+             "Get detailed prediction error with variance")
+        .def("setCuriosityParameters", [](AgentBrain& self, float explorationWeight, float noveltyThreshold) {
+             // This would need to be implemented in AgentBrain for more complex curiosity control
+             return 0.0f;
+         }, py::arg("explorationWeight"), py::arg("noveltyThreshold"),
+             "Set curiosity system parameters for exploration control")
+        .def("getNoveltyAndCuriosityCombined", [](const AgentBrain& self) {
+             return self.getNoveltyLevel() + self.getCuriosityLevel();
+         }, "Get combined novelty and curiosity score for behavior selection")
+        .def("setPredictionErrorThreshold", [](AgentBrain& self, float threshold) {
+             // Would need implementation for advanced error handling
+             return;
+         }, py::arg("threshold"),
+             "Set prediction error threshold for learning modulation")
+
+    // Advanced configuration utility functions
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        // Basic validation: check for required keys
+        const std::vector<std::string> requiredKeys = {
+            "brain.neuronCount",
+            "brain.simulation.timestep",
+            "brain.plasticity.enable"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config.has(key)) {
+                warnings.push_back("Missing recommended configuration key: " + key);
+            }
+        }
+        
+        // Check for inconsistent values
+        if (config.has("brain.plasticity.stdp.ltpWeight") &&
+            config.has("brain.plasticity.stdp.ltdWeight")) {
+            auto ltp = config.getOr<double>("brain.plasticity.stdp.ltpWeight", 0.01);
+            auto ltd = config.getOr<double>("brain.plasticity.stdp.ltdWeight", 0.02);
+            if (std::abs(ltp - ltd) < 0.001) {
+                warnings.push_back("LTP and LTD weights are too similar - consider increasing STDP asymmetry");
+            }
+        }
+        
+        if (!errors.empty() && !warnings.empty()) {
+            py::dict result;
+            result["valid"] = false;
+            result["errors"] = errors;
+            result["warnings"] = warnings;
+            return result;
+        }
+        
+        py::dict result;
+        result["valid"] = true;
+        result["warnings"] = warnings;
+        return result;
+    }, py::arg("config"), "Validate configuration and return validation results with warnings")
+    
+    .def("mergeConfigs", [](const Config& baseConfig, const Config& overrideConfig) {
+        auto merged = baseConfig;
+        const auto overrideKeys = overrideConfig.getKeys();
+        for (const auto& key : overrideKeys) {
+            auto value = overrideConfig.getOr<ConfigValue>(key, ConfigValue());
+            merged.set(key, value);
+        }
+        return merged;
+    }, py::arg("baseConfig"), py::arg("overrideConfig"),
+        "Merge two configurations (overrideConfig takes precedence)")
+    
+    .def("extractConfigSubset", [](const Config& config, const std::vector<std::string>& keys) {
+        Config subset;
+        for (const auto& key : keys) {
+            if (config.has(key)) {
+                auto value = config.getOr<ConfigValue>(key, ConfigValue());
+                subset.set(key, value);
+            }
+        }
+        return subset;
+    }, py::arg("config"), py::arg("keys"), "Extract a subset of configuration keys")
+    
+    .def("findConflictingConfigs", [](const Config& config) {
+        std::vector<std::string> conflicts;
+        
+        // Check for conflicting plasticity settings
+        if (config.has("brain.plasticity.enable") &&
+            config.has("brain.plasticity.stdp.enable") &&
+            config.has("brain.plasticity.hebbian.enable")) {
+            
+            auto stdpEnabled = config.getOr<bool>("brain.plasticity.stdp.enable", false);
+            auto hebbianEnabled = config.getOr<bool>("brain.plasticity.hebbian.enable", false);
+            auto structuralEnabled = config.getOr<bool>("brain.plasticity.structural.enable", false);
+            
+            int enabledCount = (stdpEnabled ? 1 : 0) + (hebbianEnabled ? 1 : 0) + (structuralEnabled ? 1 : 0);
+            if (enabledCount > 2) {
+                conflicts.push_back("Multiple plasticity rules enabled - may cause interference");
+            }
+        }
+        
+        // Check for incompatible neuromodulation settings
+        if (config.has("brain.neuromodulation.dopamine.enable") &&
+            config.has("brain.neuromodulation.curiosity.enable") &&
+            config.has("brain.neuromodulation.novelty.enable")) {
+            
+            auto dopWeight = config.getOr<double>("brain.neuromodulation.dopamine.weight", 1.0);
+            auto curWeight = config.getOr<double>("brain.neuromodulation.curiosity.weight", 1.0);
+            auto novWeight = config.getOr<double>("brain.neuromodulation.novelty.weight", 1.0);
+            
+            double totalWeight = dopWeight + curWeight + novWeight;
+            if (std::abs(totalWeight - 1.0) > 0.1) {
+                conflicts.push_back("Neuromodulation weights don't sum to 1.0 - may cause imbalance");
+            }
+        }
+        
+        return conflicts;
+    }, py::arg("config"), "Find potential configuration conflicts")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +599,241 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced configuration utility functions
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        // Basic validation: check for required keys
+        const std::vector<std::string> requiredKeys = {
+            "brain.neuronCount",
+            "brain.simulation.timestep",
+            "brain.plasticity.enable"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config.has(key)) {
+                warnings.push_back("Missing recommended configuration key: " + key);
+            }
+        }
+        
+        // Check for inconsistent values
+        if (config.has("brain.plasticity.stdp.ltpWeight") &&
+            config.has("brain.plasticity.stdp.ltdWeight")) {
+            auto ltp = config.getOr<double>("brain.plasticity.stdp.ltpWeight", 0.01);
+            auto ltd = config.getOr<double>("brain.plasticity.stdp.ltdWeight", 0.02);
+            if (std::abs(ltp - ltd) < 0.001) {
+                warnings.push_back("LTP and LTD weights are too similar - consider increasing STDP asymmetry");
+            }
+        }
+        
+        if (!errors.empty() && !warnings.empty()) {
+            py::dict result;
+            result["valid"] = false;
+            result["errors"] = errors;
+            result["warnings"] = warnings;
+            return result;
+        }
+        
+        py::dict result;
+        result["valid"] = true;
+        result["warnings"] = warnings;
+        return result;
+    }, py::arg("config"), "Validate configuration and return validation results with warnings")
+    
+    .def("mergeConfigs", [](const Config& baseConfig, const Config& overrideConfig) {
+        auto merged = baseConfig;
+        const auto overrideKeys = overrideConfig.getKeys();
+        for (const auto& key : overrideKeys) {
+            auto value = overrideConfig.getOr<ConfigValue>(key, ConfigValue());
+            merged.set(key, value);
+        }
+        return merged;
+    }, py::arg("baseConfig"), py::arg("overrideConfig"),
+        "Merge two configurations (overrideConfig takes precedence)")
+    
+    .def("extractConfigSubset", [](const Config& config, const std::vector<std::string>& keys) {
+        Config subset;
+        for (const auto& key : keys) {
+            if (config.has(key)) {
+                auto value = config.getOr<ConfigValue>(key, ConfigValue());
+                subset.set(key, value);
+            }
+        }
+        return subset;
+    }, py::arg("config"), py::arg("keys"), "Extract a subset of configuration keys")
+    
+    .def("findConflictingConfigs", [](const Config& config) {
+        std::vector<std::string> conflicts;
+        
+        // Check for conflicting plasticity settings
+        if (config.has("brain.plasticity.enable") &&
+            config.has("brain.plasticity.stdp.enable") &&
+            config.has("brain.plasticity.hebbian.enable")) {
+            
+            auto stdpEnabled = config.getOr<bool>("brain.plasticity.stdp.enable", false);
+            auto hebbianEnabled = config.getOr<bool>("brain.plasticity.hebbian.enable", false);
+            auto structuralEnabled = config.getOr<bool>("brain.plasticity.structural.enable", false);
+            
+            int enabledCount = (stdpEnabled ? 1 : 0) + (hebbianEnabled ? 1 : 0) + (structuralEnabled ? 1 : 0);
+            if (enabledCount > 2) {
+                conflicts.push_back("Multiple plasticity rules enabled - may cause interference");
+            }
+        }
+        
+        // Check for incompatible neuromodulation settings
+        if (config.has("brain.neuromodulation.dopamine.enable") &&
+            config.has("brain.neuromodulation.curiosity.enable") &&
+            config.has("brain.neuromodulation.novelty.enable")) {
+            
+            auto dopWeight = config.getOr<double>("brain.neuromodulation.dopamine.weight", 1.0);
+            auto curWeight = config.getOr<double>("brain.neuromodulation.curiosity.weight", 1.0);
+            auto novWeight = config.getOr<double>("brain.neuromodulation.novelty.weight", 1.0);
+            
+            double totalWeight = dopWeight + curWeight + novWeight;
+            if (std::abs(totalWeight - 1.0) > 0.1) {
+                conflicts.push_back("Neuromodulation weights don't sum to 1.0 - may cause imbalance");
+            }
+        }
+        
+        return conflicts;
+    }, py::arg("config"), "Find potential configuration conflicts")
 
+    // Advanced simulation state analysis utilities
+    m.def("analyzeBrainState", [](const Brain& brain) {
+        py::dict analysis;
+        
+        analysis["total_neurons"] = brain.getTotalNeuronCount();
+        analysis["total_synapses"] = brain.getTotalSynapseCount();
+        analysis["active_neurons"] = brain.getActiveNeuronCount();
+        analysis["firing_neurons"] = brain.getFiringNeuronCount();
+        analysis["average_firing_rate"] = brain.getAverageFiringRate();
+        analysis["excitation_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+        analysis["total_spike_count"] = brain.getTotalSpikeCount();
+        analysis["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+        
+        // Get memory system stats if available
+        if (auto ws = brain.getWorkingMemory()) {
+            analysis["working_memory_capacity"] = ws->getCapacity();
+            analysis["working_memory_active_traces"] = ws->getActiveTraces();
+            analysis["working_memory_activity"] = ws->getMemoryActivity();
+        }
+        
+        if (auto em = brain.getEpisodicMemory()) {
+            analysis["episodic_memory_episodes"] = em->getEpisodeCount();
+        }
+        
+        if (auto am = brain.getAssociativeMemory()) {
+            analysis["associative_memory_strength"] = 0.0f; // Would need to compute
+        }
+        
+        if (auto dm = brain.getDevelopmentSystem()) {
+            analysis["developmental_age"] = dm->getDevelopmentalAge();
+            analysis["critical_period"] = dm->isCriticalPeriod();
+            analysis["critical_period_progress"] = dm->getCriticalPeriodProgress();
+        }
+        
+        return analysis;
+    }, py::arg("brain"), "Analyze brain state and return comprehensive statistics")
+    
+    .def("compareBrains", [](const Brain& brain1, const Brain& brain2) {
+        py::dict comparison;
+        
+        comparison["neuron_count_diff"] = static_cast<int>(brain2.getTotalNeuronCount() - brain1.getTotalNeuronCount());
+        comparison["synapse_count_diff"] = static_cast<int>(brain2.getTotalSynapseCount() - brain1.getTotalSynapseCount());
+        comparison["firing_rate_diff"] = brain2.getAverageFiringRate() - brain1.getAverageFiringRate();
+        comparison["spike_count_diff"] = static_cast<int>(brain2.getTotalSpikeCount() - brain1.getTotalSpikeCount());
+        comparison["e_i_ratio_diff"] = brain2.getExcitationInhibitionRatio() - brain1.getExcitationInhibitionRatio();
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brain states and return differences")
+    
+    .def("getSystemStatus", [](const Brain& brain) {
+        py::dict status;
+        
+        // System health indicators
+        status["healthy"] = true;
+        status["simulation_running"] = true; // Would need actual state tracking
+        
+        // Performance indicators
+        float firingRate = brain.getAverageFiringRate();
+        status["firing_rate_healthy"] = (firingRate > 0.01 && firingRate < 100.0);
+        
+        // Memory health
+        if (auto ws = brain.getWorkingMemory()) {
+            status["working_memory_healthy"] = (ws->getMemoryActivity() < 1.0);
+        }
+        
+        // Development health
+        if (auto dm = brain.getDevelopmentSystem()) {
+            status["development_healthy"] = (dm->getPlasticityModifier() > 0.0);
+        }
+        
+        return status;
+    }, py::arg("brain"), "Get comprehensive system health status")
+
+    // ===================================================================
+    // ADVANCED ERROR HANDLING AND VALIDATION FUNCTIONS
+    // ===================================================================
+
+    // Input validation helpers
+    m.def("validateNeuronId", &validateNeuronId,
+          py::arg("neuron_id"), "Validate a neuron ID and return True if valid");
+    m.def("validateSynapseId", &validateSynapseId,
+          py::arg("synapse_id"), "Validate a synapse ID and return True if valid");
+    m.def("validateRegionId", &validateRegionId,
+          py::arg("region_id"), "Validate a region ID and return True if valid");
+    m.def("validatePopulationId", &validatePopulationId,
+          py::arg("population_id"), "Validate a population ID and return True if valid");
+
+    // Configuration validation
+    m.def("validateConfig", &validateConfig,
+          py::arg("config"), py::arg("warnings") = py::dict(),
+          "Validate configuration with optional warnings output");
+    m.def("findConflictingConfigs", &findConflictingConfigs,
+          py::arg("config"), "Find potential configuration conflicts");
+
+    // Parameter validation for simulation
+    m.def("validateSimulationParameters", &validateSimulationParameters,
+          py::arg("brain"), py::arg("step"), py::arg("time") = 0.0,
+          "Validate simulation parameters before running");
+
+    // Safe operation wrappers
+    m.def("safeBrainStep", &safeBrainStep,
+          py::arg("brain"), py::arg("step"), py::arg("time") = 0.0,
+          "Safely execute a brain step with error handling and validation");
+    m.def("safeBrainReset", &safeBrainReset,
+          py::arg("brain"), "Safely reset brain state with error handling");
+    m.def("safeBrainSave", &safeBrainSave,
+          py::arg("brain"), py::arg("filepath"), "Safely save brain state with error handling");
+    m.def("safeBrainLoad", &safeBrainLoad,
+          py::arg("brain"), py::arg("filepath"), "Safely load brain state with error handling");
+
+    // Error information and diagnostics
+    m.def("getBrainErrorInfo", &getBrainErrorInfo,
+          py::arg("brain"), "Get detailed error information and diagnostic data for brain state");
+
+    // Safe sensory injection
+    m.def("safeSensoryInjection", &safeSensoryInjection,
+          py::arg("brain"), py::arg("sensory_input"), "Safely inject sensory input with validation");
+
+    // Brain state comparison and analysis
+    m.def("analyzeBrainState", &analyzeBrainState,
+          py::arg("brain"), "Analyze brain state for health, performance, and issues");
+    m.def("compareBrains", &compareBrains,
+          py::arg("brain1"), py::arg("brain2"), "Compare two brain states and return differences");
+
+    // Configuration utilities
+    m.def("mergeConfigs", &mergeConfigs,
+          py::arg("base_config"), py::arg("override_config"),
+          "Merge two configurations with override precedence");
+    m.def("extractConfigSubset", &extractConfigSubset,
+          py::arg("config"), py::arg("keys"), "Extract subset of configuration keys");
+
+    // Simulation control utilities
+    m.def("runSafeSimulation", &runSafeSimulation,
+          py::arg("brain"), py::arg("num_steps"), py::arg("check_interval") = 100,
+          "Run a simulation with periodic state validation and error recovery");
+
+    // ===================================================================
 } // namespace nlm

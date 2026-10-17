@@ -164,6 +164,12 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Self-model for self-awareness and agency
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation and imitation
+    SocialLearning* getSocialLearning();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();

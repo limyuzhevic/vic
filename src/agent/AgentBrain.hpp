@@ -76,6 +76,21 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Planning: use neural planner for goal-directed actions
+    MotorCommand planAction(const std::vector<float>& currentState, float targetReward = 0.5f);
+    
+    // Concept formation: process sensory input into concepts
+    size_t formConcept(const std::vector<float>& sensoryPattern, float reward);
+    
+    // Self-model: track self-generated effects and agency
+    void recordSelfAction(ActionType action, const std::vector<float>& beforeState,
+                         const std::vector<float>& afterState);
+    
+    // Social learning: observe other agents and learn from them
+    void observeOtherAgent(ActionType observedAction, 
+                          const std::vector<float>& observerState,
+                          const std::vector<float>& resultingState);
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +127,33 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Integrated cognition systems
+    NeuralPlanner* planner_;
+    ConceptFormation* conceptFormation_;
+    AttentionalSelection* attention_;
+    SelfModel* selfModel_;
+    SocialLearning* socialLearning_;
+    
+    // Integrated cognition systems state
+    std::vector<float> currentConceptPattern_;
+    std::vector<float> currentSelfModelState_;
+    ActionType lastPlannedAction_;
+    size_t currentConceptId_;
+    float planningConfidence_;
+    float selfModelConfidence_;
+    
+    // Social learning state
+    size_t observationCount_;
+    float socialLearningWeight_;
+    
+    // Attention state
+    float attentionStrength_;
+    std::vector<float> attendedFeatures_;
+    
+    // Goal state for planning
+    std::vector<float> currentGoal_;
+    float goalReward_;
 };
 
 } // namespace nlm
