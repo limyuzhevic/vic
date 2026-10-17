@@ -19,12 +19,11 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <cstring>
+#include <ctime>
+#include <map>
+#include <chrono>
+#include <thread>
 
 using namespace nlm;
 
@@ -41,11 +40,41 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                       ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage(const std::string& programName) {
+    std::cout << "\n";
+    std::cout << "╔═══════════════════════════════════════════════════════════════╗\n";
+    std::cout << "║                    NLM Phase 2 USAGE                           ║\n";
+    std::cout << "╠═══════════════════════════════════════════════════════════════╣\n";
+    std::cout << "║                                                               ║\n";
+    std::cout << "║ NLM (Neural Learning Machine) - Phase 2 Real Neural Computation ║\n";
+    std::cout << "║                                                               ║\n";
+    std::cout << "║ Options:                                                      ║\n";
+    std::cout << "║   --config=FILE         Load configuration from FILE         ║\n";
+    std::cout << "║   --neuron-count=N      Set number of neurons (default: 500)  ║\n";
+    std::cout << "║   --region-count=N      Set number of regions (default: 1)   ║\n";
+    std::cout << "║   --timestep=T          Set simulation timestep (default: 0.001)║\n";
+    std::cout << "║   --seed=N              Set random seed (default: 42)         ║\n";
+    std::cout << "║   --save=FILE           Save brain state to FILE after run     ║\n";
+    std::cout << "║   --load=FILE           Load brain state from FILE            ║\n";
+    std::cout << "║   --experiment=TYPE     Run specific experiment:              ║\n";
+    std::cout << "║                         connectivity | plasticity | stdp     ║\n";
+    std::cout << "║   --progress           Show progress during simulation        ║\n";
+    std::cout << "║   --verbose            Enable verbose logging               ║\n";
+    std::cout << "║   --help, -h           Show this help message                ║\n";
+    std::cout << "║                                                               ║\n";
+    std::cout << "╚═══════════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
+    std::cout << "Examples:\n";
+    std::cout << "  ./nlm --config=myconfig.cfg --experiment=plasticity\n";
+    std::cout << "  ./nlm --neuron-count=1000 --save=checkpoint.nlm\n";
+    std::cout << "  ./nlm --load=pretrained.nlm --timestep=0.01\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -326,11 +355,44 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Parse command line arguments
+    bool showProgress = false;
+    bool verboseMode = false;
+    std::string experimentType = "all";  // "all", "connectivity", "plasticity", "stdp"
+    std::string saveFile = "";
+    std::string loadFile = "";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage("nlm");
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
+            // Already handled by config system
+        } else if (arg.find("--experiment=") != std::string::npos) {
+            experimentType = arg.substr(arg.find("=") + 1);
+        } else if (arg == "--progress") {
+            showProgress = true;
+        } else if (arg == "--verbose") {
+            verboseMode = true;
+        } else if (arg.find("--save=") != std::string::npos) {
+            saveFile = arg.substr(arg.find("=") + 1);
+        } else if (arg.find("--load=") != std::string::npos) {
+            loadFile = arg.substr(arg.find("=") + 1);
+        }
+    }
+    
+    // Initialize logger with appropriate level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = verboseMode ? LogLevel::Debug : LogLevel::Info;
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Set up additional logging based on verbosity
+    if (verboseMode) {
+        NLM_LOG_DEBUG("Verbose mode enabled - detailed logging will be shown");
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -366,7 +428,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 experiments
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -382,6 +444,10 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Memory system parameters
+    config->set("working_memory_capacity", 50, ConfigSource::Default);
+    config->set("episodes_capacity", 1000, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +456,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<size_t>("working_memory_capacity", 50)));
+    NLM_LOG_INFO("  episodes_capacity: " + std::to_string(config->getOr<size_t>("episodes_capacity", 1000)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -409,20 +477,43 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run experiments based on type
+    if (experimentType == "connectivity" || experimentType == "all") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Connectivity Test ===");
+        runBasicConnectivityTest(brain);
+        
+        // Reset for next experiment
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (experimentType == "plasticity" || experimentType == "all") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Plasticity Experiment ===");
+        runPlasticityExperiment(brain);
+        
+        // Reset for next experiment
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (experimentType == "stdp" || experimentType == "all") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running STDP Verification ===");
+        runStdpVerification(brain);
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Save brain state if requested
+    if (!saveFile.empty()) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Saving brain state to: " + saveFile);
+        if (brain->save(saveFile)) {
+            NLM_LOG_INFO("✓ Brain state saved successfully");
+        } else {
+            NLM_LOG_ERROR("✗ Failed to save brain state");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -431,7 +522,7 @@ int main(int argc, char** argv) {
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
@@ -440,10 +531,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     
     return 0;
 }
