@@ -19,16 +19,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    bool fileSuccess = true;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +43,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key is not empty
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key in configuration file " + filepath + " at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,11 +56,26 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Error parsing configuration file " + filepath + 
+                             " at line " + std::to_string(lineNumber) + ": " + e.what());
+                fileSuccess = false;
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid configuration line (no '=') in " + filepath + 
+                           " at line " + std::to_string(lineNumber) + ": " + line);
+            fileSuccess = false;
         }
     }
     
-    return true;
+    if (fileSuccess && lineNumber > 0) {
+        NLM_LOG_INFO("Successfully loaded " + std::to_string(lineNumber) + 
+                    " lines from configuration file: " + filepath);
+    }
+    
+    return fileSuccess;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
