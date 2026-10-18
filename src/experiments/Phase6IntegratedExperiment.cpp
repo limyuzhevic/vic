@@ -23,15 +23,43 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with enhanced parameters
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    
+    // Neuromodulation parameters
+    cfg->set("stdp_ltp_weight", config.stdpLTPWeight);
+    cfg->set("stdp_ltd_weight", config.stdpLTDWeight);
+    cfg->set("stdp_tau", config.stdpTau);
+    
+    // Structural plasticity parameters
+    cfg->set("synaptogenesis_rate", config.synaptogenesisRate);
+    cfg->set("pruning_rate", config.pruningRate);
+    
+    // Memory system parameters
+    cfg->set("working_memory_capacity", config.workingMemoryCapacity);
+    cfg->set("episodic_memory_capacity", config.episodicMemoryCapacity);
+    cfg->set("associative_memory_size", config.associativeMemorySize);
+    cfg->set("memory_decay_rate", config.memoryDecayRate);
+    
+    // Development parameters
+    cfg->set("developmental_plasticity_rate", config.developmentalPlasticityRate);
+    cfg->set("critical_period_duration", config.criticalPeriodDuration);
+    cfg->set("maturation_rate", config.maturationRate);
+    
+    // Hebbian plasticity
+    cfg->set("hebbian_learning_rate", config.hebbianLearningRate);
+    
+    // Novelty and curiosity
+    cfg->set("novelty_threshold", config.noveltyThreshold);
+    cfg->set("curiosity_level", config.curiosityLevel);
+    
+    // Reward and behavior
+    cfg->set("reward_scale", config.rewardScale);
+    cfg->set("exploration_rate", config.explorationRate);
+    cfg->set("attention_focus", config.attentionFocus);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -45,17 +73,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     SimpleWorld world;
     world.initialize(16, 16);
     
-    // Create agent
+    // Create agent with enhanced configuration
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
+    agent.enableRewardModulation(config.enableCheckpointing);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableNoveltyDetection);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Run simulation with enhanced parameters
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
@@ -78,27 +106,29 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
+        totalReward += reward * config.rewardScale;
         
         // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        agent.applyRewardModulation(reward * config.rewardScale, 0.0f);
         
         // Update development
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            agent.updateDevelopment(config.criticalPeriodDuration * config.maturationRate);
         }
         
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Log progress every 1000 steps with enhanced info
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                            brain->getWorkingMemory()->getActiveTraces() : 0) +
+                        " | Novelty: " + std::to_string(agent.getNoveltyLevel()) +
+                        " | Curiosity: " + std::to_string(agent.getCuriosityLevel()));
         }
     }
     
@@ -125,11 +155,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing with enhanced path
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
         if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
+            NLM_LOG_INFO("Checkpoint saved successfully to: " + config.checkpointPath);
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);

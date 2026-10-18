@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -121,7 +121,7 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (Phase 6 demo - comprehensive integration)
 add_executable(nlm
     src/main.cpp
 )
@@ -139,12 +139,51 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Python integration demo executable
+add_executable(nlm_python_demo
+    src/experiments/PythonIntegrationDemo.cpp
+)
+target_link_libraries(nlm_python_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Core brain tests
+add_executable(test_brain
+    tests/test_types.cpp
+    tests/test_main.cpp
+    tests/test_synapse.cpp
+    tests/test_stdp.cpp
+    tests/test_random.cpp
+    tests/test_neuron.cpp
+    tests/test_config.cpp
+    tests/test_clock.cpp
+    tests/test_brain.cpp
+)
+target_link_libraries(test_brain PUBLIC nlm_core)
+
+# Phase 6 integration tests
+add_executable(test_phase6_integration
+    tests/test_phase6_integration.cpp
+)
+target_link_libraries(test_phase6_integration PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Enable testing and add tests
 enable_testing()
-add_subdirectory(tests)
+add_test(NAME test_brain COMMAND test_brain)
+add_test(NAME test_phase6_integration COMMAND test_phase6_integration)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_python_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

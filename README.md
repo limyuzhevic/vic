@@ -64,13 +64,31 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Running
 
+### Phase 6 Demo (Integration Test)
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+./nlm_phase6_demo
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Other Demo Programs
+```bash
+# Phase 3: World interaction and agent behavior
+./nlm_phase3_demo
+
+# Phase 4: Advanced cognition and prediction
+./nlm_phase4_demo
+
+# Phase 5: Performance optimization and advanced features
+./nlm_phase5_demo
+
+# Phase 6: Comprehensive integration (same as nlm_phase6_demo)
+./nlm
+
+# Python integration demo (shows Python bindings usage)
+./nlm_python_demo
 ```
 
 ## Running
@@ -81,6 +99,26 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Other Demo Programs
+The NLM project includes several demo programs showcasing different aspects:
+
+- **nlm**: The main executable demonstrates Phase 6 integration with a user-friendly interface
+- **nlm_phase3_demo**: Demonstrates world interaction and agent behavior
+- **nlm_phase4_demo**: Shows advanced cognition and prediction systems
+- **nlm_phase5_demo**: Demonstrates performance optimizations and advanced features
+- **nlm_python_demo**: Shows Python bindings usage for programmatic access
+
+### Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+After building, you can run any of the demo programs listed above.
 
 ## Project Structure
 
