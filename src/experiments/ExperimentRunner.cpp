@@ -1,120 +1,83 @@
 #include "ExperimentRunner.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+#include <iostream>
+#include <algorithm>
 
 namespace nlm {
 
-struct ExperimentRunner::Impl {
-    std::vector<std::shared_ptr<Experiment>> experiments;
-    uint64_t globalSeed;
-    
-    Impl() : globalSeed(42) {}
-};
-
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
-
-ExperimentRunner::~ExperimentRunner() = default;
-
-std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
-    auto exp = std::make_shared<Experiment>(name);
-    exp->setSeed(pImpl->globalSeed++);
-    pImpl->experiments.push_back(exp);
-    return exp;
+ExperimentRunner::ExperimentRunner(std::shared_ptr<Config> config)
+    : config_(config), verbose_(false) {
 }
 
-bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
-                                     std::shared_ptr<Brain> brain,
-                                     std::shared_ptr<Environment> environment,
-                                     SimulationStep maxSteps) {
-    if (!experiment || !brain || !environment) {
+bool ExperimentRunner::runExperiment(const std::string& experimentName) {
+    if (!brain_) {
+        NLM_LOG_ERROR("No brain available for experiment: " + experimentName);
         return false;
     }
     
-    experiment->setStartStep(0);
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Experiment: " + experimentName + " ===");
+    NLM_LOG_INFO("");
     
-    // Reset environment and brain
-    auto observation = environment->reset();
-    brain->receiveSensoryInput(*observation);
-    
-    // Run simulation loop
-    for (SimulationStep step = 0; step < maxSteps && !environment->isDone(); ++step) {
-        // Brain step
-        brain->step(step);
-        
-        // Record data
-        experiment->recordStep(
-            step,
-            brain->getTotalNeuronCount(),
-            brain->getTotalSynapseCount(),
-            brain->getFiringNeuronCount(),
-            brain->getAverageFiringRate()
-        );
-        
-        // Get action from brain
-        auto action = brain->produceAction();
-        
-        // Environment step
-        observation = environment->step(*action);
-        
-        // Send observation to brain
-        brain->receiveSensoryInput(*observation);
-        
-        // Record reward
-        float reward = environment->getLastReward();
-        experiment->recordMetric("total_reward", 
-            experiment->getMetric("total_reward") + reward);
-    }
-    
-    experiment->setEndStep(maxSteps);
-    return true;
-}
-
-std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
-    const std::vector<std::shared_ptr<Experiment>>& experiments,
-    std::shared_ptr<Brain> brainTemplate,
-    std::shared_ptr<Environment> environmentTemplate,
-    SimulationStep maxSteps) {
-    
-    std::vector<std::shared_ptr<Experiment>> results;
-    
-    for (auto& exp : experiments) {
-        // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
-        brain->initialize();
-        
-        // Would also create fresh environment here
-        
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
-            results.push_back(exp);
+    try {
+        if (experimentName == "basic") {
+            runBasicConnectivityTest(brain_);
+            return true;
+        } else if (experimentName == "plasticity") {
+            runPlasticityExperiment(brain_);
+            return true;
+        } else if (experimentName == "stdp") {
+            runStdpVerification(brain_);
+            return true;
+        } else {
+            NLM_LOG_ERROR("Unknown experiment: " + experimentName);
+            return false;
         }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Experiment " + experimentName + " failed: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool ExperimentRunner::runAllExperiments() {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running All Experiments ===");
+    NLM_LOG_INFO("");
+    
+    bool allSuccess = true;
+    
+    // Run basic connectivity test
+    if (!runExperiment("basic")) {
+        allSuccess = false;
+        NLM_LOG_WARN("Basic connectivity test failed");
     }
     
-    return results;
-}
-
-const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
-    return pImpl->experiments;
-}
-
-std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
-    for (auto& exp : pImpl->experiments) {
-        if (exp->getName() == name) {
-            return exp;
-        }
+    // Reset brain between experiments
+    brain_->reset();
+    brain_->initialize();
+    
+    // Run plasticity experiment
+    if (!runExperiment("plasticity")) {
+        allSuccess = false;
+        NLM_LOG_WARN("Plasticity experiment failed");
     }
-    return nullptr;
+    
+    // Reset brain between experiments
+    brain_->reset();
+    brain_->initialize();
+    
+    // Run STDP verification
+    if (!runExperiment("stdp")) {
+        allSuccess = false;
+        NLM_LOG_WARN("STDP verification failed");
+    }
+    
+    return allSuccess;
 }
 
-void ExperimentRunner::clearExperiments() {
-    pImpl->experiments.clear();
-}
-
-void ExperimentRunner::setGlobalSeed(uint64_t seed) {
-    pImpl->globalSeed = seed;
-}
-
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+std::vector<std::string> ExperimentRunner::getAvailableExperiments() {
+    return {"basic", "plasticity", "stdp", "all"};
 }
 
 } // namespace nlm

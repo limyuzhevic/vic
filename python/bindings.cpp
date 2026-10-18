@@ -15,6 +15,12 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/core/CommandLineParser.hpp"
+#include "../src/core/ConfigManager.hpp"
+#include "../src/experiments/LearningExperiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
+#include "../src/tests/TestModules.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -262,6 +268,66 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    // Experiment Framework bindings
+    py::class_<LearningExperiment>(m, "LearningExperiment", R"pbdoc(Learning experiment class)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, uint64_t>(), py::arg("brain"), py::arg("seed"))
+        .def("recordInitialState", &LearningExperiment::recordInitialState)
+        .def("recordFinalState", &LearningExperiment::recordFinalState)
+        .def("computeStatistics", &LearningExperiment::computeStatistics)
+        .def("getInitialSynapseCount", &LearningExperiment::getInitialSynapseCount)
+        .def("getInitialWeights", &LearningExperiment::getInitialWeights)
+        .def("getFinalWeights", &LearningExperiment::getFinalWeights)
+        .def("getMostActiveNeurons", &LearningExperiment::getMostActiveNeurons)
+        .def("didLearningOccur", &LearningExperiment::didLearningOccur)
+        .def("getWeightChange", &LearningExperiment::getWeightChange)
+        .def("getStrengthenedSynapses", &LearningExperiment::getStrengthenedSynapses)
+        .def("getWeakenedSynapses", &LearningExperiment::getWeakenedSynapses)
+        .def("getUnchangedSynapses", &LearningExperiment::getUnchangedSynapses);
+
+    py::class_<ExperimentRunner>(m, "ExperimentRunner", R"pbdoc(Experiment runner for NLM)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("runExperiment", &ExperimentRunner::runExperiment, py::arg("experimentName"))
+        .def("runAllExperiments", &ExperimentRunner::runAllExperiments)
+        .def("getBrain", &ExperimentRunner::getBrain)
+        .def("setBrain", &ExperimentRunner::setBrain);
+
+    // Command Line Parser bindings
+    py::class_<CommandLineParser>(m, "CommandLineParser", R"pbdoc(Command line argument parser)pbdoc")
+        .def(py::init<int, char**>(), py::arg("argc"), py::arg("argv"))
+        .def("getOption", &CommandLineParser::getOption, py::arg("flag"), py::arg("defaultValue") = "")
+        .def("hasOption", &CommandLineParser::hasOption, py::arg("flag"))
+        .def("printHelp", &CommandLineParser::printHelp)
+        .def("applyToConfig", &CommandLineParser::applyToConfig, py::arg("config"));
+
+    // Configuration Manager bindings
+    py::class_<ConfigManager>(m, "ConfigManager", R"pbdoc(Configuration manager for runtime configuration)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("loadConfigFromFile", &ConfigManager::loadConfigFromFile, py::arg("filename"))
+        .def("saveConfigToFile", &ConfigManager::saveConfigToFile, py::arg("filename"))
+        .def("setConfigValue", &ConfigManager::setConfigValue, py::arg("key"), py::arg("value"))
+        .def("getConfigValue", &ConfigManager::getConfigValue, py::arg("key"), py::arg("defaultValue") = "")
+        .def("hasConfig", &ConfigManager::hasConfig, py::arg("key"))
+        .def("removeConfig", &ConfigManager::removeConfig, py::arg("key"))
+        .def("clearConfig", &ConfigManager::clearConfig)
+        .def("getConfigKeys", &ConfigManager::getConfigKeys)
+        .def("getConfigHistory", &ConfigManager::getConfigHistory)
+        .def("setHistorySize", &ConfigManager::setHistorySize, py::arg("size"));
+
+    // Visualization Interface bindings
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface for NLM)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, OutputFormat>(), py::arg("brain"), py::arg("format"))
+        .def("setDimensions", &VisualizationInterface::setDimensions, py::arg("width"), py::arg("height"))
+        .def("setOutputFormat", &VisualizationInterface::setOutputFormat, py::arg("format"))
+        .def("renderBrainState", &VisualizationInterface::renderBrainState);
+
+    // Test modules bindings (for testing)
+    m.def("runBasicConnectivityTest", &runBasicConnectivityTest, py::arg("brain"),
+          "Run basic connectivity test");
+    m.def("runPlasticityExperiment", &runPlasticityExperiment, py::arg("brain"),
+          "Run plasticity learning experiment");
+    m.def("runStdpVerification", &runStdpVerification, py::arg("brain"),
+          "Run STDP verification test");
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())

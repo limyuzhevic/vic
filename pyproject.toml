@@ -5,17 +5,18 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) enhanced neural simulation framework"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "artificial", "intelligence"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,6 +26,9 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Machine Learning",
+    "Topic :: Scientific/Engineering :: Computational Neuroscience",
+    "Framework :: Pytest",
 ]
 
 dependencies = []
@@ -33,12 +37,38 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.5",
+    "jupyter>=1.0",
+    "pandas>=1.3",
+    "scipy>=1.7",
+]
+experimental = [
+    "torch>=1.9",
+    "tensorflow>=2.8",
+    "jax>=0.3",
+    "optuna>=2.10",
+    "hyperopt>=0.2",
+]
+testing = [
+    "pytest>=7.0",
+    "pytest-cov>=3.0",
+    "coverage>=6.0",
+    "mock>=4.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Reports" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
+"Twitter" = "https://twitter.com/nlm_project"
+
+[project.scripts]
+nlm-cli = "pynlm.cli:main"
+config-manager = "pynlm.config_tools:main"
+experiment-runner = "pynlm.experiment_tools:main"
+visualize = "pynlm.visualization:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +77,70 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_EXPERIMENTS=ON",
+    "-DNLM_ENABLE_VIZUALIZATION=ON",
+    "-DNLM_ENABLE_CONFIG_MANAGER=ON",
+    "-DNLM_ENABLE_COMMAND_LINE_PARSER=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_ALL_EXPERIMENTS = ON
+NLM_ENABLE_ADVANCED_PLOTTING = ON
+NLM_ENABLE_MACHINE_LEARNING = ON
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short -x"
+markers = [
+    "slow: marks tests as slow (deselect with '-m "not slow"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "experiment: marks tests as experiment tests",
+    "visualization: marks tests as visualization tests",
+]
+
+[tool.coverage.run]
+source = ["pynlm"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+known_first_party = ["pynlm"]
+known_third_party = ["pybind11", "numpy", "matplotlib"]

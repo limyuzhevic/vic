@@ -1,53 +1,37 @@
 #pragma once
 
-#include "Experiment.hpp"
-#include "../brain/Brain.hpp"
-#include "../environment/Environment.hpp"
+#include "core/CommandLineParser.hpp"
+#include "experiments/LearningExperiment.hpp"
+#include "tests/TestModules.hpp"
 #include <memory>
-#include <vector>
+#include <iostream>
+#include <fstream>
 
 namespace nlm {
 
-// ExperimentRunner: Runs experiments and collects data
 class ExperimentRunner {
 public:
-    ExperimentRunner();
-    ~ExperimentRunner();
+    ExperimentRunner(std::shared_ptr<Config> config);
     
-    // Create new experiment
-    std::shared_ptr<Experiment> createExperiment(const std::string& name);
+    // Run specific experiment by name
+    bool runExperiment(const std::string& experimentName);
     
-    // Run single experiment
-    bool runExperiment(std::shared_ptr<Experiment> experiment,
-                      std::shared_ptr<Brain> brain,
-                      std::shared_ptr<Environment> environment,
-                      SimulationStep maxSteps);
+    // Run all experiments
+    bool runAllExperiments();
     
-    // Run batch of experiments
-    std::vector<std::shared_ptr<Experiment>> runBatch(
-        const std::vector<std::shared_ptr<Experiment>>& experiments,
-        std::shared_ptr<Brain> brainTemplate,
-        std::shared_ptr<Environment> environmentTemplate,
-        SimulationStep maxSteps);
+    // Get available experiment names
+    static std::vector<std::string> getAvailableExperiments();
     
-    // Get all experiments
-    const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
+    // Set brain for experiments
+    void setBrain(std::shared_ptr<Brain> brain) { brain_ = brain; }
     
-    // Get experiment by name
-    std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
-    
-    // Clear all experiments
-    void clearExperiments();
-    
-    // Set random seed for reproducibility
-    void setGlobalSeed(uint64_t seed);
-    
-    // Save experiment results
-    bool saveResults(const std::string& filepath) const;
+    // Get brain reference
+    std::shared_ptr<Brain> getBrain() const { return brain_; }
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    std::shared_ptr<Config> config_;
+    std::shared_ptr<Brain> brain_;
+    bool verbose_;
 };
 
 } // namespace nlm
