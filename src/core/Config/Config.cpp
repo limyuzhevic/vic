@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -41,18 +42,49 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+            // Convert string to ConfigValue using helper function
+            ConfigValue configValue = stringToConfigValue(value);
+            set(key, configValue, ConfigSource::File);
         }
     }
     
     return true;
+}
+
+// Helper function to parse string to ConfigValue
+static ConfigValue stringToConfigValue(const std::string& str) {
+    // Try to parse as boolean
+    if (str == "true" || str == "false") {
+        return str == "true";
+    }
+    
+    // Try to parse as integer
+    try {
+        size_t pos;
+        long long int_val = std::stoll(str, &pos);
+        if (pos == str.size()) {
+            return int_val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double double_val = std::stod(str, &pos);
+        if (pos == str.size()) {
+            return double_val;
+        }
+    } catch (...) {}
+    
+    // Return as string (remove any surrounding quotes)
+    std::string result = str;
+    if (result.size() >= 2 && 
+        ((result.front() == '"' && result.back() == '"') ||
+         (result.front() == '\'' && result.back() == '\''))) {
+        result = result.substr(1, result.size() - 2);
+    }
+    
+    return result;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,6 +110,42 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+// Helper function to parse string to ConfigValue
+static ConfigValue stringToConfigValue(const std::string& str) {
+    // Try to parse as boolean
+    if (str == "true" || str == "false") {
+        return str == "true";
+    }
+    
+    // Try to parse as integer
+    try {
+        size_t pos;
+        long long int_val = std::stoll(str, &pos);
+        if (pos == str.size()) {
+            return int_val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double double_val = std::stod(str, &pos);
+        if (pos == str.size()) {
+            return double_val;
+        }
+    } catch (...) {}
+    
+    // Return as string (remove any surrounding quotes)
+    std::string result = str;
+    if (result.size() >= 2 && 
+        ((result.front() == '"' && result.back() == '"') ||
+         (result.front() == '\'' && result.back() == '\''))) {
+        result = result.substr(1, result.size() - 2);
+    }
+    
+    return result;
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +154,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << configValueToString(entry.value) << "\n";
     }
     
     return true;
@@ -199,17 +267,68 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <iomanip>
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+namespace nlm {
 
-} // namespace nlm
+// Helper function to convert ConfigValue to string representation
+static std::string configValueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Use consistent formatting for doubles
+            oss << std::fixed << std::setprecision(6) << arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << std::fixed << std::setprecision(6) << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            // For int and int64_t
+            oss << arg;
+        }
+    }, value);
+    
+    return oss.str();
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << configValueToString(entry.value) << "\n";
+    }
+    
+    return true;
+}
