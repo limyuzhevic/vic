@@ -299,4 +299,64 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+// Getters for neuron state
+    NeuronId getId() const {
+        return pImpl->id;
+    }
+    
+    NeuronType getType() const {
+        return pImpl->type;
+    }
+    
+    bool isFiring() const {
+        return pImpl->state.firingState == FiringState::Active;
+    }
+    
+    bool isRefractory() const {
+        return pImpl->state.refractoryRemaining > 0;
+    }
+    
+    FiringRate getFiringRate() const {
+        return pImpl->state.firingRate;
+    }
+    
+    MembranePotential getTotalCurrent() const {
+        return pImpl->totalCurrent;
+    }
+    
+    const std::vector<Timestamp>& getSpikeHistory() const {
+        return pImpl->spikeHistory;
+    }
+    
+    const std::vector<SynapseHandle>& getIncomingSynapses() const {
+        return pImpl->incomingSynapses;
+    }
+    
+    const std::vector<SynapseHandle>& getOutgoingSynapses() const {
+        return pImpl->outgoingSynapses;
+    }
+    
+    const NeuronState& getState() const {
+        return pImpl->state;
+    }
+    
+    // LIF parameter getters
+    MembranePotential getMembranePotential() const {
+        return pImpl->state.membranePotential;
+    }
+    
+    MembranePotential getThreshold() const {
+        return pImpl->state.threshold;
+    }
+    
+    MembranePotential getRestingPotential() const {
+        return pImpl->state.restingPotential;
+    }
+    
+    MembranePotential getResetPotential() const {
+        return pImpl->state.resetPotential;
+    }
+    
+    uint32_t getRefractoryPeriod() const {
+        return pImpl->state.refractoryPeriod;
+    }
