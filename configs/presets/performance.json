@@ -1,0 +1,33 @@
+{
+  "name": "performance",
+  "description": "Performance-optimized configuration for speed with reduced logging",
+  "parameters": {
+    "log_level": "WARN",
+    "log_to_file": false,
+    "max_simulation_steps": 1000,
+    "enable_validation": false,
+    "parallel_threads": 8,
+    "enable_simd": true,
+    "enable_avx2": true,
+    "enable_avx512": true,
+    "enable_memory_pool": true,
+    "memory_pool_size": 1000000,
+    "neuron_count": 200,
+    "stdp_ltp_weight": 0.005,
+    "stdp_ltd_weight": 0.006,
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001,
+    "enable_performance_monitoring": true,
+    "performance_sample_rate": 0.05,
+    "enable_memory_monitoring": false,
+    "enable_cpu_monitoring": true,
+    "enable_custom_metrics": false,
+    "record_neurons": false,
+    "record_synapses": false,
+    "record_memories": false,
+    "record_modulators": false,
+    "compute_metrics": false,
+    "track_rewards": false,
+    "track_errors": false
+  }
+}

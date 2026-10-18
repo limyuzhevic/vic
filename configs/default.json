@@ -1,0 +1,31 @@
+# NLM JSON Configuration File
+# JSON format configuration for the NLM brain simulation
+
+{
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 500,
+    "region_count": 1,
+    "connection_probability": 0.15,
+    
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.015,
+    "stdp_tau": 20.0,
+    
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001,
+    
+    "log_level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0,
+    
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10
+}

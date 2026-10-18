@@ -82,6 +82,301 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Enhanced Command-Line Interface
+```bash
+./nlm  # Main NLM executable with enhanced CLI features
+./nlm-cli  # Advanced CLI tool for NLM management
+```
+
+The enhanced CLI provides powerful tools for:
+- **Configuration Management**: JSON/YAML configs, validation, and merging
+- **Experiment Management**: Batch execution, cloning, and result comparison
+- **Brain Management**: State saving/loading, visualization, and analysis
+- **Performance Profiling**: CPU, memory, I/O profiling and analysis
+- **Real-time Monitoring**: Live system monitoring and visualization
+- **Advanced Debugging**: Breakpoints, inspection, and code navigation
+
+### Configuration Files
+
+#### Traditional Config (.cfg)
+```bash
+./nlm --config configs/default.cfg
+```
+
+#### JSON Config (Recommended)
+```bash
+./nlm --json-config configs/default.json
+```
+
+#### CLI Presets
+```bash
+./nlm --preset research  # Research environment with detailed logging
+./nlm --preset performance  # Performance-optimized with reduced logging
+./nlm --preset debug  # Debug environment with maximum verbosity
+./nlm --preset production  # Production environment with validation
+```
+
+### Advanced Usage Examples
+
+#### Configuration Management
+```bash
+# Validate configuration
+./nlm-cli config-validate configs/my_config.json
+
+# Merge multiple configurations
+./nlm-cli config-merge configs/*.json merged_config.json
+
+# Show available presets
+./nlm-cli config-list --presets
+```
+
+#### Experiment Management
+```bash
+# Run experiment with configuration
+./nlm-cli exp-run --experiment learning --config configs/experiment.json
+
+# Compare experiment results
+./nlm-cli exp-compare results/experiment1.json results/experiment2.json
+
+# List available experiments
+./nlm-cli exp-list
+```
+
+#### Brain Management
+```bash
+# Show brain configuration
+./nlm-cli brain-info
+
+# Save brain state
+./nlm-cli brain-save brain_state.json
+
+# Load brain state
+./nlm-cli brain-load saved_state.json
+```
+
+#### Performance Analysis
+```bash
+# Profile CPU performance
+./nlm-cli profile-cpu --program nlm_phase6_demo --output cpu_profile.txt
+
+# Memory leak detection
+./nlm-cli profile-memory --program nlm_phase6_demo --detect-leaks --output memory_profile.txt
+
+# System monitoring
+./nlm-cli monitor-system --interval 1.0 --output system_monitor.log
+```
+
+#### Visualization
+```bash
+# Visualize neuron activity
+./nlm-cli viz-neuron --brain brain_state.json --neuron 42 --output neuron_viz.png
+
+# Visualize network connectivity
+./nlm-cli viz-network --brain brain_state.json --type adjacency --output network.png
+
+# Real-time monitoring
+./nlm-cli live-monitor --backend web --port 8080 --host 0.0.0.0
+```
+
+## Enhanced Features
+
+The NLM project now includes comprehensive enhancements:
+
+### 🔧 Configuration System
+- **JSON Support**: Native JSON configuration file support
+- **Schema Validation**: Configuration validation against JSON schemas
+- **Smart Loading**: Automatic file format detection (.json vs .cfg)
+- **Advanced Presets**: Pre-configured settings for research, performance, debug, and production
+
+### 🚀 Command-Line Interface
+- **Comprehensive CLI**: 60+ commands organized into logical categories
+- **Enhanced Argument Parsing**: Modern argument parsing with type-safe value conversion
+- **Backward Compatibility**: All existing functionality preserved
+- **Powerful Tools**: Configuration, experiment, brain, visualization, and analysis tools
+
+### 🧠 Experiment System
+- **Brain Cloning**: Multiple cloning modes (DEEP, SHALLOW, CHECKPOINT, THREAD_SAFE)
+- **Batch Management**: Advanced batch experiment execution with progress tracking
+- **Result Management**: Comprehensive experiment result aggregation and comparison
+- **Checkpointing**: Persistent checkpoint-based experiment management
+
+### 📊 Visualization & Monitoring
+- **Multi-backend Support**: Console, GUI, and web-based visualization
+- **Real-time Monitoring**: Live system and brain monitoring
+- **Advanced Visualization**: Neuron, network, dynamics, and experiment visualization
+- **Performance Monitoring**: System-wide and brain-specific monitoring
+
+### 🔍 Profiling & Debugging
+- **Comprehensive Profiling**: CPU, memory, I/O, and time profiling
+- **Advanced Debugging**: Breakpoints, inspection, and code navigation
+- **Performance Analysis**: Performance profiling and optimization tools
+- **Health Monitoring**: System health checks and validation
+
+### 📚 Documentation
+- **Complete API Documentation**: Header files with comprehensive comments
+- **User Guides**: Step-by-step tutorials and examples
+- **Technical Reference**: Detailed API specifications
+- **Best Practices**: Guidelines for effective usage
+
+## Project Structure (Enhanced)
+
+```
+NLM/
+├── src/
+│   ├── core/           # Core utilities (includes enhanced CLI, config, profiling)
+│   ├── brain/          # Neural components (integrated)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/ # Neuromodulators (integrated)
+│   ├── memory/         # Memory systems (integrated)
+│   ├── prediction/      # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
+│   ├── motor/          # Motor system
+│   ├── environment/    # Environment interface
+│   ├── experiments/    # Experiment framework (Phase 6) + enhanced cloning
+│   ├── visualization/   # Visualization framework
+│   └── profiling/       # Profiling and debugging framework
+├── tools/              # Command-line interface tools
+├── configs/            # Configuration files
+├── src/                # Source files (as listed above)
+├── tests/              # Test suite (extensive unit and integration tests)
+└── CMakeLists.txt      # Build configuration
+```
+
+## Building
+
+### Standard Build
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Build with All Features
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_ALL_TOOLS=ON
+make -j4
+```
+
+### Building Tests
+```bash
+mkdir build
+cd build
+cmake .. -DBUILD_TESTS=ON
+make
+ctest
+```
+
+## Testing
+
+The project includes comprehensive testing:
+
+### Unit Tests
+- **Configuration Tests**: JSON/YAML parsing and validation
+- **CLI Tests**: Command-line argument parsing
+- **Brain Tests**: Neuron, synapse, and brain functionality
+- **Experiment Tests**: Experiment cloning and result management
+- **Performance Tests**: Profiling and optimization
+
+### Integration Tests
+- **Full System Tests**: Complete brain simulation and experiment execution
+- **Cross-platform Tests**: Compatibility across different platforms
+- **Performance Tests**: Performance validation and optimization
+- **Regression Tests**: Regression testing for feature changes
+
+### Test Commands
+```bash
+# Run all tests
+./nlm_test
+
+# Run specific test categories
+./nlm_test --category config
+./nlm_test --category cli
+./nlm_test --category brain
+./nlm_test --category experiments
+```
+
+## Performance Optimizations
+
+### Runtime Performance
+- **Memory Management**: Optimized memory pools and event queues
+- **Parallel Processing**: SIMD vectorization and parallel execution
+- **Cache Efficiency**: Optimized data access patterns
+- **Checkpointing**: Efficient checkpoint save/load mechanisms
+
+### Tool Performance
+- **Fast Parsing**: Efficient JSON/YAML parsing
+- **Real-time Monitoring**: Low-overhead monitoring capabilities
+- **Scalable Tools**: Tools optimized for large-scale experiments
+
+## Security & Safety
+
+### Safe Programming Practices
+- **Memory Safety**: Bounds checking and safe memory management
+- **Thread Safety**: Thread-safe operations for concurrent execution
+- **Input Validation**: Comprehensive input validation
+- **Error Handling**: Graceful error recovery and informative error messages
+
+### Security Features
+- **File System Security**: Safe file operations and access control
+- **Memory Protection**: Memory corruption prevention
+- **Access Control**: Role-based access control for sensitive operations
+- **Audit Logging**: Comprehensive audit logging for security monitoring
+
+## Future Enhancements
+
+### Phase 8: Advanced AI Integration (Planned)
+- **Neural Architecture Search**: Automated neural network design
+- **Transfer Learning**: Knowledge transfer between experiments
+- **Meta-Learning**: Learning how to learn
+- **Continual Learning**: Lifelong learning capabilities
+
+### Phase 9: Quantum Computing Integration (Planned)
+- **Quantum Neurons**: Quantum-inspired neural computation
+- **Quantum Entanglement**: Quantum entanglement in neural networks
+- **Quantum Annealing**: Quantum optimization for neural learning
+
+### Phase 10: Consciousness Research (Planned)
+- **Subjective Experience**: Computational models of consciousness
+- **Qualia Representation**: Representation of subjective experiences
+- **Self-Awareness**: Self-modeling and meta-cognition
+
+## Support & Community
+
+### Documentation
+- **Documentation**: Complete API documentation and user guides
+- **Tutorials**: Step-by-step tutorials for all features
+- **Examples**: Working examples for common use cases
+- **FAQ**: Frequently asked questions and solutions
+
+### Community Resources
+- **GitHub**: Source code and contribution guidelines
+- **Issues**: Bug reports and feature requests
+- **Discussions**: Community discussions and technical support
+- **Slack/Discord**: Real-time technical support
+
+### Contact
+- **Email**: support@nlm-project.org
+- **Website**: https://nlm.readthedocs.io
+- **GitHub**: https://github.com/nlm-project/nlm
+
+## License
+
+MIT License - See LICENSE file for details.
+
+---
+
+*Enhanced NLM Project - Phase 6 Integration with Advanced AI Features*
+
+This project represents the final integration phase of the Neural Learning Machine, featuring comprehensive configuration management, advanced command-line interfaces, powerful experiment management, detailed visualization and monitoring capabilities, and sophisticated profiling and debugging tools.
+
+The enhanced system provides researchers and developers with a complete toolkit for exploring artificial neural systems, conducting large-scale experiments, and analyzing complex neural behaviors.
+
 ## Project Structure
 
 ```

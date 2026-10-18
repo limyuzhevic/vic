@@ -8,6 +8,7 @@
 // - Structural plasticity (synaptogenesis/pruning)
 
 #include "core/Config/Config.hpp"
+#include "core/ArgumentParser.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -18,6 +19,19 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+
+// CLI integration
+#include "src/cli/CLIEngine.hpp"
+#include "src/cli/HelpSystem.hpp"
+#include "src/tools/config_info_tool.hpp"
+#include "src/tools/experiment_info_tool.hpp"
+#include "src/tools/brain_tool.hpp"
+#include "src/tools/world_tool.hpp"
+#include "src/tools/analysis_tool.hpp"
+#include "src/tools/utility_tool.hpp"
+#include "src/tools/visualization_tool.hpp"
+#include "src/tools/development_tool.hpp"
+#include "src/tools/advanced_tool.hpp"
 
 #include <iostream>
 #include <memory>
@@ -322,6 +336,35 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check if CLI mode is requested (by checking for CLI-specific arguments)
+    bool isCLIMode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--cli" || arg == "--cli-mode" || 
+            arg.find("nlm-cli") != std::string::npos ||
+            arg == "config-info" || arg == "exp-info" ||
+            arg == "brain-info" || arg == "world-info" ||
+            arg == "analyze-" || arg == "viz-" ||
+            arg == "debug" || arg == "trace" || arg == "profile" ||
+            arg == "batch-exec" || arg == "parallel-exec") {
+            isCLIMode = true;
+            break;
+        }
+    }
+    
+    // If in CLI mode, delegate to CLI launcher
+    if (isCLIMode) {
+        #ifdef CLI_LAUNCHER_AVAILABLE
+        // Include CLI launcher
+        #include "src/main_cli.cpp"
+        return main_cli(argc, argv);
+        #else
+        std::cout << "Error: CLI launcher not available" << std::endl;
+        return 1;
+        #endif
+    }
+    
+    // Traditional NLM simulation mode
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -340,33 +383,57 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Create enhanced argument parser
+    auto parser = std::make_shared<ArgumentParser>();
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    // Parse command-line arguments
+    if (!parser->parse(argc, argv, *config)) {
+        std::cout << "Error parsing command-line arguments" << std::endl;
+        return 1;
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Handle special options
+    const auto& parsedOptions = parser->getParsedOptions();
+    
+    if (parsedOptions.count("--help")) {
+        parser->displayHelp();
+        return 0;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (parsedOptions.count("--version")) {
+        parser->displayVersion();
+        return 0;
+    }
     
-    // Set default values for Phase 2
+    if (parsedOptions.count("--list-configs")) {
+        std::cout << "Available configuration presets:" << std::endl;
+        std::cout << "  research: Detailed logging, validation enabled" << std::endl;
+        std::cout << "  performance: Optimized for speed, reduced logging" << std::endl;
+        std::cout << "  education: Simplified configuration, verbose output" << std::endl;
+        std::cout << "  debug: Maximum verbosity, all debugging enabled" << std::endl;
+        std::cout << "  production: Minimal output, validation enabled" << std::endl;
+        return 0;
+    }
+    
+    // Set verbosity based on parsed options
+    parser->setVerbose(parsedOptions.count("--verbose"));
+    parser->setQuiet(parsedOptions.count("--quiet"));
+    
+    if (parser->isVerbose()) {
+        NLM_LOG_INFO("Verbose logging enabled");
+    }
+    
+    if (parser->isQuiet()) {
+        NLM_LOG_INFO("Quiet mode enabled");
+    }
+    
+    if (parsedOptions.count("--show-config")) {
+        std::cout << "=== Current Configuration ===" << std::endl;
+        std::cout << config->summary() << std::endl;
+    }
+    
+    // Set default values for Phase 2 (these can be overridden by command line)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
