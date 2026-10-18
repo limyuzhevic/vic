@@ -22,6 +22,21 @@
 
 namespace nlm {
 
+/**
+ * Implementation details for the Brain class
+ * This struct contains all the private implementation details of the Brain,
+ * following the Pimpl idiom to hide implementation complexity from the interface.
+ * 
+ * The implementation includes:
+ * - Neural computation systems (Phase 2: LIF neurons, event-driven dynamics)
+ * - Integrated memory systems (Phase 6: working, episodic, associative memory)
+ * - Integrated prediction and cognition systems (Phase 6)
+ * - Neuromodulation systems (Phase 6: dopamine, curiosity, novelty, etc.)
+ * - Development system (Phase 6: developmental stages, plasticity modulation)
+ * - Plasticity rules (Phase 2: STDP, Hebbian, structural plasticity)
+ * - Checkpoint and replay systems (Phase 6)
+ */
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;

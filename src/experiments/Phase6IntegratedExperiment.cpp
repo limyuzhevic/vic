@@ -6,34 +6,87 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <ctime>
 
 namespace nlm {
+
+/**
+ * Phase 6 Integrated Experiment Implementation
+ * 
+ * This file implements the Phase 6 final integration test for the NLM brain.
+ * Phase 6 represents the final integration of all previous phases into a coherent
+ * artificial brain that can learn, adapt, and behave in a complex environment.
+ * 
+ * The integration test verifies that:
+ * 1. Memory systems are properly connected to neural processing
+ * 2. Neuromodulation systems affect plasticity and neural dynamics
+ * 3. Prediction systems are integrated with learning
+ * 4. Development systems modulate plasticity rates
+ * 5. Checkpoint systems can save and load brain state
+ * 6. Replay systems can reactivate important memories
+ * 
+ * This implementation follows the architecture described in the NLM README:
+ * - Brain class coordinates all systems
+ * - Memory systems (working, episodic, associative) store experiences
+ * - Neuromodulation systems (dopamine, curiosity, novelty) regulate learning
+ * - Prediction system guides behavior and learning
+ * - Development system shapes brain over lifetime
+ * - Checkpoint and replay systems enable persistence
+ */
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
+/**
+ * Run the complete Phase 6 integration experiment
+ * 
+ * This is the main function that runs the full Phase 6 integration test. It creates
+ * a complete brain simulation with all integrated systems and verifies that they
+ * work together as a coherent artificial brain.
+ * 
+ * The experiment follows the NLM brain loop architecture:
+ * WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE
+ * → MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION
+ * → MOTOR OUTPUT → WORLD CONSEQUENCE → REWARD/SURPRISE/ERROR
+ * → PLASTICITY → MEMORY/DEVELOPMENT → CHANGED BRAIN
+ * 
+ * @param config Configuration for the Phase 6 experiment
+ * @return Phase6IntegrationResult containing test results and metrics
+ */
+
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
+    // Start wall clock timing for performance measurement
     auto startWall = std::chrono::high_resolution_clock::now();
     
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create and configure brain with the specified settings
+    // This brain will have all Phase 6 systems integrated:
+    // - Memory systems (working, episodic, associative)
+    // - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+    // - Prediction and cognition systems (planner, concept formation, attention)
+    // - Development system
+    // - Plasticity rules (STDP, Hebbian, structural plasticity)
+    // - Checkpoint and replay systems
+    
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
     
-    // Create brain
+    // Configure plasticity parameters for learning
+    cfg->set("stdp_ltp_weight", 0.01f);     // Long-term potentiation strength
+    cfg->set("stdp_ltd_weight", 0.012f);    // Long-term depression strength
+    cfg->set("synaptogenesis_rate", 0.0001f);  // New synapse formation rate
+    cfg->set("pruning_rate", 0.00001f);    // Synapse elimination rate
+    
+    // Create the integrated brain
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
@@ -41,68 +94,72 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
+    // Create and initialize the environment (world)
+    // The world provides the external context in which the brain operates
     SimpleWorld world;
     world.initialize(16, 16);
     
-    // Create agent
+    // Create and initialize the agent
+    // The agent provides the interface between the brain and the world
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableRewardModulation(true);          // Enable reward modulation
+    agent.enableStructuralPlasticity(config.enableDevelopment);  // Enable structural plasticity
+    agent.enableDevelopment(config.enableDevelopment);  // Enable developmental plasticity
+    agent.enableCuriosity(true);                // Enable curiosity-driven exploration
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Initialize metrics collection
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
+    // Main simulation loop
+    // This implements the complete brain loop for the entire experiment duration
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get current sensory observation from the world
+        SensoryPercept percept = world.observe(brain->getRegions()[0].get());
         
-        // Process sensory input
+        // Process sensory input through the agent
         agent.processSensoryInput(percept);
         
-        // Brain step
+        // Step the brain forward in time
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command from the agent's planning system
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply the motor command to the world
+        world.applyAction(brain->getRegions()[0].get(), cmd);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward from the world based on the action
+        float reward = world.computeReward(brain->getRegions()[0].get());
         totalReward += reward;
         
-        // Apply reward modulation
+        // Apply reward modulation to the brain's plasticity
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
+        // Update developmental changes if enabled
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
         
-        // Collect metrics
+        // Collect metrics for analysis
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Log progress every 1000 steps for monitoring
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
     
-    // Collect final metrics
+    // Collect final metrics for the result
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
@@ -111,7 +168,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Verify that all systems are properly integrated
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
@@ -125,13 +182,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpoint save/load functionality
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
+            // Create a new brain and attempt to load the checkpoint
             auto brain2 = std::make_shared<Brain>(cfg);
             brain2->initialize();
             
@@ -143,9 +200,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
-        }
-    }
+        }\n    }
     
+    // Record end time and calculate wall clock duration
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
@@ -159,10 +216,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     return result;
 }
 
+/**
+ * Verify basic integration of all brain systems
+ * 
+ * This function creates a minimal brain configuration and verifies that all
+ * essential Phase 6 systems are properly initialized and connected.
+ * 
+ * @return true if all systems are integrated, false otherwise
+ */
+
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    // Create minimal brain
+    // Create minimal brain with just enough neurons to test integration
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
     cfg->set("region_count", 1);
@@ -246,6 +312,15 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     return success;
 }
 
+/**
+ * Test memory system integration
+ * 
+ * This function tests that memory systems are properly integrated with neural
+ * processing and can store and retrieve information during simulation.
+ * 
+ * @return true if memory integration test passes, false otherwise
+ */
+
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
@@ -255,7 +330,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get memory systems
+    // Get memory system pointers
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
@@ -264,7 +339,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
         return false;
     }
     
-    // Run some steps
+    // Run some steps to allow memory formation
     for (int i = 0; i < 100; ++i) {
         brain->step(i, i * 0.001);
     }
@@ -286,6 +361,15 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     return true;
 }
 
+/**
+ * Test neuromodulation integration
+ * 
+ * This function tests that neuromodulation systems are properly integrated and
+ * can modulate neural activity during simulation.
+ * 
+ * @return true if neuromodulation integration test passes, false otherwise
+ */
+
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
     
@@ -295,7 +379,7 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get neuromodulation systems
+    // Get neuromodulation system pointers
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
@@ -305,9 +389,9 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         return false;
     }
     
-    // Run some steps with sensory input
+    // Run some steps with sensory input to activate neuromodulation
     for (int i = 0; i < 50; ++i) {
-        // Inject some sensory activity
+        // Inject some sensory activity to trigger neuromodulation
         brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
         brain->step(i, i * 0.001);
     }
@@ -315,6 +399,15 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
     return true;
 }
+
+/**
+ * Test checkpoint save/load functionality
+ * 
+ * This function tests that the checkpoint system can save and load brain state,
+ * which is essential for persistence and long-term operation.
+ * 
+ * @return true if checkpoint test passes, false otherwise
+ */
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
@@ -326,7 +419,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     auto brain1 = std::make_shared<Brain>(cfg);
     brain1->initialize();
     
-    // Run some steps
+    // Run some steps to create neural activity
     for (int i = 0; i < 100; ++i) {
         brain1->step(i, i * 0.001);
     }
@@ -344,7 +437,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         return false;
     }
     
-    // Create new brain and load
+    // Create new brain and load checkpoint
     auto brain2 = std::make_shared<Brain>(cfg);
     brain2->initialize();
     
@@ -363,6 +456,15 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     return true;
 }
 
+/**
+ * Test replay system functionality
+ * 
+ * This function tests that the replay system can retrieve and replay stored
+ * episodic memories, which is important for memory consolidation.
+ * 
+ * @return true if replay test passes, false otherwise
+ */
+
 bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
@@ -378,7 +480,7 @@ bool Phase6IntegratedExperiment::testReplay() {
         return false;
     }
     
-    // Run some steps
+    // Run some steps to create episodes
     for (int i = 0; i < 200; ++i) {
         brain->step(i, i * 0.001);
     }
