@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
 
 namespace nlm {
 
@@ -675,10 +676,20 @@ float Brain::getExcitationInhibitionRatio() const {
         }
     }
     
-    if (totalInhibitory > 0.0f) {
+    // Prevent division by very small numbers and ensure numerical stability
+    const float epsilon = 1e-8f;
+    if (totalInhibitory > epsilon) {
         return totalExcitatory / totalInhibitory;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    
+    // Handle edge cases: no inhibition or negligible inhibition
+    if (totalInhibitory > 0.0f) {
+        // Very small inhibition - use a large but finite value
+        return totalExcitatory / epsilon;
+    }
+    
+    // No inhibition at all
+    return totalExcitatory > epsilon ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
@@ -1096,10 +1107,22 @@ void Brain::logStatus() const {
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
     }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory patterns: " + std::to_string(pImpl->associativeMemory->getPatternCount()));
+    }
     
-    // Neuromodulation status
+    // Neuromodulation status - all with null checks
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getError()));
     }
     
     // Development status

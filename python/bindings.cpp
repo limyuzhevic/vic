@@ -290,68 +290,71 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create a new brain with configuration")
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             "Initialize the brain with configuration. Returns True if successful.")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             "Perform a simulation step. currentStep must be >= 0.")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with timestamp. Both parameters must be valid.")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
-             "Inject sensory input into the brain")
+             "Inject sensory input into the brain. Input must not be null.")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
+             "Inject current into a specific neuron. Neuron ID must be valid, current must be within range.")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+             "Inject current into all neurons of a specific type. Neuron type must be valid.")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+             "Produce motor action based on neural activity. Returns an Action object.")
         .def("reset", &Brain::reset,
-             "Reset brain state")
+             "Reset brain state to initial conditions.")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to file. Returns True if successful, False if file write fails.")
         .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+             "Load brain state from file. Returns True if successful, False if file read fails or data is corrupted.")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+             "Add a new neural region with optional name. Returns RegionId of new region.")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
-             "Get a region by ID")
+             "Get a region by ID. Returns nullptr if region doesn't exist.")
         .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
+             "Get the number of regions. Returns non-negative integer.")
         .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
+             "Get all region IDs. Returns list of RegionId objects.")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
-             "Get all regions")
+             "Get all regions. Returns list of NeuralRegion objects.")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
+             "Get total neuron count across all regions. Returns non-negative integer.")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
+             "Get total synapse count across all regions. Returns non-negative integer.")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
+             "Get count of active neurons. Returns non-negative integer.")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
+             "Get count of currently firing neurons. Returns non-negative integer.")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
+             "Get average firing rate across all neurons. Returns float >= 0.0.")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
+             "Get excitation/inhibition balance ratio. Returns positive float or infinity.")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+             "Get total spike count across entire simulation. Returns non-negative integer.")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events. Returns non-negative integer.")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get current developmental stage. Returns DevelopmentalStage enum value.")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
-             "Set developmental stage")
+             "Set developmental stage. stage must be a valid DevelopmentalStage value.")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
+             "Get the configuration object.")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status to log file with comprehensive statistics and diagnostics.");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
