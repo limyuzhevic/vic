@@ -139,9 +139,17 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Integration test executable
+add_executable(nlm_integration_test
+    src/tests/IntegrationTest.cpp
+)
+target_link_libraries(nlm_integration_test PUBLIC nlm_core nlm_agent nlm_world)
+target_compile_features(nlm_integration_test PRIVATE cxx_std_20)
+
 # Testing
 enable_testing()
-add_subdirectory(tests)
+add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_integration_test COMMAND nlm_integration_test)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
