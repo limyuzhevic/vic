@@ -1079,6 +1079,7 @@ RandomGenerator* Brain::getRandomGenerator() {
 
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("Simulation step: " + std::to_string(pImpl->currentStep) + " (time: " + std::to_string(pImpl->currentTime) + "s)");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
@@ -1092,26 +1093,224 @@ void Brain::logStatus() const {
     // Memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_INFO("Working memory capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_INFO("Episodic memory max episodes: " + std::to_string(pImpl->episodicMemory->getMaxEpisodes()));
+        if (pImpl->episodicMemory->isReplayEnabled()) {
+            NLM_LOG_INFO("Episodic memory replay: ENABLED");
+        } else {
+            NLM_LOG_INFO("Episodic memory replay: DISABLED");
+        }
+    }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory associations: " + std::to_string(pImpl->associativeMemory->getAssociationCount()));
     }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        NLM_LOG_INFO("Dopamine plasticity factor: " + std::to_string(pImpl->dopamine->getPlasticityFactor()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error level: " + std::to_string(pImpl->predictionError->getLevel()));
     }
     
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    if (pImpl->developmentalStage == DevelopmentalStage::Initial) {
+        NLM_LOG_INFO("Development phase: INITIAL - High plasticity");
+    } else if (pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod) {
+        NLM_LOG_INFO("Development phase: CRITICAL PERIOD - Moderate plasticity");
+    } else if (pImpl->developmentalStage == DevelopmentalStage::Maturation) {
+        NLM_LOG_INFO("Development phase: MATURATION - Low plasticity");
+    } else if (pImpl->developmentalStage == DevelopmentalStage::Adult) {
+        NLM_LOG_INFO("Development phase: ADULT - Stable, minimal plasticity");
+    }
     
+    // Integration state
+    NLM_LOG_INFO("Integration state: RESTING = " + std::to_string(pImpl->isResting));
+    NLM_LOG_INFO("Steps since last episode: " + std::to_string(pImpl->stepsSinceLastEpisode));
+    NLM_LOG_INFO("Replay interval: " + std::to_string(pImpl->replayInterval) + " steps");
+    NLM_LOG_INFO("Consolidation interval: " + std::to_string(pImpl->consolidationInterval) + " steps");
+    
+    // Checkpoint system
+    if (pImpl->checkpointManager) {
+        // Note: CheckpointManager doesn't have public status methods
+        // This would need to be added to the CheckpointManager interface
+        NLM_LOG_INFO("Checkpoint system: CONFIGURED");
+    }
+    
+    // Performance metrics
+    NLM_LOG_INFO("Total spikes this step: " + std::to_string(pImpl->totalSpikesThisStep));
+    if (pImpl->totalSpikesTotal > 0) {
+        NLM_LOG_INFO("Lifetime spikes: " + std::to_string(pImpl->totalSpikesTotal));
+    }
+    
+    // Detailed region information
+    NLM_LOG_INFO("Region details:");
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                    " (" + region->getName() + "):");
+        NLM_LOG_INFO("    Neurons: " + std::to_string(region->getTotalNeuronCount()) + 
+                    ", Synapses: " + std::to_string(region->getSynapseCount()) +
+                    ", Active: " + std::to_string(region->getActiveNeuronCount()) +
+                    ", Firing: " + std::to_string(region->getFiringNeuronCount()));
+        NLM_LOG_INFO("    Average synaptic weight: " + std::to_string(region->getAverageSynapticWeight()));
+        
+        // Log population information
+        NLM_LOG_INFO("    Populations:");
+        for (const auto& pop : region->getPopulations()) {
+            NLM_LOG_INFO("      " + neuronTypeToString(pop->getNeuronType()) + 
+                         ": " + std::to_string(pop->getTotalNeuronCount()) + 
+                         " neurons, " + std::to_string(pop->getActiveNeuronCount()) + " active");
+        }
     }
+    
+    NLM_LOG_INFO("=== Performance Metrics ===");
+    
+    // Neural computation metrics
+    NLM_LOG_INFO("Neural computation metrics:");
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain.getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(brain.getActiveNeuronCount()) + "/" + 
+                    std::to_string(brain.getTotalNeuronCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain.getFiringNeuronCount()));
+    NLM_LOG_INFO("  E/I ratio: " + std::to_string(brain.getExcitationInhibitionRatio()));
+    
+    // Memory system metrics
+    NLM_LOG_INFO("Memory system metrics:");
+    if (brain.getWorkingMemory()) {
+        NLM_LOG_INFO("  Working memory active traces: " + std::to_string(brain.getWorkingMemory()->getActiveTraces()));
+        NLM_LOG_INFO("  Working memory capacity utilization: N/A");
+    }
+    if (brain.getEpisodicMemory()) {
+        NLM_LOG_INFO("  Episodic memory episodes: " + std::to_string(brain.getEpisodicMemory()->getEpisodeCount()));
+        NLM_LOG_INFO("  Episodic memory replay enabled: " + std::to_string(brain.getEpisodicMemory()->isReplayEnabled()));
+    }
+    if (brain.getAssociativeMemory()) {
+        NLM_LOG_INFO("  Associative memory associations: " + std::to_string(brain.getAssociativeMemory()->getAssociationCount()));
+    }
+    
+    // Neuromodulation metrics
+    NLM_LOG_INFO("Neuromodulation metrics:");
+    if (brain.getDopamine()) {
+        NLM_LOG_INFO("  Dopamine level: " + std::to_string(brain.getDopamine()->getLevel()));
+        NLM_LOG_INFO("  Dopamine plasticity factor: " + std::to_string(brain.getDopamine()->getPlasticityFactor()));
+    }
+    if (brain.getCuriosity()) {
+        NLM_LOG_INFO("  Curiosity level: " + std::to_string(brain.getCuriosity()->getLevel()));
+    }
+    if (brain.getNovelty()) {
+        NLM_LOG_INFO("  Novelty level: " + std::to_string(brain.getNovelty()->getLevel()));
+    }
+    
+    // Development metrics
+    NLM_LOG_INFO("Development metrics:");
+    NLM_LOG_INFO("  Current developmental stage: " + std::to_string(static_cast<int>(brain.getDevelopmentalStage())));
+    
+    // Plasticity metrics
+    NLM_LOG_INFO("Plasticity metrics:");
+    if (brain.getSTDP()) {
+        NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(brain.getSTDP()->getLTPWeight()));
+        NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(brain.getSTDP()->getLTDWeight()));
+        NLM_LOG_INFO("  STDP time constant: " + std::to_string(brain.getSTDP()->getTimeConstant()) + " ms");
+    }
+    
+void Brain::collectPerformanceMetrics() {
+    NLM_LOG_INFO("=== Performance Metrics Collection ===");
+    
+    // Neural computation metrics
+    NLM_LOG_INFO("Neural computation metrics:");
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(getActiveNeuronCount()) + "/" + 
+                    std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("  E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Memory system metrics
+    NLM_LOG_INFO("Memory system metrics:");
+    if (getWorkingMemory()) {
+        NLM_LOG_INFO("  Working memory active traces: " + std::to_string(getWorkingMemory()->getActiveTraces()));
+        NLM_LOG_INFO("  Working memory capacity utilization: N/A");
+    }
+    if (getEpisodicMemory()) {
+        NLM_LOG_INFO("  Episodic memory episodes: " + std::to_string(getEpisodicMemory()->getEpisodeCount()));
+        NLM_LOG_INFO("  Episodic memory replay enabled: " + std::to_string(getEpisodicMemory()->isReplayEnabled()));
+    }
+    if (getAssociativeMemory()) {
+        NLM_LOG_INFO("  Associative memory associations: " + std::to_string(getAssociativeMemory()->getAssociationCount()));
+    }
+    
+    // Neuromodulation metrics
+    NLM_LOG_INFO("Neuromodulation metrics:");
+    if (getDopamine()) {
+        NLM_LOG_INFO("  Dopamine level: " + std::to_string(getDopamine()->getLevel()));
+        NLM_LOG_INFO("  Dopamine plasticity factor: " + std::to_string(getDopamine()->getPlasticityFactor()));
+    }
+    if (getCuriosity()) {
+        NLM_LOG_INFO("  Curiosity level: " + std::to_string(getCuriosity()->getLevel()));
+    }
+    if (getNovelty()) {
+        NLM_LOG_INFO("  Novelty level: " + std::to_string(getNovelty()->getLevel()));
+    }
+    if (getPredictionErrorSignal()) {
+        NLM_LOG_INFO("  Prediction error level: " + std::to_string(getPredictionErrorSignal()->getLevel()));
+    }
+    
+    // Development metrics
+    NLM_LOG_INFO("Development metrics:");
+    NLM_LOG_INFO("  Current developmental stage: " + std::to_string(static_cast<int>(getDevelopmentalStage())));
+    
+    // Plasticity metrics
+    NLM_LOG_INFO("Plasticity metrics:");
+    if (getSTDP()) {
+        NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(getSTDP()->getLTPWeight()));
+        NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(getSTDP()->getLTDWeight()));
+        NLM_LOG_INFO("  STDP time constant: " + std::to_string(getSTDP()->getTimeConstant()) + " ms");
+    }
+    if (getHebbian()) {
+        NLM_LOG_INFO("  Hebbian learning rate: " + std::to_string(getHebbian()->getLearningRate()));
+    }
+    
+    // Simulation state metrics
+    NLM_LOG_INFO("Simulation state metrics:");
+    NLM_LOG_INFO("  Current step: " + std::to_string(pImpl->currentStep));
+    NLM_LOG_INFO("  Current time: " + std::to_string(pImpl->currentTime) + "s");
+    NLM_LOG_INFO("  Simulation timestep: " + std::to_string(pImpl->timestep) + "s");
+    NLM_LOG_INFO("  Total spikes so far: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("  Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
+    
+    // System resource metrics
+    NLM_LOG_INFO("System resource metrics:");
+    NLM_LOG_INFO("  Memory usage: N/A (placeholder - requires platform-specific implementation)");
+    NLM_LOG_INFO("  CPU usage: N/A (placeholder - requires platform-specific implementation)");
+    
+    // Integration state metrics
+    NLM_LOG_INFO("Integration state metrics:");
+    NLM_LOG_INFO("  Resting state: " + std::to_string(pImpl->isResting));
+    NLM_LOG_INFO("  Steps since last episode: " + std::to_string(pImpl->stepsSinceLastEpisode));
+    NLM_LOG_INFO("  Replay interval: " + std::to_string(pImpl->replayInterval) + " steps");
+    NLM_LOG_INFO("  Consolidation interval: " + std::to_string(pImpl->consolidationInterval) + " steps");
+    
+    NLM_LOG_INFO("=== End of Performance Metrics Collection ===");
 }
 
-} // namespace nlm
+// Helper function to convert NeuronType to string
+std::string neuronTypeToString(NeuronType type) {
+    switch (type) {
+        case NeuronType::Excitatory: return "Excitatory";
+        case NeuronType::Inhibitory: return "Inhibitory";
+        case NeuronType::Modulatory: return "Modulatory";
+        case NeuronType::Sensory: return "Sensory";
+        case NeuronType::Motor: return "Motor";
+        case NeuronType::Internal: return "Internal";
+        default: return "Unknown";
+    }
+}

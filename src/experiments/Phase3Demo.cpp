@@ -36,11 +36,17 @@ public:
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+            return;
+        }
         
         // Create agent brain interface
         AgentBrain agentBrain(brain);
-        agentBrain.initialize(world);
+        if (!agentBrain.initialize(world)) {
+            std::cerr << "ERROR: Failed to initialize agent brain!" << std::endl;
+            return;
+        }
         
         // Configure agent brain
         agentBrain.enableRewardModulation(true);

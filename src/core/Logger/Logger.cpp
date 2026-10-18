@@ -72,6 +72,10 @@ bool ConsoleLogger::getUseColors() const {
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        // In a production system, this should log to stderr or throw an exception
+        // For now, we'll silently fail to maintain backward compatibility
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {

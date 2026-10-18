@@ -193,6 +193,9 @@ public:
     // Logging
     void logStatus() const;
     
+    // Performance metrics
+    void collectPerformanceMetrics();
+    
 private:
     struct Impl;
     Impl* pImpl;

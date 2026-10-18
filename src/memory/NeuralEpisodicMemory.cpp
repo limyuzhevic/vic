@@ -328,6 +328,8 @@ struct NeuralAssociativeMemory::Impl {
 NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
+    , patternNeurons_()
+    , associations_()
 {
 }
 
