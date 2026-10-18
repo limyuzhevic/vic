@@ -58,6 +58,9 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
+    if (!pImpl) {
+        return nullptr;
+    }
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
@@ -65,6 +68,9 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
+    if (!pImpl) {
+        return nullptr;
+    }
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
@@ -103,6 +109,9 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
+    if (!pImpl) {
+        return nullptr;
+    }
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
@@ -112,6 +121,9 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
+    if (!pImpl) {
+        return nullptr;
+    }
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
@@ -129,6 +141,9 @@ const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
+    if (!pImpl) {
+        return {};
+    }
     std::vector<Synapse*> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
@@ -142,6 +157,9 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
+    if (!pImpl) {
+        return {};
+    }
     std::vector<Synapse*> result;
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {

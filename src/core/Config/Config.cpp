@@ -110,6 +110,7 @@ std::optional<T> Config::get(const std::string& key) const {
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    if (!pImpl) return defaultValue;
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }

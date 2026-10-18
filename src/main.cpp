@@ -30,7 +30,7 @@ using namespace nlm;
 
 void printBanner() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
+    ╔══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
@@ -44,7 +44,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -61,13 +61,20 @@ struct LearningExperiment {
         : brain(b), seed(s), initialSynapseCount(0) {}
     
     void recordInitialState() {
+        if (!brain) {
+            NLM_LOG_ERROR("Brain not initialized for experiment");
+            return;
+        }
+        
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -86,11 +93,15 @@ struct LearningExperiment {
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        if (brain && brain->getSpikeSystem()) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -158,6 +169,95 @@ struct LearningExperiment {
         }
     }
 };
+
+struct Args {
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool help = false;
+    bool version = false;
+    int runs = 1;
+    std::string outputFile = "";
+    bool validateOnly = false;
+    std::string logLevel = "info";
+    bool benchmark = false;
+    bool detailed = false;
+};
+
+Args parseArgs(int argc, char** argv) {
+    Args args;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            args.help = true;
+        } else if (arg == "--version") {
+            args.version = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--validate-only") {
+            args.validateOnly = true;
+        } else if (arg == "--benchmark") {
+            args.benchmark = true;
+        } else if (arg == "--detailed" || arg == "-d") {
+            args.detailed = true;
+        } else if (arg == "--runs" || arg == "-r") {
+            if (i + 1 < argc) {
+                args.runs = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--output" || arg == "-o") {
+            if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg == "--log-level" || arg == "--log") {
+            if (i + 1 < argc) {
+                args.logLevel = argv[++i];
+            }
+        } else if (arg.find("--config=") == 0) {
+            args.configFile = arg.substr(9);
+        } else if (arg.find("-c=") == 0) {
+            args.configFile = arg.substr(3);
+        } else if (arg.substr(0, 2) == "--" && arg.find('=') == std::string::npos) {
+            args.configFile = arg.substr(2);
+        } else if (arg.substr(0, 1) == "-" && arg.find('=') == std::string::npos) {
+            args.configFile = arg.substr(1);
+        } else {
+            // Unknown argument, treat as config file
+            args.configFile = arg;
+        }
+    }
+    return args;
+}
+
+void printHelp() {
+    std::cout << "NLM Phase 2 Neural Simulation - Command Line Interface\n";
+    std::cout << "\n";
+    std::cout << "Usage:\n";
+    std::cout << "  nlm_phase2 [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  -h, --help                    Show this help message\n";
+    std::cout << "  -v, --verbose                 Enable verbose output\n";
+    std::cout << "  -c, --config=FILE             Load configuration from file\n";
+    std::cout << "  -r, --runs=N                 Number of simulation runs (default: 1)\n";
+    std::cout << "  -o, --output=FILE             Output file for results\n";
+    std::cout << "  --validate-only               Only validate configuration, don't run simulation\n";
+    std::cout << "  --benchmark                   Run benchmark tests\n";
+    std::cout << "  -d, --detailed                Enable detailed logging\n";
+    std::cout << "  --log-level=LVL               Set log level (debug, info, warning, error)\n";
+    std::cout << "\n";
+    std::cout << "Examples:\n";
+    std::cout << "  nlm_phase2                    Run default simulation\n";
+    std::cout << "  nlm_phase2 --verbose          Run with verbose output\n";
+    std::cout << "  nlm_phase2 --config=mysim.cfg  Use custom configuration\n";
+    std::cout << "  nlm_phase2 --runs=5           Run 5 simulation iterations\n";
+    std::cout << "  nlm_phase2 --help             Show this help\n";
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 Neural Simulation Framework\n";
+    std::cout << "Version: 2.0.0\n";
+    std::cout << "Build: Phase 2 - Real Neural Computation\n";
+    std::cout << "Components: LIF neurons, STDP, Hebbian plasticity, structural plasticity\n";
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -324,13 +424,61 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    Args args = parseArgs(argc, argv);
+    
+    // Handle help and version
+    if (args.help) {
+        printHelp();
+        return 0;
+    }
+    
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Set log level based on argument
+    if (args.detailed) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (args.logLevel == "debug") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (args.logLevel == "warning") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (args.logLevel == "error") {
+        consoleLogger->setLevel(LogLevel::Error);
+    }
+    
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Set console colors if verbose
+    if (args.verbose) {
+        consoleLogger->setUseColors(true);
+    }
+    
+    if (args.verbose) {
+        NLM_LOG_INFO("=== NLM Phase 2 Demo Program ===");
+        NLM_LOG_INFO("Arguments: " + std::to_string(argc) + " parameters");
+        NLM_LOG_INFO("Config file: " + args.configFile);
+        NLM_LOG_INFO("Verbose mode: " + std::string(args.verbose ? "enabled" : "disabled"));
+        NLM_LOG_INFO("Runs: " + std::to_string(args.runs));
+        if (!args.outputFile.empty()) {
+            NLM_LOG_INFO("Output file: " + args.outputFile);
+        }
+    }
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger
+    auto globalLogger = std::make_shared<Logger>();
+    auto consoleLogger2 = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    globalLogger->addLogger(consoleLogger2);
+    Logger::setGlobal(globalLogger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");

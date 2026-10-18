@@ -732,11 +732,15 @@ void Brain::updatePlasticity() {
 
 void Brain::develop() {
     // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl && pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
+    
+    if (!pImpl) return;
     
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
@@ -746,10 +750,14 @@ void Brain::reset() {
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
-        region->reset();
+        if (region) {
+            region->reset();
+        }
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -762,6 +770,8 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
+    if (!pImpl) return false;
+    
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
@@ -789,18 +799,24 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+            if (region) {
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop) {
+                        for (const auto* neuron : pop->getNeurons()) {
+                            if (neuron) {
+                                const auto& state = neuron->getState();
+                                neuronData.membranePotential.push_back(state.membranePotential);
+                                neuronData.restingPotential.push_back(state.restingPotential);
+                                neuronData.threshold.push_back(state.threshold);
+                                neuronData.resetPotential.push_back(state.resetPotential);
+                                neuronData.leakConductance.push_back(state.leakConductance);
+                                neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                                neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+                                neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+                                neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -813,13 +829,17 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            if (region) {
+                for (const auto* syn : region->getSynapses()) {
+                    if (syn) {
+                        synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                        synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                        synapseData.weight.push_back(syn->getWeight());
+                        synapseData.delay.push_back(syn->getDelay());
+                        synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                        synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                    }
+                }
             }
         }
         

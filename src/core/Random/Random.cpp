@@ -39,6 +39,9 @@ uint64_t RandomGenerator::getSeed() const {
 }
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
@@ -50,6 +53,9 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
@@ -61,6 +67,9 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }
@@ -69,6 +78,9 @@ double RandomGenerator::uniformReal(double min, double max) {
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }
@@ -77,26 +89,41 @@ float RandomGenerator::uniformReal(float min, float max) {
 }
 
 double RandomGenerator::normal(double mean, double stddev) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     std::normal_distribution<double> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::normal(float mean, float stddev) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     std::normal_distribution<float> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 bool RandomGenerator::bernoulli(double p) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    if (!pImpl) {
+        throw std::runtime_error("RandomGenerator not properly initialized");
+    }
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }
