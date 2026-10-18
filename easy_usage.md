@@ -221,45 +221,65 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 4: Advanced Experiment Management
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
+# Create advanced configuration for research
+config = pynlm.createResearchConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
+world.setAgentStart(10, 10)
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable advanced features for research
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
 
-# Run agent
+print("Running advanced simulation with research configuration...")
+
+# Run simulation with advanced features
 for step in range(100):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Run brain
     brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Get action and apply
+    motor_cmd = agent.decodeMotorCommand()
+    world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = 0.0
+    if percept.getInternal():
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}: Firing neurons={brain.getFiringNeuronCount()}, "
+              f"Curiosity={agent.getCuriosityLevel():.3f}, "
+              f"Novelty={agent.getNoveltyLevel():.3f}")
 
-print("Agent simulation complete!")
+print("Advanced simulation completed!")
 ```
 
 ---
 
-## Quick Reference
-
-| What you want | Code |
-|--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
@@ -271,7 +291,95 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Features Quick Reference
+
+### New Configuration Functions
+
+| What you want | Code |
+|--------------|------|
+| Create quick config | `pynlm.createQuickConfig()` |
+| Create research config | `pynlm.createResearchConfig()` |
+| Create performance config | `pynlm.createPerformanceConfig()` |
+| Create development config | `pynlm.createDevelopmentConfig()` |
+| Create experiment config | `pynlm.createExperimentConfig("type")` |
+| Create config from dict | `pynlm.createConfigFromDict(dict)` |
+| Get examples | `pynlm.getExampleConfigurations()` |
+
+### New Experiment Types
+
+| Experiment Type | Description |
+|----------------|-------------|
+| `novelty_search` | Exploration and curiosity-driven behavior |
+| `reward_learning` | Reward-based learning experiments |
+| `social_learning` | Social and collaborative learning studies |
+| `developmental` | Developmental psychology studies |
+
+### New Simulation Functions
+
+| What you want | Code |
+|--------------|------|
+| Run quick demo | `pynlm.quickStartDemo()` |
+| Run complete loop | `pynlm.runSimulationLoop(brain, world, agent, steps)` |
+| Run controlled sim | `pynlm.runControlledSimulation(...)` |
+| Run multi-episode | `pynlm.runMultiStepExperiment(...)` |
+| Benchmark | `pynlm.benchmarkSimulation(brain, world, agent, steps)` |
+
+### New Analysis and State Management
+
+| What you want | Code |
+|--------------|------|
+| Analyze brain state | `pynlm.analyzeBrainState(brain)` |
+| Validate config | `pynlm.validateBrainConfiguration(config)` |
+| Export brain | `brain.save("filename.bin")` |
+| Import brain | `brain.load("filename.bin")` |
+| Export config | `config.saveToFile("filename.json")` |
+| Import config | `pynlm.importConfiguration("filename.json")` |
+
+### Convenience Functions
+
+| What you want | Code |
+|--------------|------|
+| Import config file | `pynlm.importConfiguration("file.json")` |
+| Export config file | `config.saveToFile("file.json")` |
+
+---
+
 ## Troubleshooting
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+**"My advanced features aren't working"**
+- Make sure you have the latest NLM version with Python bindings
+- Try the `pynlm.quickStartDemo()` to test everything
+- Check that all brain, world, and agent objects are properly initialized
+
+---
+
+## Next Steps
+
+When you're comfortable:
+1. Read `HOW_TO_USE.md` for more details
+2. Read `docs/ARCHITECTURE.md` to understand how it all works
+3. Experiment with different configurations!
+4. Try the new advanced experiment types
+5. Use benchmarking to optimize performance
+6. Leverage the new configuration management tools
+
+That's it! You're now ready to use NLM with all the new advanced features and commands!
+
+The enhanced NLM now provides powerful tools for researchers and advanced users, making it much easier to conduct sophisticated neural simulation experiments!
+
+```
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?

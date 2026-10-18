@@ -158,30 +158,180 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
-#### Creating a Simple World
+#### Configuration Management
 
 ```python
 import pynlm
 
-# Create a simple 2D world
+# Create a custom configuration using advanced tools
+config = pynlm.createResearchConfig()  # Pre-configured for research
+
+# Or create configuration from dictionary
+config_dict = {
+    "brain.neuron_count": 1000,
+    "brain.synapse_density": 0.12,
+    "plasticity.stdp.enable": True,
+    "neuromod.curiosity.enable": True
+}
+config = pynlm.createConfigFromDict(config_dict)
+
+# Export configuration
+config.saveToFile("my_research_config.json")
+
+# Import configuration from file
+imported_config = pynlm.importConfiguration("research_config.json")
+
+# Validate configuration
+if pynlm.validateBrainConfiguration(config):
+    print("Configuration is valid!")
+```
+
+#### Brain State Management
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation to generate brain state
+for step in range(100):
+    brain.step(step)
+
+# Export brain state for analysis
+brain.save("experiment_brain_state.bin")
+
+# Later, you can load and continue with saved state
+new_brain = pynlm.createBrain(pynlm.createDefaultConfig())
+new_brain.initialize()
+new_brain.load("experiment_brain_state.bin")
+```
+
+#### Advanced Experiment Management
+
+```python
+import pynlm
+
+# Create brain and agent components
+config = pynlm.createResearchConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
 world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+world.setAgentStart(7, 7)
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run advanced simulation
+brain, world, agent = pynlm.runSimulationLoop(
+    brain=agent.getBrain(),
+    world=world,
+    agent=agent,
+    numSteps=1000
 )
+```
 
-# Reset world to initial state
+#### Experiment-Specific Configurations
+
+```python
+import pynlm
+
+# Create configurations for different experiment types
+novelty_config = pynlm.createExperimentConfig("novelty_search")
+reward_config = pynlm.createExperimentConfig("reward_learning")
+social_config = pynlm.createExperimentConfig("social_learning")
+development_config = pynlm.createExperimentConfig("developmental")
+
+# Use experiment-specific configurations
+experiments = {
+    "novelty_search": novelty_config,
+    "reward_learning": reward_config,
+    "social_learning": social_config,
+    "developmental": development_config
+}
+
+for exp_name, exp_config in experiments.items():
+    print(f"Configured {exp_name} experiment")
+    # You would now create brain, world, and agent with exp_config
+```
+
+#### Analysis and Benchmarking
+
+```python
+import pynlm
+
+# Create components
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-# Run world update
-world.update(timestep=0.1)
+# Run simulation with analysis
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    agent.applyRewardModulation(0.0, 0.0)
+    agent.updateDevelopment(0.1)
+
+# Analyze brain state
+analysis = pynlm.analyzeBrainState(brain)
+print("Brain Analysis:")
+print(analysis)
+
+# Benchmark performance
+results = pynlm.benchmarkSimulation(brain, world, agent, 200)
+print(f"Performance: {results[1]:.1f} steps per second")
+```
+
+#### Multi-Episode Experiments
+
+```python
+import pynlm
+
+# Create components
+config = pynlm.createResearchConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=12, height=12, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run multi-episode experiment
+stats = pynlm.runMultiStepExperiment(
+    brain=brain,
+    world=world,
+    agent=agent,
+    numEpisodes=5,
+    stepsPerEpisode=50,
+    verbose=True
+)
+
+print("Experiment Results:")
+for episode, reward in stats:
+    print(f"Episode {episode}: Total Reward = {reward:.2f}")
 ```
 
 ### Complete Agent Example
