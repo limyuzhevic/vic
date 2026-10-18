@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
 
 namespace nlm {
 
@@ -26,6 +27,14 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    // Validation method
+    bool isValid() const {
+        if (level < LogLevel::Debug || level > LogLevel::Critical) return false;
+        if (message.empty() || message.length() > 10000) return false;
+        if (line < 0) return false;
+        return true;
+    }
 };
 
 // Logger interface
@@ -35,6 +44,9 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Validation helper
+    virtual bool validate(const LogEntry& entry) const { return true; }
 };
 
 // Console logger implementation
@@ -56,9 +68,14 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Validation methods
+    bool validate(const LogEntry& entry) const override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    void initialize();
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
@@ -107,6 +124,8 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    void initialize();
 };
 
 // Convenience macro for file/line/function info

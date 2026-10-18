@@ -1,6 +1,7 @@
 #include "NeuralRegion.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <numeric>
 
 namespace nlm {
 
@@ -11,9 +12,70 @@ struct NeuralRegion::Impl {
     std::vector<std::unique_ptr<Synapse>> synapses;
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
+    std::unordered_map<PopulationId, NeuralPopulation*> populationMap;     // fast population lookup
     SynapseId nextSynapseId;
     
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    // Performance optimization: cache statistics
+    mutable size_t cachedTotalNeuronCount;
+    mutable size_t cachedActiveNeuronCount;
+    mutable size_t cachedFiringNeuronCount;
+    mutable float cachedAverageFiringRate;
+    mutable float cachedAverageSynapticWeight;
+    mutable bool statisticsDirty;
+    
+    explicit Impl(RegionId id) : id(id), nextSynapseId(1),
+                                 cachedTotalNeuronCount(0),
+                                 cachedActiveNeuronCount(0),
+                                 cachedFiringNeuronCount(0),
+                                 cachedAverageFiringRate(0.0f),
+                                 cachedAverageSynapticWeight(0.0f),
+                                 statisticsDirty(true) {
+        // Initialize population map
+        populationMap.reserve(100);
+    }
+    
+    // Update population cache when populations change
+    void updatePopulationCache() {
+        populationMap.clear();
+        populationMap.reserve(populations.size());
+        for (auto& pop : populations) {
+            populationMap[pop->getId()] = pop.get();
+        }
+        statisticsDirty = true;
+    }
+    
+    // Update statistics cache
+    void updateStatistics() const {
+        if (!statisticsDirty) return;
+        
+        // Recalculate all statistics
+        cachedTotalNeuronCount = 0;
+        cachedActiveNeuronCount = 0;
+        cachedFiringNeuronCount = 0;
+        float sumFiringRates = 0.0f;
+        
+        for (const auto& pop : populations) {
+            cachedTotalNeuronCount += pop->getSize();
+            cachedActiveNeuronCount += pop->getActiveCount();
+            cachedFiringNeuronCount += pop->getFiringCount();
+            sumFiringRates += pop->getAverageFiringRate();
+        }
+        
+        cachedAverageFiringRate = populations.empty() ? 0.0f : sumFiringRates / populations.size();
+        
+        // Calculate average synaptic weight
+        if (synapses.empty()) {
+            cachedAverageSynapticWeight = 0.0f;
+        } else {
+            float sumWeights = 0.0f;
+            for (const auto& syn : synapses) {
+                sumWeights += syn->getWeight();
+            }
+            cachedAverageSynapticWeight = sumWeights / synapses.size();
+        }
+        
+        statisticsDirty = false;
+    }
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
@@ -54,6 +116,7 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
     pImpl->populations.push_back(std::move(population));
+    pImpl->updatePopulationCache();
     return popId;
 }
 
@@ -61,14 +124,40 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    
+    // Use optimized hash map lookup
+    auto it = pImpl->populationMap.find(id);
+    if (it != pImpl->populationMap.end()) {
+        return it->second;
+    }
+    
+    // Fallback to linear search (should not happen after cache update)
+    for (auto& pop : pImpl->populations) {
+        if (pop->getId() == id) {
+            return pop.get();
+        }
+    }
+    return nullptr;
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    
+    // Use optimized hash map lookup
+    auto it = pImpl->populationMap.find(id);
+    if (it != pImpl->populationMap.end()) {
+        return it->second;
+    }
+    
+    // Fallback to linear search (should not happen after cache update)
+    for (const auto& pop : pImpl->populations) {
+        if (pop->getId() == id) {
+            return pop.get();
+        }
+    }
+    return nullptr;
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -99,10 +188,12 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     pImpl->incomingSynapses[destination].push_back(synId);
     
     pImpl->synapses.push_back(std::move(synapse));
+    pImpl->statisticsDirty = true;  // Update statistics cache
     return synId;
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
+    // Optimized linear search with early exit
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
@@ -112,7 +203,8 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
+    // Optimized linear search with early exit
+    for (const auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
         }
@@ -155,49 +247,28 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
 }
 
 size_t NeuralRegion::getTotalNeuronCount() const {
-    size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getSize();
-    }
-    return total;
+    pImpl->updateStatistics();  // Update cache if needed
+    return pImpl->cachedTotalNeuronCount;
 }
 
 size_t NeuralRegion::getActiveNeuronCount() const {
-    size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getActiveCount();
-    }
-    return total;
+    pImpl->updateStatistics();  // Update cache if needed
+    return pImpl->cachedActiveNeuronCount;
 }
 
 size_t NeuralRegion::getFiringNeuronCount() const {
-    size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getFiringCount();
-    }
-    return total;
+    pImpl->updateStatistics();  // Update cache if needed
+    return pImpl->cachedFiringNeuronCount;
 }
 
 float NeuralRegion::getAverageFiringRate() const {
-    size_t popCount = pImpl->populations.size();
-    if (popCount == 0) return 0.0f;
-    
-    float sum = 0.0f;
-    for (const auto& pop : pImpl->populations) {
-        sum += pop->getAverageFiringRate();
-    }
-    return sum / static_cast<float>(popCount);
+    pImpl->updateStatistics();  // Update cache if needed
+    return pImpl->cachedAverageFiringRate;
 }
 
 float NeuralRegion::getAverageSynapticWeight() const {
-    if (pImpl->synapses.empty()) {
-        return 0.0f;
-    }
-    float sum = 0.0f;
-    for (const auto& syn : pImpl->synapses) {
-        sum += syn->getWeight();
-    }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    pImpl->updateStatistics();  // Update cache if needed
+    return pImpl->cachedAverageSynapticWeight;
 }
 
 float NeuralRegion::getSynapticDensity() const {
@@ -221,6 +292,8 @@ void NeuralRegion::step(Timestamp currentTime) {
     for (auto& syn : pImpl->synapses) {
         syn->step(currentTime);
     }
+    
+    pImpl->statisticsDirty = true;  // Mark statistics as dirty
 }
 
 void NeuralRegion::reset() {
@@ -230,6 +303,8 @@ void NeuralRegion::reset() {
     for (auto& syn : pImpl->synapses) {
         syn->reset();
     }
+    
+    pImpl->statisticsDirty = true;  // Mark statistics as dirty
 }
 
 void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
