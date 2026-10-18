@@ -397,24 +397,62 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+                .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Create a new config with default values
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, R"pbdoc(
+        Create a new configuration object with default values.
+        
+        Returns:
+            Config: A new configuration object.
+    )pbdoc");
 
+    // Create a new brain with configuration
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("config"), R"pbdoc(
+        Create a new brain with the given configuration.
+        
+        Args:
+            config (Config): Configuration object for the brain.
+            
+        Returns:
+            Brain: A new brain instance.
+            
+        Raises:
+            RuntimeError: If brain initialization fails.
+    )pbdoc");
 
+    // Create a simple world
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, R"pbdoc(
+        Create a new simple world for NLM simulation.
+        
+        Returns:
+            SimpleWorld: A new world instance.
+    )pbdoc");
 
+    // Create an agent brain interface
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, py::arg("brain"), R"pbdoc(
+        Create a new agent brain interface connecting NLM brain to world.
+        
+        Args:
+            brain (Brain): The brain to interface with the world.
+            
+        Returns:
+            AgentBrain: A new agent brain interface.
+    )pbdoc");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

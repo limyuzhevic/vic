@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <typeinfo>
 
 namespace nlm {
 
@@ -92,6 +93,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation and schema
+    bool validate() const;
+    bool validate(const std::string& key, const std::type_info& expectedType) const;
+    std::string getSchema() const;
     
 private:
     struct Impl;
