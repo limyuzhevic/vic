@@ -1,0 +1,76 @@
+{
+    "description": "NLM Neural Learning Machine Configuration",
+    "version": "0.1.0",
+    "brain": {
+        "neuron_count": 1000,
+        "region_count": 1,
+        "connection_probability": 0.1,
+        "initial_weight_mean": 0.5,
+        "initial_weight_std": 0.1,
+        "v_thresh": -50.0,
+        "v_rest": -70.0,
+        "v_reset": -75.0,
+        "tau_mem": 20.0,
+        "tau_ref": 2.0
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.01,
+            "tau_plus": 20.0,
+            "tau_minus": 20.0
+        },
+        "hebbian": {
+            "enable": true,
+            "learning_rate": 0.001,
+            "max_weight": 1.0,
+            "min_weight": 0.0
+        },
+        "structural": {
+            "enable": true,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001,
+            "max_synapses_per_neuron": 50,
+            "min_synapses_per_neuron": 1
+        }
+    },
+    "neuromodulation": {
+        "dopamine": {
+            "scale": 1.0,
+            "baseline": 0.1,
+            "learning_rate": 0.05
+        },
+        "curiosity": {
+            "enable": true,
+            "baseline": 0.05,
+            "learning_rate": 0.02,
+            "exploration_bonus": 0.5
+        },
+        "novelty": {
+            "enable": true,
+            "baseline": 0.01,
+            "threshold": 0.3
+        }
+    },
+    "simulation": {
+        "timestep": 0.001,
+        "random_seed": 42,
+        "checkpoint_interval": 1000,
+        "max_steps": 10000
+    },
+    "environment": {
+        "world_size": {
+            "width": 20,
+            "height": 20
+        },
+        "vision": {
+            "width": 8,
+            "height": 8
+        },
+        "rewards": {
+            "food_value": 1.0,
+            "hazard_value": -1.0,
+            "exploration_bonus": 0.1
+        }
+    }
+}

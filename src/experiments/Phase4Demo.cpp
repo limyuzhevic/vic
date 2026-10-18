@@ -36,15 +36,71 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
+// ====================================================================
+// Phase 4 Demo - Standalone Executable
+// ====================================================================
+
+// Command line usage examples:
+//   ./nlm_phase4_demo              # Run default demo (50 trials)
+//   ./nlm_phase4_demo --help        # Show help
+//   ./nlm_phase4_demo --version     # Show version
+//   ./nlm_phase4_demo 100           # Run 100 trials
+//   ./nlm_phase4_demo --trials 200  # Use named arguments
+
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help              Display this help message and exit\n";
+    std::cout << "  --version           Display version information and exit\n";
+    std::cout << "  --trials N          Set number of trials (default: 50)\n";
+    std::cout << "  --neuron_count N    Set number of neurons (default: 1000)\n";
+    std::cout << "  --region_count R    Set number of brain regions (default: 2)\n";
+    std::cout << "  --connection_prob P Set connection probability (default: 0.1)\n";
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 4 Demo - Emerging Cognition v0.1.0\n";
+    std::cout << "Demonstrates complex cognitive mechanisms emerging from neural dynamics.\n";
+}
+
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
-    
     // Parse command line arguments
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    bool showHelp = false;
+    bool showVersion = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--trials" && i + 1 < argc) {
+            numTrials = std::stoull(argv[++i]);
+        } else if (arg.find("--") != std::string::npos) {
+            // Unknown option, but preserve backward compatibility
+        }
     }
+    
+    // Backward compatibility: positional argument
+    if (argc > 1 && numTrials == 50) {
+        numTrials = std::stoull(argv[1]);
+    }
+    
+    if (showHelp) {
+        printHeader("Phase 4 Demo - Help");
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    if (showVersion) {
+        printHeader("Phase 4 Demo - Version");
+        printVersion();
+        return 0;
+    }
+    
+    printHeader("PHASE 4 DEMO");
+    std::cout << "Running " << numTrials << " trials.\n\n";
     
     // Create configuration
     auto config = std::make_shared<Config>();

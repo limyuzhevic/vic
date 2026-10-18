@@ -243,16 +243,79 @@ private:
 } // namespace nlm
 
 // Main entry point for Phase 3 demo
+// ====================================================================
+// Phase 3 Demo - Standalone Executable
+// ====================================================================
+
+// Command line usage examples:
+//   ./nlm_phase3_demo              # Run default demo (5 episodes, 200 steps each)
+//   ./nlm_phase3_demo --help        # Show help
+//   ./nlm_phase3_demo --version     # Show version
+//   ./nlm_phase3_demo 10 500        # Run 10 episodes with 500 steps each
+//   ./nlm_phase3_demo --episodes 20 --steps 1000  # Use named arguments
+
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help              Display this help message and exit\n";
+    std::cout << "  --version           Display version information and exit\n";
+    std::cout << "  --episodes N       Set number of episodes (default: 5)\n";
+    std::cout << "  --steps N           Set number of simulation steps (default: 200)\n";
+    std::cout << "  --neuron_count N    Set number of neurons (default: 500)\n";
+    std::cout << "  --region_count R    Set number of brain regions (default: 1)\n";
+    std::cout << "  --world_size W      Set world size (default: 20x20)\n";
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 3 Demo - World Interaction v0.1.0\n";
+    std::cout << "Demonstrates agent-world interaction, learning, and adaptation.\n";
+}
+
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool showHelp = false;
+    bool showVersion = false;
     
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            numEpisodes = std::atoi(argv[++i]);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            stepsPerEpisode = std::atoi(argv[++i]);
+        } else if (arg.find("--") != std::string::npos) {
+            // Unknown option, but preserve backward compatibility
+            // Positional arguments (argc > 1, > 2) are handled below
+        }
+    }
+    
+    // Backward compatibility: positional arguments
     if (argc > 1) {
         numEpisodes = std::atoi(argv[1]);
     }
     if (argc > 2) {
         stepsPerEpisode = std::atoi(argv[2]);
     }
+    
+    if (showHelp) {
+        printHeader("Phase 3 Demo - Help");
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    if (showVersion) {
+        printHeader("Phase 3 Demo - Version");
+        printVersion();
+        return 0;
+    }
+    
+    printHeader("PHASE 3 DEMO");
+    std::cout << "Running " << numEpisodes << " episodes with " << stepsPerEpisode << " steps each.\n\n";
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);
