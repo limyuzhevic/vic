@@ -5,17 +5,19 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with improved API and comprehensive functionality"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -24,7 +26,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = []
@@ -33,6 +34,9 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pytest-cov>=2.12",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
 ]
 
 [project.urls]
@@ -55,3 +59,7 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.scikit-build.post]
+commands = ["test_pynlm"]
+
