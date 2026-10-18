@@ -6,61 +6,53 @@
 namespace nlm {
 
 struct Synapse::Impl {
-    SynapseId id;
-    NeuronId sourceNeuron;
-    NeuronId destinationNeuron;
-    SynapticWeight weight;
-    Delay delay;  // Synaptic delay in simulation steps
+    // ========== SYNAPSE IDENTITY ==========
+    SynapseId id;                           // Unique identifier for this synapse
+    NeuronId sourceNeuron;                 // Source neuron identifier
+    NeuronId destinationNeuron;            // Destination neuron identifier
+    SynapticWeight weight;                 // Synaptic weight (-1.0 to 1.0)
+    Delay delay;                          // Synaptic delay in simulation steps
     
-    // Synapse type
-    SynapseType type;
+    // ========== SYNAPSE TYPE ==========
+    SynapseType type;                      // Functional type (Excitatory, Inhibitory, etc.)
     
-    // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    // ========== SPIKE HISTORY FOR PLASTICITY ==========
+    std::vector<Timestamp> preSpikeHistory;  // Timestamps of pre-synaptic spikes (STDP)
+    std::vector<Timestamp> postSpikeHistory; // Timestamps of post-synaptic spikes (STDP)
     
-    // Plasticity state
-    PlasticityFlags plasticityFlags;
+    // ========== PLASTICITY FLAGS ==========
+    PlasticityFlags plasticityFlags;        // Enables STDP, Hebbian, and reward-modulated learning
     
-    // Short-term plasticity state
-    float shortTermDepression;  // Utilization factor (0-1)
-    float shortTermFacilitation;  // Facilitation factor
-    float lastPreSpikeTime;  // For short-term dynamics
-    float lastPostSpikeTime;
+    // ========== SHORT-TERM PLASTICITY STATE ==========
+    float shortTermDepression;            // Utilization factor (0-1) for depression
+    float shortTermFacilitation;          // Facilitation factor (0-1) for short-term potentiation
+    float lastPreSpikeTime;               // Timestamp of last pre-synaptic spike (-1 if none)
+    float lastPostSpikeTime;              // Timestamp of last post-synaptic spike (-1 if none)
     
-    // Eligibility trace for reward-modulated learning
-    float eligibilityTrace;
+    // ========== ELIGIBILITY TRACE ==========
+    float eligibilityTrace;                // For reward-modulated learning (Hebbian with reward)
     
-    // Synaptic efficacy (use-dependent modulation)
-    float efficacy;
+    // ========== SYNAPTIC EFFICACY ==========
+    float efficacy;                        // Use-dependent modulation of synaptic strength
     
-    // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    // ========== WEIGHT BOUNDS ==========
+    static constexpr float MIN_WEIGHT = -1.0f;  // Minimum allowed weight (inhibitory limit)
+    static constexpr float MAX_WEIGHT = 1.0f;   // Maximum allowed weight (excitatory limit)
     
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    // ========== SHORT-TERM PLASTICITY PARAMETERS ==========
+    static constexpr float STP_FACILITATION_TAU = 100.0f;  // Time constant for facilitation (ms)
+    static constexpr float STP_DEPRESSION_TAU = 200.0f;   // Time constant for depression (ms)
+    static constexpr float STP_U_MAX = 1.0f;              // Maximum utilization factor
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // ========== HISTORY LIMITS ==========
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;     // Maximum spike history entries
+    
+    // ========== INITIALIZATION ==========
+    Impl() : id(), sourceNeuron(), destinationNeuron(), weight(0.0f), delay(1),
+             type(SynapseType::Excitatory), eligibilityTrace(0.0f), efficacy(1.0f),
+             shortTermDepression(1.0f), shortTermFacilitation(0.0f),
+             lastPreSpikeTime(-1.0f), lastPostSpikeTime(-1.0f) {}
 };
-
-Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->sourceNeuron = source;
-    pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
-    pImpl->type = SynapseType::Excitatory;
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
-}
 
 Synapse::~Synapse() = default;
 
@@ -231,30 +223,37 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
+    // Biological synaptic initialization with type-specific constraints
     if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
+        // Excitatory synapses: small positive weights (0.1-0.4)
+        // Excitatory synaptic transmission increases likelihood of postsynaptic firing
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
+        // Excitatory synapses have moderate initial efficacy (0.8-1.0)
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
+        // Inhibitory synapses: negative weights (-0.1 to -0.4)
+        // Inhibitory synaptic transmission decreases likelihood of postsynaptic firing
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
-        // Other types: small random weights
+        // Other types (Modulatory, Electrical, GapJunction): small random weights (-0.1 to 0.1)
+        // Modulatory synapses affect plasticity without direct excitation/inhibition
+        // Electrical and gap junction synapses have different biophysical properties
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    // Synaptic delay reflects biological transmission time
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state
+    // Short-term depression recovers toward 1.0 (full recovery)
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
+    // Short-term facilitation starts at 0.0 (no initial facilitation)
     pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     
-    // Initialize eligibility trace to 0
+    // Initialize eligibility trace for reward-modulated learning
     pImpl->eligibilityTrace = 0.0f;
     
     // Initialize last spike times

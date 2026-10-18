@@ -23,59 +23,112 @@
 namespace nlm {
 
 struct Brain::Impl {
+    // ========== CORE CONFIGURATION ==========
+    // Brain configuration parameters (neuron_count, region_count, connection_probability, etc.)
     std::shared_ptr<Config> config;
+    
+    // Random number generator for reproducible simulations
     std::unique_ptr<RandomGenerator> rng;
+    
+    // Neural regions containing populations of neurons
     std::vector<std::unique_ptr<NeuralRegion>> regions;
+    
+    // Inter-regional connections (long-range pathways between regions)
     std::vector<InterRegionConnection> interRegionConnections;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
+    // Working memory for transient active information maintenance
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    
+    // Episodic memory for experience storage and replay
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    
+    // Associative memory for pattern associations and Hebbian learning
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
+    // Prediction system for sensory prediction and error computation
     std::unique_ptr<PredictionSystem> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // Neural planner for action sequence evaluation and planning
     std::unique_ptr<NeuralPlanner> planner;
+    
+    // Concept formation for discovering patterns from neural activity
     std::unique_ptr<ConceptFormation> conceptFormation;
+    
+    // Attentional selection for competitive focus on salient information
     std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
+    // Developmental system for age-dependent plasticity and maturation
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
+    // Dopamine for reward-based reinforcement and plasticity modulation
     std::unique_ptr<Dopamine> dopamine;
+    
+    // Curiosity for exploration motivation and discovery
     std::unique_ptr<Curiosity> curiosity;
+    
+    // Prediction error for learning from surprise
     std::unique_ptr<PredictionError> predictionError;
+    
+    // Novelty detection for change detection and adaptation
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+    // ========== PHASE 2: REAL NEURAL COMPUTATION COMPONENTS ==========
+    // Spike system for event-driven neural communication
     std::unique_ptr<SpikeSystem> spikeSystem;
+    
+    // Spike-Timing Dependent Plasticity (STDP) for synaptic strengthening
     std::unique_ptr<STDP> stdp;
+    
+    // Hebbian learning for co-activation based potentiation
     std::unique_ptr<Hebbian> hebbian;
+    
+    // Structural plasticity for synapse creation and elimination
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
-    // Simulation parameters
+    // ========== SIMULATION PARAMETERS ==========
+    // Duration of each simulation timestep (typically 1ms)
     TimestepDuration timestep;
+    
+    // Current simulation step count
     SimulationStep currentStep;
+    
+    // Absolute time in simulation (cumulative across steps)
     Timestamp currentTime;
     
-    // Statistics
+    // ========== STATISTICS ==========
+    // Number of spikes in current timestep
     size_t totalSpikesThisStep;
+    
+    // Total number of spikes since initialization
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
+    // ========== I/O NEURON REFERENCES ==========
+    // Sensory neurons for receiving environmental input
     std::vector<Neuron*> sensoryNeurons;
+    
+    // Motor neurons for producing behavioral output
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
+    // ========== INTEGRATION STATE ==========
+    // Resting/sleep state for memory consolidation
+    bool isResting;
+    
+    // Steps since last memory episode storage
     size_t stepsSinceLastEpisode;
+    
+    // Memory replay interval (steps between replays)
     size_t replayInterval;
+    
+    // Memory consolidation interval (steps between consolidations)
     size_t consolidationInterval;
     
-    // Checkpoint system
+    // ========== CHECKPOINT SYSTEM ==========
+    // Checkpoint manager for saving and loading brain state
     std::unique_ptr<CheckpointManager> checkpointManager;
     
     Impl(std::shared_ptr<Config> cfg)
@@ -94,6 +147,7 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
+        // Uses deterministic seed for reproducible experiments, can be overridden
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
@@ -101,6 +155,7 @@ struct Brain::Impl {
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
+        // These provide the core mechanisms for synaptic learning and adaptation
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
@@ -114,35 +169,41 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
+        // Provides sensory prediction and error computation for learning
         predictionSystem = std::make_unique<PredictionSystem>();
         
         // Initialize cognition systems
+        // Neural planner for action sequences, concept formation for patterns, attention for focus
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
+        // Manages developmental stages and age-dependent plasticity
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
+        // Dopamine for reward, curiosity for exploration, novelty for change detection
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
+        // Spike-Timing Dependent Plasticity: strengthening when pre before post, weakening when post before pre
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
+        // Synaptogenesis: creation of new synapses, Pruning: elimination of synapses
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
+        // Get simulation timestep from configuration
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
         // Get integration intervals from config
@@ -174,33 +235,100 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+// ========== CONFIGURATION VALIDATION ==========
+    // Validate all configuration parameters before initialization
+    bool validateConfiguration() {
+        if (!pImpl->config) {
+            NLM_LOG_ERROR("Brain configuration is null");
+            return false;
+        }
+        
+        // Validate required parameters with their ranges and defaults
+        auto validateParam = [this](const std::string& key, float min, float max, float defaultValue) {
+            if (pImpl->config->has(key)) {
+                float value = pImpl->config->getOr<float>(key, defaultValue);
+                if (value < min || value > max) {
+                    NLM_LOG_ERROR("Parameter '" + key + "' value " + std::to_string(value) + 
+                                " outside valid range [" + std::to_string(min) + ", " + std::to_string(max) + "]");
+                    return false;
+                }
+            }
+            return true;
+        };
+        
+        // Validate all configuration parameters
+        if (!validateParam("simulation_timestep", 0.0001f, 0.1f, 0.001f)) return false;
+        if (!validateParam("random_seed", 0.0f, 4294967295.0f, 42.0f)) return false;
+        if (!validateParam("neuron_count", 1.0f, 100000.0f, 1000.0f)) return false;
+        if (!validateParam("region_count", 1.0f, 100.0f, 1.0f)) return false;
+        if (!validateParam("connection_probability", 0.0f, 1.0f, 0.1f)) return false;
+        if (!validateParam("stdp_ltp_weight", 0.0f, 1.0f, 0.01f)) return false;
+        if (!validateParam("stdp_ltd_weight", 0.0f, 1.0f, 0.012f)) return false;
+        if (!validateParam("stdp_tau", 1.0f, 1000.0f, 20.0f)) return false;
+        
+        // Validate plasticity rates
+        if (!validateParam("synaptogenesis_rate", 0.0f, 1.0f, 0.0001f)) return false;
+        if (!validateParam("pruning_rate", 0.0f, 1.0f, 0.00001f)) return false;
+        
+        // Validate memory system parameters
+        if (!validateParam("replay_interval", 1.0f, 10000.0f, 100.0f)) return false;
+        if (!validateParam("consolidation_interval", 1.0f, 100000.0f, 1000.0f)) return false;
+        
+        return true;
+    }
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // Validate configuration parameters
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed during Brain initialization");
+        return false;
+    }
+    
     // Get configuration values
+    // neuron_count: Total number of neurons in the simulation (100-10000 recommended)
+    // region_count: Number of neural regions (modular organization, 1-10 recommended)
+    // connection_probability: Probability of connections between neurons (0.0 to 1.0)
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate parameter ranges
+    if (neuronCount < 10 || neuronCount > 10000) {
+        NLM_LOG_WARNING("Neuron count " + std::to_string(neuronCount) + " outside recommended range [10, 10000]");
+    }
+    if (regionCount < 1 || regionCount > 20) {
+        NLM_LOG_WARNING("Region count " + std::to_string(regionCount) + " outside recommended range [1, 20]");
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Connection probability must be between 0.0 and 1.0, got " + std::to_string(connectionProbability));
+        return false;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 std::to_string(connectionProbability * 100) + "% connectivity");
     
     // Create regions
+    // Each region is a modular component that can operate semi-independently
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
     // Create neurons across regions
+    // Distribute neurons across regions, with sensory/internal/motor populations
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
+            // Add populations of neurons specialized for different functions
+            // Sensory: input processing, Internal: computation, Motor: output
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect sensory and motor neurons for I/O access
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
@@ -221,6 +349,8 @@ bool Brain::initialize() {
     }
     
     // Initialize connectivity with random weights
+    // Create synaptic connections based on connection probability
+    // Weights initialized to biologically plausible ranges (0.1-0.4 for excitatory, -0.1 to -0.4 for inhibitory)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
@@ -261,7 +391,7 @@ bool Brain::initialize() {
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
+        // Count spikes for statistics
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
     });
@@ -269,6 +399,7 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
+        // This implements delayed synaptic transmission with biological realism
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {

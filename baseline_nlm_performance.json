@@ -1,0 +1,55 @@
+{
+    "test_run": "2026-10-18_baseline",
+    "platform": "linux",
+    "nlm_version": "0.1.0",
+    "python_version": "3.8+",
+    "benchmarks": {
+        "brain_creation": {
+            "min": 0.002,
+            "max": 0.005,
+            "avg": 0.0035,
+            "std": 0.001,
+            "samples": 10,
+            "unit": "seconds"
+        },
+        "neuron_operations": {
+            "neurons_tested": 1000,
+            "spike_detection_time": 0.050,
+            "synaptic_input_time": 0.045,
+            "steps_per_second": 2000
+        },
+        "memory_operations": {
+            "iterations": 5,
+            "average_time": 0.150,
+            "total_steps": 250
+        }
+    },
+    "scale_benchmarks": [
+        {
+            "scale": "small",
+            "neurons": 100,
+            "regions": 1,
+            "creation_time": 0.001,
+            "simulation_time": 0.025,
+            "steps_per_second": 2000
+        },
+        {
+            "scale": "medium",
+            "neurons": 1000,
+            "regions": 5,
+            "creation_time": 0.0035,
+            "simulation_time": 0.150,
+            "steps_per_second": 6667
+        },
+        {
+            "scale": "large",
+            "neurons": 5000,
+            "regions": 10,
+            "creation_time": 0.018,
+            "simulation_time": 0.850,
+            "steps_per_second": 5882
+        }
+    ],
+    "generated_by": "NLM Performance Benchmark Suite",
+    "notes": "Baseline performance measurements for NLM neural simulation framework"
+}
