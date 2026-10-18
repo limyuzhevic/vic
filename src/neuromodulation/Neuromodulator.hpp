@@ -6,6 +6,13 @@
 
 namespace nlm {
 
+// Forward declarations
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+class Reward;
+
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 

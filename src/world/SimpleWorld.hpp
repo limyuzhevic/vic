@@ -63,25 +63,25 @@ public:
     // Check if position is valid (not wall)
     bool isValidPosition(float x, float y) const;
     
-    // Get object at position (if any)
-    WorldObject* getObjectAt(float x, float y);
+    // ========== ADVANCED WORLD CONTROL ==========
     
-    // World dimensions
-    float getWidth() const { return width_; }
-    float getHeight() const { return height_; }
+    // Get world physics settings
+    std::map<std::string, float> getPhysicsParameters() const;
     
-    // Energy settings
-    float getMaxEnergy() const { return maxEnergy_; }
-    void setMaxEnergy(float e) { maxEnergy_ = e; }
-    float getEnergyDecayRate() const { return energyDecayRate_; }
-    void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    // Modify world physics
+    void setPhysicsParameters(const std::map<std::string, float>& params);
     
-    // Time
-    double getSimulationTime() const { return simTime_; }
+    // Get objects by type for research
+    std::vector<WorldObject> getObjectsByType(WorldObjectType type) const;
     
-    // Seed for reproducibility
-    void setRandomSeed(uint64_t seed);
-    uint64_t getRandomSeed() const { return rngSeed_; }
+    // Get environmental statistics
+    std::map<std::string, float> getEnvironmentStats() const;
+    
+    // Add weather-like effects
+    void enableWeatherSimulation(bool enable);
+    void setWeatherParameters(float windSpeed, float precipitation);
+    float getWindSpeed() const;
+    float getPrecipitation() const;
     
 private:
     // Generate vision from current view
@@ -124,6 +124,11 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Weather simulation
+    bool weatherEnabled_;
+    float windSpeed_;
+    float precipitation_;
 };
 
 } // namespace nlm

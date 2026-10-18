@@ -14,6 +14,9 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize prediction system
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -34,9 +37,22 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Update prediction system with sensory input
+    void update(const SensoryInput& input, SimulationStep currentStep);
+    
+    // Get prediction neurons for attention
+    std::vector<NeuronId> getPredictionNeurons() const;
+    
+    // Get prediction errors for neuromodulation
+    float getPredictionErrorSignal() const;
+    
+    // Get prediction activity level
+    float getPredictionActivity() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    Brain* brain_;
 };
 
 } // namespace nlm

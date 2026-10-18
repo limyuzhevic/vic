@@ -4,13 +4,14 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "MotorDecoder.hpp"
+#include "CuriosityManager.hpp"
+#include "NeuromodulationManager.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -58,6 +59,23 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== ADVANCED AGENT CONTROL ==========
+    
+    // Set exploration strategies (random, epsilon-greedy, etc.)
+    void setExplorationMode(const std::string& mode);
+    
+    // Get statistics about action selection patterns
+    std::vector<std::pair<MotorCommand, int>> getActionSelectionStats() const;
+    
+    // Set how curiosity is calculated and used
+    void setCuriosityStrategy(const std::string& strategy);
+    
+    // Get recent behavior sequence for analysis
+    std::vector<MotorCommand> getBehaviorHistory() const;
+    
+    // Enable/disable learning mechanisms
+    void enableLearningMode(bool enable);
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -70,15 +88,19 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
+    // Internal helper methods
     MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Connected brain
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Manager components
+    MotorDecoder motorDecoder_;
+    CuriosityManager curiosityManager_;
+    NeuromodulationManager neuromodulationManager_;
+    
+    // Motor neuron groups (for backward compatibility and direct access)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -112,6 +134,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Helper methods for neuron group initialization
+    void initializeMotorGroups();
+    void initializeSensoryGroups();
 };
 
 } // namespace nlm

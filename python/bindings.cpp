@@ -160,6 +160,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("getConfigString", &Config::getConfigString,
+             "Get configuration as JSON string for debugging")
+        .def("validateConfig", &Config::validateConfig,
+             "Validate configuration parameters")
+        .def("mergeConfig", &Config::mergeConfig, py::arg("other"),
+             "Merge another config into this one")
+        .def("getConfigPath", &Config::getConfigPath,
+             "Get the path used for loading configuration")
+        .def("setConfigPath", &Config::setConfigPath, py::arg("path"),
+             "Set the configuration path")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -287,7 +297,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // ========== ADVANCED WORLD CONTROL ==========
+        .def("getPhysicsParameters", &SimpleWorld::getPhysicsParameters,
+             "Get world physics settings")
+        .def("setPhysicsParameters", &SimpleWorld::setPhysicsParameters, py::arg("params"),
+             "Modify world physics")
+        .def("getObjectsByType", &SimpleWorld::getObjectsByType, py::arg("type"),
+             "Get objects by type for research")
+        .def("getEnvironmentStats", &SimpleWorld::getEnvironmentStats,
+             "Get environmental statistics")
+        .def("enableWeatherSimulation", &SimpleWorld::enableWeatherSimulation, py::arg("enable"),
+             "Add weather-like effects")
+        .def("setWeatherParameters", &SimpleWorld::setWeatherParameters, py::arg("windSpeed"), py::arg("precipitation"),
+             "Set weather parameters")
+        .def("getWindSpeed", &SimpleWorld::getWindSpeed)
+        .def("getPrecipitation", &SimpleWorld::getPrecipitation);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -350,6 +375,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        // ========== ADVANCED NEURAL ACCESS ==========
+        .def("getAllNeuronIds", &Brain::getAllNeuronIds,
+             "Get IDs of all neurons for advanced research")
+        .def("getConnectionMatrix", &Brain::getConnectionMatrix,
+             "Get synaptic connectivity matrix (for small networks)")
+        .def("setExternalInput", &Brain::setExternalInput,
+             py::arg("neuronId"), py::arg("current"), py::arg("time"),
+             "Inject external signals at specific times")
+        .def("getNeuralTrace", &Brain::getNeuralTrace,
+             "Get neural activity trace for analysis")
+        .def("getConnectionStatistics", &Brain::getConnectionStatistics,
+             "Get detailed connection statistics")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
@@ -398,7 +435,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // ========== ADVANCED AGENT CONTROL ==========
+        .def("setExplorationMode", &AgentBrain::setExplorationMode, py::arg("mode"),
+             "Set exploration strategies (random, epsilon-greedy, etc.)")
+        .def("getActionSelectionStats", &AgentBrain::getActionSelectionStats,
+             "Get statistics about action selection patterns")
+        .def("setCuriosityStrategy", &AgentBrain::setCuriosityStrategy, py::arg("strategy"),
+             "Set how curiosity is calculated and used")
+        .def("getBehaviorHistory", &AgentBrain::getBehaviorHistory,
+             "Get recent behavior sequence for analysis")
+        .def("enableLearningMode", &AgentBrain::enableLearningMode, py::arg("enable"),
+             "Enable/disable learning mechanisms");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -64,6 +64,12 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
+    // Validate configuration before initialization
+    static bool validateBrainConfiguration(const std::shared_ptr<const Config>& config);
+    
+    // Get validation report for configuration
+    static nlm::ValidationResult getConfigurationValidationReport(const std::shared_ptr<const Config>& config);
+    
     // Main simulation step
     void step(SimulationStep currentStep);
     
@@ -93,6 +99,23 @@ public:
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    
+    // ========== ADVANCED NEURAL ACCESS ==========
+    
+    // Get IDs of all neurons for advanced research
+    std::vector<NeuronId> getAllNeuronIds() const;
+    
+    // Get synaptic connectivity matrix (for small networks)
+    std::map<std::pair<NeuronId, NeuronId>, float> getConnectionMatrix() const;
+    
+    // Inject external signals at specific times
+    void setExternalInput(NeuronId neuronId, float current, Timestamp time);
+    
+    // Get neural activity trace for analysis
+    std::vector<std::pair<Timestamp, float>> getNeuralTrace() const;
+    
+    // Get detailed connection statistics
+    std::map<std::string, float> getConnectionStatistics() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -194,8 +217,62 @@ public:
     void logStatus() const;
     
 private:
-    struct Impl;
+    // Refactored step method components
+    void runPhase1_ProcessPendingSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void runPhase2_UpdateNeuralDynamics(SimulationStep currentStep, Timestamp currentTime);
+    void runPhase3_DetectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void runPhase4_UpdateWorkingMemory();
+    void runPhase5_UpdateNeuromodulation();
+    void runPhase6_ApplyPlasticityRules();
+    void runPhase7_UpdateEpisodicMemory();
+    void runPhase8_UpdatePredictionSystem();
+    void runPhase9_UpdateAttentionSystem();
+    void runPhase10_UpdateConceptFormation();
+    void runPhase11_UpdateStructuralPlasticity(SimulationStep currentStep);
+    void runPhase12_ReplayImportantMemories(SimulationStep currentStep);
+    void runPhase13_ApplyDevelopmentEffects(SimulationStep currentStep);
+    void runPhase14_ConsolidateMemories(SimulationStep currentStep);
+    void runPhase15_UpdateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    void runPhase16_CollectStatistics();
+    
+    // Helper methods for spike processing
+    void processDelayedSpikeEvents(SimulationStep currentStep, Timestamp currentTime);
+    void scheduleNeuronSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateSpikingNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void deliverDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Helper methods for memory systems
+    void storeToWorkingMemory(Neuron* neuron, float activation);
+    void updateEpisodicMemoryWithCurrentState(SimulationStep currentStep);
+    void createEpisodicMemoryItem(SimulationStep currentStep, EpisodicMemoryItem& episode);
+    
+    // Helper methods for neuromodulation
+    void updateDopamineModulation();
+    void updateCuriosityModulation();
+    void updateNoveltyModulation();
+    void updatePredictionErrorModulation();
+    
+    // Helper methods for plasticity
+    void applySTDPPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    void applyHebbianPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Helper methods for development
+    void updateDevelopmentalStage(SimulationStep currentStep);
+    void updatePlasticityWithDevelopment();
+    
+    // Helper methods for statistics
+    void updateSpikeCounts();
+    void updateMemoryStats();
+    void updateNeuromodulationStats();
+    
+    // Core neural computation methods
+    void updateNeuronMembranePotentials(Timestamp currentTime, Timestamp timestep);
+    void detectAndScheduleSpikes(Neuron* neuron, SimulationStep currentStep, Timestamp currentTime);
+    void processNeuronSpikes(Neuron* neuron, SimulationStep currentStep, Timestamp currentTime);
+    void applySynapticPlasticity(Synapse* synapse, SimulationStep currentStep, Timestamp currentTime);
+    
+struct Impl;
     Impl* pImpl;
-};
+};;
 
 } // namespace nlm

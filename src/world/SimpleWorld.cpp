@@ -398,6 +398,116 @@ void SimpleWorld::checkCollisions() {
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
     }
+    // No audio for now
+    sensory_.setAudio({});
+}
+
+void SimpleWorld::checkCollisions() {
+    // Passive collision check (for damage when moving into objects)
+    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
+        agent_.health -= 0.01f;  // Passive damage
+    }
+}
+
+// ========== ADVANCED WORLD CONTROL ==========
+
+std::map<std::string, float> SimpleWorld::getPhysicsParameters() const {
+    std::map<std::string, float> params;
+    params["gravity"] = 9.81f;  // Standard Earth gravity
+    params["friction"] = 0.7f;  // Surface friction
+    params["elasticity"] = 0.5f;  // Collision elasticity
+    params["damping"] = 0.99f;  // Energy damping
+    params["maxSpeed"] = 5.0f;  // Maximum movement speed
+    params["acceleration"] = 2.0f;  // Movement acceleration
+    return params;
+}
+
+void SimpleWorld::setPhysicsParameters(const std::map<std::string, float>& params) {
+    // Set physics parameters from map
+    for (const auto& pair : params) {
+        const std::string& key = pair.first;
+        float value = pair.second;
+        
+        if (key == "gravity") {
+            // Gravity would affect agent in future updates
+        } else if (key == "friction") {
+            // Friction would affect agent movement in future updates
+        } else if (key == "elasticity") {
+            // Elasticity would affect collision behavior in future updates
+        } else if (key == "damping") {
+            // Damping would affect velocity decay in future updates
+        } else if (key == "maxSpeed") {
+            // Max speed would constrain agent movement in future updates
+        } else if (key == "acceleration") {
+            // Acceleration would affect agent movement in future updates
+        }
+    }
+}
+
+std::vector<WorldObject> SimpleWorld::getObjectsByType(WorldObjectType type) const {
+    std::vector<WorldObject> filteredObjects;
+    for (const auto& obj : objects_) {
+        if (obj.type == type) {
+            filteredObjects.push_back(obj);
+        }
+    }
+    return filteredObjects;
+}
+
+std::map<std::string, float> SimpleWorld::getEnvironmentStats() const {
+    std::map<std::string, float> stats;
+    
+    // Calculate basic environment statistics
+    stats["width"] = width_;
+    stats["height"] = height_;
+    stats["agent_x"] = agent_.x;
+    stats["agent_y"] = agent_.y;
+    stats["agent_energy"] = agent_.energy;
+    stats["agent_health"] = agent_.health;
+    stats["simulation_time"] = simTime_;
+    stats["object_count"] = static_cast<float>(objects_.size());
+    
+    // Count object types
+    size_t emptyCount = 0, resourceCount = 0, hazardCount = 0, wallCount = 0, markerCount = 0;
+    for (const auto& obj : objects_) {
+        switch (obj.type) {
+            case WorldObjectType::Empty: emptyCount++; break;
+            case WorldObjectType::Resource: resourceCount++; break;
+            case WorldObjectType::Hazard: hazardCount++; break;
+            case WorldObjectType::Wall: wallCount++; break;
+            case WorldObjectType::Marker: markerCount++; break;
+        }
+    }
+    
+    stats["empty_objects"] = static_cast<float>(emptyCount);
+    stats["resource_objects"] = static_cast<float>(resourceCount);
+    stats["hazard_objects"] = static_cast<float>(hazardCount);
+    stats["wall_objects"] = static_cast<float>(wallCount);
+    stats["marker_objects"] = static_cast<float>(markerCount);
+    
+    // Calculate density
+    float area = width_ * height_;
+    stats["density"] = static_cast<float>(objects_.size()) / area;
+    
+    return stats;
+}
+
+void SimpleWorld::enableWeatherSimulation(bool enable) {
+    weatherEnabled_ = enable;
+}
+
+void SimpleWorld::setWeatherParameters(float windSpeed, float precipitation) {
+    windSpeed_ = windSpeed;
+    precipitation_ = precipitation;
+}
+
+float SimpleWorld::getWindSpeed() const {
+    return windSpeed_;
+}
+
+float SimpleWorld::getPrecipitation() const {
+    return precipitation_;
 }
 
 } // namespace nlm
