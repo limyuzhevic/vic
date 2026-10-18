@@ -58,8 +58,14 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Check if configuration has errors
+    std::vector<std::string> getValidationErrors() const;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;

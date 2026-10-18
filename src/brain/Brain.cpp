@@ -1,4 +1,6 @@
 #include "Brain.hpp"
+#include "Neuron.hpp"
+#include "Synapse.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
