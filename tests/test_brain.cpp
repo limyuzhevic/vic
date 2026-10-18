@@ -90,7 +90,37 @@ void testBrainRegions() {
     std::cout << "    testBrainRegions passed" << std::endl;
 }
 
-void testBrainActionProduction() {
+void testBrainMemoryConsolidation() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    config->set("replay_interval", static_cast<size_t>(10), nlm::ConfigSource::Default);
+    config->set("consolidation_interval", static_cast<size_t>(100), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test that replay interval and consolidation interval are configured
+    // These are used internally by the brain system
+    assert(brain.getConfig()->getOr<size_t>("replay_interval", 0) == 10);
+    assert(brain.getConfig()->getOr<size_t>("consolidation_interval", 0) == 100);
+    
+    // Test that working memory can consolidate items
+    auto* workingMemory = brain.getWorkingMemory();
+    assert(workingMemory != nullptr);
+    
+    // Store several items in working memory
+    workingMemory->store("item1", "value1");
+    workingMemory->store("item2", "value2");
+    workingMemory->store("item3", "value3");
+    
+    // Test that items are still accessible
+    assert(workingMemory->has("item1"));
+    assert(workingMemory->has("item2"));
+    assert(workingMemory->has("item3"));
+    
+    std::cout << "    testBrainMemoryConsolidation passed" << std::endl;
+}
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);

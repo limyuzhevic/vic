@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -183,6 +185,12 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // SelfModel - self-representation and action prediction
+    SelfModel* getSelfModel();
+    
+    // SocialLearning - observational learning and imitation
+    SocialLearning* getSocialLearning();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

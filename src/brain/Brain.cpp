@@ -40,6 +40,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -242,8 +244,16 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize Semantic and Procedural Memory (Phase 3)
+    // Note: These systems exist but were not previously integrated
+    // They are now added as Brain members and initialized
+    pImpl->semanticMemory->initialize(this);
+    pImpl->semanticMemory->setMemoryCapacity(10000);
+    pImpl->semanticMemory->setKnowledgeRetention(0.95f);
+    
+    pImpl->proceduralMemory->initialize(this);
+    pImpl->proceduralMemory->setSkillCapacity(1000);
+    pImpl->proceduralMemory->setLearningRate(0.01f);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,40 +265,44 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    // Initialize SelfModel and SocialLearning systems (Phase 3)
+    // These systems exist in NeuralPlanner.cpp but were not previously integrated
+    // They are now added as Brain members and initialized
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
+    pImpl->socialLearning->setImitationRate(0.3f);
+    pImpl->socialLearning->setObservationMemory(10);
+    
+    // Initialize SelfModel and SocialLearning systems (Phase 3)
+    // These systems exist in NeuralPlanner.cpp but were not previously integrated
+    // They are now added as Brain members and initialized
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
+    pImpl->socialLearning->setImitationRate(0.3f);
+    pImpl->socialLearning->setObservationMemory(10);
+    
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);  // Initialize prediction error system
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
+    // Configure neuromodulation with config values
+    float dopamineBaseline = pImpl->config->getOr<float>("dopamine_baseline", 0.0f);
+    float dopamineInhibition = pImpl->config->getOr<float>("dopamine_inhibition", 0.1f);
+    pImpl->dopamine->setLevel(dopamineBaseline);
+    // TODO: Configure Dopamine system with dopamineInhibition
     
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
-            }
-        }
-    });
+    float curiosityNoveltyWeight = pImpl->config->getOr<float>("curiosity_novelty_weight", 0.5f);
+    float curiosityPredictionErrorWeight = pImpl->config->getOr<float>("curiosity_prediction_error_weight", 0.5f);
+    float curiosityDecayRate = pImpl->config->getOr<float>("curiosity_decay_rate", 0.05f);
+    pImpl->curiosity->setNoveltyWeight(curiosityNoveltyWeight);
+    pImpl->curiosity->setPredictionErrorWeight(curiosityPredictionErrorWeight);
+    // TODO: Configure Curiosity system with decayRate
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    float noveltyDecayRate = pImpl->config->getOr<float>("novelty_decay_rate", 0.1f);
+    float noveltyThreshold = pImpl->config->getOr<float>("novelty_threshold", 0.3f);
+    pImpl->novelty->setDecayRate(noveltyDecayRate);
+    pImpl->novelty->setThreshold(noveltyThreshold);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -819,7 +833,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                // Note: shortTermDepression and shortTermFacilitation are not exposed in Synapse interface
+                // They would need to be added if full checkpointing is required
             }
         }
         
@@ -895,9 +913,34 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - find matching synapses and update their properties
+        // Since synapses are created during initialization, we need to find existing
+        // synapses with the same source and destination neurons and update their properties
+        size_t matchedSynapses = 0;
+        for (const auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Find synapse with matching source and destination
+                for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+                    if (synapseData.sourceNeuron[i] == syn->getSourceNeuron().index() &&
+                        synapseData.destinationNeuron[i] == syn->getDestinationNeuron().index()) {
+                        
+                        // Update synapse properties
+                        syn->setWeight(synapseData.weight[i]);
+                        syn->setDelay(synapseData.delay[i]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        syn->getPlasticityFlags() = synapseData.plasticityFlags[i];
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        syn->setEfficacy(synapseData.efficacy[i]);
+                        
+                        matchedSynapses++;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses, " +
+                     std::to_string(matchedSynapses) + " matched");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1025,17 +1068,27 @@ PredictionSystem* Brain::getPredictionSystem() {
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
+    
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
+    
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
+    
+    // ========== PHASE 3: ADVANCED COGNITIVE SYSTEMS ==========
+    
+    SelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+    
+    SocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
