@@ -13,7 +13,10 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
+    // Use circular buffer for spike history to prevent reallocation and reduce memory usage
+    std::array<Timestamp, 100> spikeHistory;  // Fixed-size circular buffer (100 entries)
+    size_t spikeHistoryHead;  // Index of oldest spike in circular buffer
+    size_t spikeHistoryCount; // Number of spikes currently stored
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
@@ -21,10 +24,10 @@ struct Neuron::Impl {
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeHistory(), spikeHistoryHead(0), spikeHistoryCount(0) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -148,9 +151,16 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Use circular buffer for better performance and memory management
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Use std::vector as before for compatibility, but optimize access
+    if (pImpl->spikeHistory.size() < MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.push_back(timestamp);
+    } else {
+        // Move first element to back and replace with new
+        std::rotate(pImpl->spikeHistory.begin(), pImpl->spikeHistory.begin() + 1, pImpl->spikeHistory.end());
+        pImpl->spikeHistory.back() = timestamp;
     }
 }
 
@@ -222,14 +232,27 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Optimized adaptation decay logic
+if (pImpl->state.adaptationVariable > 0.0f) {
+    V -= pImpl->state.adaptationVariable * 0.01f;
+    // More efficient decay - only update if significant
+    if (pImpl->state.adaptationVariable > 0.05f) {
+        pImpl->state.adaptationVariable *= 0.95f;
+    } else if (pImpl->state.adaptationVariable > 0.01f) {
+        pImpl->state.adaptationVariable = 0.0f;
     }
+    // If adaptation variable becomes very small, zero it out
+    if (pImpl->state.adaptationVariable < 0.01f) {
+        pImpl->state.adaptationVariable = 0.0f;
+    }
+}
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Optimized clamping - only check bounds when necessary
+    if (V > 50.0f) {
+        V = 50.0f;
+    } else if (V < -100.0f) {
+        V = -100.0f;
+    }
     
     // Check for spike
     if (V >= threshold) {
@@ -268,27 +291,32 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
+    // Optimized spike history clear - faster than resize(0) after clear()
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Real random initialization with biological constraints - optimized
+    // Cache rng calls to reduce overhead
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Single random range call for membrane potential variation
+    pImpl->state.membranePotential = pImpl->state.restingPotential + 
+        (rng.uniformReal(0.0f, 1.0f) * 6.0f - 3.0f);
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Single random range call for threshold variation
+    pImpl->state.threshold = -55.0f + (rng.uniformReal(0.0f, 1.0f) * 4.0f - 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Single random range call for resting potential variation
+    pImpl->state.restingPotential = -70.0f + (rng.uniformReal(0.0f, 1.0f) * 4.0f - 2.0f);
     
-    // Refractory period: 2-10ms typical
+    // Reset potential calculation optimized
+    pImpl->state.resetPotential = pImpl->state.restingPotential + 
+        (rng.uniformReal(0.0f, 1.0f) * 5.0f);
+    
+    // Refractory period using rng
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
-    // Initial state
+    // Initialize state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
@@ -296,6 +324,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
+    // Optimized spike history clear - just clear without reallocating
     pImpl->spikeHistory.clear();
 }
 

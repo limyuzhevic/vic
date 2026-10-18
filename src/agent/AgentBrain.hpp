@@ -4,8 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Types/Types.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -13,7 +15,39 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    // Configuration structure for agent behavior
+    struct AgentConfig {
+        // Sensory processing parameters
+        float visionScaleFactor = 5.0f;
+        float touchScaleFactor = 8.0f;
+        float internalScaleFactor = 5.0f;
+        float proprioceptionScaleFactor = 3.0f;
+        
+        // Novelty detection
+        float noveltyDecayRate = 0.99f;
+        
+        // Motor decoding thresholds
+        float minActivityThreshold = 0.5f;
+        
+        // Curiosity and exploration
+        float curiosityThreshold = 0.3f;
+        float explorationProbability = 0.3f;
+        
+        // Development
+        float developmentStartAge = 60.0f;
+        float developmentCriticalStart = 300.0f;
+        float developmentMaturationStart = 900.0f;
+        
+        // Neuromodulation
+        float dopamineClampMin = -1.0f;
+        float dopamineClampMax = 1.0f;
+        
+        // Constructor with sensible defaults
+        AgentConfig() = default;
+    };
+
+public:
+    AgentBrain(std::shared_ptr<Brain> brain, const AgentConfig& config = AgentConfig());
     ~AgentBrain();
     
     // Initialize with world
@@ -58,7 +92,21 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+    // Configuration management
+    void setConfig(const AgentConfig& config) { config_ = config; }
+    const AgentConfig& getConfig() const { return config_; }
+    
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Utility methods for better testing and debugging
+    std::string getDebugInfo() const;
+    void logState() const;
+    
+    // Configuration flags
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -70,13 +118,9 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+    // Core components
     std::shared_ptr<Brain> brain_;
+    AgentConfig config_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -111,7 +155,16 @@ private:
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    
+    // Helper methods
+    void distributeMotorNeurons();
+    void distributeSensoryNeurons();
+    
+    float calculateMotorGroupActivity(const std::vector<Neuron*>& neurons) const;
+    float computeSensoryNovelty(const std::vector<float>& vision) const;
+    
+    // Initialize default configuration
+    void initializeDefaultConfig();
 };
 
 } // namespace nlm
