@@ -66,11 +66,41 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Core Library
+
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+```
+
+### Python Bindings (pynlm)
+
+The Python bindings can be built in two ways:
+
+#### 1. Using scikit-build (Recommended)
+```bash
+pip install scikit-build-core pybind11
+pip install -e .
+```
+
+#### 2. Manual Build
+```bash
+# After building the C++ core
+mkdir build-python
+cd build-python
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=$(python3 -c 'import sys; print(sys.executable)')
+make -j4
+```
+
+The Python bindings will create a `pynlm` module that can be imported in Python.
+
+### Running Tests
+
+```bash
+cd build
+ctest --output-on-failure
 ```
 
 ## Running
