@@ -11,18 +11,6 @@ namespace nlm {
 // Forward declarations
 class Config;
 
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
 // Configuration source
 enum class ConfigSource {
     Default,

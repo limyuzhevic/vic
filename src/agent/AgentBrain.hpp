@@ -4,6 +4,9 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <vector>
 
@@ -55,26 +58,78 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Advanced agent control
+    void setExplorationWeight(float weight) { explorationWeight_ = weight; }
+    void setExploitationWeight(float weight) { exploitationWeight_ = weight; }
+    void setNoveltyThreshold(float threshold) { noveltyThreshold_ = threshold; }
+    void setRiskTolerance(float tolerance) { riskTolerance_ = tolerance; }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    float getExplorationWeight() const { return explorationWeight_; }
+    float getExploitationWeight() const { return exploitationWeight_; }
+    float getNoveltyThreshold() const { return noveltyThreshold_; }
+    float getRiskTolerance() const { return riskTolerance_; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Advanced neuromodulation
+    void setDopamineGain(float gain) { dopamineGain_ = gain; }
+    void setCuriosityGain(float gain) { curiosityGain_ = gain; }
+    void setNoveltyGain(float gain) { noveltyGain_ = gain; }
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    float getDopamineGain() const { return dopamineGain_; }
+    float getCuriosityGain() const { return curiosityGain_; }
+    float getNoveltyGain() const { return noveltyGain_; }
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Advanced development
+    void setDevelopmentRate(float rate) { developmentRate_ = rate; }
+    void setMaturationSpeed(float speed) { maturationSpeed_ = speed; }
+    
+    float getDevelopmentRate() const { return developmentRate_; }
+    float getMaturationSpeed() const { return maturationSpeed_; }
+    
+    // Statistical analysis
+    std::vector<float> getActivityDistribution() const;
+    std::vector<float> getWeightDistribution() const;
+    float calculateFiringCoherence() const;
+    float calculateSynapticStrength() const;
+    
+    // State inspection
+    size_t countActiveNeurons() const;
+    size_t countConnectedSynapses() const;
+    float getAverageMembranePotential() const;
+    float getAverageSynapticWeight() const;
+    
+    // Learning statistics
+    float getLearningRate() const { return learningRate_; }
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    
+    // Performance metrics
+    float getPerformanceScore() const;
+    std::vector<float> getPerformanceHistory() const;
+    void recordPerformance(float score);
+    
+    // Memory management
+    void optimizeMemoryUsage();
+    void compressMemory();
+    size_t getMemoryUsage() const;
+    
+    // Advanced reset options
+    void resetDevelopment();
+    void resetNeuromodulation();
+    void resetLearning();
+    void resetAll();
+    
+    // Configuration presets
+    void loadPreset(const std::string& presetName);
+    static std::vector<std::string> getAvailablePresets();
+    
+    // Debug and diagnostic
+    void enableDebugMode(bool enable) { debugMode_ = enable; }
+    bool isDebugMode() const { return debugMode_; }
+    
+    void enableProfiling(bool enable) { profilingEnabled_ = enable; }
+    bool isProfilingEnabled() const { return profilingEnabled_; }
+    
+    std::string getDebugInfo() const;
+    std::vector<float> getProfilingData() const;
     
     std::shared_ptr<Brain> brain_;
     

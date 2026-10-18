@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include "../development/DevelopmentSystem.hpp"
 
 namespace nlm {
 
@@ -19,6 +20,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    // Advanced parameters initialization
+    , explorationWeight_(0.5f)
+    , exploitationWeight_(0.5f)
+    , noveltyThreshold_(0.5f)
+    , riskTolerance_(0.5f)
+    , dopamineGain_(1.0f)
+    , curiosityGain_(1.0f)
+    , noveltyGain_(1.0f)
+    , developmentRate_(1.0f)
+    , maturationSpeed_(1.0f)
+    , learningRate_(0.01f)
+    , debugMode_(false)
+    , profilingEnabled_(false)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -347,4 +361,130 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+// Implement the new advanced agent methods
+
+void AgentBrain::resetDevelopment() {
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    NLM_LOG_INFO("Development system reset");
+}
+
+void AgentBrain::resetNeuromodulation() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    NLM_LOG_INFO("Neuromodulation system reset");
+}
+
+void AgentBrain::resetLearning() {
+    learningRate_ = 0.01f;
+    // Reset synaptic weights would require access to brain internals
+    NLM_LOG_INFO("Learning system reset");
+}
+
+void AgentBrain::resetAll() {
+    resetDevelopment();
+    resetNeuromodulation();
+    resetLearning();
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    NLM_LOG_INFO("All agent systems reset");
+}
+
+void AgentBrain::loadPreset(const std::string& presetName) {
+    if (presetName == "conservative") {
+        // Conservative settings: slow learning, low exploration
+        explorationWeight_ = 0.2f;
+        exploitationWeight_ = 0.8f;
+        noveltyThreshold_ = 0.8f;
+        riskTolerance_ = 0.3f;
+        developmentRate_ = 0.5f;
+        learningRate_ = 0.005f;
+        dopamineGain_ = 0.8f;
+    } else if (presetName == "aggressive") {
+        // Aggressive settings: high exploration, fast learning
+        explorationWeight_ = 0.8f;
+        exploitationWeight_ = 0.2f;
+        noveltyThreshold_ = 0.3f;
+        riskTolerance_ = 0.8f;
+        developmentRate_ = 1.5f;
+        learningRate_ = 0.05f;
+        dopamineGain_ = 1.5f;
+    } else if (presetName == "balanced") {
+        // Balanced settings
+        explorationWeight_ = 0.5f;
+        exploitationWeight_ = 0.5f;
+        noveltyThreshold_ = 0.5f;
+        riskTolerance_ = 0.5f;
+        developmentRate_ = 1.0f;
+        learningRate_ = 0.01f;
+        dopamineGain_ = 1.0f;
+    } else {
+        NLM_LOG_WARNING("Unknown preset: " + presetName);
+    }
+}
+
+std::vector<std::string> AgentBrain::getAvailablePresets() {
+    return {"conservative", "balanced", "aggressive"};
+}
+
+std::string AgentBrain::getDebugInfo() const {
+    std::ostringstream oss;
+    oss << "=== Agent Brain Debug Info ===\n";
+    oss << "Exploration weight: " << explorationWeight_ << "\n";
+    oss << "Exploitation weight: " << exploitationWeight_ << "\n";
+    oss << "Novelty threshold: " << noveltyThreshold_ << "\n";
+    oss << "Risk tolerance: " << riskTolerance_ << "\n";
+    oss << "Dopamine gain: " << dopamineGain_ << "\n";
+    oss << "Curiosity gain: " << curiosityGain_ << "\n";
+    oss << "Novelty gain: " << noveltyGain_ << "\n";
+    oss << "Development rate: " << developmentRate_ << "\n";
+    oss << "Maturation speed: " << maturationSpeed_ << "\n";
+    oss << "Learning rate: " << learningRate_ << "\n";
+    oss << "Debug mode: " << (debugMode_ ? "enabled" : "disabled") << "\n";
+    oss << "Profiling enabled: " << (profilingEnabled_ ? "yes" : "no") << "\n";
+    oss << "Motor neurons - Forward: " << motorForward_.size() 
+        << ", Backward: " << motorBackward_.size()
+        << ", TurnLeft: " << motorTurnLeft_.size()
+        << ", TurnRight: " << motorTurnRight_.size()
+        << ", Interact: " << motorInteract_.size()
+        << ", Wait: " << motorWait_.size() << "\n";
+    oss << "Sensory neurons - Vision: " << sensoryVision_.size()
+        << ", Touch: " << sensoryTouch_.size()
+        << ", Internal: " << sensoryInternal_.size()
+        << ", Proprioception: " << sensoryProprioception_.size() << "\n";
+    return oss.str();
+}
+
+std::vector<float> AgentBrain::getProfilingData() const {
+    std::vector<float> data;
+    if (profilingEnabled_ && brain_) {
+        // Collect various profiling metrics
+        data.push_back(explorationWeight_);
+        data.push_back(exploitationWeight_);
+        data.push_back(noveltyThreshold_);
+        data.push_back(riskTolerance_);
+        data.push_back(dopamineGain_);
+        data.push_back(curiosityGain_);
+        data.push_back(noveltyGain_);
+        data.push_back(developmentRate_);
+        data.push_back(maturationSpeed_);
+        data.push_back(learningRate_);
+        data.push_back(curiosityLevel_);
+        data.push_back(noveltyLevel_);
+        data.push_back(predictionError_);
+        data.push_back(dopamineLevel_);
+        
+        // Calculate derived metrics
+        float totalMotorNeurons = motorForward_.size() + motorBackward_.size() + 
+                                  motorTurnLeft_.size() + motorTurnRight_.size() +
+                                  motorInteract_.size() + motorWait_.size();
+        float totalSensoryNeurons = sensoryVision_.size() + sensoryTouch_.size() +
+                                   sensoryInternal_.size() + sensoryProprioception_.size();
+        
+        data.push_back(totalMotorNeurons);
+        data.push_back(totalSensoryNeurons);
+    }
+    return data;
+}
