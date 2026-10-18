@@ -1,0 +1,36 @@
+# NLM Python Package Dependencies
+# This file specifies the core dependencies required for the NLM Python package
+
+# Core dependencies - minimal, only pybind11 is needed
+# Python ecosystem integration is provided via optional dependencies
+pybind11>=2.11.0
+
+# Development dependencies (optional)
+pytest>=7.0,<8.0
+pytest-asyncio>=0.19,<1.0
+pytest-cov>=3.0,<5.0
+black>=22.0,<24.0
+isort>=5.10,<6.0
+mypy>=0.991,<1.4
+flake8>=5.0,<7.0
+pylint>=2.15,<3.0
+pre-commit>=3.0,<4.0
+
+# Visualization and plotting (optional)
+numpy>=1.20,<2.0
+matplotlib>=3.5,<4.0
+pillow>=9.0,<11.0
+
+# Data analysis and scientific computing (optional)
+pandas>=1.3,<2.0
+scipy>=1.7,<2.0
+
+# Machine learning integration (optional)
+# Note: These are platform-specific and may not be available on all systems
+torch>=1.13,<3.0; platform_system != 'Windows'
+tensorflow>=2.10,<3.0; platform_system != 'Windows'
+
+# Jupyter and interactive computing (optional)
+jupyter>=1.0,<2.0
+ipykernel>=6.0,<7.0
+ipywidgets>=7.0,<9.0

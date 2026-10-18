@@ -1,215 +1,340 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
-
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+} // namespace nlm
+// Simple YAML parsing support
+bool Config::isYamlContent(const std::string& content) const {
+    // Simple YAML detection - look for YAML-like patterns
+    // Basic YAML has indentation, maps with colons, lists with dashes
+    bool hasIndentation = false;
+    bool hasColon = false;
+    bool hasDash = false;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
+    std::istringstream iss(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(iss, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+        if (line.empty() || line[0] == '#') continue;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        // Check for YAML patterns
+        if (!line.empty() && (line[0] == ' ' || line[0] == '\t')) hasIndentation = true;
+        if (line.find(':') != std::string::npos) hasColon = true;
+        if (line.find("- ") != std::string::npos) hasDash = true;
     }
     
-    return true;
+    return hasIndentation || hasColon || hasDash;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
+bool Config::loadFromYaml(const std::string& content, const std::string& filepath) {
+    std::istringstream iss(content);
+    std::string line;
+    size_t indentLevel = 0;
+    std::string currentKey;
+    std::string currentSection;
     
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        while (std::getline(iss, line)) {
+            size_t originalLength = line.length();
+            line = trim(line);
+            
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            
+            // Calculate indentation level
+            size_t currentIndent = 0;
+            while (currentIndent < originalLength && (line[currentIndent] == ' ' || line[currentIndent] == '\t')) {
+                currentIndent++;
+            }
+            
+            // Handle nested structures
+            if (currentIndent > indentLevel) {
+                currentSection = currentKey;
+            } else if (currentIndent < indentLevel) {
+                // Go back up one level
+                size_t lastDot = currentSection.find_last_of('.');
+                if (lastDot != std::string::npos) {
+                    currentSection = currentSection.substr(0, lastDot);
+                } else {
+                    currentSection = "";
+                }
+            }
+            
+            indentLevel = currentIndent;
+            
+            // Check for key-value pair
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Construct full key
+                std::string fullKey = currentSection.empty() ? key : currentSection + "." + key;
+                
+                // Remove quotes from value
+                if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                        (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Set the value
+                set(fullKey, value, ConfigSource::File);
+            } else if (line.find("-") == 0 && line.size() > 1 && std::isspace(static_cast<unsigned char>(line[1]))) {
+                // Handle list items
+                std::string listItem = trim(line.substr(1));
+                // For now, treat as string value
+                set(currentKey, listItem, ConfigSource::File);
+            }
+        }
+        
+        clearLastError();
+        return true;
+        
+    } catch (const std::exception& e) {
+        pImpl->lastError = std::string("Error parsing YAML content: ") + e.what();
+        return false;
     }
 }
 
+bool Config::loadFromJson(const std::string& content, const std::string& filepath) {
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(content);
+        
+        // Validate JSON structure
+        if (!validateJSONStructure(jsonData)) {
+            return false;
+        }
+        
+        // Convert JSON to configuration entries
+        clear();
+        parseJSON(jsonData, ConfigSource::File);
+        
+        clearLastError();
+        return true;
+        
+    } catch (const nlohmann::json::exception& e) {
+        pImpl->lastError = std::string("JSON parsing error: ") + e.what();
+        return false;
+    } catch (const std::exception& e) {
+        pImpl->lastError = std::string("Error parsing JSON content: ") + e.what();
+        return false;
+    }
+}
+
+bool Config::loadFromKeyValue(const std::string& content, const std::string& filepath) {
+    std::istringstream iss(content);
+    std::string line;
+    size_t lineNumber = 0;
+    
+    try {
+        while (std::getline(iss, line)) {
+            lineNumber++;
+            
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Validate line length
+            if (line.length() > 1024) { // 1KB line limit
+                pImpl->lastError = "Line " + std::to_string(lineNumber) + " exceeds maximum length (1024 characters)";
+                return false;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Validate key format
+                if (key.empty()) {
+                    pImpl->lastError = "Line " + std::to_string(lineNumber) + ": Empty key";
+                    return false;
+                }
+                
+                if (!isValidKey(key)) {
+                    pImpl->lastError = "Line " + std::to_string(lineNumber) + ": Invalid key format \"" + key + "\"";
+                    return false;
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && ((value.front() == '\"' && value.back() == '\"') ||
+                                        (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Validate value format
+                if (!isValidValue(value)) {
+                    pImpl->lastError = "Line " + std::to_string(lineNumber) + ": Invalid value format \"" + value + "\"";
+                    return false;
+                }
+                
+                // Set the value
+                set(key, value, ConfigSource::File);
+            } else {
+                pImpl->lastError = "Line " + std::to_string(lineNumber) + ": Missing = separator";
+                return false;
+            }
+        }
+        
+        clearLastError();
+        return true;
+        
+    } catch (const std::exception& e) {
+        pImpl->lastError = std::string("Error parsing key-value content: ") + e.what();
+        return false;
+    }
+}
+
+// Determine if content appears to be JSON
+bool Config::isJsonContent(const std::string& content) const {
+    // Trim whitespace
+    std::string trimmed = content;
+    size_t start = trimmed.find_first_not_of(" \t\r\n");
+    size_t end = trimmed.find_last_not_of(" \t\r\n");
+    if (start == std::string::npos) return false;
+    trimmed = trimmed.substr(start, end - start + 1);
+    
+    // JSON must start with { or [
+    return !trimmed.empty() && (trimmed[0] == '{' || trimmed[0] == '[');
+}// Configuration merging
+void Config::merge(const Config& other) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Merge entries from other config
+    for (const auto& entry : other.pImpl->entries) {
+        // Only override if the source is higher priority
+        if (static_cast<int>(entry.source) > static_cast<int>(getSourcePriority(entry.source))) {
+            set(entry.key, entry.value, entry.source);
+        }
+    }
+    
+    // Clear cache
+    pImpl->cache.clear();
+    pImpl->cacheDirty = true;
+}
+
+// Get source priority for merging
+ConfigSource Config::getSourcePriority(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::CommandLine:
+            return ConfigSource::CommandLine;
+        case ConfigSource::File:
+            return ConfigSource::File;
+        case ConfigSource::Runtime:
+            return ConfigSource::Runtime;
+        case ConfigSource::Default:
+            return ConfigSource::Default;
+        default:
+            return ConfigSource::Default;
+    }
+}
+
+// Clear cache implementation
+void Config::clearCache() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->cache.clear();
+    pImpl->cacheDirty = true;
+}
+
+// Get cached value implementation
+template<typename T>
+std::optional<T> Config::getCached(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    auto it = pImpl->cache.find(key);
+    if (it != pImpl->cache.end()) {
+        return std::any_cast<std::optional<T>>(it->second);
+    }
+    
+    return std::nullopt;
+}
+
+// Set cached value implementation
+template<typename T>
+void Config::setCached(const std::string& key, const T& value) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    pImpl->cache[key] = value;
+    pImpl->cacheDirty = false;
+}
+
+// Enhanced getOr implementation with better error handling
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    if (val.has_value()) {
+        return val.value();
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    // Log missing key if error handling is enabled
+    if (pImpl->lastError.empty()) {
+        pImpl->lastError = "Configuration key not found: " + key;
     }
-    return keys;
+    
+    return defaultValue;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+// Configuration validation improvements
+bool Config::validate(const std::string& key, const ConfigValue& value) const {
+    std::vector<std::string> errors;
+    
+    // Check if value type is valid for the key
+    if (!isValidKey(key)) {
+        errors.push_back("Invalid key format: " + key);
+    }
+    
+    // Type-specific validation
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (arg.length() > 1024) {
+                errors.push_back("String value too long for key: " + key);
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+            if (std::isinf(arg) || std::isnan(arg)) {
+                errors.push_back("Invalid numeric value (infinity or NaN) for key: " + key);
+            }
+            if (arg < -1e6 || arg > 1e6) {
+                errors.push_back("Numeric value out of range for key: " + key);
+            }
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            if (arg < -1000000 || arg > 1000000) {
+                errors.push_back("Integer value out of range for key: " + key);
+            }
+        }
+        
+        if constexpr (std::is_same_v<T, bool>) {
+            // Boolean values are always valid
+        }
+        
+    }, value);
+    
+    // Update error message
+    if (!errors.empty()) {
+        pImpl->lastError = "Validation failed for key \"" + key + "\": " + 
+                         (errors.size() > 1 ? ("Multiple errors: " + errors[0]) : errors[0]);
+        return false;
     }
-    return oss.str();
+    
+    pImpl->lastError.clear();
+    return true;
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Get configuration errors
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    if (!pImpl->lastError.empty()) {
+        errors.push_back(pImpl->lastError);
+    }
+    
+    return errors;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Clear validation errors
+void Config::clearValidationErrors() const {
+    pImpl->lastError.clear();
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

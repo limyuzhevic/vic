@@ -29,12 +29,22 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain (modular architecture)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainCore.cpp
+    # Brain modular components
+    src/brain/core/BrainCore.cpp
+    src/brain/memory/BrainMemoryManager.cpp
+    src/brain/prediction/BrainPredictor.cpp
+    src/brain/cognition/BrainCognition.cpp
+    src/brain/neuromodulation/BrainNeuromodulator.cpp
+    src/brain/development/BrainDevelopment.cpp
+    src/brain/plasticity/BrainPlasticity.cpp
+    # Old monolithic Brain.cpp is replaced by BrainCore.cpp
+    # src/brain/Brain.cpp  # Removed - replaced by BrainCore.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp

@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <mutex>
+#include <unordered_map>
+#include <any>
 
 namespace nlm {
 
@@ -93,6 +96,55 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get last error message
+    std::string getLastError() const;
+    
+    // Clear last error message
+    void clearLastError() const;
+    
+    // Check if key is valid (no special characters, alphanumeric + underscores)
+    static bool isValidKey(const std::string& key);
+    
+    // Check if value is valid for the key
+    static bool isValidValue(const std::string& value);
+    
+    // Get current timestamp for file headers
+    static std::string getCurrentTimestamp();
+    
+    // Validate configuration values
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    
+    // Get configuration errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Clear validation errors
+    void clearValidationErrors() const;
+    
+    // Configuration merging
+    void merge(const Config& other);
+    
+    // Clear cache flag
+    void clearCache() const;
+    
+    // Get cached value
+    template<typename T>
+    std::optional<T> getCached(const std::string& key) const;
+    
+    // Set cached value
+    template<typename T>
+    void setCached(const std::string& key, const T& value) const;
+    
+    // Clear all cached values
+    void clearCache() const;
+    
+    // Get cached value
+    template<typename T>
+    std::optional<T> getCached(const std::string& key) const;
+    
+    // Set cached value
+    template<typename T>
+    void setCached(const std::string& key, const T& value) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +152,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool isJsonContent(const std::string& content) const;
+    bool isYamlContent(const std::string& content) const;
+    bool loadFromJson(const std::string& content, const std::string& filepath);
+    bool loadFromYaml(const std::string& content, const std::string& filepath);
+    bool loadFromKeyValue(const std::string& content, const std::string& filepath);
+    
+    // JSON conversion helpers
+    static nlohmann::json convertConfigValueToJSON(const ConfigValue& value);
+    static ConfigValue convertJSONToConfigValue(const nlohmann::json& json);
+    static void parseJSON(const nlohmann::json& json, ConfigSource source);
+    static bool validateJSONStructure(const nlohmann::json& json) const;
 };
 
 } // namespace nlm

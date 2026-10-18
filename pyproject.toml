@@ -3,19 +3,20 @@ requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "pynlm"
+name = "nlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with enhanced Pythonic API"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Authors", email = "contact@nlm-project.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,87 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Framework :: Pytest",
 ]
 
-dependencies = []
+# Core dependencies - minimal, only pybind11 is needed
+# Python ecosystem integration is provided via optional dependencies
+dependencies = [
+    "pybind11>=2.11.0",  # Required for C++ bindings
+]
 
 [project.optional-dependencies]
+# Core functionality
+pythonic = [
+    "typing-extensions>=4.0",  # For Protocol support in Python < 3.8
+]
+
+# Visualization and plotting
+visualization = [
+    "numpy>=1.20,<2.0",
+    "matplotlib>=3.5,<4.0",
+    "pillow>=9.0,<11.0",
+]
+
+# Data analysis and scientific computing
+scientific = [
+    "numpy>=1.20,<2.0",
+    "pandas>=1.3,<2.0",
+    "scipy>=1.7,<2.0",
+]
+
+# Machine learning integration
+ml = [
+    "torch>=1.13,<3.0; platform_system != 'Windows'",  # PyTorch for deep learning
+    "tensorflow>=2.10,<3.0; platform_system != 'Windows'",  # TensorFlow for ML
+]
+
+# Jupyter and interactive computing
+jupyter = [
+    "jupyter>=1.0,<2.0",
+    "ipykernel>=6.0,<7.0",
+    "ipywidgets>=7.0,<9.0",
+]
+
+# Development and testing
 dev = [
-    "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest>=7.0,<8.0",
+    "pytest-asyncio>=0.19,<1.0",
+    "pytest-cov>=3.0,<5.0",
+    "black>=22.0,<24.0",
+    "isort>=5.10,<6.0",
+    "mypy>=0.991,<1.4",
+    "flake8>=5.0,<7.0",
+    "pylint>=2.15,<3.0",
+    "pre-commit>=3.0,<4.0",
+]
+
+# All optional dependencies combined
+all = [
+    "nlm[pythonic]",
+    "nlm[visualization]",
+    "nlm[scientific]",
+    "nlm[ml]",
+    "nlm[jupyter]",
+    "nlm[dev]",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issues" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
+
+[project.scripts]
+# Command-line interface for NLM
+nlm = "nlm.cli:main"
+nlm-demo = "nlm.examples:main"
+
+[project.gui-scripts]
+# Jupyter notebook integration
+nlm-notebook = "nlm.jupyter:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +115,97 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+# Python package configuration
+tool.python_packages.legacy = false
+
+[tool.scikit-build.cmake.define]
+
+# Python-specific configurations
+tool.pytest.ini_options.testpaths = ["tests"]
+tool.pytest.ini_options.python_files = ["test_*.py", "*_test.py"]
+tool.pytest.ini_options.python_classes = ["Test*"]
+tool.pytest.ini_options.python_functions = ["test_*"]
+
+# Code quality
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+skip-string-normalization = false
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | nlm/__pycache__
+  | docs/source/_build
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = ["nlm"]
+known_third_party = ["numpy", "matplotlib", "pandas", "torch", "tensorflow", "pytest"]
+sections = ["FUTURE", "STDLIB", "THIRD_PARTY", "FIRST_PARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+no_implicit_optional = true
+ignore_missing_imports = true
+
+[tool.pylint.master]
+load-plugins = ["pylint.extensions.docparams"]
+
+# Package metadata
+[tool.metadata]
+author = "NLM Authors"
+author_email = "contact@nlm-project.org"
+maintainer = "NLM Team"
+maintainer_email = "team@nlm-project.org"
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai"]
+
+# Development configuration
+[tool.dev.dependencies]
+build = ["scikit-build-core", "pybind11"]
+lint = ["black", "isort", "mypy", "flake8", "pylint"]
+format = ["black", "isort"]
+
+# Documentation
+[tool.docs.build]
+build-dir = "docs/_build"
+html-dir = "html"
+help-dir = "help"
+
+# Distribution
+[tool.distutils.setup_keywords]
+python_requires = "require"
+install_requires = "install_requires"
+extras_require = "extras_require"
+entry_points = "entry_points"
