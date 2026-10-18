@@ -2,7 +2,7 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is an experimental artificial developmental brain project. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -10,7 +10,95 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this using real Leaky Integrate-and-Fire (LIF) neuron dynamics.
+
+## Building
+
+### Linux/macOS
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Available Executables
+
+After building, you'll have these executables:
+
+- `nlm` - Basic neural computation demo (Phase 2)
+- `nlm_phase3_demo` - Phase 3 experiments
+- `nlm_phase4_demo` - Phase 4 experiments  
+- `nlm_phase5_demo` - Phase 5 optimizations (note: needs to be created)
+- `nlm_phase6_demo` - Phase 6 integration test ✅ (now available!)
+
+### Python Bindings
+
+NLM also provides Python bindings via PyPI package `pynlm`. This is the easiest way to get started:
+
+```bash
+pip install pynlm
+```
+
+## C++ API Quick Start
+
+The C++ API is more direct and powerful:
+
+```cpp
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+
+int main() {
+    // Step 1: Create configuration
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", 100);
+    config->set("region_count", 1);
+    config->set("connection_probability", 0.15f);
+    
+    // Step 2: Create brain
+    auto brain = std::make_shared<Brain>(config);
+    
+    // Step 3: Initialize
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return 1;
+    }
+    
+    // Step 4: Run simulation
+    for (int step = 0; step < 1000; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    std::cout << "Simulation complete!" << std::endl;
+    std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    
+    return 0;
+}
+```
+
+## New Phase 6 Integration
+
+The project now includes a complete **Phase 6 Integration Demo** (`nlm_phase6_demo`) that tests:
+
+- ✅ Memory systems integration (Working Memory + Episodic Memory)
+- ✅ Neuromodulation integration (Dopamine, Curiosity, Novelty)
+- ✅ Prediction system integration
+- ✅ Development system integration
+- ✅ Checkpoint save/load functionality
+- ✅ Replay and consolidation systems
+
+Run it with:
+
+```bash
+./build/nlm_phase6_demo
+```
+
+Or after building:
+
+```bash
+./nlm_phase6_demo
+```
 
 ---
 
