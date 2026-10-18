@@ -86,7 +86,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Helper function to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& v) -> std::string {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    oss << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << "\"" << arg[i] << "\"";
+                    }
+                    oss << "]";
+                }
+            }, entry.value);
+            return oss.str();
+        };
+        file << entry.key << " = " << valueToString(entry.value) << "\n";
     }
     
     return true;

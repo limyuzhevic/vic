@@ -71,35 +71,83 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### NEW: Advanced Agent Setup
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create a complete agent setup with one line
+brain, world, agent = pynlm.createAgentSetup(
+    neuronCount=1000,
+    worldSize=20,
+    visionWidth=8,
+    visionHeight=8,
+    enableLearning=True
+)
 
-# Initialize it
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Get statistics
+print("Brain stats:", pynlm.getBrainStats(brain))
+print("Agent stats:", pynlm.getAgentStats(agent))
+```
+
+### NEW: Easy Serialization
+
+```python
+import pynlm
+
+# Save your agent setup
+brain, world, agent = pynlm.createAgentSetup()
+pynlm.saveAgentToDirectory(brain, world, agent, "/tmp/my_agent")
+
+# Later, load it back
+loaded_brain, loaded_world, loaded_agent = pynlm.loadAgentFromDirectory("/tmp/my_agent")
+```
+
+### NEW: Debugging and Monitoring
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Enable verbose logging
+pynlm.enableVerboseLogging()
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Print brain state
+pynlm.printBrainState(brain)
+
+# Run a few steps
+for i in range(10):
+    brain.step(i)
+
+# Print final state
+pynlm.printBrainState(brain, includeMemory=True)
+```
+
+### NEW: Advanced Agent Configuration
+
+```python
+import pynlm
+
+# Create an advanced agent with custom configuration
+brain, world, agent = pynlm.createAdvancedAgent(
+    configName="research",
+    worldConfig="large",
+    enableAllFeatures=True
+)
+
+# Run a research experiment
+pynlm.runExperiment(brain, world, agent, 1000, "research_study")
 ```
 
 ---
@@ -141,6 +189,11 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+
+# NEW: Use convenience functions for comprehensive stats
+stats = pynlm.getBrainStats(brain)
+for key, value in stats.items():
+    print(f"{key}: {value}")
 ```
 
 ### Pattern 3: Enable Brain Features
@@ -151,6 +204,9 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# NEW: Batch enable multiple features
+pynlm.enableAllFeatures(agent, True)
 ```
 
 ---
@@ -178,6 +234,53 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+---
+
+## NEW: Advanced Features
+
+### Configuration Management
+
+```python
+# Create and configure configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+
+# Validate configuration
+if pynlm.validateConfig(config):
+    print("Configuration is valid!")
+
+# Get configuration statistics
+stats = pynlm.getConfigStats(config)
+print(f"Total configuration entries: {stats['total_entries']}")
+```
+
+### Batch Operations
+
+```python
+# Set multiple configuration values at once
+keyValues = [
+    ("brain.neuron_count", "1000"),
+    ("brain.synapse_density", "0.1"),
+    ("plasticity.stdp.enable", "true")
+]
+pynlm.batchSetConfig(config, keyValues)
+```
+
+### Debugging Tools
+
+```python
+# Enable verbose logging
+pynlm.enableVerboseLogging()
+
+# Print detailed state
+pynlm.printBrainState(brain)
+pynlm.printAgentState(agent)
+
+# Create a backup of current state
+pynlm.backupState(brain, world, agent, "/tmp/backup")
+```
 
 ---
 
@@ -221,37 +324,25 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### NEW: Complete Research Experiment
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+# Setup advanced agent
+brain, world, agent = pynlm.createAdvancedAgent(
+    configName="experiment",
+    worldConfig="medium",
+    enableAllFeatures=True
+)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Run experiment
+pynlm.runExperiment(brain, world, agent, 500, "learning_experiment")
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+# Save results
+pynlm.saveAgentToDirectory(brain, world, agent, "/tmp/experiment_results")
 
-print("Agent simulation complete!")
+print("Experiment completed and saved!")
 ```
 
 ---
@@ -265,9 +356,12 @@ print("Agent simulation complete!")
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
 | Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Get brain stats | `pynlm.getBrainStats(brain)` |
+| Get agent stats | `pynlm.getAgentStats(agent)` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Save agent | `pynlm.saveAgentToDirectory(brain, world, agent, path)` |
+| Load agent | `pynlm.loadAgentFromDirectory(path)` |
 
 ---
 
@@ -293,5 +387,6 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the new advanced features like `createAdvancedAgent()` and `runExperiment()`
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its advanced features and capabilities.

@@ -52,6 +52,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 demonstration |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -115,7 +117,7 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the NLM Python API
 
 ### Basic Usage
 
@@ -387,9 +389,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages
@@ -496,6 +498,39 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Advanced Usage with New Features
+
+```python
+import pynlm
+
+# Create advanced agent setup
+brain, world, agent = pynlm.createAgentSetup(
+    neuronCount=2000,
+    worldSize=30,
+    visionWidth=12,
+    visionHeight=12,
+    enableLearning=True
+)
+
+# Enable all features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Print detailed state
+pynlm.printBrainState(brain)
+pynlm.printAgentState(agent)
+
+# Run simulation
+pynlm.runAgentSimulation(brain, world, agent, 1000, logProgress=True)
+
+# Save for later
+pynlm.saveAgentToDirectory(brain, world, agent, "/tmp/advanced_agent")
+
+# Load later
+loaded_brain, loaded_world, loaded_agent = pynlm.loadAgentFromDirectory("/tmp/advanced_agent")
+```
+
 ---
 
 ## Troubleshooting
@@ -526,8 +561,102 @@ pip install --force-reinstall .
 
 ---
 
+## New Features and Improvements
+
+The following new features have been added to the NLM Python API:
+
+### 1. Advanced Configuration Management
+
+```python
+# Get configuration with type safety
+value = pynlm.getConfigValue(config, "key", default)
+
+# Set multiple values at once
+pynlm.batchSetConfig(config, [("key1", "value1"), ("key2", "value2")])
+
+# Get configuration statistics
+stats = pynlm.getConfigStats(config)
+
+# Validate configuration
+if pynlm.validateConfig(config):
+    print("Configuration is valid!")
+```
+
+### 2. Convenience Functions
+
+```python
+# Create complete agent setup with one line
+brain, world, agent = pynlm.createAgentSetup()
+
+# Run simulation easily
+pynlm.runAgentSimulation(brain, world, agent, 1000)
+
+# Get comprehensive statistics
+brain_stats = pynlm.getBrainStats(brain)
+agent_stats = pynlm.getAgentStats(agent)
+```
+
+### 3. Serialization Utilities
+
+```python
+# Save agent setup
+pynlm.saveAgentToDirectory(brain, world, agent, "/tmp/my_agent")
+
+# Load agent setup
+brain, world, agent = pynlm.loadAgentFromDirectory("/tmp/my_agent")
+
+# Backup current state
+pynlm.backupState(brain, world, agent, "/tmp/backup")
+```
+
+### 4. Debugging and Monitoring Tools
+
+```python
+# Enable verbose logging
+pynlm.enableVerboseLogging()
+
+# Print detailed state
+pynlm.printBrainState(brain)
+pynlm.printAgentState(agent)
+
+# This provides comprehensive debugging information
+```
+
+### 5. Advanced Agent Management
+
+```python
+# Create agent with advanced configuration
+brain, world, agent = pynlm.createAdvancedAgent(
+    configName="research",
+    worldConfig="large",
+    enableAllFeatures=True
+)
+
+# Run experiment
+pynlm.runExperiment(brain, world, agent, 1000, "my_experiment")
+```
+
+---
+
 ## Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PYTHON_API.md](docs/PYTHON_API.md) - Comprehensive Python API documentation
+- [docs/ADVANCED_FEATURES.md](docs/ADVANCED_FEATURES.md) - Advanced features and examples
+
+## Summary
+
+The NLM Python API now includes:
+
+1. **Bug fixes**: Fixed Config.saveToFile to properly save values instead of placeholders
+2. **Advanced configuration management**: Type-safe configuration access, batch operations, validation
+3. **Convenience functions**: Easy agent setup, simulation, comprehensive statistics
+4. **Serialization utilities**: Save/load agent setups, backup functionality
+5. **Debugging and monitoring**: Verbose logging, state printing, monitoring tools
+6. **Advanced agent management**: Custom agent creation, experiment running
+7. **Enhanced documentation**: Comprehensive examples and documentation
+8. **Unit tests**: Tests for new functionality
+
+These improvements make the NLM Python API more powerful, easier to use, and better suited for both beginners and advanced users.

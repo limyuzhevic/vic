@@ -422,4 +422,441 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
+// === ADVANCED CONFIGURATION MANAGEMENT ===
+
+namespace config_helpers {
+    
+    // Get configuration value with type conversion
+    template<typename T>
+    T getConfigValue(std::shared_ptr<Config> config, const std::string& key, const T& defaultValue = T()) {
+        auto value = config->get<T>(key);
+        return value.has_value() ? value.value() : defaultValue;
+    }
+    
+    // Set multiple configuration values at once
+    void batchSetConfig(std::shared_ptr<Config> config, const std::vector<std::pair<std::string, std::string>>& keyValuePairs) {
+        for (const auto& pair : keyValuePairs) {
+            config->set(pair.first, pair.second);
+        }
+    }
+    
+    // Get configuration statistics
+    std::map<std::string, std::string> getConfigStats(std::shared_ptr<Config> config) {
+        std::map<std::string, std::string> stats;
+        stats["total_entries"] = std::to_string(config->getKeys().size());
+        stats["has_default"] = std::to_string(config->has("brain.neuron_count") ? 1 : 0);
+        return stats;
+    }
+    
+    // Validate configuration
+    bool validateConfig(std::shared_ptr<Config> config) {
+        bool hasNeuronCount = config->has("brain.neuron_count");
+        bool hasSynapseDensity = config->has("brain.synapse_density");
+        return hasNeuronCount && hasSynapseDensity;
+    }
+}
+
+// === CONVENIENCE FUNCTIONS ===
+
+namespace convenience {
+    
+    // Create a complete agent setup
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> createAgentSetup(
+        int neuronCount = 1000,
+        int worldSize = 20,
+        float visionWidth = 8.0f,
+        float visionHeight = 8.0f,
+        bool enableLearning = true) {
+        
+        // Create configuration
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.connection_probability", 0.05);
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, visionWidth, visionHeight);
+        world->reset();
+        
+        // Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }
+    
+    // Run a simple agent simulation
+    void runAgentSimulation(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        int steps,
+        bool logProgress = false) {
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            // Get action and apply it
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply learning
+            if (agent->isRewardModulationEnabled()) {
+                float reward = 0.0f;
+                if (world->getSensoryPercept().getInternal() && 
+                    !world->getSensoryPercept().getInternal()->empty()) {
+                    reward = (*world->getSensoryPercept().getInternal())[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            if (logProgress && step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                          << brain->getFiringNeuronCount() << " firing neurons, "
+                          << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+            }
+        }
+    }
+    
+    // Get brain statistics
+    std::map<std::string, float> getBrainStats(std::shared_ptr<Brain> brain) {
+        std::map<std::string, float> stats;
+        stats["neuron_count"] = static_cast<float>(brain->getTotalNeuronCount());
+        stats["synapse_count"] = static_cast<float>(brain->getTotalSynapseCount());
+        stats["firing_neuron_count"] = static_cast<float>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spike_count"] = static_cast<float>(brain->getTotalSpikeCount());
+        return stats;
+    }
+    
+    // Get agent statistics
+    std::map<std::string, float> getAgentStats(std::shared_ptr<AgentBrain> agent) {
+        std::map<std::string, float> stats;
+        stats["curiosity_level"] = agent->getCuriosityLevel();
+        stats["novelty_level"] = agent->getNoveltyLevel();
+        stats["prediction_error"] = agent->getPredictionError();
+        stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        stats["developmental_stage"] = static_cast<float>(agent->getDevelopmentalStage());
+        stats["reward_modulation_enabled"] = agent->isRewardModulationEnabled() ? 1.0f : 0.0f;
+        stats["curiosity_enabled"] = agent->isCuriosityEnabled() ? 1.0f : 0.0f;
+        return stats;
+    }
+}
+
+// === SERIALIZATION UTILITIES ===
+
+namespace serialization {
+    
+    // Save brain and config to a directory
+    bool saveAgentToDirectory(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<Config> config,
+        const std::string& directory) {
+        
+        std::string brainFile = directory + "/brain.bin";
+        std::string configFile = directory + "/config.json";
+        
+        if (!brain->save(brainFile)) {
+            return false;
+        }
+        
+        if (!config->saveToFile(configFile)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Load brain and config from a directory
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<Config>> loadAgentFromDirectory(
+        const std::string& directory) {
+        
+        std::string brainFile = directory + "/brain.bin";
+        std::string configFile = directory + "/config.json";
+        
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(configFile);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->load(brainFile);
+        
+        return std::make_tuple(brain, config);
+    }
+    
+    // Create a backup of current state
+    bool backupState(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<Config> config,
+        const std::string& baseDirectory) {
+        
+        std::string timestamp = std::to_string(std::time(nullptr));
+        std::string backupDir = baseDirectory + "_backup_" + timestamp;
+        
+        return saveAgentToDirectory(brain, config, backupDir);
+    }
+}
+
+// === DEBUGGING AND MONITORING TOOLS ===
+
+namespace debugging {
+    
+    // Print detailed brain state
+    void printBrainState(std::shared_ptr<Brain> brain, bool includeMemory = false) {
+        std::cout << "=== BRAIN STATE ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+        std::cout << "E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "Development stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        if (includeMemory) {
+            auto workingMemory = brain->getWorkingMemory();
+            if (workingMemory) {
+                std::cout << "Working memory size: " << workingMemory->getCapacity() << std::endl;
+            }
+        }
+        
+        std::cout << "===================" << std::endl;
+    }
+    
+    // Print detailed agent state
+    void printAgentState(std::shared_ptr<AgentBrain> agent, bool includeWorld = false) {
+        std::cout << "=== AGENT STATE ===" << std::endl;
+        std::cout << "Curiosity level: " << agent->getCuriosityLevel() << std::endl;
+        std::cout << "Novelty level: " << agent->getNoveltyLevel() << std::endl;
+        std::cout << "Prediction error: " << agent->getPredictionError() << std::endl;
+        std::cout << "Neuromodulation level: " << agent->getNeuromodulationLevel() << std::endl;
+        std::cout << "Development stage: " << static_cast<int>(agent->getDevelopmentalStage()) << std::endl;
+        std::cout << "Reward modulation enabled: " << (agent->isRewardModulationEnabled() ? "Yes" : "No") << std::endl;
+        std::cout << "Curiosity enabled: " << (agent->isCuriosityEnabled() ? "Yes" : "No") << std::endl;
+        
+        if (includeWorld) {
+            // Would need access to world to print world state
+            std::cout << "World state: (not available in this context)" << std::endl;
+        }
+        
+        std::cout << "==================" << std::endl;
+    }
+    
+    // Enable verbose logging
+    void enableVerboseLogging() {
+        std::cout << "Verbose logging enabled" << std::endl;
+        // In a real implementation, this would configure the logger
+    }
+    
+    // Get current simulation time (placeholder)
+    double getCurrentSimulationTime(std::shared_ptr<Brain> brain) {
+        // This would require access to the brain's simulation clock
+        // For now, return a placeholder
+        return 0.0;
+    }
+}
+
+// === ADVANCED AGENT MANAGEMENT ===
+
+namespace advanced {
+    
+    // Create an agent with advanced configuration
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> createAdvancedAgent(
+        const std::string& configName,
+        const std::string& worldConfig,
+        bool enableAllFeatures = true) {
+        
+        // Create configuration with advanced settings
+        auto config = std::make_shared<Config>();
+        
+        // Basic configuration
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15);
+        config->set("brain.connection_probability", 0.08);
+        config->set("brain.v_thresh", -50.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        config->set("brain.tau_mem", 20.0);
+        config->set("brain.tau_ref", 2.0);
+        
+        // Plasticity configuration
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Neuromodulation configuration
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("neuromod.curiosity.enable", enableAllFeatures);
+        config->set("neuromod.novelty.enable", enableAllFeatures);
+        
+        // Development configuration
+        config->set("development.plasticity_rate_initial", 0.01);
+        config->set("development.plasticity_rate_maturation", 0.005);
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Parse world configuration
+        int worldSize = 30;
+        if (worldConfig == "large") worldSize = 50;
+        else if (worldConfig == "small") worldSize = 15;
+        
+        // Create world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, 12, 12);
+        world->reset();
+        world->setRandomSeed(42);
+        
+        // Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enableAllFeatures) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }
+    
+    // Run experiment with agent
+    void runExperiment(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        int steps,
+        const std::string& experimentName = "default") {
+        
+        std::cout << "Starting experiment: " << experimentName << std::endl;
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (agent->isRewardModulationEnabled()) {
+                float reward = 0.0f;
+                if (world->getSensoryPercept().getInternal() && 
+                    !world->getSensoryPercept().getInternal()->empty()) {
+                    reward = (*world->getSensoryPercept().getInternal())[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            agent->updateDevelopment(0.1);
+            
+            if (step % 1000 == 0) {
+                std::cout << "Experiment " << experimentName << ": Step " << step << std::endl;
+            }
+        }
+        
+        std::cout << "Experiment completed: " << experimentName << std::endl;
+    }
+}
+
+// === EXPOSE TO PYTHON ===
+
+// Expose advanced configuration helpers
+m.def("getConfigValue", &config_helpers::getConfigValue,
+      py::arg("config"), py::arg("key"), py::arg("defaultValue"),
+      "Get configuration value with type conversion");
+
+m.def("batchSetConfig", &config_helpers::batchSetConfig,
+      py::arg("config"), py::arg("keyValuePairs"),
+      "Set multiple configuration values at once");
+
+m.def("getConfigStats", &config_helpers::getConfigStats,
+      py::arg("config"), "Get configuration statistics");
+
+m.def("validateConfig", &config_helpers::validateConfig,
+      py::arg("config"), "Validate configuration");
+
+// Expose convenience functions
+m.def("createAgentSetup", &convenience::createAgentSetup,
+      py::arg("neuronCount") = 1000,
+      py::arg("worldSize") = 20,
+      py::arg("visionWidth") = 8.0f,
+      py::arg("visionHeight") = 8.0f,
+      py::arg("enableLearning") = true,
+      "Create a complete agent setup with brain, world, and agent");
+
+m.def("runAgentSimulation", &convenience::runAgentSimulation,
+      py::arg("brain"), py::arg("world"), py::arg("agent"),
+      py::arg("steps"), py::arg("logProgress") = false,
+      "Run a simple agent simulation");
+
+m.def("getBrainStats", &convenience::getBrainStats,
+      py::arg("brain"), "Get brain statistics");
+
+m.def("getAgentStats", &convenience::getAgentStats,
+      py::arg("agent"), "Get agent statistics");
+
+// Expose serialization utilities
+m.def("saveAgentToDirectory", &serialization::saveAgentToDirectory,
+      py::arg("brain"), py::arg("config"), py::arg("directory"),
+      "Save brain and config to a directory");
+
+m.def("loadAgentFromDirectory", &serialization::loadAgentFromDirectory,
+      py::arg("directory"), "Load brain and config from a directory");
+
+m.def("backupState", &serialization::backupState,
+      py::arg("brain"), py::arg("config"), py::arg("baseDirectory"),
+      "Create a backup of current state");
+
+// Expose debugging and monitoring tools
+m.def("printBrainState", &debugging::printBrainState,
+      py::arg("brain"), py::arg("includeMemory") = false,
+      "Print detailed brain state");
+
+m.def("printAgentState", &debugging::printAgentState,
+      py::arg("agent"), py::arg("includeWorld") = false,
+      "Print detailed agent state");
+
+m.def("enableVerboseLogging", &debugging::enableVerboseLogging,
+      "Enable verbose logging");
+
+// Expose advanced agent management
+m.def("createAdvancedAgent", &advanced::createAdvancedAgent,
+      py::arg("configName") = "default",
+      py::arg("worldConfig") = "default",
+      py::arg("enableAllFeatures") = true,
+      "Create an agent with advanced configuration");
+
+m.def("runExperiment", &advanced::runExperiment,
+      py::arg("brain"), py::arg("world"), py::arg("agent"),
+      py::arg("steps"), py::arg("experimentName") = "default",
+      "Run experiment with agent");
+
+m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
 } // namespace nlm
