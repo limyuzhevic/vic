@@ -134,14 +134,23 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements Leaky Integrate-and-Fire (LIF) dynamics
+    // Handles refractory period, spike detection, and membrane potential integration
     void step(Timestamp currentTime);
     
     // Reset to initial state
+    // Resets neuron state to factory defaults
     void reset();
     
     // Initialize with random parameters
+    // Sets random membrane potential, threshold, refractory period, and other biophysical properties
     void initializeRandom(RandomGenerator& rng);
+    
+    // Get synaptic input current (for debugging/monitoring)
+    MembranePotential getSynapticInput() const;
+    
+    // Add synaptic current input (for debugging/monitoring)
+    void addSynapticInput(MembranePotential current);
     
 private:
     struct Impl;

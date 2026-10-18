@@ -67,6 +67,23 @@ public:
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
     
+    // Advanced statistics and diagnostics
+    float getMembranePotentialMin() const;
+    float getMembranePotentialMax() const;
+    float getRefractoryNeuronRatio() const;  // fraction of neurons in refractory period
+    float getAverageAdaptationVariable() const;
+    std::vector<Neuron*> getMostActiveNeurons(size_t count) const;  // Neurons with highest firing rates
+    size_t getSpikeCount() const;  // Total spikes from all neurons in this population
+    
+    // Population dynamics and homeostasis
+    void homeostaticScale(float targetRate);  // Adjust parameters to maintain target firing rate
+    void applyInhibition(float inhibitionStrength);  // Apply global inhibition to regulate activity
+    
+    // Neuron state queries
+    bool hasActiveNeurons() const;
+    bool isPopulationStable() const;  // Check if activity has stabilized
+    size_t getPlasticityEventCount() const;  // Number of plasticity events that occurred
+    
 private:
     struct Impl;
     Impl* pImpl;

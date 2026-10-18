@@ -16,9 +16,18 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
+# Create test for improved Config class
+add_executable(nlm_test_improved
+    test_config_improved.cpp
+)
+
+target_link_libraries(nlm_test_improved PRIVATE nlm_core)
+target_compile_features(nlm_test_improved PRIVATE cxx_std_20)
+
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_test_improved COMMAND nlm_test_improved)

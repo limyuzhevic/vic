@@ -55,6 +55,111 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Helper functions for type conversion
+namespace {
+    bool tryParseBool(const std::string& str, bool& result) {
+        std::string lower = toLower(str);
+        if (lower == "true" || lower == "1" || lower == "yes" || lower == "on") {
+            result = true;
+            return true;
+        } else if (lower == "false" || lower == "0" || lower == "no" || lower == "off") {
+            result = false;
+            return true;
+        }
+        return false;
+    }
+    
+    bool tryParseInt(const std::string& str, int64_t& result) {
+        try {
+            size_t pos;
+            result = std::stoll(str, &pos);
+            return pos == str.size();
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    bool tryParseDouble(const std::string& str, double& result) {
+        try {
+            size_t pos;
+            result = std::stod(str, &pos);
+            return pos == str.size();
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    std::vector<int> tryParseIntList(const std::string& str) {
+        std::vector<int> result;
+        if (str.empty() || str[0] != '[' || str.back() != ']') {
+            return result;
+        }
+        
+        std::string content = str.substr(1, str.size() - 2);
+        std::stringstream ss(content);
+        std::string item;
+        
+        while (std::getline(ss, item, ',')) {
+            item = trim(item);
+            if (!item.empty()) {
+                try {
+                    result.push_back(std::stoi(item));
+                } catch (...) {
+                    // Skip invalid numbers
+                }
+            }
+        }
+        return result;
+    }
+    
+    std::vector<double> tryParseDoubleList(const std::string& str) {
+        std::vector<double> result;
+        if (str.empty() || str[0] != '[' || str.back() != ']') {
+            return result;
+        }
+        
+        std::string content = str.substr(1, str.size() - 2);
+        std::stringstream ss(content);
+        std::string item;
+        
+        while (std::getline(ss, item, ',')) {
+            item = trim(item);
+            if (!item.empty()) {
+                try {
+                    result.push_back(std::stod(item));
+                } catch (...) {
+                    // Skip invalid numbers
+                }
+            }
+        }
+        return result;
+    }
+    
+    std::vector<std::string> tryParseStringList(const std::string& str) {
+        std::vector<std::string> result;
+        if (str.empty() || str[0] != '[' || str.back() != ']') {
+            return result;
+        }
+        
+        std::string content = str.substr(1, str.size() - 2);
+        std::stringstream ss(content);
+        std::string item;
+        
+        while (std::getline(ss, item, ',')) {
+            item = trim(item);
+            if (!item.empty()) {
+                // Remove quotes
+                if (item.size() >= 2 && ((item.front() == '"' && item.back() == '"') ||
+                                          (item.front() == '\'' && item.back() == '\''))) {
+                    item = item.substr(1, item.size() - 2);
+                }
+                result.push_back(item);
+            }
+        }
+        return result;
+    }
+} // namespace
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -86,7 +191,43 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue back to string representation
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            file << entry.key << " = ";
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -126,8 +267,35 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+// Enhanced set method with automatic type conversion from string
+void Config::set(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Auto-detect type from string value
+    bool boolVal;
+    int64_t intVal;
+    double doubleVal;
+    std::vector<int> intListVal;
+    std::vector<double> doubleListVal;
+    std::vector<std::string> stringListVal;
+    
+    ConfigValue convertedValue;
+    
+    // Try different types in order of preference
+    if (tryParseBool(valueStr, boolVal)) {
+        convertedValue = boolVal;
+    } else if (tryParseInt(valueStr, intVal)) {
+        convertedValue = intVal;
+    } else if (tryParseDouble(valueStr, doubleVal)) {
+        convertedValue = doubleVal;
+    } else if ((intListVal = tryParseIntList(valueStr)).size() > 0) {
+        convertedValue = intListVal;
+    } else if ((doubleListVal = tryParseDoubleList(valueStr)).size() > 0) {
+        convertedValue = doubleListVal;
+    } else {
+        // Default to string
+        convertedValue = valueStr;
+    }
+    
+    set(key, convertedValue, source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {

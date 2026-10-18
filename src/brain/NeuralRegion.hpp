@@ -53,15 +53,18 @@ public:
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
     
-    // Statistics
-    size_t getTotalNeuronCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    // Connectivity queries
+    std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
+    std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
     
     // Local connectivity statistics
     float getAverageSynapticWeight() const;
     float getSynapticDensity() const;  // fraction of possible connections
+    
+    // Advanced connectivity analysis
+    float getConnectionStrength(NeuronId from, NeuronId to) const;  // Current connection weight
+    size_t getConnectionCountBetweenRegions(RegionId fromRegion, RegionId toRegion) const;  // Inter-region connections
+    std::vector<InterRegionConnection> getInterRegionConnections() const;  // Get all inter-region connections
     
     // Step all populations and synapses
     void step(Timestamp currentTime);
