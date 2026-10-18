@@ -1,15 +1,9 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
+class ConfigManager;
+class ConfigChangeListener;
+
+namespace nlm {
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -101,5 +95,74 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Advanced configuration manager with validation, schema, and monitoring
+class ConfigManager;
+
+// Configuration change notification
+class ConfigChangeListener {
+public:
+    virtual ~ConfigChangeListener() = default;
+    virtual void onConfigChanged(const std::string& key, const ConfigValue& oldValue, const ConfigValue& newValue) = 0;
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    ConfigValue defaultValue;
+    ConfigSource source;
+    std::string description;
+    bool required;
+    
+    ConfigSchema() : source(ConfigSource::Default), required(false) {}
+    ConfigSchema(const std::string& k, const ConfigValue& v, 
+                 const std::string& desc = "", bool req = false)
+        : key(k), defaultValue(v), source(ConfigSource::Default), 
+          description(desc), required(req) {}
+    ConfigSchema(const std::string& k, const std::string& v,
+                 const std::string& desc = "", bool req = false)
+        : key(k), defaultValue(v), source(ConfigSource::Default),
+          description(desc), required(req) {}
+    ConfigSchema(const std::string& k, double v,
+                 const std::string& desc = "", bool req = false)
+        : key(k), defaultValue(v), source(ConfigSource::Default),
+          description(desc), required(req) {}
+    ConfigSchema(const std::string& k, int v,
+                 const std::string& desc = "", bool req = false)
+        : key(k), defaultValue(v), source(ConfigSource::Default),
+          description(desc), required(req) {}
+    ConfigSchema(const std::string& k, bool v,
+                 const std::string& desc = "", bool req = false)
+        : key(k), defaultValue(v), source(ConfigSource::Default),
+          description(desc), required(req) {}
+};
+
+// Helper functions for configuration validation
+namespace config {
+    // Validation functions
+    bool isNonEmptyString(const ConfigValue& value);
+    bool isPositiveInt(const ConfigValue& value);
+    bool isPositiveDouble(const ConfigValue& value);
+    bool isBoolean(const ConfigValue& value);
+    bool isWithinRange(const ConfigValue& value, double min, double max);
+    bool matchesPattern(const ConfigValue& value, const std::string& pattern);
+    
+    // Type conversion utilities
+    std::string toString(const ConfigValue& value);
+    std::string formatValue(const ConfigValue& value);
+    
+    // Configuration utilities
+    std::vector<std::string> getConfigKeysWithPrefix(const Config& config, const std::string& prefix);
+    void stripPrefixFromKeys(Config& config, const std::string& prefix);
+    
+    // Command line parsing
+    struct ParsedArgs {
+        std::vector<std::string> unknownArgs;
+        std::vector<std::pair<std::string, std::string>> knownArgs;
+    };
+    
+    ParsedArgs parseAdvancedArgs(int argc, char** argv, 
+                                 const std::vector<std::string>& knownKeys);
+}
 
 } // namespace nlm
