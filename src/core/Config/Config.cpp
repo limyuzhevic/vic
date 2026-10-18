@@ -48,6 +48,33 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to parse value as int, then double, then bool, finally treat as string
+            try {
+                size_t endpos;
+                int intVal = std::stoi(value, &endpos);
+                if (endpos == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                size_t endpos;
+                double doubleVal = std::stod(value, &endpos);
+                if (endpos == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {}
+            
+            // Check for boolean values
+            if (value == "true" || value == "false") {
+                bool boolVal = (value == "true");
+                set(key, boolVal, ConfigSource::File);
+                continue;
+            }
+            
+            // Default to string
             set(key, value, ConfigSource::File);
         }
     }
@@ -65,6 +92,34 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Try to parse value as int, then double, then bool, finally treat as string
+                try {
+                    size_t endpos;
+                    int intVal = std::stoi(value, &endpos);
+                    if (endpos == value.size()) {
+                        set(key, intVal, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    size_t endpos;
+                    double doubleVal = std::stod(value, &endpos);
+                    if (endpos == value.size()) {
+                        set(key, doubleVal, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                // Check for boolean values
+                if (value == "true" || value == "false") {
+                    bool boolVal = (value == "true");
+                    set(key, boolVal, ConfigSource::CommandLine);
+                    continue;
+                }
+                
+                // Default to string
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,6 +127,34 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Try to parse value as int, then double, then bool, finally treat as string
+            try {
+                size_t endpos;
+                int intVal = std::stoi(value, &endpos);
+                if (endpos == value.size()) {
+                    set(key, intVal, ConfigSource::CommandLine);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                size_t endpos;
+                double doubleVal = std::stod(value, &endpos);
+                if (endpos == value.size()) {
+                    set(key, doubleVal, ConfigSource::CommandLine);
+                    continue;
+                }
+            } catch (...) {}
+            
+            // Check for boolean values
+            if (value == "true" || value == "false") {
+                bool boolVal = (value == "true");
+                set(key, boolVal, ConfigSource::CommandLine);
+                continue;
+            }
+            
+            // Default to string
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -81,6 +164,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        // Log error for file not being openable
         return false;
     }
     
