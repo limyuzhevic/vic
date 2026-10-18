@@ -1,11 +1,11 @@
 #pragma once
 
-#include "PlasticityRule.hpp"
+#include "RewardModulatedSTDP.hpp"
 
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real STDP implementation based on spike-timing correlations
 
 class STDP : public PlasticityRule {
 public:
@@ -26,6 +26,10 @@ public:
     float getLTDWeight() const;
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
@@ -36,15 +40,33 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// Implements reward-modulated learning with eligibility traces
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "R-STDP"; }
+    
+    // R-STDP parameters
+    void setLearningRate(float rate);    // Learning rate for reward modulation
+    float getLearningRate() const;
+    void setTraceDecay(float decay);     // Eligibility trace decay rate
+    float getTraceDecay() const;
+    void setRewardScale(float scale);    // Reward signal scaling factor
+    float getRewardScale() const;
+    
+    // Update parameters from config
+    void configure(float learningRate, float traceDecay, float rewardScale);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions

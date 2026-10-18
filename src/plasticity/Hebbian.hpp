@@ -17,11 +17,18 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
+    // Hebbian learning parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
-    
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Update parameters from config
+    void configure(float learningRate, float timeConstant);
     
 private:
     struct Impl;

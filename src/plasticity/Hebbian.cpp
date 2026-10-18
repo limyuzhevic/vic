@@ -1,106 +1,97 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include <cmath>
 #include <algorithm>
 
 namespace nlm {
 
-struct Hebbian::Impl {
+struct HebbianRule::Impl {
     float learningRate;
-    float maxWeight;
-    float minWeight;
-    float covarianceThreshold;  // For covariance rule
+    float timeConstant;     // Time constant for spike timing window (ms)
+    float minWeight;        // Minimum synaptic weight
+    float maxWeight;        // Maximum synaptic weight
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+    Impl() : learningRate(0.01f), timeConstant(10.0f),
+             minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+HebbianRule::HebbianRule() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+HebbianRule::~HebbianRule() = default;
 
-void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
+void HebbianRule::update(Synapse* synapse,
+                         const std::vector<Timestamp>& preSpikes,
+                         const std::vector<Timestamp>& postSpikes,
+                         TimestepDuration dt) {
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Real Hebbian learning implementation based on spike-timing correlation
+    float totalDelta = 0.0f;
+    float tau = pImpl->timeConstant;
+    
+    // Compute correlated firing between pre and post neurons
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            
+            // Close spike timing correlation
+            // Hebbian potentiation is strongest when pre fires shortly before post
+            if (dt >= 0 && dt <= tau) {
+                float correlation = std::exp(-dt / tau);
+                totalDelta += correlation;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
-    
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
+    // Apply weight change with bounds and biological constraints
+    if (totalDelta > 0.0f) {
+        // Scale by learning rate and current synaptic efficacy
+        float efficacy = synapse->getEfficacy();
+        float delta = pImpl->learningRate * totalDelta * efficacy;
+        
+        // Apply weight change
         applyWeightChange(synapse, delta);
+        
+        // Update eligibility trace for reward-modulated learning
+        float currentTrace = synapse->getEligibilityTrace();
+        synapse->setEligibilityTrace(currentTrace + totalDelta);
     }
 }
 
-void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
+    // Clamp weight to biologically plausible bounds
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
 
-const char* Hebbian::getName() const {
+const char* HebbianRule::getName() const {
     return "Hebbian";
 }
 
-void Hebbian::setLearningRate(float rate) {
-    pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
+void HebbianRule::setLearningRate(float rate) {
+    pImpl->learningRate = std::clamp(rate, 0.0f, 0.1f);
 }
 
-float Hebbian::getLearningRate() const {
+float HebbianRule::getLearningRate() const {
     return pImpl->learningRate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+void HebbianRule::setTimeConstant(float tau) {
+    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
-float Hebbian::getMaxWeight() const {
-    return pImpl->maxWeight;
+float HebbianRule::getTimeConstant() const {
+    return pImpl->timeConstant;
+}
+
+void HebbianRule::configure(float learningRate, float timeConstant) {
+    setLearningRate(learningRate);
+    setTimeConstant(timeConstant);
 }
 
 } // namespace nlm

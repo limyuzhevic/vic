@@ -13,7 +13,6 @@ public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -36,8 +35,7 @@ private:
     bool enabled_;
 };
 
-// Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Hebbian learning: "neurons that fire together, wire together"
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -53,6 +51,15 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Update parameters from config
+    void configure(float learningRate, float timeConstant);
     
 private:
     struct Impl;
