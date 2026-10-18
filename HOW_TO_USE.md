@@ -52,7 +52,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demonstration |
+| `pynlm` | Shared Library | Python bindings (pynlm package) |
 
 ### Build Options
 

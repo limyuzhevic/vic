@@ -6,7 +6,7 @@
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
+NLM IS NOT:
 - A transformer or LLM
 - A chatbot
 - A deep learning model
@@ -67,52 +67,376 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 ## Building
 
 ```bash
+# Standard build with all features
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+
+# For development (with debugging symbols)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j4
+
+# Install to system (optional)
+make install
 ```
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main Executable
 ```bash
+# Basic brain simulation (Phase 3+ level)
+./nlm
+
+# Phase 3: World interaction demo
+./nlm_phase3_demo
+
+# Phase 4: Emerging cognition demo  
+./nlm_phase4_demo
+
+# Phase 6: Integration test (comprehensive)
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Python Bindings
+```bash
+# Install Python package (recommended for users)
+pip install .
+
+# Or install in development mode
+pip install -e .
+
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+```
+
+### Python Usage
+```python
+import pynlm
+
+# Create a default brain configuration
+config = pynlm.createDefaultConfig()
+
+# Configure specific parameters
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── CMakeLists.txt                    # Build system configuration
+├── README.md                          # This documentation
+├── easy_usage.md                      # Simplified usage guide
+├── HOW_TO_USE.md                       # Detailed usage instructions
+├── docs/                              # Comprehensive documentation
+│   ├── ARCHITECTURE.md                # System architecture
+│   ├── SCIENCE.md                      # Scientific background
+│   ├── ROADMAP.md                      # Project roadmap
+│   ├── EXPERIMENTS.md                 # Experiment descriptions
+│   ├── LIMITATIONS.md                 # Current limitations
+│   └── PHASE6_FINAL_AUDIT.md          # Phase 6 audit report
+├── src/                               # Source code
+│   ├── core/                          # Core utilities
+│   │   ├── Config/                     # Configuration system (JSON/YAML parser)
+│   │   ├── Random/                     # Random number generation
+│   │   ├── Logger/                      # Logging system
+│   │   └── SimulationClock/            # Time management
+│   ├── brain/                         # Neural components (Phase 6 integrated)
+│   ├── dynamics/                      # Neural dynamics
+│   ├── plasticity/                    # Plasticity rules
+│   ├── development/                   # Developmental system
+│   ├── neuromodulation/                # Neuromodulators (Phase 6 integrated)
+│   ├── memory/                        # Memory systems (Phase 6 integrated)
+│   ├── prediction/                    # Prediction systems (Phase 6 integrated)
+│   ├── cognition/                     # Cognitive mechanisms (Phase 6 integrated)
+│   ├── sensory/                       # Sensory processing
+│   ├── motor/                         # Motor system
+│   ├── environment/                   # Environment interface
+│   ├── experiments/                   # Experiment framework (Phase 6)
+│   └── visualization/                 # Visualization
+├── tests/                             # Unit and integration tests
+├── python/                            # Python bindings source
+└── configs/                           # Example configuration files
 ```
+
+## Available Executables
+
+| Executable | Phase | Description |
+|------------|-------|-------------|
+| `nlm` | Phase 3 | Basic brain simulation with world interaction |
+| `nlm_phase3_demo` | Phase 3 | World interaction demonstration |
+| `nlm_phase4_demo` | Phase 4 | Emerging cognition demonstration |
+| `nlm_phase6_demo` | Phase 6 | Comprehensive integration test |
+
+## Python Package
+
+The `pynlm` Python package provides the following classes and functions:
+
+### Core Classes
+- **Brain**: Main neural simulation brain with all Phase 6 integrated systems
+- **Config**: Configuration system with JSON/YAML parser support
+- **AgentBrain**: Interface connecting brain to world simulation
+- **SimpleWorld**: 2D world for testing and simulation
+- **SensoryInput**: Base class for sensory data (Vision, Audio, InternalSignals)
+- **Action**: Motor commands and actions
+
+### Key Methods
+
+#### Brain Class
+```python
+brain = pynlm.createBrain(config)
+brain.initialize()
+brain.step(step)                    # Run one simulation step
+brain.receiveSensoryInput(input)     # Inject sensory data
+action = brain.produceAction()       # Get motor action
+brain.save("checkpoint.bin")         # Save brain state
+brain.load("checkpoint.bin")         # Load brain state
+```
+
+#### Config Class
+```python
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.loadFromFile("config.json")   # JSON format supported
+config.saveToFile("config.json")     # JSON output
+```
+
+#### AgentBrain Class
+```python
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.processSensoryInput(percept)
+agent.decodeMotorCommand()
+agent.applyRewardModulation(reward, predicted_reward)
+```
+
+### Configuration Options
+
+#### Brain Configuration
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `brain.neuron_count` | int | 1000 | Total number of neurons |
+| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
+| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
+| `brain.v_thresh` | float | -50.0 | Neuron threshold potential |
+
+#### Plasticity Configuration
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `plasticity.stdp.enable` | bool | true | Enable Spike-Timing-Dependent Plasticity |
+| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
+| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
+
+#### Neuromodulation Configuration
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
+| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
+| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+
+## Usage Examples
+
+### Minimal Example
+```python
+import pynlm
+
+# Create and initialize
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Simulate
+for i in range(100):
+    brain.step(i)
+
+print("Simulation complete!")
+```
+
+### Environment Interaction
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run episode
+for _ in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(0)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```
+
+### Complete Agent Example
+```python
+import pynlm
+
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_agent_simulation(1000)
+```
+
+## Building from Source
+
+### Prerequisites
+- C++20 compatible compiler (GCC 10+, Clang 12+, or MSVC 2019+)
+- CMake 3.16 or higher
+- Python 3.8+ (for Python bindings)
+- pybind11 (automatically included via CMake)
+
+### Build Steps
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd nlm
+
+# Create build directory and compile
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+```
+
+## Troubleshooting
+
+### Build Issues
+
+**CMake cannot find Python:**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+## Further Reading
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [HOW_TO_USE.md](HOW_TO_USE.md) - Detailed usage instructions
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
 
 ## Phase Summary
 

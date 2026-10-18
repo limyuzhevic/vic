@@ -3,11 +3,19 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cstring>
+#include <cctype>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Enhanced JSON parser for configuration files
+    bool parseJSON(const std::string& content);
+    bool parseJSONValue(const std::string& content, size_t& pos, ConfigValue& outValue);
+    void skipWhitespace(const std::string& content, size_t& pos);
+    std::string escapeString(const std::string& str);
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -18,30 +26,332 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Enhanced JSON parser for configuration files
+bool Config::Impl::parseJSON(const std::string& content) {
+    size_t pos = 0;
+    skipWhitespace(content, pos);
     
+    if (pos >= content.size() || content[pos] != '{') {
+        return false; // Expected object
+    }
+    
+    pos++; // Skip '{'
+    skipWhitespace(content, pos);
+    
+    while (pos < content.size()) {
+        skipWhitespace(content, pos);
+        
+        // Check for closing brace
+        if (content[pos] == '}') {
+            break;
+        }
+        
+        // Parse key (string)
+        if (content[pos] != '"') {
+            return false; // Expected string key
+        }
+        
+        size_t keyStart = ++pos; // Skip opening quote
+        while (pos < content.size() && content[pos] != '"') {
+            pos++;
+        }
+        
+        if (pos >= content.size()) {
+            return false; // Unterminated string
+        }
+        
+        std::string key = content.substr(keyStart, pos - keyStart);
+        pos++; // Skip closing quote
+        skipWhitespace(content, pos);
+        
+        if (pos >= content.size() || content[pos] != ':') {
+            return false; // Expected colon
+        }
+        
+        pos++; // Skip colon
+        skipWhitespace(content, pos);
+        
+        // Parse value
+        ConfigValue value;
+        if (!parseJSONValue(content, pos, value)) {
+            return false;
+        }
+        
+        entries.emplace_back(key, value, ConfigSource::File);
+        
+        skipWhitespace(content, pos);
+        
+        // Check for comma or closing brace
+        if (pos < content.size() && content[pos] == ',') {
+            pos++; // Skip comma
+            skipWhitespace(content, pos);
+        }
+        else if (pos < content.size() && content[pos] == '}') {
+            break;
+        }
+        else {
+            return false;
+        }
+    }
+    
+    if (pos >= content.size() || content[pos] != '}') {
+        return false; // Missing closing brace
+    }
+    
+    return true;
+}
+
+bool Config::Impl::parseJSONValue(const std::string& content, size_t& pos, ConfigValue& outValue) {
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) {
+        return false;
+    }
+    
+    char c = content[pos];
+    
+    if (c == '"') {
+        // String
+        size_t start = ++pos; // Skip opening quote
+        while (pos < content.size() && content[pos] != '"') {
+            if (content[pos] == '\\') {
+                pos++; // Skip escaped character
+            }
+            pos++;
+        }
+        
+        if (pos >= content.size()) {
+            return false; // Unterminated string
+        }
+        
+        std::string str = content.substr(start, pos - start);
+        // Unescape the string
+        size_t outPos = 0;
+        std::string unescaped;
+        unescaped.reserve(str.size());
+        while (outPos < str.size()) {
+            if (str[outPos] == '\\' && outPos + 1 < str.size()) {
+                switch (str[outPos + 1]) {
+                    case '\"': unescaped += '\"'; break;
+                    case '\\\\': unescaped += '\\\\'; break;
+                    case '\\/': unescaped += '\\/'; break;
+                    case '\\b': unescaped += '\b'; break;
+                    case '\\f': unescaped += '\f'; break;
+                    case '\\n': unescaped += '\n'; break;
+                    case '\\r': unescaped += '\r'; break;
+                    case '\\t': unescaped += '\t'; break;
+                    default: unescaped += str[outPos + 1]; break;
+                }
+                outPos += 2;
+            } else {
+                unescaped += str[outPos];
+                outPos++;
+            }
+        }
+        
+        outValue = unescaped;
+        pos++; // Skip closing quote
+    }
+    else if (c == '-' || (c >= '0' && c <= '9')) {
+        // Number
+        size_t start = pos;
+        bool hasDecimal = false;
+        bool hasExponent = false;
+        
+        while (pos < content.size()) {
+            char ch = content[pos];
+            if (ch == '.' || ch == 'e' || ch == 'E') {
+                if (ch == '.' && hasDecimal) break;
+                if ((ch == 'e' || ch == 'E') && hasExponent) break;
+                if (ch == 'e' || ch == 'E') {
+                    hasExponent = true;
+                    pos++;
+                    if (pos < content.size() && (content[pos] == '+' || content[pos] == '-')) {
+                        pos++;
+                    }
+                    continue;
+                }
+                hasDecimal = true;
+            } else if (ch == '-' && hasExponent) {
+                pos++;
+                continue;
+            } else if (!(ch >= '0' && ch <= '9')) {
+                break;
+            }
+            pos++;
+        }
+        
+        std::string numStr = content.substr(start, pos - start);
+        
+        // Try to parse as double first
+        try {
+            size_t endPos;
+            double val = std::stod(numStr, &endPos);
+            if (endPos == numStr.size()) {
+                outValue = val;
+            } else {
+                // Try as int
+                size_t endPos2;
+                long long val = std::stoll(numStr, &endPos2);
+                if (endPos2 == numStr.size()) {
+                    outValue = val;
+                } else {
+                    return false;
+                }
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    else if (c == 't' || c == 'f') {
+        // Boolean
+        if (pos + 3 < content.size() && content.compare(pos, 4, "true") == 0) {
+            outValue = true;
+            pos += 4;
+        } else if (pos + 4 < content.size() && content.compare(pos, 5, "false") == 0) {
+            outValue = false;
+            pos += 5;
+        } else {
+            return false;
+        }
+    }
+    else if (c == 'n') {
+        // null
+        if (pos + 3 < content.size() && content.compare(pos, 4, "null") == 0) {
+            outValue = std::string("");
+            pos += 4;
+        } else {
+            return false;
+        }
+    }
+    else if (c == '[') {
+        // Array
+        pos++; // Skip '['
+        skipWhitespace(content, pos);
+        
+        std::vector<std::string> arrayElements;
+        
+        while (pos < content.size() && content[pos] != ']') {
+            ConfigValue element;
+            if (!parseJSONValue(content, pos, element)) {
+                return false;
+            }
+            
+            // Store element as string for now (can be enhanced)
+            std::string elementStr;
+            std::visit([&elementStr](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    elementStr = std::to_string(arg);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    elementStr = std::to_string(arg);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    elementStr = arg ? "true" : "false";
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    elementStr = arg;
+                }
+            }, element);
+            
+            arrayElements.push_back(elementStr);
+            
+            skipWhitespace(content, pos);
+            
+            if (pos < content.size() && content[pos] == ',') {
+                pos++; // Skip comma
+                skipWhitespace(content, pos);
+            }
+            else if (pos < content.size() && content[pos] == ']') {
+                break;
+            } else {
+                return false;
+            }
+        }
+        
+        if (pos >= content.size() || content[pos] != ']') {
+            return false; // Missing closing bracket
+        }
+        
+        pos++; // Skip ']'
+        
+        // Store array as vector<string> for now
+        outValue = arrayElements;
+    }
+    else {
+        return false; // Unsupported value type
+    }
+    
+    skipWhitespace(content, pos);
+    return true;
+}
+
+void Config::Impl::skipWhitespace(const std::string& content, size_t& pos) {
+    while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos]))) {
+        pos++;
+    }
+}
+
+std::string Config::Impl::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (char c : str) {
+        switch (c) {
+            case '\"': result += "\\\\\""; break;
+            case '\\\\': result += "\\\\\\\\"; break;
+            case '\\/': result += "\\\\/"; break;
+            case '\\b': result += "\\\\b"; break;
+            case '\\f': result += "\\\\f"; break;
+            case '\\n': result += "\\\\n"; break;
+            case '\\r': result += "\\\\r"; break;
+            case '\\t': result += "\\\\t"; break;
+            default:
+                if (c < 32 || c > 126) {
+                    result += "\\\\u";
+                    char hex[5];
+                    snprintf(hex, sizeof(hex), "%04x", static_cast<unsigned int>(c));
+                    result += hex;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    
+    return result;
+}
+
+// Enhanced configuration loading with JSON support
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try JSON format first
+    if (pImpl->parseJSON(content)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    file.clear();
+    file.seekg(0);
+    
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -55,43 +365,50 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Save in JSON format
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << pImpl->escapeString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << "[]"; // Simplified for now
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
     return true;
 }
 
+// Template implementations for configuration access
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -191,12 +508,6 @@ std::string Config::trim(const std::string& str) {
     if (start == std::string::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
     return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
 }
 
 // Explicit template instantiations

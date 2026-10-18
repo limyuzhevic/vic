@@ -139,12 +139,46 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 5: Performance optimization infrastructure (header-based)
+# Performance infrastructure is implemented via header-only configuration
+# Files in src/performance/ provide compile-time configuration options
+# that are integrated into other components (MemoryPool, SIMD, etc.)
+
+# Phase 6 integrated demo executable (Phase 6: FINAL INTEGRATION)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 integrated experiment library (Phase 6: FINAL INTEGRATION)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Python bindings for pynlm package
+add_library(pynlm MODULE python/bindings.cpp)
+target_include_directories(pynlm PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+
+# Set Python module properties
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    SUFFIX ".so"
+    OUTPUT_NAME "pynlm"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python_bindings"
+)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
