@@ -416,10 +416,194 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // Create advanced configuration presets for common scenarios
+    m.def("createSimulationConfig", [](const std::string& preset) {
+        auto config = std::make_shared<Config>();
+        
+        if (preset == "default") {
+            // Default simulation parameters
+            config->set("simulation.timestep", 0.01, ConfigSource::Default);
+            config->set("simulation.duration", 10000, ConfigSource::Default);
+            config->set("neuron.threshold", -55.0, ConfigSource::Default);
+            config->set("neuron.restingpotential", -70.0, ConfigSource::Default);
+            config->set("neuron.refractoryperiod", 10, ConfigSource::Default);
+            config->set("synapse.weight", 1.0, ConfigSource::Default);
+            config->set("plasticity.hebbianrate", 0.01, ConfigSource::Default);
+            config->set("plasticity.stdprate", 0.01, ConfigSource::Default);
+        } else if (preset == "fast") {
+            // Fast simulation (fewer neurons, faster timestep)
+            config->set("simulation.timestep", 0.005, ConfigSource::Default);
+            config->set("neuron.refractoryperiod", 2, ConfigSource::Default);
+            config->set("plasticity.hebbianrate", 0.05, ConfigSource::Default);
+        } else if (preset == "accurate") {
+            // Accurate simulation (more neurons, slower timestep)
+            config->set("simulation.timestep", 0.02, ConfigSource::Default);
+            config->set("neuron.refractoryperiod", 20, ConfigSource::Default);
+            config->set("plasticity.hebbianrate", 0.001, ConfigSource::Default);
+            config->set("plasticity.stdprate", 0.002, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("preset"), "Create simulation configuration with preset parameters");
+    
+    // Advanced sensory input utilities
+    m.def("createVisionInput", [](size_t width, size_t height, size_t channels = 3) {
+        auto vision = std::make_shared<Vision>();
+        vision->configure(width, height, channels);
+        return vision;
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+       "Create vision sensory input with specified dimensions");
+    
+    m.def("createAudioInput", [](size_t sampleRate, size_t numSamples, size_t channels = 1) {
+        auto audio = std::make_shared<Audio>();
+        audio->configure(sampleRate, numSamples, channels);
+        return audio;
+    }, py::arg("sampleRate"), py::arg("numSamples"), py::arg("channels") = 1,
+       "Create audio sensory input with specified parameters");
+    
+    m.def("createInternalSignals", []() {
+        return std::make_shared<InternalSignals>();
+    }, "Create internal signals sensory input");
+    
+    // Advanced brain configuration helpers
+    m.def("createAgentConfig", [](const std::string& agentType, const std::string& worldType) {
+        auto config = std::make_shared<Config>();
+        
+        if (agentType == "simple") {
+            config->set("agent.maxenergy", 100.0, ConfigSource::Default);
+            config->set("agent.energydecayrate", 0.01, ConfigSource::Default);
+            config->set("agent.health", 1.0, ConfigSource::Default);
+            config->set("agent.maxage", 1000, ConfigSource::Default);
+        } else if (agentType == "advanced") {
+            config->set("agent.maxenergy", 200.0, ConfigSource::Default);
+            config->set("agent.energydecayrate", 0.005, ConfigSource::Default);
+            config->set("agent.health", 1.0, ConfigSource::Default);
+            config->set("agent.maxage", 2000, ConfigSource::Default);
+            config->set("agent.curiositycoefficient", 0.5, ConfigSource::Default);
+            config->set("agent.noveltythreshold", 0.3, ConfigSource::Default);
+        }
+        
+        if (worldType == "grid") {
+            config->set("world.type", "grid", ConfigSource::Default);
+            config->set("world.width", 100, ConfigSource::Default);
+            config->set("world.height", 100, ConfigSource::Default);
+        } else if (worldType == "continuous") {
+            config->set("world.type", "continuous", ConfigSource::Default);
+            config->set("world.bounds.xmin", -100.0, ConfigSource::Default);
+            config->set("world.bounds.xmax", 100.0, ConfigSource::Default);
+            config->set("world.bounds.ymin", -100.0, ConfigSource::Default);
+            config->set("world.bounds.ymax", 100.0, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("agentType"), py::arg("worldType"), "Create configuration for agent with specified type");
+    
+    // Enhanced simulation utilities
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                             int numSteps, bool recordOutput = false) {
+        brain->initialize();
+        
+        std::vector<std::shared_ptr<SensoryPercept>> percepts;
+        std::vector<std::shared_ptr<Action>> actions;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            auto percept = world->getSensoryPercept();
+            brain->processSensoryInput(*percept);
+            
+            if (recordOutput) {
+                percepts.push_back(percept);
+            }
+            
+            auto action = brain->produceAction();
+            world->applyMotorCommand(action->getType(), brain->getCurrentTime());
+            
+            if (recordOutput) {
+                actions.push_back(action);
+            }
+            
+            brain->step(step);
+            world->update(step);
+        }
+        
+        if (recordOutput) {
+            return std::make_tuple(percepts, actions);
+        } else {
+            return std::make_tuple(std::vector<std::shared_ptr<SensoryPercept>>{}, 
+                                 std::vector<std::shared_ptr<Action>>{});
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps") = 1000, py::arg("recordOutput") = false,
+       "Run complete simulation and return sensory inputs and actions");
+    
+    // Advanced analysis functions
+    m.def("analyzeBrainActivity", [](std::shared_ptr<Brain> brain) {
+        auto stats = brain->analyzeBrainActivity();
+        
+        py::dict result;
+        result["totalNeurons"] = stats.totalNeurons;
+        result["totalSynapses"] = stats.totalSynapses;
+        result["activeNeurons"] = stats.activeNeurons;
+        result["firingNeurons"] = stats.firingNeurons;
+        result["averageFiringRate"] = stats.averageFiringRate;
+        result["excitationInhibitionRatio"] = stats.excitationInhibitionRatio;
+        result["totalSpikes"] = stats.totalSpikes;
+        result["developmentStage"] = static_cast<int>(stats.developmentStage);
+        
+        return result;
+    }, py::arg("brain"), "Analyze brain activity and return statistics");
+    
+    // Configuration preset management
+    m.def("getAvailableConfigPresets", []() {
+        return std::vector<std::string>{"default", "minimal", "fast", "accurate"};
+    }, "Get list of available configuration presets");
+    
+    // Advanced initialization utilities
+    m.def("initializeForLearning", [](std::shared_ptr<AgentBrain> agentBrain, 
+                                     std::shared_ptr<SimpleWorld> world,
+                                     const std::string& learningMode) {
+        agentBrain->enableRewardModulation(learningMode.find("reward") != std::string::npos);
+        agentBrain->enableStructuralPlasticity(learningMode.find("structural") != std::string::npos);
+        agentBrain->enableDevelopment(learningMode.find("development") != std::string::npos);
+        agentBrain->enableCuriosity(learningMode.find("curiosity") != std::string::npos);
+        
+        agentBrain->initialize(*world);
+        
+        // Configure world for learning
+        world->setLearningMode(learningMode);
+        world->enableExploration(true);
+        
+        return true;
+    }, py::arg("agentBrain"), py::arg("world"), py::arg("learningMode"), 
+       "Initialize agent brain for specific learning mode");
+    
+    // Advanced error handling and validation
+    py::register_exception<std::invalid_argument>(m, "ConfigurationError");
+    py::register_exception<std::runtime_error>(m, "SimulationError");
+    py::register_exception<std::out_of_range>(m, "BrainError");
+    
+    // Simulation benchmarking utilities
+    m.def("benchmarkSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   int numSteps, int warmupSteps = 100) {
+        // Warmup
+        for (int i = 0; i < warmupSteps; ++i) {
+            brain->step(i);
+            world->update(i);
+        }
+        
+        // Actual benchmark
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int i = warmupSteps; i < warmupSteps + numSteps; ++i) {
+            brain->step(i);
+            world->update(i);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        return py::make_tuple(
+            duration.count(),
+            static_cast<double>(numSteps) / (duration.count() / 1000.0),  // steps per second
+            brain->getTotalSpikeCount()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps"), py::arg("warmupSteps") = 100,
+       "Benchmark simulation performance and return timing info");
