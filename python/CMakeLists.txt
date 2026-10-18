@@ -91,12 +91,40 @@ pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+# Enhanced NLM bindings (new enhanced Python interface)
+pybind11_add_module(pynlm_enhanced EnhancedBindings.cpp)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Phase 2 demo experiment (for backward compatibility)
+pybind11_add_module(pynlm_phase2_demo Phase2Demo.cpp)
+target_link_libraries(pynlm_phase2_demo PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_phase2_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_enhanced PRIVATE /permissive-)
+    target_compile_options(pynlm_phase2_demo PRIVATE /permissive-)
 endif()
 
-install(TARGETS pynlm
+install(TARGETS pynlm pynlm_enhanced pynlm_phase2_demo
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+enable_testing()
+add_test(NAME pynlm_enhanced_test
+    COMMAND ${Python_EXECUTABLE} -c "import pynlm_enhanced; print('Enhanced NLM bindings loaded successfully')"
+)
+
+add_test(NAME pynlm_phase2_demo_test
+    COMMAND ${Python_EXECUTABLE} -c "import pynlm_phase2_demo; print('Phase 2 NLM demo loaded successfully')"
+)
+
+message(STATUS "NLM Python Bindings Configuration")
+message(STATUS "  - Standard bindings (pynlm): Original interface")
+message(STATUS "  - Enhanced bindings (pynlm_enhanced): Pythonic API with advanced features")
+message(STATUS "  - Phase 2 demo (pynlm_phase2_demo): Backward compatible demo")
+message(STATUS "  - All bindings include comprehensive error handling and validation")
+message(STATUS "  - Enhanced bindings include factory methods and analysis tools")

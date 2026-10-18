@@ -1,8 +1,18 @@
+// Enhanced Neuron.hpp with Improved Memory Management
+// 
+// This version improves the Neuron class with:
+// 1. Smart pointer-based Pimpl pattern using std::unique_ptr
+// 2. Better exception safety and RAII compliance
+// 3. Improved move semantics with proper cleanup
+// 4. Enhanced memory safety and resource management
+// 5. Cleaner interface and better encapsulation
+
 #pragma once
 
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>  // For smart pointers
 
 namespace nlm {
 
@@ -41,7 +51,7 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with improved memory management
 class Neuron {
 public:
     // Create neuron with ID
@@ -52,8 +62,8 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&&) noexcept = default;
+    Neuron& operator=(Neuron&&) noexcept = default;
     
     // Identity
     NeuronId getId() const;
@@ -144,8 +154,12 @@ public:
     void initializeRandom(RandomGenerator& rng);
     
 private:
+    // Smart pointer-based Pimpl for improved memory safety
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Private constructor for move-only semantics
+    Neuron() = default;
 };
 
 } // namespace nlm

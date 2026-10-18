@@ -1,7 +1,17 @@
+// Enhanced Neuron.cpp with Smart Pointer Memory Management
+// 
+// This implementation provides:
+// 1. Smart pointer-based Pimpl pattern using std::unique_ptr
+// 2. Proper RAII and automatic memory management
+// 3. Enhanced exception safety
+// 4. Cleaner move semantics with automatic resource transfer
+// 5. Improved memory safety and resource cleanup
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>  // For smart pointers
 
 namespace nlm {
 
@@ -27,7 +37,7 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -37,21 +47,28 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
@@ -62,12 +79,28 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
 }
 
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
 void Neuron::setThreshold(MembranePotential threshold) {
     pImpl->state.threshold = threshold;
 }
 
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
 }
 
 void Neuron::decrementRefractory() {
@@ -77,6 +110,10 @@ void Neuron::decrementRefractory() {
             pImpl->state.firingState = FiringState::Resting;
         }
     }
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
@@ -89,10 +126,6 @@ void Neuron::setLeakConductance(MembranePotential conductance) {
 
 MembranePotential Neuron::getLeakConductance() const {
     return pImpl->state.leakConductance;
-}
-
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -121,25 +154,21 @@ float Neuron::getLastSpikeTime() const {
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
 }
 
@@ -166,8 +195,16 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
@@ -184,8 +221,16 @@ void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
@@ -273,7 +318,6 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
