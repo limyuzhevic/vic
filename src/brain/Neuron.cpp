@@ -148,6 +148,10 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    // Record spike timestamp for STDP and synaptic plasticity
+    // Spike history is maintained as a circular buffer to store recent spikes
+    // This allows spike-timing-dependent plasticity calculations
+    // Maximum history size is limited to prevent unbounded memory growth
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -155,14 +159,23 @@ void Neuron::recordSpike(Timestamp timestamp) {
 }
 
 void Neuron::clearSpikeHistory() {
+    // Clear all recorded spike times
+    // Used to reset STDP synaptic modifications
+    // Typically called when brain is reset for new episode
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Register incoming synaptic connection
+    // Used for synaptic plasticity calculations
+    // Synapses are identified by handle rather than pointer to avoid circular dependencies
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Register outgoing synaptic connection
+    // Used for synaptic plasticity calculations
+    // Synapses are identified by handle rather than pointer to avoid circular dependencies
     pImpl->outgoingSynapses.push_back(handle);
 }
 
@@ -204,56 +217,89 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Where:
+    //   V is membrane potential (mV)
+    //   V_rest is resting potential (typically -70mV)
+    //   tau is membrane time constant (typically 20ms)
+    //   I is total synaptic current input (nA)
+    //   C is membrane capacitance (typically 1nF)
+    // This equation describes how membrane potential changes over time due to:
+    // 1. Leak current: (V_rest - V)/tau (drives V toward V_rest)
+    // 2. Synaptic current: I/C (represents summed synaptic inputs)
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::TIME_CONSTANT;  // Membrane time constant (ms)
+    float C = Impl::MEMBRANE_CAPACITANCE;  // Membrane capacitance (nF)
     
-    // Synaptic input contributes to membrane potential change
+    // Synaptic input contribution to membrane potential
+    // Synaptic conductance * reversal potential = current
+    // For excitatory synapses (AMPA), reversal potential is ~0mV
+    // For inhibitory synapses (GABA), reversal potential is ~-70mV
+    // The total current is divided by capacitance to get dV/dt
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution to membrane potential
+    // Represents the natural tendency of membrane potential to decay
+    // toward the resting potential, modeled as a first-order linear system
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Convert dt from seconds to milliseconds for consistency with tau
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // This models biological adaptation where firing rate decreases over time
+    // The adaptation variable accumulates with each spike and decays exponentially
+    // This mechanism reduces firing rate during sustained input, mimicking neural adaptation
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
+        V -= pImpl->state.adaptationVariable * 0.01f;  // Apply adaptation current
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
+    // Biological neurons have natural limits to membrane potential
+    // Below -100mV is near reversal potential for most ions
+    // Above 50mV indicates depolarization block (neuron cannot fire)
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike threshold crossing
+    // When V reaches threshold (~-55mV), neuron fires an action potential
+    // This represents the all-or-nothing firing property of real neurons
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for STDP and synaptic plasticity
+        // Spike history is used for spike-timing-dependent plasticity (STDP)
+        // This stores precise spike times for learning rules
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset potential after spike
+        // In real neurons, action potentials trigger sodium channel inactivation
+        // and potassium channel activation, rapidly resetting V to ~-70mV
         V = V_reset;
         
         // Enter refractory period
+        // After spike, neuron cannot fire for refractoryPeriod milliseconds
+        // During refractory period, sodium channels are inactivated
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Update adaptation variable for spike-frequency adaptation
+        // Each spike adds to adaptation, making subsequent spikes less likely
+        // This models short-term synaptic depression and neural adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Active;  // For rate-based computation
     }
     
     // Clear synaptic input for next step
+    // Inputs are integrated over one timestep and then cleared
+    // This prevents synaptic inputs from accumulating indefinitely
     pImpl->synapticInput = 0.0f;
     
     return fired;
