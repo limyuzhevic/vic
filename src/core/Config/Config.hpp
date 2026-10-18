@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -22,6 +23,9 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// JSON schema type alias
+using JsonSchema = nlohmann::json;
 
 // Configuration source
 enum class ConfigSource {
@@ -64,6 +68,12 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Load from JSON string
+    bool loadFromJsonString(const std::string& jsonStr);
+    
+    // Convert to JSON string
+    std::string toJsonString() const;
+    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
@@ -93,6 +103,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Schema validation
+    bool validateSchema(const JsonSchema& schema) const;
+    
+    // Merge with another config
+    void merge(const Config& other);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +116,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper functions (implementation in Config.cpp)
+    static json configValueToJson(const ConfigValue& value);
+    static ConfigValue jsonToConfigValue(const json& j);
 };
 
 } // namespace nlm
