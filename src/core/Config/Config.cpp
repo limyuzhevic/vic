@@ -24,72 +24,151 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        Logger::getInstance().error("Failed to open configuration file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    try {
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(file, line)) {
+            ++lineNumber;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Validate key
+                if (key.empty()) {
+                    Logger::getInstance().warning("Empty key at line " + std::to_string(lineNumber));
+                    continue;
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to parse value as int, double, or bool, otherwise treat as string
+                try {
+                    size_t pos2;
+                    int intVal = std::stoi(value, &pos2);
+                    if (pos2 == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    size_t pos2;
+                    double doubleVal = std::stod(value, &pos2);
+                    if (pos2 == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                    continue;
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                    continue;
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                Logger::getInstance().warning("Invalid format at line " + std::to_string(lineNumber) + ": " + line);
+            }
         }
+        
+        Logger::getInstance().info("Successfully loaded " + std::to_string(pImpl->entries.size()) + 
+                                     " configuration entries from " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::getInstance().error("Error parsing configuration file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    Logger::getInstance().warning("Invalid command line argument format: " + arg);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                Logger::getInstance().warning("Invalid command line argument format: " + arg);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        Logger::getInstance().error("Error parsing command line arguments: " + std::string(e.what()));
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        Logger::getInstance().error("Failed to save configuration to file: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        file << "# NLM Configuration File\n";
+        file << "# Generated by NLM Phase 6\n\n";
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        Logger::getInstance().info("Configuration saved to " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::getInstance().error("Error saving configuration to file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 template<typename T>
