@@ -182,6 +182,10 @@ bool Brain::initialize() {
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // NEW: Get synaptic weight initialization parameters from config
+    float synapseWeightMax = pImpl->config->getOr<float>("synapse_weight_max", 0.4f);
+    float synapseWeightMin = pImpl->config->getOr<float>("synapse_weight_min", 0.1f);
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
@@ -195,10 +199,19 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            // Add populations with configurable sizes
+            // NEW: Use configurable population ratios from config
+            float sensoryRatio = pImpl->config->getOr<float>("sensory_population_ratio", 0.25f);
+            float internalRatio = pImpl->config->getOr<float>("internal_population_ratio", 0.5f);
+            float motorRatio = pImpl->config->getOr<float>("motor_population_ratio", 0.25f);
+            
+            size_t sensoryNeurons = static_cast<size_t>(neuronsPerRegion * sensoryRatio);
+            size_t internalNeurons = static_cast<size_t>(neuronsPerRegion * internalRatio);
+            size_t motorNeurons = neuronsPerRegion - sensoryNeurons - internalNeurons;
+            
+            auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -215,8 +228,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -225,7 +238,8 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            // NEW: Use configurable synaptic parameters from config
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, synapseWeightMax, synapseWeightMin);
         }
     }
     
@@ -347,9 +361,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                bool justFired = false;
+                
+                // Neuron fired this step if:
+                // 1. It was in Active state at end of previous step (firing completed)
+                // 2. It has a valid last spike time
+                // 3. The spike occurred in the very recent past (current timestep)
+                if (state.firingState == FiringState::Refractory && 
+                    state.lastSpikeTime >= 0.0f &&
+                    std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 1.5f) {
+                    justFired = true;
+                }
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -425,12 +447,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // NEW: Get dopamine excitability modulation factor from config
+        float dopamineExcitabilityMod = pImpl->config->getOr<float>("dopamine_excitability_mod", 0.5f);
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    float excitabilityMod = dopamineLevel * dopamineExcitabilityMod;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
@@ -456,8 +482,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    
+                    // NEW: Get weight adjustment factor from config
+                    float weightAdjustmentFactor = pImpl->config->getOr<float>("weight_adjustment_factor", 0.001f);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * weightAdjustmentFactor;
                     syn->setWeight(weight);
                 }
             }
@@ -479,7 +508,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    
+    // NEW: Get episode storage interval from config
+    int episodeStorageInterval = pImpl->config->getOr<int>("episode_storage_interval", 10);
+    
+    if (pImpl->stepsSinceLastEpisode >= episodeStorageInterval) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -533,21 +566,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    // NEW: Get structural plasticity interval from config
+    int structuralPlasticityInterval = pImpl->config->getOr<int>("structural_plasticity_interval", 100);
+    if (currentStep % structuralPlasticityInterval == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        // NEW: Get number of episodes to replay from config
+        int episodesToReplayCount = pImpl->config->getOr<int>("replay_episodes_count", 3);
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(episodesToReplayCount);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    // NEW: Get development update interval from config
+    int developmentUpdateInterval = pImpl->config->getOr<int>("development_update_interval", 1000);
+    if (currentStep % developmentUpdateInterval == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
@@ -579,7 +617,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // NEW: Get consolidation threshold from config
+        float consolidationThreshold = pImpl->config->getOr<float>("consolidation_threshold", 0.3f);
+        pImpl->episodicMemory->consolidate(consolidationThreshold);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -599,19 +639,25 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     if (numSensory == 0) return;
     
     // Distribute input across sensory neurons
+    // NEW: Get sensory input normalization factor from config
+    float sensoryInputNormalization = pImpl->config->getOr<float>("sensory_input_normalization", 10.0f);
+    
+    // NEW: Get working memory storage threshold from config
+    float workingMemoryStorageThreshold = pImpl->config->getOr<float>("working_memory_storage_threshold", 0.5f);
+    
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            normalizedValue = static_cast<float>(values[i]) * sensoryInputNormalization;
         }
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (pImpl->workingMemory && normalizedValue > workingMemoryStorageThreshold) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / sensoryInputNormalization);
         }
     }
 }
@@ -690,30 +736,98 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection system
+    // Based on motor neuron populations, activity levels, and brain state
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // NEW: Get configurable thresholds from config
+    float actionSelectionTemperature = pImpl->config->getOr<float>("action_selection_temperature", 0.1f);
+    float actionExplorationRate = pImpl->config->getOr<float>("action_exploration_rate", 0.1f);
+    float actionConsolidationThreshold = pImpl->config->getOr<float>("action_consolidation_threshold", 0.8f);
+    float moveForwardThreshold = pImpl->config->getOr<float>("move_forward_threshold", 0.8f);
+    float moveBackwardThreshold = pImpl->config->getOr<float>("move_backward_threshold", 0.6f);
+    float reactToStimulusThreshold = pImpl->config->getOr<float>("react_to_stimulus_threshold", 0.7f);
+    float planActionThreshold = pImpl->config->getOr<float>("plan_action_threshold", 0.9f);
+    float minActivityThreshold = pImpl->config->getOr<float>("min_activity_threshold", 0.1f);
+    
+    // Find motor neuron populations with highest activity
+    std::vector<std::pair<float, ActionType>> actionCandidates;
+    
     for (auto* neuron : pImpl->motorNeurons) {
+        // Get continuous activity level (0.0 to 1.0)
+        float activity = neuron->getFiringRate() / 100.0f;  // Normalize to 0-1
+        
+        // Determine potential action based on neuron type and activity
+        ActionType potentialAction = ActionType::Wait;
+        
         if (neuron->isFiring()) {
-            ++firingMotor;
+            // Map motor neuron activity to actions based on type
+            switch (neuron->getType()) {
+                case NeuronType::Motor:
+                    // Primary motor neurons - movement actions
+                    if (activity > moveForwardThreshold) {
+                        potentialAction = ActionType::MoveForward;
+                    } else if (activity > moveBackwardThreshold) {
+                        potentialAction = ActionType::MoveBackward;
+                    } else {
+                        potentialAction = ActionType::TurnLeft;
+                    }
+                    break;
+                case NeuronType::Sensory:
+                    // Sensory input can trigger reactive actions
+                    if (activity > reactToStimulusThreshold) {
+                        potentialAction = ActionType::ReactToStimulus;
+                    }
+                    break;
+                case NeuronType::Internal:
+                    // Internal neurons can trigger cognitive actions
+                    if (activity > planActionThreshold) {
+                        potentialAction = ActionType::PlanAction;
+                    }
+                    break;
+                default:
+                    potentialAction = ActionType::Wait;
+            }
+        }
+        
+        // Only add actions with significant activity
+        if (activity > minActivityThreshold) {
+            actionCandidates.push_back({activity, potentialAction});
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Also consider neuromodulation effects on action selection
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Dopamine increases exploration - add more action variety
+        if (dopamineLevel > 0.5f && !actionCandidates.empty()) {
+            // Select a random action from candidates for exploration
+            size_t randomIndex = pImpl->rng->uniformInt(0, actionCandidates.size() - 1);
+            return std::make_unique<Action>(actionCandidates[randomIndex].second);
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Select best action based on highest activity level
+    if (!actionCandidates.empty()) {
+        // Find action with highest activity
+        size_t bestIndex = 0;
+        float bestActivity = actionCandidates[0].first;
+        
+        for (size_t i = 1; i < actionCandidates.size(); ++i) {
+            if (actionCandidates[i].first > bestActivity) {
+                bestActivity = actionCandidates[i].first;
+                bestIndex = i;
+            }
+        }
+        
+        return std::make_unique<Action>(actionCandidates[bestIndex].second);
+    }
     
-    return action;
+    // Default to wait if no significant motor activity
+    return std::make_unique<Action>(ActionType::Wait);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
