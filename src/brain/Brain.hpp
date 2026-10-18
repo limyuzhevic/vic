@@ -125,6 +125,12 @@ public:
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
+    // Neuron lookup management - O(1) lookup by neuron ID
+    void updateNeuronLookup(Neuron* neuron);
+    void removeNeuronFromLookup(NeuronId neuronId);
+    Neuron* getNeuronById(NeuronId neuronId);
+    const Neuron* getNeuronById(NeuronId neuronId) const;
+    
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
                                   float weight = 0.0f, Delay delay = 1);

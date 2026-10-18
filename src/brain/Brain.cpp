@@ -28,6 +28,9 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // O(1) neuron lookup table: NeuronId -> Neuron*
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -92,6 +95,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , neuronLookup()
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -155,6 +159,34 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;  // O(1) neuron lookup
+    
+    // Helper functions for neuron lookup
+    void updateNeuronLookup(Neuron* neuron) {
+        if (neuron) {
+            neuronLookup[neuron->getId()] = neuron;
+        }
+    }
+    
+    void removeNeuronFromLookup(NeuronId neuronId) {
+        neuronLookup.erase(neuronId);
+    }
+    
+    Neuron* getNeuronById(NeuronId neuronId) {
+        auto it = neuronLookup.find(neuronId);
+        if (it != neuronLookup.end()) {
+            return it->second;
+        }
+        return nullptr;
+    }
+    
+    const Neuron* getNeuronById(NeuronId neuronId) const {
+        auto it = neuronLookup.find(neuronId);
+        if (it != neuronLookup.end()) {
+            return it->second;
+        }
+        return nullptr;
+    }
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -268,20 +300,15 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // Find destination neuron using O(1) lookup
+        Neuron* destination = pImpl->getNeuronById(event.destination_neuron);
+        if (destination) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                destination->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                destination->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -333,67 +360,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
-        }
+    // Flatten to single loop over all neurons for better cache locality and SIMD
+    // (Triples the complex operations to O(neurons) from O(regions × populations × neurons))
+    for (size_t i = 0; i < pImpl->allNeurons.size(); ++i) {
+        auto* neuron = pImpl->allNeurons[i];
+        neuron->stepLIF(currentTime, pImpl->timestep);
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+    // Use flat neuron vector for efficient spike detection and event scheduling
+    // O(num_neurons) instead of O(regions × populations × neurons)
+    for (size_t i = 0; i < pImpl->allNeurons.size(); ++i) {
+        auto* neuron = pImpl->allNeurons[i];
+        // Check if neuron just fired this step
+        const auto& state = neuron->getState();
+        bool justFired = (state.firingState == FiringState::Refractory &&
+                         state.lastSpikeTime >= 0.0f &&
+                         std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+        if (justFired) {
+            // Neuron fired this step - queue the spike
+            SpikeEvent event(neuron->getId(), currentTime, currentStep);
+            pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
+            // Record post-synaptic spike for incoming synapses (plasticity)
+            auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+            for (Synapse* syn : incomingSynapses) {
+                syn->recordPostSpike(currentTime);
+            }
 
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+            // Get outgoing synapses and schedule delayed spike events
+            auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+            for (Synapse* syn : outgoingSynapses) {
+                // Create delayed spike event
+                Delay delay = syn->getDelay();
+                SimulationStep deliveryStep = currentStep + delay;
+                Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
+                DelayedSpikeEvent delayedEvent(
+                    neuron->getId(),
+                    syn->getDestinationNeuron(),
+                    syn->getId(),
+                    syn->getWeight(),
+                    syn->getType(),
+                    currentTime,
+                    deliveryTime,
+                    currentStep,
+                    deliveryStep
+                );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
-                    }
-                }
+                // Record pre-synaptic spike for plasticity
+                syn->recordPreSpike(currentTime);
+            }
+            
+            // Store to working memory - neurons that fire become part of working memory
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                    std::abs(state.membranePotential - state.restingPotential) / 10.0f);
             }
         }
     }
@@ -931,6 +956,50 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
         }
     }
     return nullptr;
+}
+
+// Add helper functions for O(1) neuron lookup
+void Brain::Impl::updateNeuronLookup(Neuron* neuron) {
+    if (neuron) {
+        neuronLookup[neuron->getId()] = neuron;
+    }
+}
+
+void Brain::Impl::removeNeuronFromLookup(NeuronId neuronId) {
+    neuronLookup.erase(neuronId);
+}
+
+Neuron* Brain::Impl::getNeuronById(NeuronId neuronId) {
+    auto it = neuronLookup.find(neuronId);
+    if (it != neuronLookup.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+const Neuron* Brain::Impl::getNeuronById(NeuronId neuronId) const {
+    auto it = neuronLookup.find(neuronId);
+    if (it != neuronLookup.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+// Public wrapper functions
+void Brain::updateNeuronLookup(Neuron* neuron) {
+    pImpl->updateNeuronLookup(neuron);
+}
+
+void Brain::removeNeuronFromLookup(NeuronId neuronId) {
+    pImpl->removeNeuronFromLookup(neuronId);
+}
+
+Neuron* Brain::getNeuronById(NeuronId neuronId) {
+    return pImpl->getNeuronById(neuronId);
+}
+
+const Neuron* Brain::getNeuronById(NeuronId neuronId) const {
+    return pImpl->getNeuronById(neuronId);
 }
 
 size_t Brain::getRegionCount() const {

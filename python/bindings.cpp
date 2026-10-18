@@ -115,6 +115,29 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Look", ActionType::Look)
         .value("LookUp", ActionType::LookUp)
         .value("LookDown", ActionType::LookDown)
+        .value("LookLeft", ActionType::LookLeft)
+        .value("LookRight", ActionType::LookRight)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    // Additional action types for more comprehensive control
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("LookLeft", ActionType::LookLeft)
+        .value("LookRight", ActionType::LookRight)
         .value("Interact", ActionType::Interact)
         .value("Eat", ActionType::Eat)
         .value("Drink", ActionType::Drink)
@@ -263,20 +286,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // Enhance SimpleWorld with more configuration options
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
              py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("configureWithDefaults", [](SimpleWorld& self) {
+            self.configure(20, 20, 8, 8);
+        }, "Configure world with default size and vision")
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
+        .def("step", &SimpleWorld::update, py::arg("timestep"), "Alias for update() method")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
              py::arg("cmd"), py::arg("currentTime"))
+        .def("applyAction", &SimpleWorld::applyMotorCommand,
+             py::arg("action"), py::arg("currentTime"), "Alias for applyMotorCommand()")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
              py::return_value_policy::reference_internal)
+        .def("getPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal, "Alias for getSensoryPercept()")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
              py::return_value_policy::reference_internal)
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+        .def("addResource", [](SimpleWorld& self, float x, float y, float value) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value);
+            self.addObject(obj);
+        }, "Add a resource object to the world")
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
         .def("getWidth", &SimpleWorld::getWidth)
@@ -288,6 +324,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // Add more constants for better Python API
+    m.attr("MAX_WORLD_SIZE") = 1000;
+    m.attr("DEFAULT_VISION_SIZE") = 8;
+    m.attr("DEFAULT_WORLD_SIZE") = 20;
+    m.attr("DEFAULT_MAX_ENERGY") = 100.0f;
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -347,11 +389,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"), "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Add common convenience methods
+        .def("isInitialized", [](const Brain& brain) {
+            return brain.getTotalNeuronCount() > 0;
+        }, "Check if brain is initialized (has neurons)")
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count")
+        .def("getSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -420,6 +484,72 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Add Pythonic convenience functions for common use cases
+
+    m.def("runSimpleExperiment", 
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+           std::shared_ptr<AgentBrain> agent, int numSteps) {
+            agent->initialize(*world);
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            
+            for (int step = 0; step < numSteps; ++step) {
+                world->update(0.1);
+                
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Simple reward based on world state
+                float reward = 0.0f;
+                auto objects = world->getAgentBody();
+                // In a real implementation, you'd have proper reward calculation
+                if (objects) {
+                    agent->applyRewardModulation(reward, 0.0f);
+                }
+            }
+            
+            return std::make_tuple(brain->getTotalSpikeCount(),
+                                  agent->getCuriosityLevel(),
+                                  agent->getNoveltyLevel());
+        },
+        py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+        "Run a simple experiment with brain, world, and agent");
+
+    m.def("createStandardConfig", 
+        []() -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(1000));
+            config->set("region_count", static_cast<int64_t>(1));
+            config->set("connection_probability", 0.1f);
+            config->set("stdp_ltp_weight", 0.01f);
+            config->set("stdp_ltd_weight", 0.012f);
+            config->set("random_seed", static_cast<int64_t>(42));
+            return config;
+        },
+        "Create a standard configuration for typical experiments");
+
+    m.def("createExplorationConfig", 
+        []() -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(500));
+            config->set("region_count", static_cast<int64_t>(2));
+            config->set("connection_probability", 0.15f);
+            config->set("stdp_ltp_weight", 0.005f);
+            config->set("stdp_ltd_weight", 0.006f);
+            config->set("synaptogenesis_rate", 0.0005f);
+            config->set("random_seed", static_cast<int64_t>(12345));
+            return config;
+        },
+        "Create a configuration optimized for exploration and learning");
+
+    // Add module metadata and documentation
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) - Python bindings for neural simulation";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__license__") = "MIT";
+}
