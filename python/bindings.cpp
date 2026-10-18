@@ -383,22 +383,91 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
+        .def("enableActionSequencing", &AgentBrain::enableActionSequencing,
+              py::arg("enable"), "Enable or disable action sequencing")
+        .def("enableMemoryBasedNavigation", &AgentBrain::enableMemoryBasedNavigation,
+              py::arg("enable"), "Enable or disable memory-based navigation")
+        .def("enableGoalDirectedBehavior", &AgentBrain::enableGoalDirectedBehavior,
+              py::arg("enable"), "Enable or disable goal-directed behavior")
+        .def("setExplorationRadius", &AgentBrain::setExplorationRadius,
+              py::arg("radius"), "Set exploration radius for memory-based navigation")
+        .def("setMemoryDecayRate", &AgentBrain::setMemoryDecayRate,
+              py::arg("decay"), "Set memory decay rate (0.0-1.0)")
+        .def("recordVisitedLocation", &AgentBrain::recordVisitedLocation,
+              py::arg("x"), py::arg("y"), "Record visited location for navigation memory")
+        .def("isLocationVisited", &AgentBrain::isLocationVisited,
+              py::arg("x"), py::arg("y"), "Check if location has been visited")
+        .def("getVisitedLocations", &AgentBrain::getVisitedLocations,
+              "Get all visited locations (memory-based navigation)")
+        .def("clearVisitedLocations", &AgentBrain::clearVisitedLocations,
+              "Clear visited locations memory")
+        .def("startActionSequence", &AgentBrain::startActionSequence,
+              py::arg("sequence"), "Start an action sequence")
+        .def("isInActionSequence", &AgentBrain::isInActionSequence,
+              "Check if currently executing an action sequence")
+        .def("getNextActionFromSequence", &AgentBrain::getNextActionFromSequence,
+              "Get next action from current sequence")
+        .def("cancelActionSequence", &AgentBrain::cancelActionSequence,
+              "Cancel current action sequence")
+        .def("getExpectedReward", &AgentBrain::getExpectedReward,
+              "Get expected reward from reward prediction")
+        .def("getDevelopmentalAge", &AgentBrain::getDevelopmentalAge,
+              "Get current developmental age")
+        .def("getPlasticityModifier", &AgentBrain::getPlasticityModifier,
+              "Get current plasticity modifier")
+        .def("getRewardPredictionError", &AgentBrain::getPredictionError,
+              "Get reward prediction error (alias for getPredictionError)")
+        .def("setGoal", [](AgentBrain& self, float x, float y) {
+            self.setGoal(x, y);
+        }, py::arg("x"), py::arg("y"), "Set navigation goal for goal-directed behavior")
+        .def("getGoal", &AgentBrain::getGoal,
+              "Get current navigation goal")
+        .def("hasGoal", &AgentBrain::hasGoal,
+              "Check if goal-directed behavior is active")
+        .def("getMemoryUsage", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.getVisitedLocations().size(),
+                self.getRewardHistory().size()
+            );
+        }, "Get memory usage (visited locations, reward history)")
+        .def("getBehaviorStats", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.isRewardModulationEnabled(),
+                self.isActionSequencingEnabled(),
+                self.isMemoryBasedNavigationEnabled(),
+                self.isGoalDirectedBehaviorEnabled()
+            );
+        }, "Get current behavior configuration");
+.def("enableActionSequencing", &AgentBrain::enableActionSequencing,
+              py::arg("enable"), "Enable or disable action sequencing")
+        .def("enableMemoryBasedNavigation", &AgentBrain::enableMemoryBasedNavigation,
+              py::arg("enable"), "Enable or disable memory-based navigation")
+        .def("enableGoalDirectedBehavior", &AgentBrain::enableGoalDirectedBehavior,
+              py::arg("enable"), "Enable or disable goal-directed behavior")
+        .def("setExplorationRadius", &AgentBrain::setExplorationRadius,
+              py::arg("radius"), "Set exploration radius for memory-based navigation")
+        .def("setMemoryDecayRate", &AgentBrain::setMemoryDecayRate,
+              py::arg("decay"), "Set memory decay rate (0.0-1.0)")
+        .def("recordVisitedLocation", &AgentBrain::recordVisitedLocation,
+              py::arg("x"), py::arg("y"), "Record visited location for navigation memory")
+        .def("isLocationVisited", &AgentBrain::isLocationVisited,
+              py::arg("x"), py::arg("y"), "Check if location has been visited")
+        .def("getVisitedLocations", &AgentBrain::getVisitedLocations,
+              "Get all visited locations (memory-based navigation)")
+        .def("clearVisitedLocations", &AgentBrain::clearVisitedLocations,
+              "Clear visited locations memory")
+        .def("startActionSequence", &AgentBrain::startActionSequence,
+              py::arg("sequence"), "Start an action sequence")
+        .def("isInActionSequence", &AgentBrain::isInActionSequence,
+              "Check if currently executing an action sequence")
+        .def("getNextActionFromSequence", &AgentBrain::getNextActionFromSequence,
+              "Get next action from current sequence")
+        .def("cancelActionSequence", &AgentBrain::cancelActionSequence,
+              "Cancel current action sequence")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

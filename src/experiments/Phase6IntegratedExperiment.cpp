@@ -19,6 +19,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
+    // Validate configuration
+    if (!validatePhase6Config(config)) {
+        NLM_LOG_ERROR("Invalid Phase 6 configuration");
+        return result;
+    }
+    
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
@@ -33,7 +39,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
-    // Create brain
+    // Create brain with error handling
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
@@ -41,64 +47,102 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
+    // Create simple world with error handling
     SimpleWorld world;
-    world.initialize(16, 16);
+    if (!world.initialize(16, 16)) {
+        NLM_LOG_ERROR("Failed to initialize world");
+        result.endTime = time(nullptr);
+        return result;
+    }
     
-    // Create agent
+    // Create agent with error handling
     AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    try {
+        agent.initialize(world);
+        agent.enableRewardModulation(true);
+        agent.enableStructuralPlasticity(config.enableDevelopment);
+        agent.enableDevelopment(config.enableDevelopment);
+        agent.enableCuriosity(true);
+        agent.enableActionSequencing(true);
+        agent.enableMemoryBasedNavigation(true);
+        agent.enableGoalDirectedBehavior(config.enableDevelopment);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize agent: " + std::string(e.what()));
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Run simulation with better error handling
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+        try {
+            // Get observation
+            SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+            
+            // Validate percept
+            if (percept.getVision().empty() && !config.connectionProbability) {
+                NLM_LOG_WARNING("Empty vision percept at step " + std::to_string(step));
+                continue;
+            }
+            
+            // Process sensory input
+            agent.processSensoryInput(percept);
+            
+            // Store visited location for memory-based navigation
+            if (agent.isMemoryBasedNavigationEnabled()) {
+                // Simple position tracking (approximate)
+                float x = step % 16 * 0.5f;  // Approximate position
+                float y = (step / 16) * 0.5f;
+                agent.recordVisitedLocation(x, y);
+            }
+            
+            // Brain step
+            brain->step(step, step * 0.001);
+            
+            // Validate step result
+            if (!brain->getTotalNeuronCount()) {
+                NLM_LOG_ERROR("Brain has no neurons at step " + std::to_string(step));
+                break;
+            }
+            
+            // Get motor command
+            MotorCommand cmd = agent.decodeMotorCommand();
+            
+            // Apply action to world
+            world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+            
+            // Compute reward
+            float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+            totalReward += reward;
+            
+            // Apply reward modulation
+            agent.applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            if (config.enableDevelopment) {
+                agent.updateDevelopment(0.001);
+            }
+            
+            // Collect metrics
+            totalFiringRate += brain->getAverageFiringRate();
+            if (brain->getFiringNeuronCount() > 0) firingCount++;
+            
+            // Periodic status with better logging
+            if (step % 1000 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                            " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                            " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                            " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                                brain->getWorkingMemory()->getActiveTraces() : 0));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error at step " + std::to_string(step) + ": " + std::string(e.what()));
+            break;  // Stop simulation on error
         }
     }
     
@@ -125,21 +169,25 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing with better error handling
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        std::string checkpointPath = config.checkpointPath.empty() ? "/tmp/nlm_checkpoint_test.bin" : config.checkpointPath;
+        
+        if (brain->save(checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
+            // Create new brain and load with error handling
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
+            if (!brain2->initialize()) {
+                NLM_LOG_ERROR("Failed to initialize second brain for checkpoint test");
             } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+                if (brain2->load(checkpointPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint");
+                }
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
@@ -157,6 +205,83 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
     
     return result;
+}
+
+// Add validation helper method
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() {
+    // Initialize experiment with default settings
+    NLM_LOG_INFO("Phase 6 Integrated Experiment created");
+}
+
+Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+
+// Enhanced validation with detailed error reporting
+bool Phase6IntegratedExperiment::validatePhase6Config(const Phase6Config& config) {
+    // Comprehensive validation of Phase 6 experiment configuration
+    
+    // Validate neuron count - must be positive and within reasonable bounds
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be > 0 (got " + std::to_string(config.neuronCount) + ")");
+        return false;
+    }
+    
+    if (config.neuronCount > 100000) {
+        NLM_LOG_ERROR("Invalid neuron_count: exceeds maximum limit (got " + std::to_string(config.neuronCount) + ")");
+        return false;
+    }
+    
+    // Validate region count - must be positive and reasonable
+    if (config.regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: must be > 0 (got " + std::to_string(config.regionCount) + ")");
+        return false;
+    }
+    
+    if (config.regionCount > 1000) {
+        NLM_LOG_ERROR("Invalid region_count: exceeds maximum limit (got " + std::to_string(config.regionCount) + ")");
+        return false;
+    }
+    
+    // Validate connection probability - must be between 0 and 1
+    if (config.connectionProbability < 0.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be >= 0.0 (got " + std::to_string(config.connectionProbability) + ")");
+        return false;
+    }
+    
+    if (config.connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be <= 1.0 (got " + std::to_string(config.connectionProbability) + ")");
+        return false;
+    }
+    
+    // Validate step count - must be positive and within reasonable bounds
+    if (config.maxSteps == 0) {
+        NLM_LOG_ERROR("Invalid maxSteps: must be > 0 (got " + std::to_string(config.maxSteps) + ")");
+        return false;
+    }
+    
+    if (config.maxSteps > 1000000) {
+        NLM_LOG_ERROR("Invalid maxSteps: exceeds maximum limit (got " + std::to_string(config.maxSteps) + ")");
+        return false;
+    }
+    
+    // Validate checkpoint path if enabled
+    if (config.enableCheckpointing) {
+        if (config.checkpointPath.empty()) {
+            NLM_LOG_WARNING("Checkpoint enabled but checkpoint_path not specified; using default path");
+        }
+    }
+    
+    // Validate consistency between configuration flags
+    if (config.enableDevelopment && config.maxSteps < 100) {
+        NLM_LOG_WARNING("Development enabled but maxSteps is very small (" + std::to_string(config.maxSteps) + "); development effects may not be visible");
+    }
+    
+    if (config.enableReplay && config.maxSteps < 10) {
+        NLM_LOG_WARNING("Replay enabled but maxSteps is very small (" + std::to_string(config.maxSteps) + "); replay effects may not be visible");
+    }
+    
+    // All validation passed
+    NLM_LOG_INFO("Phase 6 configuration validation passed");
+    return true;
 }
 
 bool Phase6IntegratedExperiment::verifyIntegration() {

@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 namespace nlm {
 
@@ -18,8 +19,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , explorationRadius_(1.0f)
+    , memoryDecayRate_(0.99f)
+    , goalTolerance_(0.1f)
+    , actionSequencingEnabled_(false)
+    , memoryBasedNavigationEnabled_(false)
+    , goalDirectedBehaviorEnabled_(false)
+    , targetX_(0.0f)
+    , targetY_(0.0f)
+    , rewardPredictionError_(0.0f)
+    , rewardPredictionDecay_(0.9f)
     , sensoryNoveltyDecay_(0.99f)
+    , visitedLocations_()
+    , actionSequence_()
+    , rewardHistory_()
 {
+    // Initialize random seed for exploration
+    if (brain_ && brain_->getRandomGenerator()) {
+        brain_->getRandomGenerator()->seed(std::chrono::steady_clock::now().time_since_epoch().count());
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -154,9 +173,25 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    // Check if we're in an action sequence
+    if (isInActionSequence()) {
+        decoded = getNextActionFromSequence();
+    } else if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Goal-directed behavior
+    if (goalDirectedBehaviorEnabled_ && targetX_ != 0.0f && targetY_ != 0.0f && brain_) {
+        // Check if we've reached the target
+        float currentX = brain_->getRegionIds()[0].index();  // Approximate position
+        float currentY = 0.0f;
+        
+        float distanceToTarget = std::sqrt(std::pow(targetX_ - currentX, 2) + std::pow(targetY_ - currentY, 2));
+        
+        if (distanceToTarget < goalTolerance_) {
+            // We're close to target - approach or wait
+            decoded = MotorCommand::Wait;
+        }
     }
     
     return decoded;
@@ -215,6 +250,10 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
+        if (!brain_ || !brain_->getRandomGenerator()) {
+            return defaultCmd;
+        }
+        
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
@@ -249,6 +288,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Update reward prediction
+    rewardPredictionError_ = reward - predictedReward;
+    rewardPredictionError_ *= rewardPredictionDecay_;
+    rewardHistory_.push_back(reward);
+    if (rewardHistory_.size() > 100) {
+        rewardHistory_.erase(rewardHistory_.begin());
+    }
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -313,28 +360,86 @@ void AgentBrain::updateDevelopment(double timestep) {
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
+void AgentBrain::recordVisitedLocation(float x, float y) {
+    if (memoryBasedNavigationEnabled_) {
+        // Round to integer grid cells for memory efficiency
+        int gridX = static_cast<int>(std::round(x));
+        int gridY = static_cast<int>(std::round(y));
+        
+        // Check if this location has been visited recently
+        bool isVisited = false;
+        for (const auto& loc : visitedLocations_) {
+            if (std::abs(loc.first - x) < 0.01f && std::abs(loc.second - y) < 0.01f) {
+                isVisited = true;
+                break;
+            }
+        }
+        
+        if (!isVisited) {
+            visitedLocations_.emplace_back(x, y);
+        }
+        
+        // Apply memory decay to old locations
+        std::vector<std::pair<float, float>> newLocations;
+        for (const auto& loc : visitedLocations_) {
+            if (brain_ && brain_->getRandomGenerator()) {
+                // Decay based on exploration radius
+                float distance = std::sqrt(std::pow(loc.first - x, 2) + std::pow(loc.second - y, 2));
+                if (distance < explorationRadius_ && 
+                    brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) > memoryDecayRate_) {
+                    newLocations.push_back(loc);
+                }
+            } else {
+                newLocations.push_back(loc);
+            }
+        }
+        
+        visitedLocations_ = newLocations;
+    }
 }
 
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+bool AgentBrain::isLocationVisited(float x, float y) const {
+    // Check if the given location has been visited based on recorded positions
+    // Uses a simple grid-based comparison with tolerance
+    for (const auto& loc : visitedLocations_) {
+        if (std::abs(loc.first - x) < 0.01f && std::abs(loc.second - y) < 0.01f) {
+            return true;
+        }
+    }
+    return false;
 }
 
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+void AgentBrain::startActionSequence(const std::vector<MotorCommand>& sequence) {
+    // Begin executing a predefined sequence of motor commands
+    // Only starts if action sequencing is enabled and sequence is not empty
+    if (actionSequencingEnabled_ && !sequence.empty()) {
+        actionSequence_ = sequence;
+        NLM_LOG_INFO("Action sequence started with " + std::to_string(sequence.size()) + " commands");
+    }
 }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+MotorCommand AgentBrain::getNextActionFromSequence() {
+    // Retrieve the next motor command from the action sequence
+    // Returns Wait command if sequence is empty
+    if (!actionSequence_.empty()) {
+        MotorCommand nextAction = actionSequence_.front();
+        actionSequence_.erase(actionSequence_.begin());
+        return nextAction;
+    }
+    return MotorCommand::Wait;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+void AgentBrain::cancelActionSequence() {
+    // Cancel the current action sequence if it's executing
+    if (!actionSequence_.empty()) {
+        NLM_LOG_INFO("Action sequence cancelled, " + std::to_string(actionSequence_.size()) + " commands remaining");
+        actionSequence_.clear();
+    }
 }
 
 void AgentBrain::reset() {
+    // Reset all internal state to initial conditions for a new episode
+    // This clears neuromodulation signals, development state, and memory systems
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
@@ -342,9 +447,19 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    rewardPredictionError_ = 0.0f;
     
-    // Clear previous vision
+    // Clear previous vision buffer
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear advanced behavior state
+    visitedLocations_.clear();           // Clear location memory for navigation
+    actionSequence_.clear();             // Clear action sequence
+    rewardHistory_.clear();               // Clear reward prediction history
+    
+    // Reset goal-directed behavior targets
+    targetX_ = 0.0f;
+    targetY_ = 0.0f;
 }
 
 } // namespace nlm

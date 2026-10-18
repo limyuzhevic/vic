@@ -100,6 +100,20 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
+# Python bindings
+find_package(pybind11 REQUIRED)
+
+pybind11_add_module(pynlm
+    python/bindings.cpp
+)
+target_include_directories(pynlm PRIVATE src)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+set_target_properties(pynlm PROPERTIES
+    OUTPUT_NAME "pynlm"
+    PREFIX ""
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
