@@ -62,6 +62,9 @@ void testSTDPPotentiation() {
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
     
+    // Enable STDP plasticity on the synapse
+    synapse.enablePlasticity(false, true, false);
+    
     float initialWeight = synapse.getWeight();
     
     // Pre fires before post (positive dt) - should potentiate
@@ -87,6 +90,9 @@ void testSTDPDepression() {
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
     
+    // Enable STDP plasticity on the synapse
+    synapse.enablePlasticity(false, true, false);
+    
     float initialWeight = synapse.getWeight();
     
     // Post fires before pre (negative dt) - should depress
@@ -108,6 +114,7 @@ void testSTDPEmptySpikes() {
     nlm::STDP stdp;
     
     nlm::Synapse synapse(nlm::SynapseId(3), nlm::NeuronId(5), nlm::NeuronId(6));
+    synapse.enablePlasticity(false, true, false);
     float initialWeight = synapse.getWeight();
     
     // Empty pre spikes - should not change
@@ -132,6 +139,9 @@ void testSTDPWeightBounds() {
     nlm::Synapse synapse(nlm::SynapseId(4), nlm::NeuronId(7), nlm::NeuronId(8));
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.99f);  // Near max
+    
+    // Enable STDP plasticity on the synapse
+    synapse.enablePlasticity(false, true, false);
     
     // Very strong potentiation
     std::vector<nlm::Timestamp> preSpikes = {0.0, 1.0, 2.0, 3.0, 4.0};

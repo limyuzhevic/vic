@@ -28,25 +28,75 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
-}
+// Configuration and utility functions
+struct CommandLineArgs {
+    // Basic options (existing)
+    std::string configFile = "configs/default.cfg";
+    bool helpRequested = false;
+    bool verboseMode = false;
+    int testMode = 0;  // 0 = all tests, 1 = basic connectivity, 2 = plasticity, 3 = STDP
+    int maxSteps = 1000;
+    bool enableVisualization = false;
+    std::string outputFile = "";
+    
+    // Advanced configuration options
+    std::optional<int64_t> neuronCount;
+    std::optional<int64_t> regionCount;
+    std::optional<float> stdpLtpWeight;
+    std::optional<float> stdpLtdWeight;
+    std::optional<float> stdpTimeConstant;
+    std::optional<float> synaptogenesisRate;
+    std::optional<float> pruningRate;
+    std::optional<float> learningRate;
+    
+    // Enhanced output options
+    std::string outputFormat = "text";  // text, json, csv
+    std::string outputPath = "";
+    std::vector<std::string> outputDestinations;  // stdout, file, both
+    bool quietMode = false;
+    bool summaryOnly = false;
+    
+    // Logging configuration
+    std::string logLevel = "INFO";
+    std::string logFile = "";
+    std::string logFormat = "default";  // default, concise, detailed
+    bool logTimestamps = true;
+    bool logColors = true;
+    
+    // Simulation control options
+    std::optional<double> timestep;
+    std::optional<int> maxSimulationSteps;
+    std::optional<int> timeLimit;
+    bool allowPlasticity = true;
+    bool allowStructuralPlasticity = true;
+    
+    // Progress monitoring
+    bool enableProgress = true;
+    int progressInterval = 100;
+    bool showTiming = true;
+    
+    // Performance monitoring
+    bool enablePerfMetrics = false;
+    std::string perfMetricsFile = "";
+    std::vector<std::string> perfMetricsTypes;  // memory, cpu, network
+    
+    // Debug and diagnostic options
+    bool debugMode = false;
+    bool validateConfig = false;
+    bool generateReport = false;
+    std::string reportFile = "";
+    std::string reportFormat = "text";
+    
+    // Configuration validation
+    bool validateBeforeRun = false;
+    bool autoFixConfig = false;
+    
+    // Command history and scripting
+    std::string commandHistoryFile = "";
+    bool scriptMode = false;
+    std::string scriptFile = "";
+    bool batchMode = false;
+};
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -319,6 +369,366 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
+}
+
+CommandLineArgs parseCommandLine(int argc, char** argv) {
+    CommandLineArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            args.helpRequested = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verboseMode = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.quietMode = true;
+        } else if (arg == "--summary-only") {
+            args.summaryOnly = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 5) == "--test") {
+            if (arg.find('=') != std::string::npos) {
+                args.testMode = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.testMode = std::stoi(argv[++i]);
+            }
+        } else if (arg.substr(0, 6) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                args.maxSteps = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.maxSteps = std::stoi(argv[++i]);
+            }
+        } else if (arg.substr(0, 6) == "--output") {
+            if (arg.find('=') != std::string::npos) {
+                args.outputFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg == "--visualization" || arg == "--viz") {
+            args.enableVisualization = true;
+        } else if (arg.substr(0, 13) == "--neuron-count") {
+            if (arg.find('=') != std::string::npos) {
+                args.neuronCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.neuronCount = std::stoll(argv[++i]);
+            }
+        } else if (arg.substr(0, 12) == "--region-count") {
+            if (arg.find('=') != std::string::npos) {
+                args.regionCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.regionCount = std::stoll(argv[++i]);
+            }
+        } else if (arg.substr(0, 16) == "--stdp-ltp-weight") {
+            if (arg.find('=') != std::string::npos) {
+                args.stdpLtpWeight = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.stdpLtpWeight = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 16) == "--stdp-ltd-weight") {
+            if (arg.find('=') != std::string::npos) {
+                args.stdpLtdWeight = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.stdpLtdWeight = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 15) == "--stdp-time-const") {
+            if (arg.find('=') != std::string::npos) {
+                args.stdpTimeConstant = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.stdpTimeConstant = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 20) == "--synaptogenesis-rate") {
+            if (arg.find('=') != std::string::npos) {
+                args.synaptogenesisRate = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.synaptogenesisRate = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 13) == "--pruning-rate") {
+            if (arg.find('=') != std::string::npos) {
+                args.pruningRate = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.pruningRate = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 13) == "--learning-rate") {
+            if (arg.find('=') != std::string::npos) {
+                args.learningRate = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.learningRate = std::stof(argv[++i]);
+            }
+        } else if (arg.substr(0, 13) == "--output-format") {
+            if (arg.find('=') != std::string::npos) {
+                args.outputFormat = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.outputFormat = argv[++i];
+            }
+        } else if (arg.substr(0, 12) == "--output-path") {
+            if (arg.find('=') != std::string::npos) {
+                args.outputPath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.outputPath = argv[++i];
+            }
+        } else if (arg.substr(0, 23) == "--output-destinations") {
+            if (arg.find('=') != std::string::npos) {
+                std::string dests = arg.substr(arg.find('=') + 1);
+                size_t pos = 0;
+                while ((pos = dests.find(',')) != std::string::npos) {
+                    args.outputDestinations.push_back(dests.substr(0, pos));
+                    dests.erase(0, pos + 1);
+                }
+                args.outputDestinations.push_back(dests);
+            } else if (i + 1 < argc) {
+                std::string dests = argv[++i];
+                size_t pos = 0;
+                while ((pos = dests.find(',')) != std::string::npos) {
+                    args.outputDestinations.push_back(dests.substr(0, pos));
+                    dests.erase(0, pos + 1);
+                }
+                args.outputDestinations.push_back(dests);
+            }
+        } else if (arg.substr(0, 10) == "--log-level") {
+            if (arg.find('=') != std::string::npos) {
+                args.logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.logLevel = argv[++i];
+            }
+        } else if (arg.substr(0, 9) == "--log-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 11) == "--log-format") {
+            if (arg.find('=') != std::string::npos) {
+                args.logFormat = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.logFormat = argv[++i];
+            }
+        } else if (arg == "--no-log-timestamps") {
+            args.logTimestamps = false;
+        } else if (arg == "--no-log-colors") {
+            args.logColors = false;
+        } else if (arg.substr(0, 11) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                args.timestep = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.timestep = std::stod(argv[++i]);
+            }
+        } else if (arg.substr(0, 18) == "--max-simulation-steps") {
+            if (arg.find('=') != std::string::npos) {
+                args.maxSimulationSteps = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.maxSimulationSteps = std::stoi(argv[++i]);
+            }
+        } else if (arg.substr(0, 12) == "--time-limit") {
+            if (arg.find('=') != std::string::npos) {
+                args.timeLimit = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.timeLimit = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--no-plasticity") {
+            args.allowPlasticity = false;
+        } else if (arg == "--no-structural-plasticity") {
+            args.allowStructuralPlasticity = false;
+        } else if (arg == "--progress" || arg == "--progress-reporting") {
+            args.enableProgress = true;
+        } else if (arg.substr(0, 17) == "--progress-interval") {
+            if (arg.find('=') != std::string::npos) {
+                args.progressInterval = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.progressInterval = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--no-timing") {
+            args.showTiming = false;
+        } else if (arg == "--perf-metrics") {
+            args.enablePerfMetrics = true;
+        } else if (arg.substr(0, 17) == "--perf-metrics-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.perfMetricsFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.perfMetricsFile = argv[++i];
+            }
+        } else if (arg.substr(0, 18) == "--perf-metrics-types") {
+            if (arg.find('=') != std::string::npos) {
+                std::string types = arg.substr(arg.find('=') + 1);
+                size_t pos = 0;
+                while ((pos = types.find(',')) != std::string::npos) {
+                    args.perfMetricsTypes.push_back(types.substr(0, pos));
+                    types.erase(0, pos + 1);
+                }
+                args.perfMetricsTypes.push_back(types);
+            } else if (i + 1 < argc) {
+                std::string types = argv[++i];
+                size_t pos = 0;
+                while ((pos = types.find(',')) != std::string::npos) {
+                    args.perfMetricsTypes.push_back(types.substr(0, pos));
+                    types.erase(0, pos + 1);
+                }
+                args.perfMetricsTypes.push_back(types);
+            }
+        } else if (arg == "--debug") {
+            args.debugMode = true;
+        } else if (arg == "--validate-config") {
+            args.validateConfig = true;
+        } else if (arg == "--generate-report") {
+            args.generateReport = true;
+        } else if (arg.substr(0, 13) == "--report-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.reportFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.reportFile = argv[++i];
+            }
+        } else if (arg.substr(0, 14) == "--report-format") {
+            if (arg.find('=') != std::string::npos) {
+                args.reportFormat = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.reportFormat = argv[++i];
+            }
+        } else if (arg == "--validate-before-run") {
+            args.validateBeforeRun = true;
+        } else if (arg == "--auto-fix-config") {
+            args.autoFixConfig = true;
+        } else if (arg.substr(0, 21) == "--command-history-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.commandHistoryFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.commandHistoryFile = argv[++i];
+            }
+        } else if (arg == "--script-mode") {
+            args.scriptMode = true;
+        } else if (arg.substr(0, 13) == "--script-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.scriptFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.scriptFile = argv[++i];
+            }
+        } else if (arg == "--batch-mode") {
+            args.batchMode = true;
+        }
+    }
+    
+    return args;
+}
+
+void printUsage(const char* programName) {
+
+// Output format handlers
+void writeOutput(const std::string& content, const CommandLineArgs& args);
+void writeJSONOutput(const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+void writeCSVOutput(const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+void writeTextOutput(const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+
+// Logging configuration helpers
+void setupLogging(const CommandLineArgs& args);
+std::string logLevelToString(const std::string& level);
+LogLevel stringToLogLevel(const std::string& level);
+
+// Progress and timing helpers
+void setupProgressMonitoring(const CommandLineArgs& args);
+void updateProgress(int step, const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+void printTimingInfo(const std::chrono::steady_clock::time_point& startTime, const CommandLineArgs& args);
+
+// Performance monitoring helpers
+void setupPerformanceMonitoring(const CommandLineArgs& args);
+void collectPerformanceMetrics(const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+void writePerformanceMetrics(const CommandLineArgs& args);
+
+// Debug and diagnostic helpers
+void setupDebugMode(const CommandLineArgs& args);
+void validateConfiguration(const CommandLineArgs& args);
+void generateDiagnosticReport(const std::shared_ptr<Brain>& brain, const CommandLineArgs& args);
+void writeDiagnosticReport(const CommandLineArgs& args);
+
+// Configuration validation helpers
+bool validateConfigurationFile(const std::string& configFile, const CommandLineArgs& args);
+bool autoFixConfiguration(std::shared_ptr<Config> config, const CommandLineArgs& args);
+
+// Command history helpers
+void setupCommandHistory(const CommandLineArgs& args);
+void writeCommandHistory(const std::string& command, const CommandLineArgs& args);
+
+void printUsage(const char* programName) {
+    printBanner();
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    
+    // Basic options
+    std::cout << "  -h, --help              Show this help message" << std::endl;
+    std::cout << "  -v, --verbose           Enable verbose output" << std::endl;
+    std::cout << "  -q, --quiet             Enable quiet mode" << std::endl;
+    std::cout << "  --summary-only          Output only summary information" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --test <mode>           Run specific test: 0=all, 1=connectivity, 2=plasticity, 3=stdp" << std::endl;
+    std::cout << "  --steps <count>         Maximum simulation steps" << std::endl;
+    std::cout << "  --output <file>         Save results to file" << std::endl;
+    std::cout << "  --visualization          Enable visualization (if supported)" << std::endl;
+    
+    // Advanced configuration options
+    std::cout << "  --neuron-count <count>  Set number of neurons (overrides config)" << std::endl;
+    std::cout << "  --region-count <count>  Set number of brain regions (overrides config)" << std::endl;
+    std::cout << "  --stdp-ltp-weight <val>  Set STDP LTP weight (overrides config)" << std::endl;
+    std::cout << "  --stdp-ltd-weight <val>  Set STDP LTD weight (overrides config)" << std::endl;
+    std::cout << "  --stdp-time-const <val>  Set STDP time constant (overrides config)" << std::endl;
+    std::cout << "  --synaptogenesis-rate <val> Set structural plasticity synaptogenesis rate (overrides config)" << std::endl;
+    std::cout << "  --pruning-rate <val>    Set structural plasticity pruning rate (overrides config)" << std::endl;
+    std::cout << "  --learning-rate <val>    Set plasticity learning rate (overrides config)" << std::endl;
+    
+    // Enhanced output options
+    std::cout << "  --output-format <fmt>    Output format: text, json, csv" << std::endl;
+    std::cout << "  --output-path <path>     Set output directory" << std::endl;
+    std::cout << "  --output-destinations <list> Output destinations: stdout,file,both (comma-separated)" << std::endl;
+    
+    // Logging configuration
+    std::cout << "  --log-level <level>      Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL" << std::endl;
+    std::cout << "  --log-file <file>        Set log file path" << std::endl;
+    std::cout << "  --log-format <fmt>       Log format: default, concise, detailed" << std::endl;
+    std::cout << "  --no-log-timestamps      Disable log timestamps" << std::endl;
+    std::cout << "  --no-log-colors          Disable colored output in logs" << std::endl;
+    
+    // Simulation control options
+    std::cout << "  --timestep <val>         Set simulation timestep (overrides config)" << std::endl;
+    std::cout << "  --max-simulation-steps <count> Maximum simulation steps" << std::endl;
+    std::cout << "  --time-limit <sec>       Simulation time limit in seconds" << std::endl;
+    std::cout << "  --no-plasticity          Disable plasticity" << std::endl;
+    std::cout << "  --no-structural-plasticity Disable structural plasticity" << std::endl;
+    
+    // Progress monitoring
+    std::cout << "  --progress               Enable progress reporting" << std::endl;
+    std::cout << "  --progress-interval <int> Progress reporting interval in steps" << std::endl;
+    std::cout << "  --no-timing              Disable timing information" << std::endl;
+    
+    // Performance monitoring
+    std::cout << "  --perf-metrics           Enable performance metrics collection" << std::endl;
+    std::cout << "  --perf-metrics-file <file> Performance metrics output file" << std::endl;
+    std::cout << "  --perf-metrics-types <list> Performance metrics types: memory,cpu,network (comma-separated)" << std::endl;
+    
+    // Debug and diagnostic options
+    std::cout << "  --debug                  Enable debug mode" << std::endl;
+    std::cout << "  --validate-config        Validate configuration before running" << std::endl;
+    std::cout << "  --generate-report        Generate diagnostic report" << std::endl;
+    std::cout << "  --report-file <file>     Set diagnostic report file" << std::endl;
+    std::cout << "  --report-format <fmt>    Diagnostic report format: text, json, xml" << std::endl;
+    
+    // Configuration validation
+    std::cout << "  --validate-before-run    Validate configuration before starting simulation" << std::endl;
+    std::cout << "  --auto-fix-config        Automatically fix configuration errors" << std::endl;
+    
+    // Command history and scripting
+    std::cout << "  --command-history-file <file> Command history file path" << std::endl;
+    std::cout << "  --script-mode            Enable script mode" << std::endl;
+    std::cout << "  --script-file <file>     Load and execute script file" << std::endl;
+    std::cout << "  --batch-mode             Run in batch mode without interactive prompts" << std::endl;
+    
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --test 2 --verbose --neuron-count 1000 --output-format json" << std::endl;
+    std::cout << "  " << programName << " --config myconfig.cfg --output results.txt --log-level DEBUG --perf-metrics" << std::endl;
+    std::cout << "  " << programName << " --script-mode --script-file script.nml --batch-mode" << std::endl;
 }
 
 int main(int argc, char** argv) {
