@@ -106,11 +106,52 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
-    void reset();
+    // ========== EXTRACTED STEP FUNCTIONS (for better modularity) ==========
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    // STEP 1: Process pending delayed spike events (deliver synaptic input)
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // STEP 2: Update all neurons (LIF dynamics)
+    void updateAllNeurons(Timestamp currentTime);
+    
+    // STEP 3: Detect spikes and schedule spike events
+    void detectAndScheduleSpikes(Timestamp currentTime);
+    
+    // STEP 4: Update working memory (maintenance and competition)
+    void updateWorkingMemory();
+    
+    // STEP 5: Apply neuromodulation effects on neural excitability
+    void applyNeuromodulationEffects();
+    
+    // STEP 6: Apply plasticity rules (STDP, Hebbian)
+    void applyPlasticityRules();
+    
+    // STEP 7: Update episodic memory with current experience
+    void updateEpisodicMemory(Timestamp currentTime);
+    
+    // STEP 8: Update prediction system
+    void updatePredictionSystem();
+    
+    // STEP 9: Update attention system
+    void updateAttentionSystem();
+    
+    // STEP 10: Update concept formation
+    void updateConceptFormation();
+    
+    // STEP 11: Apply structural plasticity (synaptogenesis, pruning)
+    void applyStructuralPlasticity();
+    
+    // STEP 12: Replay important memories (during rest or periodically)
+    void replayMemories(Timestamp currentTime);
+    
+    // STEP 13: Apply development effects
+    void applyDevelopmentEffects(Timestamp currentTime);
+    
+    // STEP 14: Periodic memory consolidation
+    void consolidateMemory(Timestamp currentTime);
+    
+    // STEP 15: Checkpoint management
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
     
     // Load brain state from file
     bool load(const std::string& filepath);

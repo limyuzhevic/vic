@@ -103,6 +103,9 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Legacy alias for getGlobal() - maintains compatibility with existing code
+    static Logger& getInstance();
 
 private:
     struct Impl;
