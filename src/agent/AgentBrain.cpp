@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/IMemorySystem.hpp"
+#include "../memory/MemoryManager.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,6 +21,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , memoryManager_(std::make_unique<MemoryManager>())
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -58,6 +61,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+        
+        // Initialize memory manager with brain
+        memoryManager_->initialize(brain_.get());
     }
 }
 
@@ -67,6 +73,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize memory systems
+    if (memoryManager_) {
+        memoryManager_->enableWorkingMemory(true);
+        memoryManager_->enableEpisodicMemory(true);
+        memoryManager_->enableAssociativeMemory(true);
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -124,7 +137,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Compute novelty (difference from previous vision) - store in unified episodic memory
     if (!vision.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
@@ -140,12 +153,22 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Store sensory pattern in episodic memory
+        if (memoryManager_) {
+            memoryManager_->storeEpisodicMemoryFromBrain(0.0f); // Will use reward from world
+        }
     }
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Store current neural state in working memory
+    if (memoryManager_) {
+        memoryManager_->storeWorkingMemoryFromBrain();
     }
 }
 
@@ -345,6 +368,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset memory systems
+    if (memoryManager_) {
+        memoryManager_->clear();
+    }
 }
 
 } // namespace nlm
