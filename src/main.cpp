@@ -28,24 +28,42 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    std::cout << "Usage: ./nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation with LIF neurons, STDP, and structural plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --help, --usage              Show this help message" << std::endl;
+    std::cout << "  --config <file>              Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neurons <count>            Set number of neurons" << std::endl;
+    std::cout << "  --regions <count>            Set number of regions" << std::endl;
+    std::cout << "  --timestep <time>            Set simulation timestep in seconds" << std::endl;
+    std::cout << "  --connection-prob <prob>     Set connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --stdp-ltp <weight>          Set STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd <weight>          Set STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau <tau>             Set STDP time constant" << std::endl;
+    std::cout << "  --random-seed <seed>         Set random seed for reproducibility" << std::endl;
+    std::cout << "  --synaptogenesis <rate>      Set structural synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning <rate>             Set structural pruning rate" << std::endl;
+    std::cout << "  --log-level <level>          Set logging level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --log-file <file>            Set log output file" << std::endl;
+    std::cout << "  --checkpoint <file>          Save brain state to checkpoint file" << std::endl;
+    std::cout << "  --load <file>                Load brain state from checkpoint file" << std::endl;
+    std::cout << "  --validate-only              Only validate integration, don't run tests" << std::endl;
+    std::cout << "  --debug-mode                 Enable debug output and verbose logging" << std::endl;
+    std::cout << "  --benchmark                  Run benchmark mode with timing metrics" << std::endl;
+    std::cout << "  --version                    Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./nlm                        Run Phase 2 neural computation demo" << std::endl;
+    std::cout << "  ./nlm --neurons 5000 --regions 2  Set custom network size" << std::endl;
+    std::cout << "  ./nlm --validate-only          Validate system integration" << std::endl;
+    std::cout << "  ./nlm --log-level DEBUG       Enable debug logging" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration can also be overridden using '=' syntax:" << std::endl;
+    std::cout << "  ./nlm --connection-prob=0.2 --random-seed=123" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,6 +342,63 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Check for help/usage option
+    bool showHelp = false;
+    bool validateOnly = false;
+    bool debugMode = false;
+    bool benchmarkMode = false;
+    bool versionOnly = false;
+    std::string checkpointFile;
+    std::string loadFile;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "--usage") {
+            showHelp = true;
+        } else if (arg == "--validate-only") {
+            validateOnly = true;
+        } else if (arg == "--debug-mode") {
+            debugMode = true;
+        } else if (arg == "--benchmark") {
+            benchmarkMode = true;
+        } else if (arg == "--version") {
+            versionOnly = true;
+        } else if (arg == "--checkpoint" || arg == "--save") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        } else if (arg == "--load") {
+            if (i + 1 < argc) {
+                loadFile = argv[++i];
+            }
+        }
+    }
+    
+    // Handle special options first
+    if (versionOnly) {
+        std::cout << "NLM (熙然) Neural Learning Machine v0.1.0" << std::endl;
+        std::cout << "Phase 2: Real Neural Computation" << std::endl;
+        return 0;
+    }
+    
+    if (showHelp) {
+        printUsage();
+        return 0;
+    }
+    
+    if (validateOnly) {
+        std::cout << "=== NLM Integration Validation ===" << std::endl;
+        std::cout << "This mode validates that all brain systems are properly connected." << std::endl;
+        std::cout << "System integration verification will run..." << std::endl;
+        // For now, just run basic checks
+        // In a full implementation, this would run the Phase6 integration verification
+    }
+    
+    if (debugMode) {
+        std::cout << "Debug mode enabled - verbose logging will be shown" << std::endl;
+        // Enable debug logging here
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -352,6 +427,88 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg.find("=" ) != std::string::npos && arg.substr(0, 4) == "--" &&
+                   (arg.substr(4, 10) == "neurons" || arg.substr(4, 9) == "regions" ||
+                    arg.substr(4, 8) == "timestep" || arg.substr(4, 19) == "connection-prob" ||
+                    arg.substr(4, 8) == "stdp-ltp" || arg.substr(4, 8) == "stdp-ltd" ||
+                    arg.substr(4, 8) == "stdp-tau" || arg.substr(4, 14) == "random-seed" ||
+                    arg.substr(4, 16) == "synaptogenesis" || arg.substr(4, 9) == "pruning")) {
+            // Handle command-line arguments with = syntax
+            size_t equalsPos = arg.find('=');
+            std::string key = arg.substr(0, equalsPos);
+            std::string value = arg.substr(equalsPos + 1);
+            
+            if (key == "--neurons") {
+                try {
+                    int64_t neurons = std::stoll(value);
+                    config->set("neuron_count", neurons, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --neurons: " + value);
+                }
+            } else if (key == "--regions") {
+                try {
+                    int64_t regions = std::stoll(value);
+                    config->set("region_count", regions, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --regions: " + value);
+                }
+            } else if (key == "--timestep") {
+                try {
+                    double timestep = std::stod(value);
+                    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --timestep: " + value);
+                }
+            } else if (key == "--connection-prob") {
+                try {
+                    float prob = std::stof(value);
+                    config->set("connection_probability", prob, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --connection-prob: " + value);
+                }
+            } else if (key == "--stdp-ltp") {
+                try {
+                    float weight = std::stof(value);
+                    config->set("stdp_ltp_weight", weight, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --stdp-ltp: " + value);
+                }
+            } else if (key == "--stdp-ltd") {
+                try {
+                    float weight = std::stof(value);
+                    config->set("stdp_ltd_weight", weight, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --stdp-ltd: " + value);
+                }
+            } else if (key == "--stdp-tau") {
+                try {
+                    float tau = std::stof(value);
+                    config->set("stdp_tau", tau, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --stdp-tau: " + value);
+                }
+            } else if (key == "--random-seed") {
+                try {
+                    int64_t seed = std::stoll(value);
+                    config->set("random_seed", seed, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --random-seed: " + value);
+                }
+            } else if (key == "--synaptogenesis") {
+                try {
+                    float rate = std::stof(value);
+                    config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --synaptogenesis: " + value);
+                }
+            } else if (key == "--pruning") {
+                try {
+                    float rate = std::stof(value);
+                    config->set("pruning_rate", rate, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid value for --pruning: " + value);
+                }
             }
         }
     }

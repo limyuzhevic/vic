@@ -286,9 +286,72 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    bool saveBrainState(NeuronCheckpointData& data) {
+        data.membranePotential.clear();
+        data.restingPotential.clear();
+        data.threshold.clear();
+        data.resetPotential.clear();
+        data.leakConductance.clear();
+        data.firingState.clear();
+        data.refractoryRemaining.clear();
+        data.refractoryPeriod.clear();
+        data.lastSpikeTime.clear();
+        data.neuronType.clear();
+        data.regionId.clear();
+        data.populationId.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.neuronType.push_back(static_cast<uint64_t>(pop->getNeuronType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId().index());
+                }
+            }
+        }
+        
+        return !data.membranePotential.empty();
+    }
+    
+    bool saveSynapseState(SynapseCheckpointData& data) {
+        data.sourceNeuron.clear();
+        data.destinationNeuron.clear();
+        data.weight.clear();
+        data.delay.clear();
+        data.synapseType.clear();
+        data.plasticityFlags.clear();
+        data.eligibilityTrace.clear();
+        data.efficacy.clear();
+        data.shortTermDepression.clear();
+        data.shortTermFacilitation.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags()));
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+                data.shortTermDepression.push_back(syn->getShortTermDepression());
+                data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+            }
+        }
+        
+        return !data.sourceNeuron.empty();
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -582,9 +645,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // Save integrated systems
+    saveIntegratedSystems(writer);
+    
+    // Finalize
+    if (!writer.finalize()) {
+        NLM_LOG_ERROR("Failed to finalize checkpoint");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+    return true;
+    
+    // Removed manual save implementation that was duplicating CheckpointWriter
     }
 }
 

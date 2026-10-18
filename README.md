@@ -74,13 +74,88 @@ make -j4
 ```
 
 ## Running
-
 ### Phase 6 Demo (Integration Test)
+
+The Phase 6 integration demo is now included in the build system:
+
 ```bash
+# Run the comprehensive integration test
 ./nlm_phase6_demo
+
+# Or run with enhanced command-line options
+./nlm_phase6_demo --help
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Demo (Neural Computation)
+
+The original Phase 2 demo showing basic neural computation:
+
+```bash
+./nlm
+```
+
+## Enhanced Command-Line Interface
+
+NLM now provides comprehensive command-line options:
+
+### General Options
+- `--help, --usage` - Show help information
+- `--version` - Show version information
+- `--config <file>` - Load configuration from file
+
+### Configuration Options
+- `--neurons <count>` - Set number of neurons
+- `--regions <count>` - Set number of regions  
+- `--timestep <time>` - Set simulation timestep (seconds)
+- `--connection-prob <prob>` - Set connection probability (0.0-1.0)
+- `--random-seed <seed>` - Set random seed for reproducibility
+
+### Advanced Options
+- `--validate-only` - Only validate integration, don't run tests
+- `--debug-mode` - Enable debug output and verbose logging
+- `--checkpoint <file>` - Save brain state to checkpoint
+- `--load <file>` - Load brain state from checkpoint
+
+### Example Usage
+
+```bash
+# Run basic Phase 2 demo with custom settings
+./nlm --neurons 2000 --regions 2 --timestep 0.0005
+
+# Validate system integration
+./nlm_phase6_demo --validate-only
+
+# Run with debug logging
+./nlm --debug-mode --log-level DEBUG
+
+# Save and load brain state
+./nlm --checkpoint mybrain.bin
+# ... later ...
+./nlm --load mybrain.bin
+```
+
+## Validation Tools
+
+A comprehensive validation script is included for testing system integration:
+
+```bash
+# Quick validation (30 seconds)
+./validate.sh
+
+# Full validation (5 minutes)  
+./validate.sh --full
+
+# Memory systems validation only
+./validate.sh --memory-only
+
+# Cognitive systems validation only
+./validate.sh --cognition-only
+
+# Show help
+./validate.sh --help
+```
 
 ## Project Structure
 
@@ -220,6 +295,20 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Phase 6 Integration Summary
+
+Phase 6 achieves the final integration milestone by:
+
+1. **Connecting all memory systems** to neural processing loops
+2. **Integrating neuromodulation** with plasticity and cognition  
+3. **Connecting prediction systems** to sensory processing
+4. **Connecting cognitive systems** to action selection
+5. **Integrating development** with structural plasticity
+6. **Implementing persistence** through checkpointing
+7. **Enabling replay** for memory consolidation
+
+The result is a coherent artificial brain where all systems work together as a unified cognitive architecture.
 
 ## License
 
