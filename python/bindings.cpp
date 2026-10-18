@@ -25,21 +25,101 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Version: 0.1.0
+        Author: NLM Authors
+        License: MIT
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Set module version
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__license__") = "MIT";
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // Add metadata attributes
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__license__") = "MIT";
+
+    // Add Pythonic utility functions
+    m.def("createBrainWithRandomConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(std::random_device()()), ConfigSource::User);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with random configuration");
+
+    m.def("createDefaultBrain", []() {
+        auto config = std::make_shared<Config>();
+        // Apply default settings for Phase 2
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a default brain with standard settings");
+
+    m.def("createReadyToRunSimpleExperiment", []() {
+        auto brain = createDefaultBrain();
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10, 10);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable common features for experimentation
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete, ready-to-run experiment setup");
+
+    m.def("quickTestRun", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                            std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Null brain, world, or agent provided");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        agent->reset();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            world->getAgentBody()->x,
+            world->getAgentBody()->y
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps") = 100,
+       "Run a complete simulation with the given setup");
+
+    // Add convenience constructors with validation
+    m.def("createBrain", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a brain with validation");
+
+    m.def("createAgent", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create an agent brain with validation");
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -420,6 +500,177 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add metadata attributes
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__license__") = "MIT";
+
+    // Add Pythonic utility functions
+    m.def("createBrainWithRandomConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(std::random_device()()), ConfigSource::User);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with random configuration");
+
+    m.def("createDefaultBrain", []() {
+        auto config = std::make_shared<Config>();
+        // Apply default settings for Phase 2
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a default brain with standard settings");
+
+    m.def("createReadyToRunSimpleExperiment", []() {
+        auto brain = createDefaultBrain();
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10, 10);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable common features for experimentation
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete, ready-to-run experiment setup");
+
+    m.def("quickTestRun", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                            std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Null brain, world, or agent provided");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        agent->reset();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            world->getAgentBody()->x,
+            world->getAgentBody()->y
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps") = 100,
+       "Run a complete simulation with the given setup");
+
+    // Add helpful conversion and utility functions
+    m.def("to_vision", [](size_t width, size_t height, size_t channels = 3) {
+        return Vision(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+       "Create a Vision sensory input with specified dimensions");
+
+    m.def("to_audio", [](size_t sampleRate, size_t numSamples) {
+        return Audio(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"),
+       "Create an Audio sensory input with specified parameters");
+
+    m.def("random_position", []() {
+        return std::make_pair(static_cast<float>(rand()) / RAND_MAX * 100.0f,
+                             static_cast<float>(rand()) / RAND_MAX * 100.0f);
+    }, "Generate a random position in 2D space");
+
+    m.def("random_action", []() {
+        std::vector<ActionType> types = {
+            ActionType::MoveForward, ActionType::MoveBackward,
+            ActionType::TurnLeft, ActionType::TurnRight,
+            ActionType::Look, ActionType::Interact
+        };
+        return Action(types[rand() % types.size()]);
+    }, "Generate a random action");
+
+    m.def("run_learning_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                        std::shared_ptr<AgentBrain> agent, int steps) {
+        // Complete simulation with learning
+        brain->reset();
+        brain->initialize();
+        agent->reset();
+        
+        double totalReward = 0.0;
+        int successfulActions = 0;
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            auto action = agent->decodeMotorCommand();
+            
+            auto result = world->applyMotorCommand(action, world->getSimulationTime());
+            totalReward += result.reward;
+            if (result.success) successfulActions++;
+            
+            // Apply reward modulation for learning
+            agent->applyRewardModulation(result.reward, 0.0);
+        }
+        
+        return std::make_tuple(
+            totalReward,
+            successfulActions,
+            brain->getTotalSpikeCount(),
+            agent->getDevelopmentalStage()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 100,
+       "Run a learning simulation and return statistics");
+
+    // Add batch processing utilities
+    m.def("batch_process_steps", [](std::shared_ptr<Brain> brain, 
+                                   std::function<void(std::shared_ptr<Brain>, int, double)> processor,
+                                   int startStep, int endStep) {
+        for (int step = startStep; step <= endStep; ++step) {
+            processor(brain, step, step * 0.001);
+        }
+    }, py::arg("brain"), py::arg("processor"), py::arg("startStep"), py::arg("endStep"),
+       "Process brain steps in batch with a custom processor function");
+
+    // Add statistics and analysis helpers
+    m.def("get_brain_stats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["active_neurons"] = static_cast<double>(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        stats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+
+    // Add config helper functions
+    m.def("create_config", []() {
+        return std::make_shared<Config>();
+    }, "Create a configuration object");
+
+    m.def("create_config_with_seed", [](int64_t seed) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", seed, ConfigSource::User);
+        return config;
+    }, py::arg("seed"), "Create a configuration with specified random seed");
+
+    m.def("get_config_summary", [](std::shared_ptr<Config> config) {
+        if (!config) throw std::runtime_error("Config is null");
+        return config->summary();
+    }, py::arg("config"), "Get configuration summary as string");
 }
 
 } // namespace nlm

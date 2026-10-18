@@ -252,11 +252,187 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
 
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
 # Run the simulation
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Advanced Python Features
+
+This section covers the enhanced Python API features introduced in version 0.1.0:
+
+#### Module Information
+
+```python
+import pynlm
+
+# Module metadata
+print(f"pynlm version: {pynlm.__version__}")
+print(f"Author: {pynlm.__author__}")
+print(f"License: {pynlm.__license__}")
+```
+
+#### Convenience Factory Functions
+
+The enhanced Python bindings provide several convenience factory functions:
+
+```python
+import pynlm
+
+# Create a brain with random seed (Phase 2 settings)
+brain = pynlm.createBrainWithRandomConfig()
+brain.initialize()
+
+# Or create a standard default brain
+brain = pynlm.createDefaultBrain()
+brain.initialize()
+
+# Create a complete, ready-to-run experiment setup
+brain, world, agent = pynlm.createReadyToRunSimpleExperiment()
+```
+
+#### Advanced Simulation Helpers
+
+Run simulations with built-in error handling and validation:
+
+```python
+# Quick simulation test
+spike_count, x_pos, y_pos = pynlm.quickTestRun(brain, world, agent, 100)
+print(f"Simulation: {spike_count} spikes at ({x_pos:.1f}, {y_pos:.1f})")
+
+# Run learning simulation with statistics
+total_reward, success_count, total_spikes, stage = pynlm.run_learning_simulation(
+    brain, world, agent, 200
+)
+print(f"Learning: {total_reward:.2f} reward, {success_count} successes")
+```
+
+#### Utility Functions
+
+Convenience functions for common operations:
+
+```python
+import pynlm
+
+# Create sensory inputs
+vision = pynlm.to_vision(32, 32, 3)
+audio = pynlm.to_audio(44100, 1024)
+
+# Generate random data
+position = pynlm.random_position()
+action = pynlm.random_action()
+
+# Batch processing
+def my_processor(brain, step, time):
+    # Custom processing logic
+    pass
+
+pynlm.batch_process_steps(brain, my_processor, 0, 100)
+```
+
+#### Statistics and Analysis
+
+Get comprehensive statistics about the brain:
+
+```python
+import pynlm
+
+# Get brain statistics
+brain_stats = pynlm.get_brain_stats(brain)
+print(f"Neurons: {brain_stats['total_neurons']}")
+print(f"Synapses: {brain_stats['total_synapses']}")
+print(f"Firing rate: {brain_stats['average_firing_rate']:.3f}")
+print(f"E/I ratio: {brain_stats['excitation_inhibition_ratio']:.3f}")
+```
+
+#### Enhanced Configuration
+
+Create configuration objects with helpful defaults:
+
+```python
+import pynlm
+
+# Create configuration with specific seed
+config = pynlm.create_config_with_seed(42)
+
+# Or create simple config
+config = pynlm.create_config()
+
+# Get summary
+summary = pynlm.get_config_summary(config)
+```
+
+#### Error Handling
+
+The enhanced bindings provide better error messages and validation:
+
+```python
+import pynlm
+
+try:
+    brain = pynlm.createBrain(config)  # Validates config
+    world = pynlm.createSimpleWorld()
+    agent = pynlm.createAgentBrain(brain)  # Validates brain
+except RuntimeError as e:
+    print(f"Error: {e}")
+```
+
+## Advanced Python API Reference
+
+This section provides a reference to the enhanced Python API features.
+
+### Module-Level Functions
+
+| Function | Description | Return Type |
+|----------|-------------|-------------|
+| `pynlm.createBrainWithRandomConfig()` | Create brain with random seed | Brain |
+| `pynlm.createDefaultBrain()` | Create brain with Phase 2 defaults | Brain |
+| `pynlm.createReadyToRunSimpleExperiment()` | Create complete experiment setup | Tuple[Brain, World, AgentBrain] |
+| `pynlm.quickTestRun(brain, world, agent, numSteps)` | Run quick simulation test | Tuple[int, float, float] |
+| `pynlm.run_learning_simulation(brain, world, agent, steps)` | Run learning simulation | Tuple[float, int, int, DevelopmentalStage] |
+| `pynlm.to_vision(width, height, channels=3)` | Create Vision sensory input | Vision |
+| `pynlm.to_audio(sampleRate, numSamples)` | Create Audio sensory input | Audio |
+| `pynlm.random_position()` | Generate random 2D position | Tuple[float, float] |
+| `pynlm.random_action()` | Generate random Action | Action |
+| `pynlm.batch_process_steps(brain, processor, start, end)` | Process steps in batch | None |
+| `pynlm.get_brain_stats(brain)` | Get comprehensive brain statistics | Dict[str, float] |
+| `pynlm.create_config()` | Create empty configuration | Config |
+| `pynlm.create_config_with_seed(seed)` | Create configuration with seed | Config |
+| `pynlm.get_config_summary(config)` | Get configuration summary | str |
+
+### Enhanced Error Classes
+
+| Class | Description |
+|-------|-------------|
+| `pynlm.RuntimeError` | Standard runtime error for invalid operations |
+
+### Module Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `pynlm.__version__` | str | Module version (0.1.0) |
+| `pynlm.__author__` | str | Module author |
+| `pynlm.__license__` | str | Module license |
+
+### Compatibility Notes
+
+1. All existing APIs continue to work unchanged
+2. New convenience functions follow Python naming conventions
+3. Error handling is more robust with descriptive messages
+4. Type conversions are more intuitive
+5. Batch processing enables more complex simulations
+
+---
+
+## Conclusion
+
+The enhanced Python API for NLM 0.1.0 provides a powerful, Pythonic interface to the complex C++ neural simulation framework. Whether you're a beginner using the easy usage guide or an advanced researcher implementing complex experiments, the new features provide the tools you need while maintaining backward compatibility.
 
 #### Brain Class
 

@@ -42,33 +42,42 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+```python
+import pynlm
+
+# Check module info
+print(f"pynlm version: {pynlm.__version__}")
+print(f"Author: {pynlm.__author__}")
+print(f"License: {pynlm.__license__}")
+```
+
+### Example 2: Advanced Brain Setup
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create a brain with random seed
+brain = pynlm.createBrainWithRandomConfig()
 brain.initialize()
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
+# Or create a default brain (Phase 2 settings)
+brain = pynlm.createDefaultBrain()
+brain.initialize()
+print(f"Default brain ready: {brain.getTotalSpikeCount()} spikes")
+```
 
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+### Example 3: Ready-to-Run Experiment
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+```python
+import pynlm
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+# Create a complete, ready-to-run experiment setup
+brain, world, agent = pynlm.createReadyToRunSimpleExperiment()
+
+# Run a quick test
+spike_count, x_pos, y_pos = pynlm.quickTestRun(brain, world, agent, 100)
+print(f"Simulation complete: {spike_count} spikes, agent at ({x_pos}, {y_pos})")
 ```
 
 ---
@@ -252,6 +261,51 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+```
+
+### Project 4: Advanced Usage Examples
+
+```python
+import pynlm
+
+# Example 4.1: Advanced sensory input creation
+vision = pynlm.to_vision(32, 32, 3)
+print(f"Vision dimensions: {vision.getWidth()}x{vision.getHeight()}x{vision.getChannels()}")
+
+audio = pynlm.to_audio(44100, 1024)
+print(f"Audio: {audio.getSampleRate()} Hz, {audio.getNumSamples()} samples")
+```
+
+```python
+# Example 4.2: Random utilities
+import random
+
+# Generate random position
+x, y = pynlm.random_position()
+print(f"Random position: ({x:.2f}, {y:.2f})")
+
+# Generate random action
+action = pynlm.random_action()
+print(f"Random action: {action.getName()} ({action.getType()})")
+```
+
+```python
+# Example 4.3: Learning simulation with statistics
+import pynlm
+
+# Create complete setup
+brain, world, agent = pynlm.createReadyToRunSimpleExperiment()
+
+# Run learning simulation
+total_reward, successful_actions, total_spikes, stage = pynlm.run_learning_simulation(
+    brain, world, agent, 200
+)
+
+print(f"Learning simulation complete!")
+print(f"Total reward: {total_reward:.2f}")
+print(f"Successful actions: {successful_actions}")
+print(f"Total spikes: {total_spikes}")
+print(f"Developmental stage: {stage}")
 ```
 
 ---
