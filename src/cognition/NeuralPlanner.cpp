@@ -98,7 +98,12 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         totalReward += actionValue;
         
         // Reduce confidence if we're uncertain
-        confidence *= getSelfModelConfidence(action);
+        // Use action quality as proxy for self-model confidence
+        if (action < actionQuality_.size()) {
+            confidence *= actionQuality_[static_cast<size_t>(action)];
+        } else {
+            confidence *= 0.5f;
+        }
     }
     
     candidate.expectedReward = totalReward;
