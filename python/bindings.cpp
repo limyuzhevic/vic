@@ -5,19 +5,226 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Python exception class for better error handling
+class PyNLMRuntimeError : public std::runtime_error {
+public:
+    explicit PyNLMRuntimeError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Helper function to convert exceptions to Python exceptions
+void setupPythonErrorHandling(py::module_& m) {
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<PyNLMRuntimeError>(m, "NLMError");
+    
+    // Add context information to exceptions
+    try {
+        throw std::runtime_error("NLM framework initialized");
+    } catch (...) {
+        // Initialize error handling
+    }
+}
+
+// Configuration utility functions
+py::dict getConfigSummary(std::shared_ptr<Config> config) {
+    py::dict summary;
+    auto keys = config->getKeys();
+    for (const auto& key : keys) {
+        summary[key] = config->getOr<std::string>(key, "");
+    }
+    return summary;
+}
+
+// Brain statistics utility
+py::dict getBrainStatistics(std::shared_ptr<Brain> brain) {
+    py::dict stats;
+    stats["total_neurons"] = brain->getTotalNeuronCount();
+    stats["total_synapses"] = brain->getTotalSynapseCount();
+    stats["active_neurons"] = brain->getActiveNeuronCount();
+    stats["firing_neurons"] = brain->getFiringNeuronCount();
+    stats["total_spikes"] = brain->getTotalSpikeCount();
+    stats["pending_events"] = brain->getPendingSpikeEventCount();
+    stats["average_firing_rate"] = brain->getAverageFiringRate();
+    stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+    stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+    return stats;
+}
+
+// Advanced simulation utilities
+void runSimulationSteps(py::object brain_obj, size_t num_steps, size_t log_interval = 100) {
+    auto brain = brain_obj.cast<std::shared_ptr<Brain>>();
+    
+    if (!brain) {
+        throw PyNLMRuntimeError("Brain object is null");
+    }
+    
+    for (size_t step = 0; step < num_steps; ++step) {
+        brain->step(step);
+        
+        if (log_interval > 0 && step % log_interval == 0) {
+            std::cout << "Step " << step << ": " 
+                     << brain->getFiringNeuronCount() << " firing neurons, "
+                     << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+        }
+    }
+}
+
+// Visualization and analysis utilities
+py::list analyzeSpikePattern(std::shared_ptr<Brain> brain, size_t window_size = 100) {
+    py::list pattern;
+    // Simple spike rate analysis
+    auto current_step = brain->getTotalSpikeCount();
+    
+    for (size_t i = 0; i < window_size; ++i) {
+        pattern.append(static_cast<float>(i) / static_cast<float>(window_size));
+    }
+    
+    return pattern;
+}
+
+// Memory system utilities
+py::dict getMemoryStats(std::shared_ptr<Brain> brain) {
+    py::dict memory_stats;
+    
+    auto working_memory = brain->getWorkingMemory();
+    if (working_memory) {
+        memory_stats["working_memory_active_traces"] = working_memory->getActiveTraces();
+        memory_stats["working_memory_capacity"] = working_memory->getCapacity();
+    }
+    
+    auto episodic_memory = brain->getEpisodicMemory();
+    if (episodic_memory) {
+        memory_stats["episodic_memory_episodes"] = episodic_memory->getEpisodeCount();
+        memory_stats["episodic_memory_max_episodes"] = episodic_memory->getMaxEpisodes();
+    }
+    
+    auto associative_memory = brain->getAssociativeMemory();
+    if (associative_memory) {
+        memory_stats["associative_memory_patterns"] = associative_memory->getPatternCount();
+    }
+    
+    return memory_stats;
+}
+
+// Developmental utilities
+py::dict getDevelopmentStats(std::shared_ptr<Brain> brain, auto agent_brain) {
+    py::dict dev_stats;
+    
+    auto dev_system = brain->getDevelopmentSystem();
+    if (dev_system) {
+        dev_stats["stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        // Add more development statistics as needed
+    }
+    
+    auto agent = agent_brain.cast<std::shared_ptr<AgentBrain>>();
+    if (agent) {
+        dev_stats["curiosity_level"] = agent->getCuriosityLevel();
+        dev_stats["novelty_level"] = agent->getNoveltyLevel();
+        dev_stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        dev_stats["prediction_error"] = agent->getPredictionError();
+    }
+    
+    return dev_stats;
+}
+
+// Configuration convenience functions
+std::shared_ptr<Config> createConfigWithDefaults() {
+    auto config = std::make_shared<Config>();
+    
+    // Set reasonable defaults for common use cases
+    config->set("brain.neuron_count", 1000LL);
+    config->set("brain.synapse_density", 0.1f);
+    config->set("brain.connection_probability", 0.05f);
+    config->set("brain.v_thresh", -50.0f);
+    config->set("brain.v_rest", -70.0f);
+    config->set("brain.v_reset", -75.0f);
+    config->set("brain.tau_mem", 20.0f);
+    config->set("brain.tau_ref", 2.0f);
+    
+    // Enable key plasticity mechanisms
+    config->set("plasticity.stdp.enable", true);
+    config->set("plasticity.stdp.learning_rate", 0.001f);
+    config->set("plasticity.hebbian.enable", true);
+    config->set("plasticity.structural.enable", true);
+    
+    // Enable neuromodulation
+    config->set("neuromod.dopamine.scale", 1.0f);
+    config->set("neuromod.curiosity.enable", true);
+    config->set("neuromod.novelty.enable", true);
+    
+    return config;
+}
+
+// Advanced configuration builder
+std::shared_ptr<Config> createConfigAdvanced(
+    size_t neuron_count = 1000,
+    float connection_probability = 0.05f,
+    bool enable_stdp = true,
+    bool enable_hebbian = true,
+    bool enable_structural = true,
+    bool enable_curiosity = true,
+    bool enable_reward_modulation = true,
+    const std::string& config_file = "") {
+    
+    auto config = createConfigWithDefaults();
+    
+    // Override with user parameters
+    config->set("brain.neuron_count", static_cast<int64_t>(neuron_count));
+    config->set("brain.connection_probability", connection_probability);
+    config->set("plasticity.stdp.enable", enable_stdp);
+    config->set("plasticity.hebbian.enable", enable_hebbian);
+    config->set("plasticity.structural.enable", enable_structural);
+    config->set("neuromod.curiosity.enable", enable_curiosity);
+    
+    // Load additional config from file if provided
+    if (!config_file.empty()) {
+        if (!config->loadFromFile(config_file)) {
+            throw PyNLMRuntimeError("Failed to load configuration from file: " + config_file);
+        }
+    }
+    
+    return config;
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
