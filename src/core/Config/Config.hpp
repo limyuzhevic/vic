@@ -78,6 +78,11 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set vector values
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    
     // Check existence
     bool has(const std::string& key) const;
     

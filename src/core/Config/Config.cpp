@@ -67,12 +67,28 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
+            // Handle --flag (boolean true) format
+            else if (arg.size() >= 3) {
+                std::string key = arg.substr(2);
+                set(key, true, ConfigSource::CommandLine);
+            }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle standalone --key (for disabling boolean flags)
+        else if (arg.substr(0, 2) == "--" && arg.size() > 2) {
+            std::string key = arg.substr(2);
+            // Check if it's a negative flag (--no-key)
+            if (key.substr(0, 3) == "no-") {
+                std::string trueKey = key.substr(3);
+                set(trueKey, false, ConfigSource::CommandLine);
+            } else {
+                set(key, true, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -86,7 +102,44 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Helper function to convert ConfigValue to string
+        auto valueToString = [this](const ConfigValue& val) -> std::string {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        oss << arg[i];
+                        if (i < arg.size() - 1) oss << ", ";
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        oss << arg[i];
+                        if (i < arg.size() - 1) oss << ", ";
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        oss << "\"" << arg[i] << "\"";
+                        if (i < arg.size() - 1) oss << ", ";
+                    }
+                    oss << "]";
+                } else {
+                    oss << arg;
+                }
+            }, val);
+            return oss.str();
+        };
+        
+        file << valueToString(entry.value) << "\n";
     }
     
     return true;
@@ -101,10 +154,76 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::nullopt;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    // Special handling for vector types since they require different type checking
+    using T = std::decay_t<T>;
+    if constexpr (std::is_same_v<T, std::vector<int>> ||
+                  std::is_same_v<T, std::vector<double>> ||
+                  std::is_same_v<T, std::vector<std::string>>) {
+        // For vector types, we need to visit the variant
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            // Also try to find if it's stored as a different vector type
+            if constexpr (std::is_same_v<T, std::vector<int>>) {
+                if (auto val = std::get_if<std::vector<double>>(&it->value)) {
+                    std::vector<int> result;
+                    result.reserve(val->size());
+                    for (double v : *val) result.push_back(static_cast<int>(v));
+                    return result;
+                } else if (auto val = std::get_if<std::vector<std::string>>(&it->value)) {
+                    // Try to convert strings to ints
+                    std::vector<int> result;
+                    result.reserve(val->size());
+                    for (const std::string& s : *val) {
+                        try {
+                            result.push_back(std::stoi(s));
+                        } catch (...) {
+                            result.push_back(0);
+                        }
+                    }
+                    return result;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                if (auto val = std::get_if<std::vector<int>>(&it->value)) {
+                    std::vector<double> result;
+                    result.reserve(val->size());
+                    for (int v : *val) result.push_back(static_cast<double>(v));
+                    return result;
+                } else if (auto val = std::get_if<std::vector<std::string>>(&it->value)) {
+                    std::vector<double> result;
+                    result.reserve(val->size());
+                    for (const std::string& s : *val) {
+                        try {
+                            result.push_back(std::stod(s));
+                        } catch (...) {
+                            result.push_back(0.0);
+                        }
+                    }
+                    return result;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                if (auto val = std::get_if<std::vector<int>>(&it->value)) {
+                    std::vector<std::string> result;
+                    result.reserve(val->size());
+                    for (int v : *val) result.push_back(std::to_string(v));
+                    return result;
+                } else if (auto val = std::get_if<std::vector<double>>(&it->value)) {
+                    std::vector<std::string> result;
+                    result.reserve(val->size());
+                    for (double v : *val) result.push_back(std::to_string(v));
+                    return result;
+                }
+            }
+            
+            return std::nullopt;
+        }
+    } else {
+        // For simple types, use the standard get
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
     }
 }
 
@@ -138,13 +257,16 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
 }
 
 void Config::remove(const std::string& key) {

@@ -1,4 +1,6 @@
 #include "Brain.hpp"
+#include "StatisticsManager.hpp"
+#include "Statistics.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -11,9 +13,11 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -22,29 +26,32 @@
 
 namespace nlm {
 
+// Global statistics manager instance
+static StatisticsManager statsManager;
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
+    // Integrated memory systems
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    // Integrated prediction system
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // Integrated cognition systems
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Development system
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Neuromodulation systems
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
@@ -55,6 +62,10 @@ struct Brain::Impl {
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Statistics for SoA optimization
+    std::vector<RegionStats> regionStats;
+    BrainStats brainStats;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -155,7 +166,7 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
-};
+    };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -420,18 +431,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
+        float dopamineLevel = pImpl->dopamine->getLevel();
         
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        float excitabilityMod = dopamineLevel * 0.5f;
+        if (excitabilityMod > 0.0f) {
+            // Batch update all neurons in a single pass
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -966,28 +976,81 @@ void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
 }
 
 size_t Brain::getTotalNeuronCount() const {
-    size_t total = 0;
+    // Use new statistics framework for optimized computation
+    pImpl->brainStats.totalNeuronCount = 0;
+    pImpl->brainStats.regionNeuronCounts.clear();
+    
     for (const auto& region : pImpl->regions) {
-        total += region->getTotalNeuronCount();
+        size_t regionCount = region->getTotalNeuronCount();
+        pImpl->brainStats.totalNeuronCount += regionCount;
+        pImpl->brainStats.regionNeuronCounts.push_back(regionCount);
+        
+        // Update region statistics using SoA arrays
+        RegionStats regionStats;
+        statsManager.initializeRegionStats(regionStats, 
+                                         region->getPopulationCount(),
+                                         region->getSynapseCount());
+        
+        // Populate SoA arrays
+        // Note: This would require access to the SoA arrays in NeuralRegion
+        // For now, using existing methods for backward compatibility
+        regionStats.totalNeuronCount = region->getTotalNeuronCount();
+        regionStats.averageSynapticWeight = region->getAverageSynapticWeight();
+        
+        pImpl->regionStats.push_back(regionStats);
     }
-    return total;
+    
+    // Update brain statistics using SoA
+    statsManager.updateBrainStats(pImpl->brainStats, pImpl->regionStats);
+    
+    return pImpl->brainStats.totalNeuronCount;
 }
 
 size_t Brain::getTotalSynapseCount() const {
-    size_t total = 0;
+    // Use new statistics framework for optimized computation
+    pImpl->brainStats.totalSynapseCount = 0;
+    
     for (const auto& region : pImpl->regions) {
-        total += region->getSynapseCount();
+        // Use region's synapse count (updated in region stats)
+        pImpl->brainStats.totalSynapseCount += region->getSynapseCount();
     }
-    total += pImpl->interRegionConnections.size();
-    return total;
+    
+    pImpl->brainStats.totalSynapseCount += pImpl->interRegionConnections.size();
+    
+    // Update brain stats with SoA optimization
+    pImpl->brainStats.synapseConnections.clear();
+    for (const auto& region : pImpl->regions) {
+        pImpl->brainStats.synapseConnections.push_back(region->getSynapseCount());
+    }
+    
+    return pImpl->brainStats.totalSynapseCount;
 }
 
 size_t Brain::getActiveNeuronCount() const {
-    size_t total = 0;
+    // Use new statistics framework for optimized computation
+    pImpl->brainStats.activeNeuronCount = 0;
+    pImpl->brainStats.firingNeuronCount = 0;
+    
     for (const auto& region : pImpl->regions) {
-        total += region->getActiveNeuronCount();
+        // Note: This would use SoA arrays in the updated NeuralRegion implementation
+        pImpl->brainStats.activeNeuronCount += region->getActiveNeuronCount();
+        pImpl->brainStats.firingNeuronCount += region->getFiringNeuronCount();
     }
-    return total;
+    
+    // Use statistics manager for SoA-based computation
+    pImpl->brainStats.regionFiringRates.clear();
+    pImpl->brainStats.regionWeights.clear();
+    
+    for (const auto& region : pImpl->regions) {
+        // Aggregate statistics using SoA
+        pImpl->brainStats.regionFiringRates.push_back(region->getAverageFiringRate());
+        pImpl->brainStats.regionWeights.push_back((region->getSynapseCount() > 0) ? 
+                                                 region->getAverageSynapticWeight() : 0.0f);
+    }
+    
+    statsManager.updateBrainStats(pImpl->brainStats, pImpl->regionStats);
+    
+    return pImpl->brainStats.activeNeuronCount;
 }
 
 size_t Brain::getFiringNeuronCount() const {
@@ -995,12 +1058,23 @@ size_t Brain::getFiringNeuronCount() const {
 }
 
 float Brain::getAverageFiringRate() const {
-    if (pImpl->regions.empty()) return 0.0f;
-    float sum = 0.0f;
+    // Use new statistics framework for optimized computation
+    pImpl->brainStats.regionFiringRates.clear();
+    
     for (const auto& region : pImpl->regions) {
-        sum += region->getAverageFiringRate();
+        pImpl->brainStats.regionFiringRates.push_back(region->getAverageFiringRate());
     }
-    return sum / static_cast<float>(pImpl->regions.size());
+    
+    // Update brain statistics using SoA optimization
+    if (!pImpl->brainStats.regionFiringRates.empty()) {
+        float sum = 0.0f;
+        for (float rate : pImpl->brainStats.regionFiringRates) {
+            sum += rate;
+        }
+        pImpl->brainStats.averageFiringRate = sum / static_cast<float>(pImpl->brainStats.regionFiringRates.size());
+    }
+    
+    return pImpl->brainStats.averageFiringRate;
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========

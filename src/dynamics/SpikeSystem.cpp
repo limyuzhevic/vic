@@ -49,29 +49,49 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
+    if (pImpl->pendingSpikes.empty()) {
+        return;
+    }
+    
+    // Batch process all pending spikes to reduce function call overhead
+    // Collect all spikes first, then process them in bulk
+    std::vector<SpikeEvent> batchSpikes;
+    batchSpikes.reserve(pImpl->pendingSpikes.size());
+    
     while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
+        batchSpikes.push_back(pImpl->pendingSpikes.front());
         pImpl->pendingSpikes.pop();
-        
+    }
+    
+    // Process the entire batch
+    for (const auto& event : batchSpikes) {
         // Create detailed event
         DetailedSpikeEvent detailed;
         detailed.source = event.source_neuron;
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
+        // Add to history (batch operation)
         pImpl->spikeHistory.push_back(detailed);
         
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
+    }
+    
+    // Trim history if needed (batch operation)
+    if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+        size_t excess = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                               pImpl->spikeHistory.begin() + excess);
+    }
+    
+    // Call all handlers with all events
+    for (const auto& event : batchSpikes) {
+        DetailedSpikeEvent detailed;
+        detailed.source = event.source_neuron;
+        detailed.timestamp = event.timestamp;
+        detailed.step = event.step;
         
-        // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-        }
-        
-        // Call handlers
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }

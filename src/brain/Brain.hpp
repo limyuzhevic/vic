@@ -2,6 +2,8 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
+#include "StatisticsManager.hpp"
+#include "Statistics.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"

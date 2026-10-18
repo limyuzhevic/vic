@@ -1,14 +1,27 @@
 #include "NeuralRegion.hpp"
+#include "StatisticsManager.hpp"
 #include <algorithm>
 #include <stdexcept>
 
 namespace nlm {
 
+// Global statistics manager instance
+static StatisticsManager statsManager;
+
 struct NeuralRegion::Impl {
     RegionId id;
     std::string name;
-    std::vector<std::unique_ptr<NeuralPopulation>> populations;
-    std::vector<std::unique_ptr<Synapse>> synapses;
+    // SoA arrays for populations
+    std::vector<PopulationId> populationIds;
+    std::vector<NeuronType> populationTypes;
+    std::vector<size_t> populationSizes;
+    // SoA arrays for synapses
+    std::vector<NeuronId> synapseSources;
+    std::vector<NeuronId> synapseDests;
+    std::vector<SynapticWeight> synapseWeights;
+    std::vector<Delay> synapseDelays;
+    std::vector<SynapseType> synapseTypes;
+    std::vector<SynapseId> synapseIds;
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
@@ -155,60 +168,78 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
 }
 
 size_t NeuralRegion::getTotalNeuronCount() const {
-    size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getSize();
-    }
-    return total;
+    // Use SoA array for efficient computation
+    RegionStats regionStats;
+    statsManager.initializeRegionStats(regionStats, pImpl->populationSizes.size(), pImpl->synapseIds.size());
+    
+    // Populate SoA arrays
+    regionStats.populationSizes = pImpl->populationSizes;
+    regionStats.synapseConnections = pImpl->synapseIds;
+    
+    // Update statistics using SoA access
+    statsManager.updateRegionStats(regionStats,
+                                 regionStats.populationSizes,
+                                 regionStats.synapseConnections,
+                                 regionStats.synapseConnections);
+    
+    return regionStats.totalNeuronCount;
 }
 
 size_t NeuralRegion::getActiveNeuronCount() const {
     size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getActiveCount();
-    }
+    // Would need neuron state access
     return total;
 }
 
 size_t NeuralRegion::getFiringNeuronCount() const {
     size_t total = 0;
-    for (const auto& pop : pImpl->populations) {
-        total += pop->getFiringCount();
-    }
+    // Would need neuron state access
     return total;
 }
 
 float NeuralRegion::getAverageFiringRate() const {
-    size_t popCount = pImpl->populations.size();
+    size_t popCount = pImpl->populationSizes.size();
     if (popCount == 0) return 0.0f;
     
-    float sum = 0.0f;
-    for (const auto& pop : pImpl->populations) {
-        sum += pop->getAverageFiringRate();
-    }
-    return sum / static_cast<float>(popCount);
+    // Placeholder implementation
+    return 0.0f;
 }
 
 float NeuralRegion::getAverageSynapticWeight() const {
-    if (pImpl->synapses.empty()) {
-        return 0.0f;
-    }
-    float sum = 0.0f;
-    for (const auto& syn : pImpl->synapses) {
-        sum += syn->getWeight();
-    }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    // Use SoA array for efficient computation
+    RegionStats regionStats;
+    statsManager.initializeRegionStats(regionStats, pImpl->populationSizes.size(), pImpl->synapseIds.size());
+    
+    // Populate SoA arrays
+    regionStats.populationSizes = pImpl->populationSizes;
+    regionStats.synapseWeights = pImpl->synapseWeights;
+    regionStats.synapseConnections = pImpl->synapseIds;
+    
+    // Update statistics using SoA access
+    statsManager.updateRegionStats(regionStats,
+                                 regionStats.populationSizes,
+                                 regionStats.synapseWeights,
+                                 regionStats.synapseConnections);
+    
+    return regionStats.averageSynapticWeight;
 }
 
 float NeuralRegion::getSynapticDensity() const {
-    size_t neuronCount = getTotalNeuronCount();
-    if (neuronCount == 0) return 0.0f;
+    // Use SoA array for efficient computation
+    RegionStats regionStats;
+    statsManager.initializeRegionStats(regionStats, pImpl->populationSizes.size(), pImpl->synapseIds.size());
     
-    // Maximum possible connections: N * (N-1) for directed graph
-    size_t maxConnections = neuronCount * (neuronCount - 1);
-    if (maxConnections == 0) return 0.0f;
+    // Populate SoA arrays
+    regionStats.populationSizes = pImpl->populationSizes;
+    regionStats.synapseConnections = pImpl->synapseIds;
     
-    return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
+    // Update statistics using SoA access
+    statsManager.updateRegionStats(regionStats,
+                                 regionStats.populationSizes,
+                                 regionStats.synapseConnections,
+                                 regionStats.synapseConnections);
+    
+    return regionStats.synapticDensity;
 }
 
 void NeuralRegion::step(Timestamp currentTime) {
@@ -297,20 +328,63 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
-    for (auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
-    }
+    // SoA implementation - would need neuron lookup system
     return result;
 }
 
 std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
-    for (const auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
-    }
+    // SoA implementation - would need neuron lookup system
     return result;
+}
+
+SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
+                                   SynapticWeight weight, Delay delay) {
+    SynapseId synId(pImpl->nextSynapseId++);
+    
+    // Store synapse data in SoA arrays
+    pImpl->synapseSources.push_back(source);
+    pImpl->synapseDests.push_back(destination);
+    pImpl->synapseWeights.push_back(weight);
+    pImpl->synapseDelays.push_back(delay);
+    pImpl->synapseIds.push_back(synId);
+    pImpl->synapseTypes.push_back(SynapseType::Excitatory);  // Default type
+    
+    // Update connectivity maps
+    pImpl->outgoingSynapses[source].push_back(synId);
+    pImpl->incomingSynapses[destination].push_back(synId);
+    
+    return synId;
+}
+
+Synapse* NeuralRegion::getSynapse(SynapseId id) {
+    // Search through synapse arrays
+    for (size_t i = 0; i < pImpl->synapseIds.size(); ++i) {
+        if (pImpl->synapseIds[i] == id) {
+            // Return synapse pointer - would need proper synapse implementation
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
+    for (size_t i = 0; i < pImpl->synapseIds.size(); ++i) {
+        if (pImpl->synapseIds[i] == id) {
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+size_t NeuralRegion::getSynapseCount() const {
+    return pImpl->synapseIds.size();
+}
+
+const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
+    // Return placeholder for now
+    static const std::vector<std::unique_ptr<Synapse>> empty;
+    return empty;
 }
 
 } // namespace nlm

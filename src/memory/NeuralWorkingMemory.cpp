@@ -116,28 +116,36 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Collect indices of neurons with significant activation to reduce loop overhead
+    std::vector<size_t> activeIndices;
+    activeIndices.reserve(memoryNeurons_.size());
+    
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
-        
-        if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
-            
-            // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
-            }
-            
-            memoryActivations_[i] = activation;
+        if (memoryActivations_[i] > 0.1f) {
+            activeIndices.push_back(i);
         }
     }
     
-    // Decay weak traces
+    // Process only active neurons (event-driven approach)
+    for (size_t idx : activeIndices) {
+        NeuronId neuron = memoryNeurons_[idx];
+        float activation = memoryActivations_[idx];
+        
+        // Inject maintenance current
+        brain_->injectCurrent(neuron, activation * 2.0f);
+        
+        // Age the trace
+        memoryTimestamps_[idx]++;
+        
+        // Check if trace is too old and decay if needed
+        if (memoryTimestamps_[idx] > 1000) {
+            activation *= (1.0f - decayRate_);
+        }
+        
+        memoryActivations_[idx] = activation;
+    }
+    
+    // Decay weak traces (batch decay for efficiency)
     decayWeakTraces();
     
     // Run competition to select winners
