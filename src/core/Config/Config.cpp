@@ -193,10 +193,179 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+// Configuration category definitions
+struct ConfigCategory {
+    std::string name;
+    std::string description;
+    std::vector<std::string> keys;
+};
+
+// Configuration metadata for help system
+struct ConfigMetadata {
+    std::string key;
+    std::string description;
+    std::string defaultValue;
+    std::string type;
+    std::string category;
+    std::string validation;
+};
+
+// Static metadata (would be populated from documentation)
+const std::vector<ConfigMetadata>& getConfigMetadata() {
+    static const std::vector<ConfigMetadata> metadata = {
+        // Core configuration
+        {"random_seed", "Random seed for reproducible experiments", "42", "int", "core", "nonnegative"},
+        {"simulation_timestep", "Simulation timestep in seconds", "0.001", "float", "core", "positive"},
+        
+        // Brain configuration
+        {"neuron_count", "Number of neurons in the brain", "1000", "int", "brain", "positive"},
+        {"region_count", "Number of brain regions", "2", "int", "brain", "positive"},
+        {"connection_probability", "Connection probability for random connectivity", "0.1", "float", "brain", "range[0,1]"},
+        
+        // Plasticity configuration
+        {"plasticity_learning_rate", "Plasticity learning rate", "0.01", "float", "plasticity", "positive"},
+        {"stdp_ltp_weight", "STDP LTP weight", "0.01", "float", "plasticity", "positive"},
+        {"stdp_ltd_weight", "STDP LTD weight", "0.012", "float", "plasticity", "positive"},
+        {"stdp_time_constant", "STDP time constant", "20.0", "float", "plasticity", "positive"},
+        
+        // Development configuration
+        {"development_synaptogenesis_rate", "Development synaptogenesis rate", "0.001", "float", "development", "range[0,1]"},
+        {"development_pruning_rate", "Development pruning rate", "0.0001", "float", "development", "range[0,1]"},
+        
+        // Neuromodulation configuration
+        {"dopamine_baseline", "Dopamine baseline level", "0.1", "float", "neuromodulation", "nonnegative"},
+        
+        // Reward configuration
+        {"reward_discount_factor", "Reward discount factor", "0.99", "float", "reward", "range[0,1]"},
+        
+        // Environment configuration
+        {"environment_name", "Environment name", "GridWorld", "string", "environment", "nonempty"},
+        {"environment_width", "Environment width", "10", "int", "environment", "positive"},
+        {"environment_height", "Environment height", "10", "int", "environment", "positive"},
+        
+        // Logging configuration
+        {"log_level", "Log level", "INFO", "string", "logging", "enum[ERROR,WARN,INFO,DEBUG]"},
+        {"log_to_file", "Log to file", "false", "boolean", "logging", "boolean"},
+        {"log_filename", "Log filename", "nlm.log", "string", "logging", "nonempty"},
+        
+        // Simulation configuration
+        {"max_simulation_steps", "Maximum simulation steps", "10000", "int", "simulation", "positive"},
+        {"simulation_time_limit", "Simulation time limit", "0.0", "float", "simulation", "nonnegative"},
+        
+        // Visualization configuration
+        {"visualization_enabled", "Enable visualization", "false", "boolean", "visualization", "boolean"},
+        {"visualization_update_rate", "Visualization update rate", "30.0", "float", "visualization", "positive"},
+    };
+    return metadata;
+}
+
+} // namespace nlm
+
+std::string Config::getHelp(const std::string& category) {
+    const auto& metadata = getConfigMetadata();
+    
+    std::ostringstream oss;
+    oss << "NLM Configuration Options" << std::endl;
+    oss << std::string(60, '=') << std::endl;
+    
+    if (category.empty()) {
+        // Show all categories
+        oss << "Available Categories:" << std::endl;
+        std::set<std::string> categories;
+        for (const auto& meta : metadata) {
+            categories.insert(meta.category);
+        }
+        for (const auto& cat : categories) {
+            oss << "  " << cat << std::endl;
+        }
+        oss << std::endl;
+        oss << "Use --help=<category> for details on a specific category." << std::endl;
+    } else {
+        // Show specific category
+        oss << "Configuration for category: " << category << std::endl;
+        oss << std::string(60, '-') << std::endl;
+        
+        for (const auto& meta : metadata) {
+            if (meta.category == category) {
+                oss << meta.key << std::endl;
+                oss << "  Type: " << meta.type << std::endl;
+                oss << "  Default: " << meta.defaultValue << std::endl;
+                oss << "  Description: " << meta.description << std::endl;
+                if (!meta.validation.empty()) {
+                    oss << "  Validation: " << meta.validation << std::endl;
+                }
+                oss << std::endl;
+            }
+        }
+    }
+    
+    return oss.str();
+}
+
+std::vector<std::string> Config::getCategories() {
+    std::set<std::string> categories;
+    const auto& metadata = getConfigMetadata();
+    for (const auto& meta : metadata) {
+        categories.insert(meta.category);
+    }
+    return std::vector<std::string>(categories.begin(), categories.end());
+}
+
+std::vector<ConfigEntry> Config::getByCategory(const std::string& category) const {
+    std::vector<ConfigEntry> result;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == category) {  // TODO: This should check if entry.key belongs to category
+            result.push_back(entry);
+        }
+    }
+    
     return result;
+}
+
+std::string Config::generateTemplate(const std::vector<std::string>& categories) const {
+    std::ostringstream oss;
+    oss << "# NLM Configuration Template" << std::endl;
+    oss << "# Generated on " << __DATE__ << " " << __TIME__ << std::endl;
+    oss << std::endl;
+    
+    // Get metadata
+    const auto& metadata = getConfigMetadata();
+    
+    // Filter by categories
+    std::vector<ConfigMetadata> filtered;
+    if (categories.empty()) {
+        filtered = metadata;
+    } else {
+        for (const auto& cat : categories) {
+            for (const auto& meta : metadata) {
+                if (meta.category == cat) {
+                    filtered.push_back(meta);
+                }
+            }
+        }
+    }
+    
+    // Group by category
+    std::map<std::string, std::vector<ConfigMetadata>> byCategory;
+    for (const auto& meta : filtered) {
+        byCategory[meta.category].push_back(meta);
+    }
+    
+    // Generate template
+    for (const auto& categoryPair : byCategory) {
+        const std::string& category = categoryPair.first;
+        oss << "# " << category << " configuration" << std::endl;
+        oss << std::string(60, '-') << std::endl;
+        
+        for (const auto& meta : categoryPair.second) {
+            oss << meta.key << " = " << meta.defaultValue << "  # " << meta.description << std::endl;
+        }
+        
+        oss << std::endl;
+    }
+    
+    return oss.str();
 }
 
 // Explicit template instantiations

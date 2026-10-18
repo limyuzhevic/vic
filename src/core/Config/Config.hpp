@@ -90,16 +90,17 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation function
+    bool validate(const std::vector<std::pair<std::string, std::string>>& rules) const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get configuration description/help
+    static std::string getHelp(const std::string& category = "");
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    // Get configuration category
+    static std::vector<std::string> getCategories();
+    
+    // Get configuration entries by category
+    std::vector<ConfigEntry> getByCategory(const std::string& category) const;
+    
+    // Generate configuration file template
+    static std::string generateTemplate(const std::vector<std::string>& categories) const;

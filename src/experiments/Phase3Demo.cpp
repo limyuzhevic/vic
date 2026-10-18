@@ -246,12 +246,30 @@ private:
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool quiet = false;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Parse command line arguments with standardized interface
+    parseCommandLineArgs(argc, argv, numEpisodes, stepsPerEpisode, configFile, verbose, quiet);
+    
+    // Initialize logging
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Set log level based on verbosity
+    if (quiet) {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    // Load configuration if specified
+    if (!configFile.empty() && configFile != "configs/default.cfg") {
+        // This would load config from file (implementation would depend on Config class)
+        NLM_LOG_INFO("Configuration file support would be implemented here: " + configFile);
     }
     
     nlm::Phase3Demo demo;
