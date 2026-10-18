@@ -60,8 +60,9 @@ After successful compilation, you will have:
 # Debug build (with symbols and assertions)
 cmake .. -DCMAKE_BUILD_TYPE=Debug
 
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+# Build with specific compiler and features
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc \
+    -DCMAKE_CXX_STANDARD=20 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
@@ -76,7 +77,7 @@ make install
 
 ```bash
 # Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+pip install pybind11 scikit-build-core pytest numpy matplotlib plotly seaborn
 
 # Build and install
 pip install .
