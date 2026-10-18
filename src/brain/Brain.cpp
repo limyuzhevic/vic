@@ -45,10 +45,9 @@ struct Brain::Impl {
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +128,19 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Complete neuromodulation system with ACh, NE, 5-HT
+        // ACh: Attention and memory consolidation
+        // NE: Arousal and vigilance  
+        // 5-HT: Mood and impulsivity control
+        auto acetylcholine = std::make_unique<Acetylcholine>();
+        auto norepinephrine = std::make_unique<Norepinephrine>();
+        auto serotonin = std::make_unique<Serotonin>();
+        
+        // Store neuromodulators for easy access
+        pImpl->acetylcholine = std::move(acetylcholine);
+        pImpl->norepinephrine = std::move(norepinephrine);
+        pImpl->serotonin = std::move(serotonin);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -290,13 +302,81 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    // Set checkpoint data providers
+    pImpl->checkpointManager->setNeuronProvider(
+        [this](NeuronCheckpointData& data) {
+            // Provider function to collect neuron state for checkpointing
+            data.membranePotential.reserve(getTotalNeuronCount());
+            data.restingPotential.reserve(getTotalNeuronCount());
+            data.threshold.reserve(getTotalNeuronCount());
+            data.resetPotential.reserve(getTotalNeuronCount());
+            data.leakConductance.reserve(getTotalNeuronCount());
+            data.firingState.reserve(getTotalNeuronCount());
+            data.refractoryRemaining.reserve(getTotalNeuronCount());
+            data.refractoryPeriod.reserve(getTotalNeuronCount());
+            data.lastSpikeTime.reserve(getTotalNeuronCount());
+            data.neuronType.reserve(getTotalNeuronCount());
+            data.regionId.reserve(getTotalNeuronCount());
+            data.populationId.reserve(getTotalNeuronCount());
+            
+            // Collect neuron states
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        data.membranePotential.push_back(state.membranePotential);
+                        data.restingPotential.push_back(state.restingPotential);
+                        data.threshold.push_back(state.threshold);
+                        data.resetPotential.push_back(state.resetPotential);
+                        data.leakConductance.push_back(state.leakConductance);
+                        data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        data.refractoryRemaining.push_back(state.refractoryRemaining);
+                        data.refractoryPeriod.push_back(state.refractoryPeriod);
+                        data.lastSpikeTime.push_back(state.lastSpikeTime);
+                        data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                        data.regionId.push_back(region->getId().index());
+                        data.populationId.push_back(pop->getId().index());
+                    }
+                }
+            }
+            
+            return !data.membranePotential.empty();
+        });
     
-    return true;
+    pImpl->checkpointManager->setSynapseProvider(
+        [this](SynapseCheckpointData& data) {
+            // Provider function to collect synapse state for checkpointing
+            data.sourceNeuron.reserve(getTotalSynapseCount());
+            data.destinationNeuron.reserve(getTotalSynapseCount());
+            data.weight.reserve(getTotalSynapseCount());
+            data.delay.reserve(getTotalSynapseCount());
+            data.synapseType.reserve(getTotalSynapseCount());
+            data.plasticityFlags.reserve(getTotalSynapseCount());
+            data.eligibilityTrace.reserve(getTotalSynapseCount());
+            data.efficacy.reserve(getTotalSynapseCount());
+            data.shortTermDepression.reserve(getTotalSynapseCount());
+            data.shortTermFacilitation.reserve(getTotalSynapseCount());
+            
+            // Collect synapse states
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    data.weight.push_back(syn->getWeight());
+                    data.delay.push_back(syn->getDelay());
+                    data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    data.plasticityFlags.push_back(*reinterpret_cast<const uint8_t*>(&syn->getPlasticityFlags()));
+                    data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                    data.efficacy.push_back(syn->getEfficacy());
+                    data.shortTermDepression.push_back(syn->getSTD() / 10.0f);  // Placeholder
+                    data.shortTermFacilitation.push_back(syn->getSTF() / 10.0f);  // Placeholder
+                }
+            }
+            
+            return !data.sourceNeuron.empty();
+        });
+    
+    NLM_LOG_INFO("Checkpoint providers configured");
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -406,38 +486,125 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
+        // Apply neuromodulation effects
         pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Update dopamine (reward prediction error)
+        if (pImpl->dopamine) {
+            pImpl->dopamine->update(pImpl->timestep);
+            
+            // Apply dopamine effects on neural excitability
+            // Dopamine modulates neural excitability by adjusting effective current injection
+            // Higher dopamine increases excitability (lower effective threshold)
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Dopamine modulates excitability by injecting additional current
+                        // Positive dopamine adds excitatory bias
+                        float excitabilityMod = dopamineLevel * 0.5f;
+                        if (excitabilityMod > 0.0f) {
+                            neuron->injectCurrent(excitabilityMod);
+                        }
                     }
                 }
             }
         }
-    }
+        
+        // Update acetylcholine (attention and memory)
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->update(pImpl->timestep);
+            
+            // ACh enhances attention to salient stimuli
+            float achLevel = pImpl->acetylcholine->getLevel();
+            if (achLevel > 0.5f) {
+                // Enhance working memory maintenance
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->strengthenMemory(1.0f + achLevel * 0.5f);
+                }
+            }
+        }
+        
+        // Update norepinephrine (arousal and focus)
+        if (pImpl->norepinephrine) {
+            pImpl->norepinephrine->update(pImpl->timestep);
+            
+            // NE affects signal-to-noise ratio in cortical circuits
+            float neLevel = pImpl->norepinephrine->getLevel();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // NE increases neural gain, making responses more focused
+                        float gainMod = neLevel * 0.3f;
+                        if (gainMod > 0.0f) {
+                            neuron->injectCurrent(gainMod);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update serotonin (mood and behavior regulation)
+        if (pImpl->serotonin) {
+            pImpl->serotonin->update(pImpl->timestep);
+            
+            // 5-HT affects behavioral flexibility and impulse control
+            float serotoninLevel = pImpl->serotonin->getLevel();
+            if (serotoninLevel > 0.5f) {
+                // Promote behavioral inhibition to reduce impulsivity
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->setDecayRate(std::min(0.1f, 0.01f + serotoninLevel * 0.1f));
+                }
+            }
+        }
+        
+        // Apply neuromodulation to plasticity rules (STDP and Hebbian)
+        // Calculate neuromodulation factor for plasticity
+        float plasticityMod = 1.0f;
+        if (pImpl->dopamine) {
+            plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        }
+        if (pImpl->acetylcholine) {
+            plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+        }
+        if (pImpl->norepinephrine) {
+            plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+        }
+        if (pImpl->serotonin) {
+            plasticityMod *= pImpl->serotonin->getPlasticityFactor();
+        }
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Apply STDP with neuromodulation
+                if (syn->getPlasticityFlags().stdp) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        // Modify weight change based on all neuromodulators
+                        pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                        float weight = syn->getWeight();
+                        weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                        syn->setWeight(weight);
+                    }
+                }
+                
+                // Apply Hebbian learning
+                if (syn->getPlasticityFlags().hebbian) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
+                }
+                
+                // Update synapse state
+                syn->step(currentTime);
+            }
+        }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -488,7 +655,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store neural activity pattern
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -499,6 +666,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
                         }
                     }
+                }
+            }
+            
+            // Store sensory pattern (captured from working memory)
+            if (pImpl->workingMemory) {
+                std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+                if (!sensoryPattern.empty()) {
+                    episode.sensoryState = sensoryPattern;
                 }
             }
             
@@ -528,8 +703,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract features from working memory for concept learning
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current memory activations
+            std::vector<float> currentPattern;
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                currentPattern.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+            
+            if (!currentPattern.empty()) {
+                // Convert neural pattern to features
+                std::vector<float> features = currentPattern;
+                
+                // Get reward from neuromodulation
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Present experience to concept formation
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    currentPattern, features, reward, pImpl->currentStep);
+                
+                if (conceptId > 0) {
+                    // Concept was learned or updated
+                    float stability = pImpl->conceptFormation->getConceptStability(conceptId);
+                    if (stability >= 0.7f) {
+                        // Stable concept - could be used for higher-level cognition
+                        // In future, this could activate related cognitive pathways
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -574,6 +777,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Enhanced development: affects neural excitability
+        float developmentFactor = 0.0f;
+        if (pImpl->developmentSystem) {
+            switch (pImpl->developmentSystem->getStage()) {
+                case DevelopmentalStage::Initial:
+                    developmentFactor = 1.2f;  // Higher excitability, faster learning
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    developmentFactor = 1.0f;  // Normal development
+                    break;
+                case DevelopmentalStage::Maturation:
+                    developmentFactor = 0.8f;  // Slower, more refined
+                    break;
+                case DevelopmentalStage::Adult:
+                    developmentFactor = 0.5f;  // Stable, less plastic
+                    break;
+            }
+            
+            // Apply developmental effects to all neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Development affects resting potential and threshold
+                        float originalResting = neuron->getState().restingPotential;
+                        float newResting = originalResting * developmentFactor;
+                        neuron->setRestingPotential(newResting);
+                        
+                        // Modulate threshold for action potential generation
+                        float originalThreshold = neuron->getState().threshold;
+                        float newThreshold = originalThreshold * (2.0f - developmentFactor);
+                        neuron->setThreshold(newThreshold);
+                        
+                        // Adjust leak conductance
+                        float originalLeak = neuron->getState().leakConductance;
+                        float newLeak = originalLeak * developmentFactor;
+                        neuron->setLeakConductance(newLeak);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -606,10 +850,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        // Inject current into this sensory neuron using brain's method
+        injectCurrent(pImpl->sensoryNeurons[i]->getId(), normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory for short-term retention
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
@@ -765,77 +1009,20 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
+        // Use the checkpoint manager
+        if (pImpl->checkpointManager) {
+            // For now, just save basic state via checkpoint manager
+            // The checkpoint manager handles the actual save/load
+            if (!pImpl->checkpointManager->save(filepath)) {
+                NLM_LOG_ERROR("Failed to save via checkpoint manager");
+                return false;
             }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_INFO("Brain state saved successfully");
+            return true;
+        } else {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
             return false;
         }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
-        }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
@@ -847,60 +1034,20 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
-        CheckpointReader reader;
-        if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
-        }
-        
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
+        // Use the checkpoint manager
+        if (pImpl->checkpointManager) {
+            // For now, just load basic state via checkpoint manager
+            // The checkpoint manager handles the actual save/load
+            if (!pImpl->checkpointManager->load(filepath)) {
+                NLM_LOG_ERROR("Failed to load via checkpoint manager");
+                return false;
             }
-        }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+            NLM_LOG_INFO("Brain state loaded successfully");
+            return true;
+        } else {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
             return false;
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
@@ -1065,9 +1212,24 @@ Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* Brain::getAcetylcholine() {
+        return pImpl->acetylcholine.get();
+    }
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* Brain::getNorepinephrine() {
+        return pImpl->norepinephrine.get();
+    }
+    
+    // Serotonin - mood and social behavior
+    Serotonin* Brain::getSerotonin() {
+        return pImpl->serotonin.get();
+    }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
