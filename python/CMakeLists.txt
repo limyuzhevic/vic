@@ -3,7 +3,7 @@ project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -99,4 +99,10 @@ install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Install Python helper files
+install(FILES __init__.py DESTINATION pynlm)
+install(DIRECTORY tests/ DESTINATION pynlm/tests
+    FILES_MATCHING PATTERN "*.py"
 )
