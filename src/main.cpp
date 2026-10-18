@@ -25,8 +25,132 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <stdexcept>
+#include <csignal>
+#include <algorithm>
 
 using namespace nlm;
+
+namespace {
+    // Global error handling flag
+    volatile bool gShouldExit = false;
+    
+    // Signal handler for graceful shutdown
+    void signalHandler(int signal) {
+        gShouldExit = true;
+        NLM_LOG_WARNING("Received signal " + std::to_string(signal) + ", shutting down gracefully...");
+    }
+    
+    // Register signal handlers
+    void setupSignalHandlers() {
+        std::signal(SIGINT, signalHandler);
+        std::signal(SIGTERM, signalHandler);
+    }
+    
+    // Validate configuration values for Phase 2
+    bool validateConfiguration(const Config& config) {
+        try {
+            // Check essential configuration
+            if (!config.has("neuron_count")) {
+                throw std::runtime_error("Missing required configuration: neuron_count");
+            }
+            
+            int64_t neuronCount = config.getOr<int64_t>("neuron_count", 500);
+            if (neuronCount < 1 || neuronCount > 1000000) {
+                throw std::runtime_error("Invalid neuron_count: " + std::to_string(neuronCount) +
+                                       ". Must be between 1 and 1,000,000");
+            }
+            
+            // Validate plasticity parameters
+            if (config.has("plasticity.stdp.learning_rate")) {
+                float learningRate = config.getOr<float>("plasticity.stdp.learning_rate", 0.001f);
+                if (learningRate < 0.0f || learningRate > 10.0f) {
+                    throw std::runtime_error("Invalid STDP learning_rate: " + std::to_string(learningRate));
+                }
+            }
+            
+            if (config.has("plasticity.stdp.tau_plus")) {
+                float tau = config.getOr<float>("plasticity.stdp.tau_plus", 20.0f);
+                if (tau < 1.0f || tau > 1000.0f) {
+                    throw std::runtime_error("Invalid STDP tau_plus: " + std::to_string(tau));
+                }
+            }
+            
+            // Validate neuron parameters
+            if (config.has("brain.v_thresh")) {
+                float vthresh = config.getOr<float>("brain.v_thresh", -50.0f);
+                if (vthresh < -100.0f || vthresh > 0.0f) {
+                    throw std::runtime_error("Invalid v_thresh: " + std::to_string(vthresh));
+                }
+            }
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Configuration validation failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    // Safe configuration loading with error handling
+    std::shared_ptr<Config> safeLoadConfiguration(int argc, char** argv) {
+        try {
+            auto config = std::make_shared<Config>();
+            
+            // Try to load from default config file first
+            std::string configFile = "configs/default.cfg";
+            if (argc > 1) {
+                // Parse command line arguments
+                for (int i = 1; i < argc; ++i) {
+                    std::string arg(argv[i]);
+                    if (arg.find("--config") != std::string::npos) {
+                        if (arg.find('=') != std::string::npos) {
+                            configFile = arg.substr(arg.find('=') + 1);
+                        } else if (i + 1 < argc) {
+                            configFile = argv[++i];
+                        }
+                    }
+                }
+            }
+            
+            // Load configuration file
+            if (!configFile.empty() && !configFile.empty()) {
+                if (!config->loadFromFile(configFile)) {
+                    NLM_LOG_WARNING("Could not load configuration from " + configFile + ". Using defaults.");
+                }
+            }
+            
+            // Load from command line arguments
+            config->loadFromArgs(argc, argv);
+            
+            return config;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to load configuration: " + std::string(e.what()));
+            throw;
+        }
+    }
+}
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Real LIF neuron dynamics                                ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -402,27 +526,33 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    try {
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        brain->logStatus();
+        
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Fatal error during simulation: " + std::string(e.what()));
         return 1;
     }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
     
     // Final brain status
     NLM_LOG_INFO("");

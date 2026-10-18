@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -43,7 +44,13 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Exception class for configuration errors
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Main configuration class with enhanced validation and error handling
 class Config {
 public:
     Config();
@@ -71,7 +78,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +100,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced validation methods
+    bool validateKeyFormat(const std::string& key) const;
+    bool validateKey(const std::string& key, const ConfigValue& value) const;
+    std::string getValueString(const ConfigValue& value) const;
+    std::string getSchemaInfo(const std::string& key) const;
+    std::string getSchemaSummary() const;
+    
+    // Schema initialization
+    void initializeSchema();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +117,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private validation methods
+    bool validateValue(const ConfigValue& value, const std::string& typeConstraint) const;
 };
 
 } // namespace nlm

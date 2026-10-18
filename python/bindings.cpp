@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -405,6 +407,9 @@ PYBIND11_MODULE(pynlm, m) {
     }, "Create a default configuration");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
@@ -413,8 +418,60 @@ PYBIND11_MODULE(pynlm, m) {
     }, "Create a new simple world");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("runQuickSimulation", [](std::shared_ptr<Brain> brain, size_t steps) -> std::vector<size_t> {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        brain->initialize();
+        std::vector<size_t> spikeCounts;
+        spikeCounts.reserve(steps);
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(static_cast<nlm::SimulationStep>(i));
+            spikeCounts.push_back(brain->getFiringNeuronCount());
+        }
+        return spikeCounts;
+    }, py::arg("brain"), py::arg("steps"), 
+        "Run a quick simulation and return firing counts at each step. "
+        "Brain will be initialized automatically.");
+
+    m.def("exportBrainState", [](const std::string& filepath, std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        brain->save(filepath);
+    }, py::arg("filepath"), py::arg("brain"),
+        "Export brain state to a binary file.");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+        "Import brain state from a binary file.");
+
+    m.def("createConfigFromJson", [](const std::string& jsonString) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(jsonString)) {
+            throw std::runtime_error("Failed to load configuration from file: " + jsonString);
+        }
+        return config;
+    }, py::arg("jsonString"),
+        "Create a configuration from a JSON file.");
+
+    m.def("getVersionInfo", []() {
+        py::dict info;
+        info["version"] = "0.1.0";
+        info["phase"] = "6 (FINAL INTEGRATION)";
+        info["description"] = "Neural Learning Machine - Experimental Artificial Developmental Brain";
+        return info;
+    }, "Get version and build information.");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
