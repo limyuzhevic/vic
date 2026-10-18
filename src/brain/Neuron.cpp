@@ -189,6 +189,12 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate input parameters
+    if (dt <= 0.0f || dt > 10.0f) {
+        // Invalid timestep - clamp to reasonable range
+        dt = std::clamp(dt, 0.001f, 1.0f);  // Reasonable range: 1ms to 1s
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -213,6 +219,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate tau and capacitance
+    if (tau <= 0.0f || C <= 0.0f) {
+        // Invalid parameters - reset to safe values
+        tau = Impl::TIME_CONSTANT;
+        C = Impl::MEMBRANE_CAPACITANCE;
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
@@ -220,7 +233,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Add bounds checking during integration
+    float potentialChange = static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    // Check for potential overflow/underflow
+    if (std::abs(potentialChange) > 1000.0f) {
+        // Clamping potential change to prevent numerical instability
+        potentialChange = std::clamp(potentialChange, -100.0f, 100.0f);
+    }
+    
+    V = V + potentialChange;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -231,17 +253,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
-    if (V >= threshold) {
+    // Check for spike with hysteresis to prevent multiple spikes per timestep
+    if (V >= threshold && pImpl->state.firingState != FiringState::Refractory) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity
         recordSpike(currentTime);
         
-        // Reset membrane potential
-        V = V_reset;
+        // Reset membrane potential with small random jitter to prevent oscillations
+        V = V_reset + (rng_.uniformReal(-0.1f, 0.1f));
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;

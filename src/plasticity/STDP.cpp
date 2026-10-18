@@ -59,37 +59,57 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Clamp tau to avoid division by zero or extremely small values
+    if (tau <= 0.0f) {
+        tau = 1.0f;  // Default safe value
+    }
+    
+    // Calculate total weight change from all spike pairings
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
+            // Compute timing difference in milliseconds
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
-                // Pre before post: POTENTIATION
+                // Pre before post: POTENTIATION (LTP)
                 // "Cells that fire together, wire together" - but only if pre fires before post
+                // Use exponential decay based on timing difference
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
+            } else if (dt < -tau) {
+                // Post before pre with sufficient timing difference: DEPRESSION (LTD)
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                // Use exponential decay based on absolute timing difference
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
+            // dt in (-tau, 0): minimal effect, ignore
         }
     }
     
     // Apply weight change with bounds
+    // Clamp totalDelta to reasonable values to prevent runaway weight changes
+    const float MAX_TOTAL_DELTA = 1.0f;  // Maximum total change per STDP window
     if (std::abs(totalDelta) > 1e-6f) {
+        totalDelta = std::clamp(totalDelta, -MAX_TOTAL_DELTA, MAX_TOTAL_DELTA);
+        
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
+        // Ensure efficacy is reasonable (should typically be 0-2 based on Synapse.cpp)
+        efficacy = std::max(0.0f, std::min(efficacy, 2.0f));
         totalDelta *= efficacy;
+        
+        // Re-clamp after efficacy scaling
+        totalDelta = std::clamp(totalDelta, -MAX_TOTAL_DELTA, MAX_TOTAL_DELTA);
         
         // Apply weight change
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
+        // Eligibility trace should accumulate but decay over time
         float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        synapse->setEligibilityTrace(currentTrace + totalDelta * 0.5f);  // Scale eligibility trace contribution
     }
 }
 

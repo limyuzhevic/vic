@@ -53,25 +53,40 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // Count correlated spike pairs with temporal precision
+    // Use spike timing windows to determine correlation
+    const float CORRELATION_WINDOW = 50.0f;  // 50ms correlation window
     size_t correlationCount = 0;
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+            // Count spikes within correlation window as correlated
+            if (std::abs(dt) < CORRELATION_WINDOW) {
                 ++correlationCount;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Calculate weight change based on correlation
+    // Use learning rate to control the magnitude of change
+    float baseDelta = pImpl->learningRate * static_cast<float>(correlationCount);
+    
+    // Apply stabilization: prevent runaway potentiation by scaling with current weight
+    float currentWeight = synapse->getWeight();
+    float weightBasedScaling = 1.0f - std::abs(currentWeight) * 0.5f;  // Less scaling near zero weight
+    float delta = baseDelta * weightBasedScaling;
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
+    }
+    
+    // Update eligibility trace for reward-modulated Hebbian learning
+    if (std::abs(delta) > 0.0f) {
+        float currentTrace = synapse->getEligibilityTrace();
+        // Eligibility trace accumulates changes but decays over time
+        synapse->setEligibilityTrace(currentTrace + delta * 0.3f);  // Scale eligibility contribution
     }
 }
 

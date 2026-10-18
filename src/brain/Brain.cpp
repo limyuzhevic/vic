@@ -22,11 +22,46 @@
 
 namespace nlm {
 
+#include "Brain.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+
+namespace nlm {
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== MEMORY POOLS ==========
+    NeuronPool neuronPool;
+    SynapsePool synapsePool;
+    
+    // ========== NEURAL COMPUTATION COMPONENTS ==========
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -50,12 +85,6 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -64,6 +93,12 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
+    
+    // Memory statistics
+    size_t neuronPoolAllocations;
+    size_t synapsePoolAllocations;
+    size_t neuronPoolDeallocations;
+    size_t synapsePoolDeallocations;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -88,10 +123,15 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , neuronPoolAllocations(0)
+        , synapsePoolAllocations(0)
+        , neuronPoolDeallocations(0)
+        , synapsePoolDeallocations(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -100,14 +140,23 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize neural computation systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Initialize memory pools with sizes based on configuration
+        size_t neuronCount = config->getOr<size_t>("neuron_count", 1000);
+        size_t synapseCount = config->getOr<size_t>("synapse_count", 10000);
         
+        // Reserve space in memory pools
+        neuronPool.reserve(neuronCount);
+        synapsePool.reserve(synapseCount);
+    }
+    
+    // Initialize all integrated systems
+    void initializeIntegratedSystems() {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -130,6 +179,16 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Configure plasticity systems
+        configurePlasticitySystems();
+        
+        // Configure checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+        configureCheckpointManager();
+    }
+    
+    // Configure plasticity system parameters
+    void configurePlasticitySystems() {
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
@@ -141,17 +200,37 @@ struct Brain::Impl {
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
+    }
+    
+    // Configure checkpoint manager
+    void configureCheckpointManager() {
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        if (checkpointManager) {
+            checkpointManager->configure(checkpointDir, 10000, 5, true);
+        }
+    }
+    
+    // Get timestep from config
+    void configureTimestep() {
         timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
+    }
+    
+    // Get integration intervals from config
+    void configureIntegrationIntervals() {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
+    
+    // Memory management helper methods
+    NeuronId allocateNeuron(const std::string& typeName);
+    void deallocateNeuron(NeuronId id);
+    SynapseId allocateSynapse(NeuronId source, NeuronId destination);
+    void deallocateSynapse(SynapseId id);
+    
+    // Memory statistics
+    void updateMemoryStats();
+    size_t getNeuronPoolMemoryUsage() const;
+    size_t getSynapsePoolMemoryUsage() const;
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -186,11 +265,39 @@ bool Brain::initialize() {
                  std::to_string(regionCount) + " regions");
     
     // Create regions
+    createRegions(regionCount);
+    
+    // Create neurons across regions
+    createNeurons(neuronCount, regionCount, connectionProbability);
+    
+    // Initialize all integrated systems
+    initializeIntegratedSystems();
+    
+    // Initialize integrated systems
+    initializeAllIntegratedSystems(neuronCount);
+    
+    // Register event-driven processing handlers
+    registerSpikeHandlers();
+    
+    // Configure checkpoint manager
+    configureCheckpointManager();
+    
+    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    return true;
+}
+
+void Brain::createRegions(size_t regionCount) {
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
-    
-    // Create neurons across regions
+}
+
+void Brain::createNeurons(size_t neuronCount, size_t regionCount, float connectionProbability) {
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -219,19 +326,10 @@ bool Brain::initialize() {
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
-    
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
-        }
-    }
-    
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
+}
+
+void Brain::initializeAllIntegratedSystems(size_t neuronCount) {
+    // Initialize memory systems
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
@@ -258,7 +356,9 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
-    
+}
+
+void Brain::registerSpikeHandlers() {
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
@@ -285,18 +385,13 @@ bool Brain::initialize() {
             }
         }
     });
-    
-    // Configure checkpoint manager
+}
+
+void Brain::configureCheckpointManager() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
 }
 
 void Brain::step(SimulationStep currentStep) {
