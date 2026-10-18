@@ -420,6 +420,283 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced prediction system bindings
+    m.def("getPredictionError", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            return brain->getPredictionSystem()->getPredictionError();
+        }
+        return 0.0f;
+    }, py::arg("brain"), "Get current prediction error");
+    
+    m.def("getPredictionConfidence", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            return brain->getPredictionSystem()->getPredictionConfidence();
+        }
+        return 0.0f;
+    }, py::arg("brain"), "Get prediction confidence");
+    
+    m.def("getPredictionHistory", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            return brain->getPredictionSystem()->getErrorHistory();
+        }
+        return std::vector<float>();
+    }, py::arg("brain"), "Get prediction error history");
+    
+    m.def("getPredictionNeurons", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            return brain->getPredictionSystem()->getPredictionNeurons();
+        }
+        return std::vector<NeuronId>();
+    }, py::arg("brain"), "Get neurons involved in prediction");
+    
+    m.def("getActionConsequencePredictor", [](std::shared_ptr<Brain> brain) {
+        return brain->getActionConsequencePredictor();
+    }, py::arg("brain"), "Get action-consequence predictor");
+    
+    m.def("getPredictionErrorSignal", [](std::shared_ptr<Brain> brain) {
+        return brain->getPredictionErrorSignal();
+    }, py::arg("brain"), "Get prediction error signal");
+    
+    m.def("getSequenceNeurons", [](std::shared_ptr<Brain> brain) {
+        if (brain->getPredictionSystem()) {
+            return brain->getPredictionSystem()->getSequenceNeurons();
+        }
+        return std::vector<NeuronId>();
+    }, py::arg("brain"), "Get neurons involved in temporal sequences");
+    
+    m.def("getConceptFormation", [](std::shared_ptr<Brain> brain) {
+        return brain->getConceptFormation();
+    }, py::arg("brain"), "Get concept formation system");
+    
+    m.def("getNeuralPlanner", [](std::shared_ptr<Brain> brain) {
+        return brain->getPlanner();
+    }, py::arg("brain"), "Get neural planner");
+    
+    m.def("getDevelopmentalStage", [](std::shared_ptr<Brain> brain) {
+        return brain->getDevelopmentalStage();
+    }, py::arg("brain"), "Get developmental stage");
+    
+    m.def("setDevelopmentalStage", [](std::shared_ptr<Brain> brain, DevelopmentalStage stage) {
+        brain->setDevelopmentalStage(stage);
+    }, py::arg("brain"), py::arg("stage"), "Set developmental stage");
+    
+    m.def("getSimulationStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitement_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get comprehensive simulation statistics");
+    
+    m.def("enableAdvancedSystems", [](std::shared_ptr<Brain> brain, bool prediction, bool conceptFormation, bool planning) {
+        if (prediction && brain->getPredictionSystem()) {
+            brain->getPredictionSystem()->enableTemporalPrediction(true);
+            brain->getPredictionSystem()->enableActionConsequencePrediction(true);
+        }
+        if (conceptFormation && brain->getConceptFormation()) {
+            // Concept formation is always enabled by default
+        }
+        if (planning && brain->getPlanner()) {
+            brain->getPlanner()->setPlanningDepth(3);
+        }
+    }, py::arg("brain"), py::arg("prediction") = true, py::arg("conceptFormation") = true, py::arg("planning") = true,
+       "Enable advanced neural systems for enhanced cognitive capabilities");
+    
+    m.def("getSystemStatus", [](std::shared_ptr<Brain> brain) {
+        py::dict status;
+        status["prediction_system"] = (brain->getPredictionSystem() != nullptr);
+        status["action_consequence_predictor"] = (brain->getActionConsequencePredictor() != nullptr);
+        status["prediction_error_signal"] = (brain->getPredictionErrorSignal() != nullptr);
+        status["concept_formation"] = (brain->getConceptFormation() != nullptr);
+        status["neural_planner"] = (brain->getPlanner() != nullptr);
+        status["episodic_memory"] = (brain->getEpisodicMemory() != nullptr);
+        status["working_memory"] = (brain->getWorkingMemory() != nullptr);
+        status["attention"] = (brain->getAttention() != nullptr);
+        status["development_system"] = (brain->getDevelopmentSystem() != nullptr);
+        status["dopamine"] = (brain->getDopamine() != nullptr);
+        status["curiosity"] = (brain->getCuriosity() != nullptr);
+        status["novelty"] = (brain->getNovelty() != nullptr);
+        return status;
+    }, py::arg("brain"), "Get status of all integrated neural systems");
+    
+    m.def("createAdvancedBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.05f);
+        config->set("brain.connection_probability", 0.1f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        return brain;
+    }, "Create an advanced brain with all integrated systems enabled");
+    
+    m.def("createAdvancedAgent", [](std::shared_ptr<SimpleWorld> world) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.03f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable all subsystems for advanced cognitive capabilities
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("world"), "Create an advanced agent with all cognitive capabilities");
+    
+    m.def("runAdvancedSimulation", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                                 size_t numSteps, bool enableLearning = true) {
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process input through agent
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            agent->getBrain()->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (enableLearning) {
+                // Get reward from world internal signals
+                float reward = 0.0f;
+                if (!percept.getInternal().empty()) {
+                    reward = percept.getInternal()[0];
+                }
+                
+                // Apply reward modulation
+                agent->applyRewardModulation(reward, 0.0f);
+                
+                // Update development
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        // Return final statistics
+        py::dict stats;
+        stats["total_steps"] = numSteps;
+        stats["final_neuron_count"] = agent->getBrain()->getTotalNeuronCount();
+        stats["final_synapse_count"] = agent->getBrain()->getTotalSynapseCount();
+        stats["final_firing_rate"] = agent->getBrain()->getAverageFiringRate();
+        stats["curiosity_level"] = agent->getCuriosityLevel();
+        stats["novelty_level"] = agent->getNoveltyLevel();
+        stats["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("agent"), py::arg("world"), py::arg("numSteps"), py::arg("enableLearning") = true,
+       "Run an advanced simulation with cognitive capabilities");
+    
+    m.def("extractNeuralPatterns", [](std::shared_ptr<Brain> brain) {
+        std::vector<float> patterns;
+        
+        // Extract patterns from working memory
+        auto* wm = brain->getWorkingMemory();
+        if (wm) {
+            auto neurons = wm->getMemoryNeurons();
+            auto activations = wm->getMemoryActivations();
+            for (size_t i = 0; i < neurons.size() && i < activations.size(); ++i) {
+                patterns.push_back(neurons[i].value);
+                patterns.push_back(activations[i]);
+            }
+        }
+        
+        // Extract patterns from episodic memory
+        auto* em = brain->getEpisodicMemory();
+        if (em) {
+            for (size_t i = 0; i < std::min<size_t>(em->getEpisodeCount(), 10); ++i) {
+                auto* episode = em->getEpisode(i);
+                if (episode) {
+                    for (float val : episode->sensoryState) {
+                        patterns.push_back(val);
+                    }
+                }
+            }
+        }
+        
+        // Extract neural activity patterns
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Internal) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isActive()) {
+                            float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            patterns.push_back(1.0f);  // neuron ID
+                            patterns.push_back(activity);  // activity
+                        }
+                    }
+                }
+            }
+        }
+        
+        return patterns;
+    }, py::arg("brain"), "Extract neural activity patterns from memory systems");
+    
+    m.def("analyzeConceptDiscovery", [](std::shared_ptr<Brain> brain) {
+        py::dict analysis;
+        auto* cf = brain->getConceptFormation();
+        
+        if (cf) {
+            analysis["concept_count"] = cf->getConceptCount();
+            analysis["concept_ids"] = std::vector<size_t>(cf->getConceptCount());
+            
+            // Analyze concept stability
+            float totalStability = 0.0f;
+            size_t stableConcepts = 0;
+            for (size_t i = 0; i < cf->getConceptCount(); ++i) {
+                float stability = cf->getConceptStability(i);
+                totalStability += stability;
+                if (stability > 0.7f) {
+                    stableConcepts++;
+                }
+            }
+            
+            analysis["average_stability"] = cf->getConceptCount() > 0 ? totalStability / cf->getConceptCount() : 0.0f;
+            analysis["stable_concepts"] = stableConcepts;
+            analysis["discovery_rate"] = cf->getConceptCount() / 10.0f;  // Assuming 10 steps
+            
+            // Analyze concept generalization
+            float totalGeneralization = 0.0f;
+            for (size_t i = 0; i < cf->getConceptCount(); ++i) {
+                totalGeneralization += cf->getGeneralizationAbility(i);
+            }
+            analysis["average_generalization"] = cf->getConceptCount() > 0 ? totalGeneralization / cf->getConceptCount() : 0.0f;
+        } else {
+            analysis["concept_count"] = 0;
+            analysis["average_stability"] = 0.0f;
+            analysis["stable_concepts"] = 0;
+            analysis["discovery_rate"] = 0.0f;
+            analysis["average_generalization"] = 0.0f;
+        }
+        
+        return analysis;
+    }, py::arg("brain"), "Analyze concept formation and discovery process");
 }
 
 } // namespace nlm

@@ -19,7 +19,9 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -148,10 +150,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
+// ========== PREDICTION SYSTEM ==========
+
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    NeuralPrediction* getPredictionSystem();
+    ActionConsequencePredictor* getActionConsequencePredictor();
+    PredictionErrorSignal* getPredictionErrorSignal();
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -182,7 +186,7 @@ public:
     Novelty* getNovelty();
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionErrorSignal* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
