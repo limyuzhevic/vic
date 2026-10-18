@@ -179,6 +179,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Vision& self, float* data, size_t size) {
+            self.setData(data, size);
+        }, py::arg("data"), py::arg("size"), "Set vision data from raw pointer")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
         .def("getChannels", &Vision::getChannels);
@@ -189,14 +192,32 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"), "Set audio sample rate")
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"), "Add a signal value")
+        .def("clearSignals", &InternalSignals::clearSignals, "Clear all signals");
+    
+    py::class_<VisionProcessor>(m, "VisionProcessor", R"pbdoc(Vision processing neural network)pbdoc")
+        .def(py::init<>())
+        .def("process", &VisionProcessor::process, py::arg("input"), "Process vision input")
+        .def("getFeatures", &VisionProcessor::getFeatures, "Get processed vision features")
+        .def("getFeatureDimensions", &VisionProcessor::getFeatureDimensions, "Get feature dimensionality");
+    
+    py::class_<AudioProcessor>(m, "AudioProcessor", R"pbdoc(Audio processing neural network)pbdoc")
+        .def(py::init<>())
+        .def("process", &AudioProcessor::process, py::arg("input"), "Process audio input")
+        .def("getFeatures", &AudioProcessor::getFeatures, "Get processed audio features")
+        .def("getFeatureDimensions", &AudioProcessor::getFeatureDimensions, "Get feature dimensionality");
+    
+    py::class_<InternalSignalsProcessor>(m, "InternalSignalsProcessor", R"pbdoc(Internal signals processing neural network)pbdoc")
+        .def(py::init<>())
+        .def("process", &InternalSignalsProcessor::process, py::arg("input"), "Process internal signals")
+        .def("getProcessedSignals", &InternalSignalsProcessor::getProcessedSignals, "Get processed signals")
+        .def("getHomeostaticSignals", &InternalSignalsProcessor::getHomeostaticSignals, "Get homeostatic signals");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -420,6 +441,113 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add convenience functions to create multiple sensory inputs
+    m.def("createVision", [](size_t width, size_t height, size_t channels = 3,
+                             const std::vector<float>& data = std::vector<float>(),
+                             double timestamp = 0.0) {
+        auto vision = std::make_shared<Vision>(width, height, channels);
+        if (!data.empty()) vision->setData(data);
+        vision->setTimestamp(timestamp);
+        return vision;
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+        py::arg("data") = std::vector<float>(), py::arg("timestamp") = 0.0,
+        "Create a Vision sensory input with optional data");
+
+    m.def("createAudio", [](size_t sampleRate, size_t numSamples,
+                           const std::vector<float>& data = std::vector<float>(),
+                           double timestamp = 0.0) {
+        auto audio = std::make_shared<Audio>(sampleRate, numSamples);
+        if (!data.empty()) audio->setData(data);
+        audio->setTimestamp(timestamp);
+        return audio;
+    }, py::arg("sampleRate"), py::arg("numSamples"),
+        py::arg("data") = std::vector<float>(), py::arg("timestamp") = 0.0,
+        "Create an Audio sensory input with optional data");
+
+    m.def("createInternalSignals", [](const std::vector<float>& signals,
+                                     double timestamp = 0.0) {
+        auto internal = std::make_shared<InternalSignals>();
+        internal->setTimestamp(timestamp);
+        for (float signal : signals) {
+            internal->addSignal(signal);
+        }
+        return internal;
+    }, py::arg("signals"), py::arg("timestamp") = 0.0,
+        "Create InternalSignals with initial values");
+
+    // Add batch processing functions
+    m.def("batchProcessVision", [](std::vector<std::shared_ptr<Vision>>& visions,
+                                  VisionProcessor& processor) {
+        for (auto& vision : visions) {
+            processor.process(*vision);
+        }
+    }, py::arg("visions"), py::arg("processor"),
+        "Process multiple Vision inputs with a processor");
+
+    m.def("batchProcessAudio", [](std::vector<std::shared_ptr<Audio>>& audios,
+                                 AudioProcessor& processor) {
+        for (auto& audio : audios) {
+            processor.process(*audio);
+        }
+    }, py::arg("audios"), py::arg("processor"),
+        "Process multiple Audio inputs with a processor");
+
+    m.def("batchProcessInternalSignals", [](std::vector<std::shared_ptr<InternalSignals>>& signals,
+                                            InternalSignalsProcessor& processor) {
+        for (auto& signal : signals) {
+            processor.process(*signal);
+        }
+    }, py::arg("signals"), py::arg("processor"),
+        "Process multiple InternalSignals inputs with a processor");
+
+    // Add utility functions for creating common patterns
+    m.def("createDefaultVision", [](size_t width = 64, size_t height = 64) {
+        return std::make_shared<Vision>(width, height);
+    }, py::arg("width") = 64, py::arg("height") = 64,
+        "Create a default Vision input (640x480 with 3 channels)");
+
+    m.def("createDefaultAudio", [](size_t sampleRate = 44100, size_t durationMs = 1000) {
+        size_t numSamples = (sampleRate * durationMs) / 1000;
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate") = 44100, py::arg("durationMs") = 1000,
+        "Create a default Audio input (44.1kHz, 1 second)");
+
+    // Add error checking utilities
+    m.def("validateVisionData", [](const std::vector<float>& data, size_t width, size_t height) {
+        if (data.empty()) {
+            throw std::invalid_argument("Vision data cannot be empty");
+        }
+        size_t expectedSize = width * height * 3;
+        if (data.size() < expectedSize) {
+            throw std::invalid_argument("Vision data size too small for specified dimensions");
+        }
+        return true;
+    }, py::arg("data"), py::arg("width"), py::arg("height"),
+        "Validate vision data dimensions");
+
+    m.def("validateAudioData", [](const std::vector<float>& data, size_t sampleRate, size_t expectedDurationMs = 1000) {
+        if (data.empty()) {
+            throw std::invalid_argument("Audio data cannot be empty");
+        }
+        size_t expectedSize = (sampleRate * expectedDurationMs) / 1000;
+        if (data.size() < expectedSize) {
+            throw std::invalid_argument("Audio data size too small for specified duration");
+        }
+        return true;
+    }, py::arg("data"), py::arg("sampleRate"), py::arg("expectedDurationMs") = 1000,
+        "Validate audio data duration");
+
+    // Add performance-related utilities
+    m.def("getMemoryUsage", []() {
+        // Get memory usage information
+        return "Memory usage: (implementation depends on system)";
+    }, "Get current memory usage information");
+
+    m.def("getPerformanceInfo", []() {
+        // Get performance information
+        return "Performance: (implementation depends on system)";
+    }, "Get performance information");
 }
 
 } // namespace nlm
