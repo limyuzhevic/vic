@@ -1,144 +1,113 @@
-// NLM Performance Benchmark
-// Measures simulation performance for different network sizes
-
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-
+// benchmark.cpp - Implementation of BenchmarkSuite
+#include "benchmark.h"
 #include <iostream>
-#include <chrono>
-#include <vector>
+#include <fstream>
 #include <iomanip>
-#include <string>
+#include <algorithm>
+#include <cmath>
 
-using namespace nlm;
+namespace nlm {
 
-// Simple performance measurement
-struct BenchmarkResult {
-    size_t neurons;
-    size_t synapses;
-    size_t steps;
-    double totalTime;      // seconds
-    double stepsPerSecond;
-    double spikesPerStep;
-    double synapsesPerNeuron;
-};
-
-BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
-    std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
-              << steps << " steps..." << std::flush;
-    
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
-    
-    // Create brain
-    auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
-    
-    // Run simulation
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
-    for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
-        for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
-        
-        brain->step(step, step * 0.001);
-    }
-    
-    auto endTime = std::chrono::high_resolution_clock::now();
-    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
-    
-    // Collect results
-    BenchmarkResult result;
-    result.neurons = brain->getTotalNeuronCount();
-    result.synapses = brain->getTotalSynapseCount();
-    result.steps = steps;
-    result.totalTime = totalTime;
-    result.stepsPerSecond = steps / totalTime;
-    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
-    result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
-    
-    std::cout << " Done!" << std::endl;
-    std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
-    std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
-    std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
-    
-    return result;
+BenchmarkSuite::BenchmarkSuite() {
+    NLM_LOG_INFO("BenchmarkSuite initialized");
 }
 
-void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
-    std::cout << std::endl;
-    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
-    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
-    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
-    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
-    
-    for (const auto& r : results) {
-        std::cout << "║ " << std::setw(13) << r.neurons 
-                  << " ║ " << std::setw(13) << r.synapses
-                  << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << r.stepsPerSecond
-                  << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << r.spikesPerStep
-                  << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) << r.synapsesPerNeuron
-                  << " ║" << std::endl;
-    }
-    
-    std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╝" << std::endl;
-    std::cout << std::endl;
+BenchmarkSuite::~BenchmarkSuite() = default;
+
+void BenchmarkSuite::addBenchmark(const Benchmark& benchmark) {
+    pImpl->addBenchmark(benchmark);
 }
 
-int main() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Performance Benchmark                                     ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    std::cout << "Running NLM Performance Benchmarks..." << std::endl;
-    std::cout << std::endl;
-    
-    std::vector<BenchmarkResult> results;
-    
-    // Benchmark configurations: (neuron_count, steps)
-    std::vector<std::pair<size_t, size_t>> benchmarks = {
-        {100, 1000},      // 100 neurons, 1000 steps
-        {500, 1000},      // 500 neurons, 1000 steps
-        {1000, 500},      // 1000 neurons, 500 steps
-        {2000, 200},      // 2000 neurons, 200 steps
-    };
-    
-    for (const auto& [neurons, steps] : benchmarks) {
-        auto result = runBenchmark(neurons, steps);
-        results.push_back(result);
-        std::cout << std::endl;
-    }
-    
-    // Print summary
-    printBenchmarkResults(results);
-    
-    std::cout << "Benchmark complete." << std::endl;
-    
-    return 0;
+void BenchmarkSuite::removeBenchmark(const std::string& name) {
+    pImpl->removeBenchmark(name);
 }
+
+void BenchmarkSuite::clearBenchmarks() {
+    pImpl->clearBenchmarks();
+}
+
+bool BenchmarkSuite::hasBenchmark(const std::string& name) const {
+    return pImpl->hasBenchmark(name);
+}
+
+void BenchmarkSuite::setIterations(size_t iterations) {
+    pImpl->setIterations(iterations);
+}
+
+void BenchmarkSuite::setTimeout(double timeout) {
+    pImpl->setTimeout(timeout);
+}
+
+void BenchmarkSuite::enableWarmup(bool enable) {
+    pImpl->enableWarmup(enable);
+}
+
+void BenchmarkSuite::setWarmupIterations(size_t iterations) {
+    pImpl->setWarmupIterations(iterations);
+}
+
+BenchmarkResult BenchmarkSuite::runBenchmark(const std::string& name) {
+    return pImpl->runBenchmark(name);
+}
+
+std::vector<BenchmarkResult> BenchmarkSuite::runAllBenchmarks() {
+    return pImpl->runAllBenchmarks();
+}
+
+double BenchmarkSuite::getAverageTime(const std::string& name) const {
+    return pImpl->getAverageTime(name);
+}
+
+double BenchmarkSuite::getMinTime(const std::string& name) const {
+    return pImpl->getMinTime(name);
+}
+
+double BenchmarkSuite::getMaxTime(const std::string& name) const {
+    return pImpl->getMaxTime(name);
+}
+
+double BenchmarkSuite::getStandardDeviation(const std::string& name) const {
+    return pImpl->getStandardDeviation(name);
+}
+
+size_t BenchmarkSuite::getTotalOperations(const std::string& name) const {
+    return pImpl->getTotalOperations(name);
+}
+
+double BenchmarkSuite::getOperationsPerSecond(const std::string& name) const {
+    return pImpl->getOperationsPerSecond(name);
+}
+
+void BenchmarkSuite::generateBenchmarkReport(const std::string& outputFile) const {
+    pImpl->generateBenchmarkReport(outputFile);
+}
+
+void BenchmarkSuite::generateComparisonReport(const std::vector<BenchmarkResult>& results, const std::string& outputFile) const {
+    pImpl->generateComparisonReport(results, outputFile);
+}
+
+void BenchmarkSuite::addDefaultBenchmarks() {
+    pImpl->addDefaultBenchmarks();
+}
+
+void BenchmarkSuite::addSimulationBenchmarks() {
+    pImpl->addSimulationBenchmarks();
+}
+
+void BenchmarkSuite::addMemoryBenchmarks() {
+    pImpl->addMemoryBenchmarks();
+}
+
+void BenchmarkSuite::addCPUBenchmarks() {
+    pImpl->addCPUBenchmarks();
+}
+
+bool BenchmarkSuite::loadBenchmarksFromFile(const std::string& filename) {
+    return pImpl->loadBenchmarksFromFile(filename);
+}
+
+bool BenchmarkSuite::saveBenchmarksToFile(const std::string& filename) const {
+    return pImpl->saveBenchmarksToFile(filename);
+}
+
+} // namespace nlm

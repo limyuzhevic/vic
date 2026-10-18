@@ -193,6 +193,107 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ADVANCED BRAIN CONTROLS ==========
+    
+    // Direct neuron population access
+    std::vector<Neuron*> getNeuronsByType(NeuronType type) const;
+    std::vector<Neuron*> getNeuronsByPopulation(PopulationId popId) const;
+    Neuron* getNeuron(NeuronId id) const;
+    
+    // Simulation control
+    bool isRunning() const { return !pImpl->isResting; }
+    void pause() { pImpl->isResting = true; }
+    void resume() { pImpl->isResting = false; }
+    void togglePause() { pImpl->isResting = !pImpl->isResting; }
+    
+    // Time control and monitoring
+    Timestamp getCurrentTime() const { return pImpl->currentTime; }
+    SimulationStep getCurrentStep() const { return pImpl->currentStep; }
+    double getTimeStep() const { return pImpl->timestep; }
+    
+    // Enhanced statistics
+    size_t getSpikesThisStep() const { return pImpl->totalSpikesThisStep; }
+    size_t getPendingSpikeEvents() const { return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount(); }
+    float getEnergyConsumption() const;
+    float getSynapticActivity() const;
+    
+    // Spike system monitoring and control
+    void addSpikeHandler(const std::function<void(const SpikeEvent&)>& handler);
+    void removeSpikeHandler(const std::function<void(const SpikeEvent&)>& handler);
+    std::vector<SpikeEvent> getRecentSpikes(size_t count) const;
+    void clearSpikeHistory();
+    
+    // Region and population control
+    NeuralRegion* getRegionByName(const std::string& name) const;
+    PopulationId addPopulation(RegionId regionId, size_t neuronCount, NeuronType type);
+    bool removePopulation(RegionId regionId, PopulationId popId);
+    
+    // Development system controls
+    void advanceDevelopmentStage();
+    void setDevelopmentAge(double age);
+    double getDevelopmentAge() const;
+    
+    // Neuromodulation controls
+    void setDopamineLevel(float level);
+    void setCuriosityLevel(float level);
+    void setNoveltyLevel(float level);
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    
+    // Memory system controls
+    size_t getWorkingMemorySize() const;
+    size_t getEpisodicMemoryCount() const;
+    size_t getAssociativeMemorySize() const;
+    void clearWorkingMemory();
+    void clearEpisodicMemory();
+    void clearAssociativeMemory();
+    
+    // Pattern recording and analysis
+    std::vector<NeuronId> getActiveNeurons() const;
+    std::vector<float> getNeuralActivityPattern() const;
+    float getNeuralActivityForNeuron(NeuronId id) const;
+    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    
+    // Event queue management
+    bool hasPendingEvents() const;
+    void flushPendingEvents();
+    
+    // Event-driven processing control
+    void setEventDrivenMode(bool enabled);
+    bool isEventDrivenMode() const;
+    void setProcessingLatency(float latency);
+    float getProcessingLatency() const;
+    
+    // Configuration overrides
+    void setNeuronParameters(const std::string& paramName, float value);
+    void restoreDefaultNeuronParameters();
+    
+    // Performance and debugging
+    void enableDebugLogging(bool enabled);
+    bool isDebugLoggingEnabled() const;
+    void setPerformanceMode(bool highPerformance);
+    bool isPerformanceMode() const;
+    
+    // State monitoring
+    bool isInReplayMode() const { return pImpl->stepsSinceLastEpisode > 0; }
+    size_t getReplayProgress() const;
+    double getConsolidationProgress() const;
+    
+    // Reward and reinforcement controls
+    void setReward(float reward, float predictedReward = 0.0f);
+    void setPunishment(float punishment);
+    
+    // Curiosity and exploration controls
+    void setExplorationThreshold(float threshold);
+    void setExploitationWeight(float weight);
+    float getExplorationDrive() const;
+    float getExploitationDrive() const;
+    
+    // Integration time management
+    void setIntegrationInterval(size_t replayInterval, size_t consolidationInterval);
+    void getIntegrationInterval(size_t& replayInterval, size_t& consolidationInterval) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

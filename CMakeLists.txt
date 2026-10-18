@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
@@ -85,6 +80,13 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Enhanced Memory Management
+    src/memory_management/memory_manager.cpp
+    src/checkpoint_management/checkpoint_manager.cpp
+    src/memory_monitoring/memory_usage_monitor.cpp
+    src/backup_management/backup_system.cpp
+    # Python Bindings
+    python/bindings.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -149,3 +151,8 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Enhanced memory management test executable
+add_executable(test_enhanced_memory test_enhanced_memory.cpp)
+target_link_libraries(test_enhanced_memory nlm_core)
+add_test(NAME test_enhanced_memory COMMAND test_enhanced_memory)

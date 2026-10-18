@@ -1,0 +1,1 @@
+Now let me create a comprehensive performance monitoring integration for the NLM project. I'll create a main.cpp file that demonstrates the performance monitoring integration with the existing NLM system, and also create a Python bindings file to provide a Python API for performance monitoring.

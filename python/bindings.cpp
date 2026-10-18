@@ -1,425 +1,386 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../memory_management/memory_manager.h"
+#include "../checkpoint_management/checkpoint_manager.h"
+#include "../memory_monitoring/memory_usage_monitor.h"
+#include "../backup_management/backup_system.h"
 
 namespace py = pybind11;
-namespace nlm {
 
-PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
-
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
-
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+PYBIND11_MODULE(nlm_memory_management, m) {
+    m.doc() = "NLM Memory Management and Checkpoint Systems Python Bindings";
+    
+    // Memory Manager bindings
+    py::class_<nlm::AdvancedMemoryItem>(m, "AdvancedMemoryItem")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+        .def_readwrite("neuron_id", &nlm::AdvancedMemoryItem::neuronId)
+        .def_readwrite("activation_value", &nlm::AdvancedMemoryItem::activationValue)
+        .def_readwrite("timestamp", &nlm::AdvancedMemoryItem::timestamp)
+        .def_readwrite("pattern", &nlm::AdvancedMemoryItem::pattern)
+        .def_readwrite("associated_neurons", &nlm::AdvancedMemoryItem::associatedNeurons)
+        .def_readwrite("associated_weights", &nlm::AdvancedMemoryItem::associatedWeights)
+        .def_readwrite("metadata", &nlm::AdvancedMemoryItem::metadata)
+        .def_readwrite("relevance_score", &nlm::AdvancedMemoryItem::relevanceScore)
+        .def_readwrite("decay_rate", &nlm::AdvancedMemoryItem::decayRate)
+        .def_readwrite("last_access_time", &nlm::AdvancedMemoryItem::lastAccessTime);
+    
+    py::class_<nlm::AdvancedEpisodicMemoryItem>(m, "AdvancedEpisodicMemoryItem")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+        .def_readwrite("timestamp", &nlm::AdvancedEpisodicMemoryItem::timestamp)
+        .def_readwrite("sensory_pattern", &nlm::AdvancedEpisodicMemoryItem::sensoryPattern)
+        .def_readwrite("motor_pattern", &nlm::AdvancedEpisodicMemoryItem::motorPattern)
+        .def_readwrite("reward", &nlm::AdvancedEpisodicMemoryItem::reward)
+        .def_readwrite("energy", &nlm::AdvancedEpisodicMemoryItem::energy)
+        .def_readwrite("location", &nlm::AdvancedEpisodicMemoryItem::location)
+        .def_readwrite("action", &nlm::AdvancedEpisodicMemoryItem::action)
+        .def_readwrite("active_neurons", &nlm::AdvancedEpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuron_activations", &nlm::AdvancedEpisodicMemoryItem::neuronActivations)
+        .def_readwrite("novelty_score", &nlm::AdvancedEpisodicMemoryItem::noveltyScore)
+        .def_readwrite("stress_level", &nlm::AdvancedEpisodicMemoryItem::stressLevel);
+    
+    py::class_<nlm::AdvancedPattern>(m, "AdvancedPattern")
+        .def(py::init<const std::vector<float>&>())
+        .def_readwrite("vector", &nlm::AdvancedPattern::vector)
+        .def_readwrite("neurons", &nlm::AdvancedPattern::neurons)
+        .def_readwrite("magnitude", &nlm::AdvancedPattern::magnitude)
+        .def_readwrite("features", &nlm::AdvancedPattern::features);
+    
+    py::class_<nlm::AdvancedAssociativeItem>(m, "AdvancedAssociativeItem")
+        .def(py::init<const nlm::AdvancedPattern&, const nlm::AdvancedPattern&, float>())
+        .def_readwrite("pattern1", &nlm::AdvancedAssociativeItem::pattern1)
+        .def_readwrite("pattern2", &nlm::AdvancedAssociativeItem::pattern2)
+        .def_readwrite("strength", &nlm::AdvancedAssociativeItem::strength)
+        .def_readwrite("last_updated", &nlm::AdvancedAssociativeItem::lastUpdated)
+        .def_readwrite("decay_rate", &nlm::AdvancedAssociativeItem::decayRate);
+    
+    py::class_<nlm::CheckpointMetadata>(m, "CheckpointMetadata")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+        .def_readwrite("id", &nlm::CheckpointMetadata::id)
+        .def_readwrite("step", &nlm::CheckpointMetadata::step)
+        .def_readwrite("description", &nlm::CheckpointMetadata::description)
+        .def_readwrite("creation_time", &nlm::CheckpointMetadata::creationTime)
+        .def_readwrite("last_access_time", &nlm::CheckpointMetadata::lastAccessTime)
+        .def_readwrite("size", &nlm::CheckpointMetadata::size)
+        .def_readwrite("is_compressed", &nlm::CheckpointMetadata::isCompressed)
+        .def_readwrite("is_encrypted", &nlm::CheckpointMetadata::isEncrypted)
+        .def_readwrite("compression_algorithm", &nlm::CheckpointMetadata::compressionAlgorithm)
+        .def_readwrite("integrity_hash", &nlm::CheckpointMetadata::integrityHash)
+        .def_readwrite("metadata_tags", &nlm::CheckpointMetadata::metadataTags)
+        .def_readwrite("dependent_checkpoints", &nlm::CheckpointMetadata::dependentCheckpoints)
+        .def_readwrite("required_checkpoints", &nlm::CheckpointMetadata::requiredCheckpoints);
+    
+    py::class_<nlm::MemoryStatistics>(m, "MemoryStatistics")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
+        .def_readwrite("total_memory", &nlm::MemoryStatistics::totalMemory)
+        .def_readwrite("used_memory", &nlm::MemoryStatistics::usedMemory)
+        .def_readwrite("peak_memory", &nlm::MemoryStatistics::peakMemory)
+        .def_readwrite("allocated_objects", &nlm::MemoryStatistics::allocatedObjects)
+        .def_readwrite("deallocated_objects", &nlm::MemoryStatistics::deallocatedObjects)
+        .def_readwrite("efficiency", &nlm::MemoryStatistics::efficiency)
+        .def_readwrite("fragmentation", &nlm::MemoryStatistics::fragmentation)
+        .def_readwrite("timestamp", &nlm::MemoryStatistics::timestamp);
+    
+    py::class_<nlm::BackupMetadata>(m, "BackupMetadata")
+        .def(py::init<>())
+        .def_readwrite("id", &nlm::BackupMetadata::id)
+        .def_readwrite("step", &nlm::BackupMetadata::step)
+        .def_readwrite("description", &nlm::BackupMetadata::description)
+        .def_readwrite("creation_time", &nlm::BackupMetadata::creationTime)
+        .def_readwrite("last_access_time", &nlm::BackupMetadata::lastAccessTime)
+        .def_readwrite("size", &nlm::BackupMetadata::size)
+        .def_readwrite("is_encrypted", &nlm::BackupMetadata::isEncrypted)
+        .def_readwrite("integrity_hash", &nlm::BackupMetadata::integrityHash)
+        .def_readwrite("remote_location", &nlm::BackupMetadata::remoteLocation)
+        .def_readwrite("is_remote", &nlm::BackupMetadata::isRemote);
+    
+    py::class_<nlm::ValidationResult>(m, "ValidationResult")
+        .def(py::init<>())
+        .def_readwrite("is_valid", &nlm::ValidationResult::isValid)
+        .def_readwrite("validation_report", &nlm::ValidationResult::validationReport)
+        .def_readwrite("errors", &nlm::ValidationResult::errors)
+        .def_readwrite("warnings", &nlm::ValidationResult::warnings)
+        .def_readwrite("integrity_score", &nlm::ValidationResult::integrityScore);
+    
+    // Network Backup Config
+    py::class_<nlm::NetworkBackupConfig>(m, "NetworkBackupConfig")
+        .def(py::init<>())
+        .def_readwrite("host", &nlm::NetworkBackupConfig::host)
+        .def_readwrite("port", &nlm::NetworkBackupConfig::port)
+        .def_readwrite("username", &nlm::NetworkBackupConfig::username)
+        .def_readwrite("password", &nlm::NetworkBackupConfig::password)
+        .def_readwrite("key_path", &nlm::NetworkBackupConfig::keyPath)
+        .def_readwrite("use_ssl", &nlm::NetworkBackupConfig::useSSL)
+        .def_readwrite("timeout", &nlm::NetworkBackupConfig::timeout);
+    
+    py::class_<nlm::RemoteBackupResult>(m, "RemoteBackupResult")
+        .def(py::init<>())
+        .def_readwrite("success", &nlm::RemoteBackupResult::success)
+        .def_readwrite("message", &nlm::RemoteBackupResult::message)
+        .def_readwrite("timestamp", &nlm::RemoteBackupResult::timestamp);
+    
+    // Enum bindings
+    py::enum_<nlm::CompressionAlgorithm>(m, "CompressionAlgorithm")
+        .value("None", nlm::CompressionAlgorithm::None)
+        .value("Gzip", nlm::CompressionAlgorithm::Gzip)
+        .value("LZ4", nlm::CompressionAlgorithm::LZ4)
+        .value("Zstd", nlm::CompressionAlgorithm::Zstd)
+        .value("Brotli", nlm::CompressionAlgorithm::Brotli)
         .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
+    
+    py::enum_<nlm::EncryptionAlgorithm>(m, "EncryptionAlgorithm")
+        .value("None", nlm::EncryptionAlgorithm::None)
+        .value("AES128", nlm::EncryptionAlgorithm::AES128)
+        .value("AES256", nlm::EncryptionAlgorithm::AES256)
+        .value("ChaCha20", nlm::EncryptionAlgorithm::ChaCha20)
         .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
-
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
-
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
-
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
-
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    
+    // Memory Manager class
+    py::class_<nlm::MemoryManager>(m, "MemoryManager")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
-
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
-
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def("initialize", &nlm::MemoryManager::initialize, "Initialize with brain reference")
+        .def("set_working_memory_capacity", &nlm::MemoryManager::setWorkingMemoryCapacity)
+        .def("get_working_memory_capacity", &nlm::MemoryManager::getWorkingMemoryCapacity)
+        .def("store_to_working_memory", &nlm::MemoryManager::storeToWorkingMemory)
+        .def("retrieve_from_working_memory", &nlm::MemoryManager::retrieveFromWorkingMemory)
+        .def("clear_working_memory", &nlm::MemoryManager::clearWorkingMemory)
+        .def("get_working_memory_load", &nlm::MemoryManager::getWorkingMemoryLoad)
+        .def("store_to_episodic_memory", &nlm::MemoryManager::storeToEpisodicMemory)
+        .def("retrieve_from_episodic_memory", &nlm::MemoryManager::retrieveFromEpisodicMemory)
+        .def("get_recent_episodes", &nlm::MemoryManager::getRecentEpisodes)
+        .def("consolidate_memory", &nlm::MemoryManager::consolidateMemory)
+        .def("set_episodic_memory_capacity", &nlm::MemoryManager::setEpisodicMemoryCapacity)
+        .def("store_association", &nlm::MemoryManager::storeAssociation)
+        .def("recall_pattern", &nlm::MemoryManager::recallPattern)
+        .def("clear_associative_memory", &nlm::MemoryManager::clearAssociativeMemory)
+        .def("set_association_decay_rate", &nlm::MemoryManager::setAssociationDecayRate)
+        .def("consolidate_memories", &nlm::MemoryManager::consolidateMemories)
+        .def("consolidate_important_memories", &nlm::MemoryManager::consolidateImportantMemories)
+        .def("consolidate_unused_memories", &nlm::MemoryManager::consolidateUnusedMemories)
+        .def("forget_memory", &nlm::MemoryManager::forgetMemory)
+        .def("forget_unused_memories", &nlm::MemoryManager::forgetUnusedMemories)
+        .def("set_memory_decay_rate", &nlm::MemoryManager::setMemoryDecayRate)
+        .def("reduce_memory_interference", &nlm::MemoryManager::reduceMemoryInterference)
+        .def("enhance_memory_recall", &nlm::MemoryManager::enhanceMemoryRecall)
+        .def("calculate_memory_interference", &nlm::MemoryManager::calculateMemoryInterference)
+        .def("set_checkpoint_manager", &nlm::MemoryManager::setCheckpointManager)
+        .def("set_memory_usage_monitor", &nlm::MemoryManager::setMemoryUsageMonitor)
+        .def("set_backup_system", &nlm::MemoryManager::setBackupSystem)
+        .def("optimize_memory_usage", &nlm::MemoryManager::optimizeMemoryUsage)
+        .def("preallocate_memory", &nlm::MemoryManager::preallocateMemory)
+        .def("cleanup_unused_memory", &nlm::MemoryManager::cleanupUnusedMemory)
+        .def("handle_memory_pressure", &nlm::MemoryManager::handleMemoryPressure)
+        .def("get_memory_pressure_level", &nlm::MemoryManager::getMemoryPressureLevel)
+        .def("get_memory_statistics", &nlm::MemoryManager::getMemoryStatistics)
+        .def("get_total_memory_usage", &nlm::MemoryManager::getTotalMemoryUsage)
+        .def("get_peak_memory_usage", &nlm::MemoryManager::getPeakMemoryUsage);
+    
+    // Checkpoint Manager class
+    py::class_<nlm::CheckpointManager>(m, "CheckpointManager")
         .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
-
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def("set_checkpoint_directory", &nlm::CheckpointManager::setCheckpointDirectory)
+        .def("set_checkpoint_frequency", &nlm::CheckpointManager::setCheckpointFrequency)
+        .def("set_checkpoint_compression", &nlm::CheckpointManager::setCheckpointCompression)
+        .def("set_checkpoint_encryption", &nlm::CheckpointManager::setCheckpointEncryption)
+        .def("set_max_checkpoint_size", &nlm::CheckpointManager::setMaxCheckpointSize)
+        .def("create_checkpoint", &nlm::CheckpointManager::createCheckpoint)
+        .def("restore_checkpoint", &nlm::CheckpointManager::restoreCheckpoint)
+        .def("delete_checkpoint", &nlm::CheckpointManager::deleteCheckpoint)
+        .def("get_checkpoint_ids", &nlm::CheckpointManager::getCheckpointIds)
+        .def("get_checkpoint_info", &nlm::CheckpointManager::getCheckpointInfo)
+        .def("create_incremental_checkpoint", &nlm::CheckpointManager::createIncrementalCheckpoint)
+        .def("apply_incremental_checkpoint", &nlm::CheckpointManager::applyIncrementalCheckpoint)
+        .def("create_differential_checkpoint", &nlm::CheckpointManager::createDifferentialCheckpoint)
+        .def("apply_differential_checkpoint", &nlm::CheckpointManager::applyDifferentialCheckpoint)
+        .def("validate_checkpoint", &nlm::CheckpointManager::validateCheckpoint)
+        .def("validate_all_checkpoints", &nlm::CheckpointManager::validateAllCheckpoints)
+        .def("get_checkpoint_validation_report", &nlm::CheckpointManager::getCheckpointValidationReport)
+        .def("validate_checkpoint_details", &nlm::CheckpointManager::validateCheckpointDetails)
+        .def("enable_parallel_checkpoints", &nlm::CheckpointManager::enableParallelCheckpoints)
+        .def("are_parallel_checkpoints_enabled", &nlm::CheckpointManager::areParallelCheckpointsEnabled)
+        .def("get_active_operations", &nlm::CheckpointManager::getActiveOperations)
+        .def("set_compression_algorithm", &nlm::CheckpointManager::setCompressionAlgorithm)
+        .def("set_encryption_algorithm", &nlm::CheckpointManager::setEncryptionAlgorithm)
+        .def("set_encryption_key", &nlm::CheckpointManager::setEncryptionKey)
+        .def("set_encryption_salt", &nlm::CheckpointManager::setEncryptionSalt)
+        .def("compress_data", &nlm::CheckpointManager::compressData)
+        .def("decompress_data", &nlm::CheckpointManager::decompressData)
+        .def("encrypt_data", &nlm::CheckpointManager::encryptData)
+        .def("decrypt_data", &nlm::CheckpointManager::decryptData)
+        .def("calculate_integrity_hash", &nlm::CheckpointManager::calculateIntegrityHash)
+        .def("verify_integrity", &nlm::CheckpointManager::verifyIntegrity)
+        .def("set_memory_manager", &nlm::CheckpointManager::setMemoryManager)
+        .def("get_total_checkpoints", &nlm::CheckpointManager::getTotalCheckpoints)
+        .def("get_active_checkpoints", &nlm::CheckpointManager::getActiveCheckpoints)
+        .def("get_total_storage_size", &nlm::CheckpointManager::getTotalStorageSize)
+        .def("get_all_checkpoints_info", &nlm::CheckpointManager::getAllCheckpointsInfo)
+        .def("get_last_checkpoint_time", &nlm::CheckpointManager::getLastCheckpointTime)
+        .def("get_checkpoints_since", &nlm::CheckpointManager::getCheckpointsSince)
+        .def("cleanup_old_checkpoints", &nlm::CheckpointManager::cleanupOldCheckpoints)
+        .def("compact_checkpoints", &nlm::CheckpointManager::compactCheckpoints)
+        .def("rebuild_index", &nlm::CheckpointManager::rebuildIndex)
+        .def("create_batch_checkpoints", &nlm::CheckpointManager::createBatchCheckpoints)
+        .def("restore_batch_checkpoints", &nlm::CheckpointManager::restoreBatchCheckpoints)
+        .def("get_last_error", &nlm::CheckpointManager::getLastError)
+        .def("clear_error", &nlm::CheckpointManager::clearError);
+    
+    // Memory Usage Monitor class
+    py::class_<nlm::MemoryUsageMonitor>(m, "MemoryUsageMonitor")
         .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
-
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def("start_tracking", &nlm::MemoryUsageMonitor::startTracking)
+        .def("stop_tracking", &nlm::MemoryUsageMonitor::stopTracking)
+        .def("track_memory_allocation", &nlm::MemoryUsageMonitor::trackMemoryAllocation)
+        .def("track_memory_deallocation", &nlm::MemoryUsageMonitor::trackMemoryDeallocation)
+        .def("get_current_memory_stats", &nlm::MemoryUsageMonitor::getCurrentMemoryStats)
+        .def("get_memory_usage_history", &nlm::MemoryUsageMonitor::getMemoryUsageHistory)
+        .def("detect_memory_leaks", &nlm::MemoryUsageMonitor::detectMemoryLeaks)
+        .def("calculate_memory_fragmentation", &nlm::MemoryUsageMonitor::calculateMemoryFragmentation)
+        .def("optimize_memory_usage", &nlm::MemoryUsageMonitor::optimizeMemoryUsage)
+        .def("get_optimization_recommendations", &nlm::MemoryUsageMonitor::getOptimizationRecommendations)
+        .def("apply_memory_optimization", &nlm::MemoryUsageMonitor::applyMemoryOptimization)
+        .def("enable_leak_detection", &nlm::MemoryUsageMonitor::enableLeakDetection)
+        .def("is_leak_detection_enabled", &nlm::MemoryUsageMonitor::isLeakDetectionEnabled)
+        .def("get_detected_leaks", &nlm::MemoryUsageMonitor::getDetectedLeaks)
+        .def("set_memory_manager", &nlm::MemoryUsageMonitor::setMemoryManager);
+    
+    // Backup System class
+    py::class_<nlm::BackupSystem>(m, "BackupSystem")
         .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
-
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def("set_backup_directory", &nlm::BackupSystem::setBackupDirectory)
+        .def("set_backup_frequency", &nlm::BackupSystem::setBackupFrequency)
+        .def("set_backup_encryption", &nlm::BackupSystem::setBackupEncryption)
+        .def("set_max_backups", &nlm::BackupSystem::setMaxBackups)
+        .def("create_backup", &nlm::BackupSystem::createBackup)
+        .def("restore_backup", &nlm::BackupSystem::restoreBackup)
+        .def("delete_backup", &nlm::BackupSystem::deleteBackup)
+        .def("get_backup_ids", &nlm::BackupSystem::getBackupIds)
+        .def("get_backup_info", &nlm::BackupSystem::getBackupInfo)
+        .def("validate_backup", &nlm::BackupSystem::validateBackup)
+        .def("validate_all_backups", &nlm::BackupSystem::validateAllBackups)
+        .def("get_backup_validation_report", &nlm::BackupSystem::getBackupValidationReport)
+        .def("validate_backup_details", &nlm::BackupSystem::validateBackupDetails)
+        .def("configure_remote_backup", &nlm::BackupSystem::configureRemoteBackup)
+        .def("backup_to_remote", &nlm::BackupSystem::backupToRemote)
+        .def("restore_from_remote", &nlm::BackupSystem::restoreFromRemote)
+        .def("test_remote_connection", &nlm::BackupSystem::testRemoteConnection)
+        .def("enable_automatic_backup", &nlm::BackupSystem::enableAutomaticBackup)
+        .def("is_automatic_backup_enabled", &nlm::BackupSystem::isAutomaticBackupEnabled)
+        .def("set_backup_schedule", &nlm::BackupSystem::setBackupSchedule)
+        .def("set_memory_manager", &nlm::BackupSystem::setMemoryManager)
+        .def("set_checkpoint_manager", &nlm::BackupSystem::setCheckpointManager)
+        .def("get_total_backups", &nlm::BackupSystem::getTotalBackups)
+        .def("get_active_backups", &nlm::BackupSystem::getActiveBackups)
+        .def("get_total_backup_storage", &nlm::BackupSystem::getTotalBackupStorage)
+        .def("get_all_backups_info", &nlm::BackupSystem::getAllBackupsInfo)
+        .def("get_last_backup_time", &nlm::BackupSystem::getLastBackupTime)
+        .def("get_backups_since", &nlm::BackupSystem::getBackupsSince)
+        .def("cleanup_old_backups", &nlm::BackupSystem::cleanupOldBackups)
+        .def("compact_backups", &nlm::BackupSystem::compactBackups)
+        .def("rebuild_backup_index", &nlm::BackupSystem::rebuildBackupIndex)
+        .def("create_batch_backups", &nlm::BackupSystem::createBatchBackups)
+        .def("restore_batch_backups", &nlm::BackupSystem::restoreBatchBackups)
+        .def("backup_to_multiple_remote", &nlm::BackupSystem::backupToMultipleRemote)
+        .def("restore_from_multiple_remote", &nlm::BackupSystem::restoreFromMultipleRemote)
+        .def("get_last_error", &nlm::BackupSystem::getLastError)
+        .def("clear_error", &nlm::BackupSystem::clearError);
+    
+    // Enhanced Memory Management CLI
+    py::class_<nlm::EnhancedMemoryManagementCLI>(m, "EnhancedMemoryManagementCLI")
         .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
-
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
-
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
-        .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
-
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
-
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
-
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
-
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+        .def("initialize_with_brain", &nlm::EnhancedMemoryManagementCLI::initializeWithBrain)
+        .def("memory_info", &nlm::EnhancedMemoryManagementCLI::memoryInfo)
+        .def("working_memory_set_capacity", &nlm::EnhancedMemoryManagementCLI::workingMemorySetCapacity)
+        .def("working_memory_store", &nlm::EnhancedMemoryManagementCLI::workingMemoryStore)
+        .def("working_memory_retrieve", &nlm::EnhancedMemoryManagementCLI::workingMemoryRetrieve)
+        .def("working_memory_clear", &nlm::EnhancedMemoryManagementCLI::workingMemoryClear)
+        .def("episodic_memory_set_capacity", &nlm::EnhancedMemoryManagementCLI::episodicMemorySetCapacity)
+        .def("episodic_memory_store", &nlm::EnhancedMemoryManagementCLI::episodicMemoryStore)
+        .def("episodic_memory_retrieve", &nlm::EnhancedMemoryManagementCLI::episodicMemoryRetrieve)
+        .def("episodic_memory_get_recent", &nlm::EnhancedMemoryManagementCLI::episodicMemoryGetRecent)
+        .def("episodic_memory_consolidate", &nlm::EnhancedMemoryManagementCLI::episodicMemoryConsolidate)
+        .def("associative_memory_set_decay", &nlm::EnhancedMemoryManagementCLI::associativeMemorySetDecay)
+        .def("associative_memory_store", &nlm::EnhancedMemoryManagementCLI::associativeMemoryStore)
+        .def("associative_memory_recall", &nlm::EnhancedMemoryManagementCLI::associativeMemoryRecall)
+        .def("associative_memory_clear", &nlm::EnhancedMemoryManagementCLI::associativeMemoryClear)
+        .def("memory_consolidate", &nlm::EnhancedMemoryManagementCLI::memoryConsolidate)
+        .def("memory_forget", &nlm::EnhancedMemoryManagementCLI::memoryForget)
+        .def("memory_forget_unused", &nlm::EnhancedMemoryManagementCLI::memoryForgetUnused)
+        .def("memory_set_decay_rate", &nlm::EnhancedMemoryManagementCLI::memorySetDecayRate)
+        .def("memory_reduce_interference", &nlm::EnhancedMemoryManagementCLI::memoryReduceInterference)
+        .def("memory_enhance_recall", &nlm::EnhancedMemoryManagementCLI::memoryEnhanceRecall)
+        .def("memory_calculate_interference", &nlm::EnhancedMemoryManagementCLI::memoryCalculateInterference)
+        .def("memory_optimize", &nlm::EnhancedMemoryManagementCLI::memoryOptimize)
+        .def("memory_preallocate", &nlm::EnhancedMemoryManagementCLI::memoryPreallocate)
+        .def("memory_cleanup", &nlm::EnhancedMemoryManagementCLI::memoryCleanup)
+        .def("memory_handle_pressure", &nlm::EnhancedMemoryManagementCLI::memoryHandlePressure)
+        .def("monitor_start", &nlm::EnhancedMemoryManagementCLI::monitorStart)
+        .def("monitor_stop", &nlm::EnhancedMemoryManagementCLI::monitorStop)
+        .def("monitor_stats", &nlm::EnhancedMemoryManagementCLI::monitorStats)
+        .def("monitor_leaks", &nlm::EnhancedMemoryManagementCLI::monitorLeaks)
+        .def("monitor_fragmentation", &nlm::EnhancedMemoryManagementCLI::monitorFragmentation)
+        .def("monitor_optimize", &nlm::EnhancedMemoryManagementCLI::monitorOptimize)
+        .def("monitor_recommendations", &nlm::EnhancedMemoryManagementCLI::monitorRecommendations)
+        .def("monitor_apply_recommendation", &nlm::EnhancedMemoryManagementCLI::monitorApplyRecommendation)
+        .def("monitor_enable_leak_detection", &nlm::EnhancedMemoryManagementCLI::monitorEnableLeakDetection)
+        .def("checkpoint_set_directory", &nlm::EnhancedMemoryManagementCLI::checkpointSetDirectory)
+        .def("checkpoint_set_frequency", &nlm::EnhancedMemoryManagementCLI::checkpointSetFrequency)
+        .def("checkpoint_set_compression", &nlm::EnhancedMemoryManagementCLI::checkpointSetCompression)
+        .def("checkpoint_set_encryption", &nlm::EnhancedMemoryManagementCLI::checkpointSetEncryption)
+        .def("checkpoint_set_max_size", &nlm::EnhancedMemoryManagementCLI::checkpointSetMaxSize)
+        .def("checkpoint_create", &nlm::EnhancedMemoryManagementCLI::checkpointCreate)
+        .def("checkpoint_restore", &nlm::EnhancedMemoryManagementCLI::checkpointRestore)
+        .def("checkpoint_delete", &nlm::EnhancedMemoryManagementCLI::checkpointDelete)
+        .def("checkpoint_list", &nlm::EnhancedMemoryManagementCLI::checkpointList)
+        .def("checkpoint_incremental", &nlm::EnhancedMemoryManagementCLI::checkpointIncremental)
+        .def("checkpoint_apply_incremental", &nlm::EnhancedMemoryManagementCLI::checkpointApplyIncremental)
+        .def("checkpoint_differential", &nlm::EnhancedMemoryManagementCLI::checkpointDifferential)
+        .def("checkpoint_apply_differential", &nlm::EnhancedMemoryManagementCLI::checkpointApplyDifferential)
+        .def("checkpoint_validate", &nlm::EnhancedMemoryManagementCLI::checkpointValidate)
+        .def("checkpoint_validate_all", &nlm::EnhancedMemoryManagementCLI::checkpointValidateAll)
+        .def("checkpoint_enable_parallel", &nlm::EnhancedMemoryManagementCLI::checkpointEnableParallel)
+        .def("checkpoint_set_compression_algorithm", &nlm::EnhancedMemoryManagementCLI::checkpointSetCompressionAlgorithm)
+        .def("checkpoint_set_encryption_algorithm", &nlm::EnhancedMemoryManagementCLI::checkpointSetEncryptionAlgorithm)
+        .def("checkpoint_set_encryption_key", &nlm::EnhancedMemoryManagementCLI::checkpointSetEncryptionKey)
+        .def("checkpoint_set_encryption_salt", &nlm::EnhancedMemoryManagementCLI::checkpointSetEncryptionSalt)
+        .def("checkpoint_cleanup", &nlm::EnhancedMemoryManagementCLI::checkpointCleanup)
+        .def("checkpoint_compact", &nlm::EnhancedMemoryManagementCLI::checkpointCompact)
+        .def("checkpoint_rebuild_index", &nlm::EnhancedMemoryManagementCLI::checkpointRebuildIndex)
+        .def("checkpoint_create_batch", &nlm::EnhancedMemoryManagementCLI::checkpointCreateBatch)
+        .def("checkpoint_restore_batch", &nlm::EnhancedMemoryManagementCLI::checkpointRestoreBatch)
+        .def("backup_set_directory", &nlm::EnhancedMemoryManagementCLI::backupSetDirectory)
+        .def("backup_set_frequency", &nlm::EnhancedMemoryManagementCLI::backupSetFrequency)
+        .def("backup_set_encryption", &nlm::EnhancedMemoryManagementCLI::backupSetEncryption)
+        .def("backup_set_max_backups", &nlm::EnhancedMemoryManagementCLI::backupSetMaxBackups)
+        .def("backup_create", &nlm::EnhancedMemoryManagementCLI::backupCreate)
+        .def("backup_restore", &nlm::EnhancedMemoryManagementCLI::backupRestore)
+        .def("backup_delete", &nlm::EnhancedMemoryManagementCLI::backupDelete)
+        .def("backup_list", &nlm::EnhancedMemoryManagementCLI::backupList)
+        .def("backup_validate", &nlm::EnhancedMemoryManagementCLI::backupValidate)
+        .def("backup_validate_all", &nlm::EnhancedMemoryManagementCLI::backupValidateAll)
+        .def("backup_configure_remote", &nlm::EnhancedMemoryManagementCLI::backupConfigureRemote)
+        .def("backup_to_remote", &nlm::EnhancedMemoryManagementCLI::backupToRemote)
+        .def("backup_restore_from_remote", &nlm::EnhancedMemoryManagementCLI::backupRestoreFromRemote)
+        .def("backup_test_remote_connection", &nlm::EnhancedMemoryManagementCLI::backupTestRemoteConnection)
+        .def("backup_enable_automatic", &nlm::EnhancedMemoryManagementCLI::backupEnableAutomatic)
+        .def("backup_set_schedule", &nlm::EnhancedMemoryManagementCLI::backupSetSchedule)
+        .def("backup_cleanup", &nlm::EnhancedMemoryManagementCLI::backupCleanup)
+        .def("backup_compact", &nlm::EnhancedMemoryManagementCLI::backupCompact)
+        .def("backup_rebuild_index", &nlm::EnhancedMemoryManagementCLI::backupRebuildIndex)
+        .def("backup_create_batch", &nlm::EnhancedMemoryManagementCLI::backupCreateBatch)
+        .def("backup_restore_batch", &nlm::EnhancedMemoryManagementCLI::backupRestoreBatch)
+        .def("backup_to_multiple_remote", &nlm::EnhancedMemoryManagementCLI::backupToMultipleRemote)
+        .def("backup_restore_from_multiple_remote", &nlm::EnhancedMemoryManagementCLI::backupRestoreFromMultipleRemote)
+        .def("system_status", &nlm::EnhancedMemoryManagementCLI::systemStatus)
+        .def("integrate_with_brain", &nlm::EnhancedMemoryManagementCLI::integrateWithBrain);
+    
+    // System information
+    m.def("get_version", []() { return "NLM Enhanced Memory Management System v1.0.0"; });
+    m.def("get_description", []() { return "Comprehensive memory management and checkpoint system for NLM"; });
+    
+    // Factory functions
+    m.def("create_memory_manager", []() { return nlm::MemoryManager(); });
+    m.def("create_checkpoint_manager", []() { return nlm::CheckpointManager(); });
+    m.def("create_memory_usage_monitor", []() { return nlm::MemoryUsageMonitor(); });
+    m.def("create_backup_system", []() { return nlm::BackupSystem(); });
+    m.def("create_enhanced_cli", []() { return nlm::EnhancedMemoryManagementCLI(); });
 }
-
-} // namespace nlm

@@ -58,6 +58,63 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== ADVANCED AGENT CAPABILITIES ==========
+    
+    // Enhanced sensory processing
+    std::vector<float> extractSensoryFeatures(const SensoryPercept& percept) const;
+    std::vector<float> processSensoryHistory(const std::vector<SensoryPercept>& history) const;
+    float assessSensoryQuality(const SensoryPercept& percept) const;
+    
+    // Multi-modal sensory fusion
+    std::vector<float> fuseSensoryModality(const std::vector<float>& visionFeatures,
+                                          const std::vector<float>& touchFeatures,
+                                          const std::vector<float>& internalFeatures,
+                                          const std::vector<float>& proprioceptionFeatures) const;
+    
+    // Policy-based action selection
+    MotorCommand selectAction(const std::vector<float>& state, bool useExploration = true);
+    MotorCommand applyReinforcementPolicy(float reward, float predictedReward, const std::vector<float>& state);
+    MotorCommand applyRuleBasedPolicy(const std::vector<float>& state) const;
+    
+    // Behavior planning and sequencing
+    std::vector<MotorCommand> planBehaviorSequence(const std::vector<float>& goalState) const;
+    MotorCommand getNextActionInSequence(const std::vector<MotorCommand>& sequence, size_t stepIndex) const;
+    bool shouldContinueSequence(const std::vector<MotorCommand>& sequence, size_t currentStep) const;
+    
+    // Advanced curiosity and exploration
+    float computeCuriosityDrive(const SensoryPercept& currentPercept) const;
+    MotorCommand applyCuriosityDrivenExploration(const std::vector<float>& state);
+    MotorCommand balanceExplorationExploitation(const std::vector<float>& state, float explorationRate);
+    
+    // Sensorimotor integration
+    std::vector<float> predictSensoryOutcome(const MotorCommand& action) const;
+    float computeSensoryPredictionError(const SensoryPercept& actual, const SensoryPercept& predicted) const;
+    void updateSensorimotorMapping(const MotorCommand& action, const SensoryPercept& outcome);
+    
+    // Goal-based behavior
+    bool hasGoal() const { return !goalState_.empty(); }
+    void setGoal(const std::vector<float>& goalState);
+    void clearGoal();
+    float getGoalProgress(const std::vector<float>& currentState) const;
+    
+    // Social learning capabilities
+    void learnFromObservation(const std::vector<float>& observerState, const MotorCommand& observedAction);
+    std::vector<MotorCommand> getSociallyInformedActions(const std::vector<float>& socialContext) const;
+    void enableSocialLearning(bool enabled) { socialLearningEnabled_ = enabled; }
+    bool isSocialLearningEnabled() const { return socialLearningEnabled_; }
+    
+    // Advanced agent state and monitoring
+    std::vector<float> getCurrentAgentState() const;
+    void setAgentState(const std::vector<float>& state);
+    float getActionValue(const MotorCommand& action, const std::vector<float>& state) const;
+    void updateActionValues(const MotorCommand& action, float value, const std::vector<float>& state);
+    
+    // Performance monitoring
+    size_t getTotalActionsTaken() const { return totalActionsTaken_; }
+    float getActionSuccessRate() const { return actionSuccessRate_; }
+    float getExplorationRatio() const { return explorationRatio_; }
+    double getTotalSimulationTime() const { return totalSimulationTime_; }
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -68,6 +125,38 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Advanced configuration
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    void setExploitationWeight(float weight) { exploitationWeight_ = weight; }
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    void setActionSelectionMethod(const std::string& method) { actionSelectionMethod_ = method; }
+    
+    float getExplorationRate() const { return explorationRate_; }
+    float getExploitationWeight() const { return exploitationWeight_; }
+    float getLearningRate() const { return learningRate_; }
+    const std::string& getActionSelectionMethod() const { return actionSelectionMethod_; }
+    
+    // Episodic memory for agent behavior
+    void storeEpisode(const std::vector<float>& state, const MotorCommand& action, 
+                     float reward, const std::vector<float>& nextState);
+    std::vector<std::tuple<std::vector<float>, MotorCommand, float, std::vector<float>>> getRecentEpisodes(size_t count) const;
+    
+    // Configuration groups
+    void addSensorGroup(const std::string& groupName);
+    void removeSensorGroup(const std::string& groupName);
+    bool hasSensorGroup(const std::string& groupName) const;
+    
+    // Performance and debugging
+    void enablePerformanceMonitoring(bool enabled) { performanceMonitoringEnabled_ = enabled; }
+    bool isPerformanceMonitoringEnabled() const { return performanceMonitoringEnabled_; }
+    void setActionSelectionTimeout(float timeout) { actionSelectionTimeout_ = timeout; }
+    float getActionSelectionTimeout() const { return actionSelectionTimeout_; }
+    
+    // Health and robustness
+    bool isHealthy() const;
+    std::string getHealthStatus() const;
+    void resetPerformanceCounters();
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -108,10 +197,47 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool socialLearningEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced agent state
+    std::vector<float> currentState_;
+    std::vector<float> goalState_;
+    
+    // Policy and learning state
+    std::unordered_map<MotorCommand, std::vector<float>> actionValues_;
+    std::vector<std::tuple<std::vector<float>, MotorCommand, float, std::vector<float>>> episodeMemory_;
+    std::string actionSelectionMethod_;
+    float explorationRate_;
+    float exploitationWeight_;
+    float learningRate_;
+    
+    // Performance monitoring
+    size_t totalActionsTaken_;
+    size_t successfulActions_;
+    float actionSuccessRate_;
+    float explorationRatio_;
+    double totalSimulationTime_;
+    bool performanceMonitoringEnabled_;
+    
+    // Configuration groups
+    std::unordered_set<std::string> sensorGroups_;
+    
+    // Action selection timing
+    float actionSelectionTimeout_;
+    
+    // Social learning
+    std::unordered_map<MotorCommand, std::vector<float>> socialActionWeights_;
+    
+    // Helper methods
+    std::vector<float> encodeSensoryPercept(const SensoryPercept& percept) const;
+    MotorCommand decodeMotorFromActivity(const std::vector<float>& motorActivity) const;
+    float calculateExplorationBonus(const std::vector<float>& state) const;
+    void updatePerformanceCounters(bool success);
+    bool isActionInGroup(const MotorCommand& action, const std::string& groupName) const;
 };
 
 } // namespace nlm
