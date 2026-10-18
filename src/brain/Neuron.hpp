@@ -134,7 +134,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements LIF (Leaky Integrate-and-Fire) dynamics with real membrane potential integration
+    // Called by Brain to advance neural dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

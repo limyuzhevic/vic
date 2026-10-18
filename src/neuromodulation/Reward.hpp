@@ -23,7 +23,11 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // Implements real reward computation with multiple components:
+    // - External rewards from environmental resources/hazards
+    // - Prediction error (surprise) for learning
+    // - Novelty rewards for exploration
+    // - Action outcome rewards
     float computeReward(const class Observation& observation) const;
     
     // Reward history

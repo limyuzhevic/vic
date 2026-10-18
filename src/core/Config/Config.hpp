@@ -55,9 +55,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
     
+    // Internal loading methods
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    void parseSimpleJSONLine(const std::string& line);
+    void parseSimpleYAMLLine(const std::string& line);
+    void parseSimpleConfigLine(const std::string& line);
+    void parseConfigValue(const std::string& key, const std::string& valueStr);
+    void skipWhitespace(const std::string& line, size_t& pos);
+
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
