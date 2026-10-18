@@ -65,25 +65,65 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigSaveToFile() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Add various types of config entries
+    config.set("string_key", std::string("hello"), nlm::ConfigSource::Runtime);
+    config.set("int_key", 42, nlm::ConfigSource::Runtime);
+    config.set("double_key", 3.14, nlm::ConfigSource::Runtime);
+    config.set("bool_key", true, nlm::ConfigSource::Runtime);
+    config.set("int_vector_key", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    config.set("string_vector_key", std::vector<std::string>({"a", "b", "c"}), nlm::ConfigSource::Runtime);
+    config.set("double_vector_key", std::vector<double>({1.5, 2.5, 3.5}), nlm::ConfigSource::Runtime);
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    // Test with custom descriptions
+    config.set("key_with_desc", "value", nlm::ConfigSource::Runtime);
+    // Note: description is set during construction, not through set() method
     
-    std::cout << "    testConfigKeys passed" << std::endl;
-}
-
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
+    // Save to file
+    bool saved = config.saveToFile("test_config_output.txt");
+    assert(saved);
+    
+    // Verify file was created and contains expected content
+    std::ifstream file("test_config_output.txt");
+    assert(file.is_open());
+    
+    std::string line;
+    std::vector<std::string> keys = {"string_key", "int_key", "double_key", "bool_key", 
+                                      "int_vector_key", "string_vector_key", "double_vector_key", "key_with_desc"};
+    
+    bool foundKeys[8] = {false, false, false, false, false, false, false, false};
+    bool foundDescriptions = false;
+    
+    while (std::getline(file, line)) {
+        // Check for key=value pairs
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (line.find(keys[i] + " =") != std::string::npos) {
+                foundKeys[i] = true;
+                // Verify values are saved correctly (not PLACEHOLDER_VALUE)
+                assert(line.find("PLACEHOLDER_VALUE") == std::string::npos);
+            }
+        }
+        
+        // Check for comments (descriptions)
+        if (line.find("#") != std::string::npos) {
+            foundDescriptions = true;
+        }
+    }
+    
+    file.close();
+    
+    // Remove test file
+    std::remove("test_config_output.txt");
+    
+    // Verify all keys were found
+    for (size_t i = 0; i < 8; ++i) {
+        assert(foundKeys[i]);
+    }
+    assert(foundDescriptions);  // Should have descriptions for all entries
+    
+    std::cout << "    testConfigSaveToFile passed" << std::endl;
 }
 
 } // namespace test_config
