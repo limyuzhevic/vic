@@ -1,0 +1,87 @@
+# Production Configuration Template (TOML)
+# This template is designed for production deployment with optimized performance
+
+[simulation]
+neuron_count = 10000
+simulation_timestep = 0.001
+region_count = 5
+connection_probability = 0.05
+max_simulation_steps = 1000000
+enable_plasticity = true
+plasticity_learning_rate = 0.005
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 15.0
+
+[development]
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+maturation_rate = 0.0002
+enable_developmental_plasticity = true
+
+[neuromodulation]
+dopamine_baseline = 0.0
+dopamine_gain = 2.0
+curiosity_rate = 0.01
+reward_discount_factor = 0.999
+novelty_threshold = 0.1
+
+[prediction]
+prediction_horizon = 50
+confidence_threshold = 0.8
+prediction_error_decay = 0.99
+
+[cognition]
+planning_horizon = 20
+concept_learning_rate = 0.001
+attention_focus_radius = 1.0
+
+[memory]
+working_memory_size = 500
+episodic_memory_capacity = 10000
+semantic_memory_size = 2000
+replay_frequency = 0.05
+consolidation_threshold = 0.9
+
+[environment]
+name = "ComplexWorld"
+width = 100
+height = 100
+cell_size = 1.0
+max_steps = 10000
+reward_per_step = 0.01
+reward_goal = 10.0
+reward_failure = -10.0
+
+[logging]
+level = "INFO"
+to_file = true
+filename = "nlm_production.log"
+format = "json"
+include_timestamps = true
+color_output = false
+flush_on_write = false
+
+[performance]
+enable_parallel_processing = true
+enable_memory_pools = true
+enable_simd = true
+thread_count = 0
+optimization_level = 3
+
+[validation]
+enable_runtime_validation = true
+strict_mode = true
+validation_report_file = "production_validation_report.json"
+
+[checkpoint]
+enabled = true
+interval = 10000
+filename_prefix = "nlm_checkpoint"
+save_memory = true
+compress = true
+
+[security]
+enable_audit_logging = true
+log_file_permissions = "600"
+config_file_permissions = "600"

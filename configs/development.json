@@ -1,0 +1,80 @@
+# Development Configuration Template
+# This template is designed for development, testing, and debugging purposes
+
+{
+  "nlm": {
+    "simulation": {
+      "neuron_count": 1000,
+      "simulation_timestep": 0.001,
+      "region_count": 2,
+      "connection_probability": 0.1,
+      "max_simulation_steps": 10000,
+      "enable_plasticity": true,
+      "plasticity_learning_rate": 0.01,
+      "stdp_ltp_weight": 0.02,
+      "stdp_ltd_weight": 0.015,
+      "stdp_time_constant": 20.0
+    },
+    "development": {
+      "synaptogenesis_rate": 0.001,
+      "pruning_rate": 0.0001,
+      "maturation_rate": 0.0005,
+      "enable_developmental_plasticity": true
+    },
+    "neuromodulation": {
+      "dopamine_baseline": 0.1,
+      "dopamine_gain": 1.0,
+      "curiosity_rate": 0.05,
+      "reward_discount_factor": 0.99,
+      "novelty_threshold": 0.5
+    },
+    "prediction": {
+      "prediction_horizon": 10,
+      "confidence_threshold": 0.7,
+      "prediction_error_decay": 0.95
+    },
+    "cognition": {
+      "planning_horizon": 5,
+      "concept_learning_rate": 0.01,
+      "attention_focus_radius": 0.5
+    },
+    "memory": {
+      "working_memory_size": 100,
+      "episodic_memory_capacity": 1000,
+      "semantic_memory_size": 500,
+      "replay_frequency": 0.1,
+      "consolidation_threshold": 0.8
+    },
+    "environment": {
+      "name": "GridWorld",
+      "width": 10,
+      "height": 10,
+      "cell_size": 1.0,
+      "max_steps": 100,
+      "reward_per_step": 0.0,
+      "reward_goal": 1.0,
+      "reward_failure": -1.0
+    },
+    "logging": {
+      "level": "DEBUG",
+      "to_file": true,
+      "filename": "nlm_development.log",
+      "format": "json",
+      "include_timestamps": true,
+      "color_output": true,
+      "flush_on_write": true
+    },
+    "performance": {
+      "enable_parallel_processing": true,
+      "enable_memory_pools": true,
+      "enable_simd": true,
+      "thread_count": 0,
+      "optimization_level": 2
+    },
+    "validation": {
+      "enable_runtime_validation": true,
+      "strict_mode": false,
+      "validation_report_file": "validation_report.json"
+    }
+  }
+}

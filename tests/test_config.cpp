@@ -1,7 +1,8 @@
-// Config Tests
+// Enhanced Config Tests
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +79,121 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testHierarchicalConfig() {
+    nlm::Config config;
+    
+    config.setHierarchical("simulation.neuron_count", 1000LL);
+    config.setHierarchical("simulation.timestep", 0.001);
+    config.setHierarchical("environment.name", std::string("GridWorld"));
+    
+    assert(config.hasHierarchical("simulation.neuron_count"));
+    assert(config.hasHierarchical("simulation.timestep"));
+    assert(config.hasHierarchical("environment.name"));
+    
+    auto neuron_count = config.getHierarchical<int64_t>("simulation.neuron_count");
+    assert(neuron_count.has_value());
+    assert(*neuron_count == 1000LL);
+    
+    std::cout << "    testHierarchicalConfig passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    config.set("test1", 1, nlm::ConfigSource::Runtime);
+    config.set("test2", std::string("hello"), nlm::ConfigSource::File);
+    
+    std::string summary = config.summary();
+    assert(!summary.empty());
+    assert(summary.find("Configuration (2 entries)") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
+void testConfigSchemaValidation() {
+    nlm::Config config;
+    nlm::ConfigSchema schema("test_schema");
+    
+    nlm::ConfigSchema::FieldSchema field;
+    field.name = "required_param";
+    field.type = "int";
+    field.default_value = 0;
+    field.required = true;
+    field.validator = [](const nlm::ConfigValue& v) { return std::get<int>(v) > 0; };
+    schema.addField(field);
+    
+    config.set("required_param", 42, nlm::ConfigSource::Runtime);
+    assert(config.validate(schema));
+    
+    config.set("required_param", -1, nlm::ConfigSource::Runtime);
+    assert(!config.validate(schema));
+    
+    std::cout << "    testConfigSchemaValidation passed" << std::endl;
+}
+
+void testConfigExportImport() {
+    nlm::Config config;
+    config.set("neuron_count", 1000LL);
+    config.set("timestep", 0.001);
+    config.set("environment_name", std::string("GridWorld"));
+    
+    // Test JSON export
+    nlm::ConfigExporter exporter("test_exporter");
+    exporter.setFormat(nlm::ConfigExporter::ExportFormat::JSON);
+    std::string json_output = exporter.exportConfig(config);
+    assert(!json_output.empty());
+    
+    // Test YAML export
+    exporter.setFormat(nlm::ConfigExporter::ExportFormat::YAML);
+    std::string yaml_output = exporter.exportConfig(config);
+    assert(!yaml_output.empty());
+    
+    // Test TOML export
+    exporter.setFormat(nlm::ConfigExporter::ExportFormat::TOML);
+    std::string toml_output = exporter.exportConfig(config);
+    assert(!toml_output.empty());
+    
+    // Test import
+    nlm::ConfigImporter importer("test_importer");
+    Config imported_config = importer.importFromJSON(json_output);
+    assert(imported_config.getOr<int64_t>("neuron_count", 0) == 1000);
+    
+    std::cout << "    testConfigExportImport passed" << std::endl;
+}
+
+void testConfigTemplateManager() {
+    auto templates = nlm::ConfigTemplateManager().getBuiltInTemplates();
+    assert(!templates.empty());
+    
+    // Test development template
+    auto dev_config = nlm::ConfigTemplateManager::loadDevelopmentTemplate();
+    assert(dev_config.getOr<int64_t>("neuron_count", 0) == 500);
+    assert(dev_config.getOr<std::string>("environment_name", "") == "GridWorld");
+    
+    // Test testing template
+    auto test_config = nlm::ConfigTemplateManager::loadTestingTemplate();
+    assert(test_config.getOr<int64_t>("neuron_count", 0) == 100);
+    
+    // Test production template
+    auto prod_config = nlm::ConfigTemplateManager::loadProductionTemplate();
+    assert(prod_config.getOr<int64_t>("neuron_count", 0) == 10000);
+    
+    std::cout << "    testConfigTemplateManager passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testHierarchicalConfig();
+    testConfigSummary();
+    testConfigSchemaValidation();
+    testConfigExportImport();
+    testConfigTemplateManager();
+    
+    std::cout << std::endl << "All tests passed!" << std::endl;
 }
 
 } // namespace test_config

@@ -1,0 +1,81 @@
+# Testing Configuration Template (TOML)
+# This template is designed for automated testing
+
+[simulation]
+neuron_count = 100
+simulation_timestep = 0.01
+region_count = 1
+connection_probability = 0.2
+max_simulation_steps = 1000
+enable_plasticity = false
+plasticity_learning_rate = 0.001
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 10.0
+
+[development]
+synaptogenesis_rate = 0.0
+pruning_rate = 0.0
+maturation_rate = 0.0
+enable_developmental_plasticity = false
+
+[neuromodulation]
+dopamine_baseline = 0.0
+dopamine_gain = 0.5
+curiosity_rate = 0.1
+reward_discount_factor = 0.9
+novelty_threshold = 0.3
+
+[prediction]
+prediction_horizon = 5
+confidence_threshold = 0.5
+prediction_error_decay = 0.9
+
+[cognition]
+planning_horizon = 3
+concept_learning_rate = 0.005
+attention_focus_radius = 0.3
+
+[memory]
+working_memory_size = 20
+episodic_memory_capacity = 50
+semantic_memory_size = 30
+replay_frequency = 0.05
+consolidation_threshold = 0.5
+
+[environment]
+name = "SimpleWorld"
+width = 5
+height = 5
+cell_size = 1.0
+max_steps = 50
+reward_per_step = 0.1
+reward_goal = 1.0
+reward_failure = -1.0
+
+[logging]
+level = "INFO"
+to_file = false
+filename = "nlm_testing.log"
+format = "text"
+include_timestamps = false
+color_output = false
+flush_on_write = true
+
+[performance]
+enable_parallel_processing = false
+enable_memory_pools = true
+enable_simd = false
+thread_count = 1
+optimization_level = 0
+
+[validation]
+enable_runtime_validation = true
+strict_mode = true
+validation_report_file = "testing_validation_report.json"
+
+[experiments]
+test_id = "TEST_001"
+run_name = "StandardTest"
+repeat_count = 5
+seed = 42

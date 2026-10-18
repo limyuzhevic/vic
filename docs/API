@@ -1,0 +1,564 @@
+# NLM Core API Documentation
+
+## Overview
+
+This document provides comprehensive API documentation for the NLM (Neural Learning Machine) core components. The NLM framework implements a biologically-inspired artificial developmental brain with spiking neural networks, capable of learning, adaptation, and autonomous behavior.
+
+## Table of Contents
+
+1. [Configuration System](config_api.md)
+2. [Logging System](logging_api.md)
+3. [Brain Module](brain_api.md)
+4. [Neuron Module](neuron_api.md)
+5. [Synapse Module](synapse_api.md)
+6. [Types and Definitions](types_api.md)
+7. [Memory Systems](memory_api.md)
+8. [Neuromodulation](neuromodulation_api.md)
+9. [Cognition](cognition_api.md)
+10. [Development](development_api.md)
+11. [Sensory Systems](sensory_api.md)
+12. [Motor Systems](motor_api.md)
+13. [Visualization](visualization_api.md)
+
+## Core Architecture
+
+NLM follows a modular, hierarchical architecture representing brain processes:
+
+```
+WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE → MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION → MOTOR OUTPUT → WORLD CONSEQUENCE → PLASTICITY → MEMORY/DEVELOPMENT → CHANGED BRAIN → CHANGED FUTURE BEHAVIOR
+```
+
+## Programming Model
+
+### Key Concepts
+
+1. **Event-Driven Processing**: Neural computation occurs in response to spikes rather than continuous time stepping
+2. **Strong Typing**: Custom ID types prevent logical errors and enable type-safe operations
+3. **Memory Management**: RAII and smart pointers ensure safe resource management
+4. **Modular Design**: Each functional area is encapsulated in separate classes
+5. **Multi-level Integration**: Systems operate at different timescales and abstraction levels
+
+### Error Handling
+
+- **Zero-cost assertions**: Compile-time checks for type safety
+- **Runtime validation**: Optional runtime checks for debugging
+- **Exception safety**: Strong exception guarantee for all operations
+- **Error codes**: Standardized error codes for system failures
+
+### Thread Safety
+
+- **Read-only operations**: Safe concurrent access to const methods
+- **Write operations**: Require external synchronization
+- **Atomic updates**: Thread-safe operations where possible
+- **Data races prevention**: Careful design to avoid data races
+
+## Building and Running
+
+### Build System
+
+```bash
+# Standard build
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Phase 6 demo (integration test)
+./nlm_phase6_demo
+
+# Basic simulation
+./nlm
+```
+
+### Python Bindings
+
+```python
+# Install Python bindings
+pip install pynlm
+
+# Basic usage
+import nlm
+
+# Create a brain with custom configuration
+config = nlm.Config()
+config.set("neuron_count", 1000)
+config.set("random_seed", 42)
+
+brain = nlm.Brain(config)
+brain.initialize()
+
+# Run simulation for 1000 steps
+for step in range(1000):
+    brain.step(step, step * 0.001)
+
+# Check results
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getFiringNeuronCount() / brain.getTotalNeuronCount()}")
+```
+
+## Installation
+
+### Dependencies
+
+- **C++20 compiler**: GCC 9+, Clang 10+, or MSVC 19+
+- **CMake 3.16+**: Build system
+- **Python 3.8+**: For bindings (optional)
+- **pybind11**: For Python bindings
+
+### Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/nlm-project/nlm.git
+
+cd nlm
+mkdir build
+cerulean build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON
+make -j4
+```
+
+### Package Installation
+
+```bash
+# Install system-wide
+sudo make install
+
+# Install Python bindings
+pip install ./python
+```
+
+## Usage Examples
+
+### Basic Simulation
+
+```cpp
+#include <nlm/core/Config.hpp>
+#include <nlm/brain/Brain.hpp>
+#include <nlm/core/Logger/Logger.hpp>
+
+int main() {
+    // Initialize logging
+    auto logger = std::make_shared<nlm::Logger>();
+    auto consoleLogger = std::make_shared<nlm::ConsoleLogger>(nlm::LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    nlm::Logger::setGlobal(logger);
+    
+    // Create configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", 1000);
+    config->set("random_seed", 42);
+    
+    // Create and initialize brain
+    auto brain = std::make_shared<nlm::Brain>(config);
+    if (!brain->initialize()) {
+        nlm::Logger::getGlobal().error("Failed to initialize brain");
+        return 1;
+    }
+    
+    // Run simulation
+    for (nlm::SimulationStep step = 0; step < 1000; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    // Display results
+    brain->logStatus();
+    
+    return 0;
+}
+```
+
+### Advanced Configuration
+
+```cpp
+#include <nlm/core/Config.hpp>
+
+int main(int argc, char** argv) {
+    // Load configuration from file
+    auto config = std::make_shared<nlm::Config>();
+    if (config->loadFromFile("configs/default.cfg")) {
+        std::cout << "Loaded configuration from file" << std::endl;
+    }
+    
+    // Override with command line arguments
+    config->loadFromArgs(argc, argv);
+    
+    // Get configuration values
+    std::cout << "Neuron count: " << config->getOr<int64_t>("neuron_count", 1000) << std::endl;
+    std::cout << "Timestep: " << config->getOr<double>("simulation_timestep", 0.001) << std::endl;
+    
+    // Set runtime configuration
+    config->set("plasticity_learning_rate", 0.05f);
+    config->set("random_seed", 1234567890LL);
+    
+    // Display configuration summary
+    std::cout << config->summary() << std::endl;
+    
+    return 0;
+}
+```
+
+### Custom Experiment
+
+```cpp
+#include <nlm/brain/Brain.hpp>
+#include <nlm/experiments/Phase3Experiment.hpp>
+
+int main() {
+    // Create experiment configuration
+    nlm::Phase3Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableLearning = true;
+    config.enableDevelopment = true;
+    
+    // Create and run experiment
+    nlm::Phase3Experiment experiment(config);
+    nlm::ExperimentResult result = experiment.run();
+    
+    // Analyze results
+    std::cout << "Experiment completed successfully!" << std::endl;
+    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Success rate: " << result.successRate << std::endl;
+    std::cout << "Average firing rate: " << result.avgFiringRate << std::endl;
+    
+    return 0;
+}
+```
+
+### Python Integration
+
+```python
+import nlm
+import numpy as np
+
+# Create brain with Python interface
+brain_config = nlm.Config()
+brain_config.set("neuron_count", 2000)
+brain_config.set("simulation_timestep", 0.0005)
+
+# Initialize brain
+brain = nlm.Brain(brain_config)
+brain.initialize()
+
+# Run training simulation
+for step in range(5000):
+    # Inject random sensory input
+    input_pattern = np.random.randn(100) * 10.0
+    sensory_input = nlm.SensoryInput(input_pattern)
+    brain.receiveSensoryInput(sensory_input)
+    
+    brain.step(step, step * 0.0005)
+    
+    if step % 1000 == 0:
+        print(f"Step {step}: Spikes={brain.getTotalSpikeCount()}")
+
+# Analyze performance
+print(f"Final spike count: {brain.getTotalSpikeCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Excitatory/inhibitory ratio: {brain.getExcitationInhibitionRatio()}")
+
+# Save brain state
+brain.saveToCheckpoint("brain_checkpoint.nml")
+
+# Load brain state
+loaded_brain = nlm.Brain(brain_config)
+loaded_brain.loadFromCheckpoint("brain_checkpoint.nml")
+```
+
+## Module-Specific Documentation
+
+Each module has its own API documentation. Click on the links above to access detailed API documentation for:
+
+- **Config System**: Configuration management and parameter handling
+- **Logging System**: Comprehensive logging and debugging
+- **Brain Module**: Core neural simulation and integration
+- **Neuron Module**: Individual neuron dynamics and behavior
+- **Synapse Module**: Connection management and plasticity
+- **Types and Definitions**: Type system and identifier definitions
+- **Memory Systems**: Working, episodic, and semantic memory
+- **Neuromodulation**: Dopamine, curiosity, and prediction error systems
+- **Cognition**: Concept formation, planning, and reasoning
+- **Development**: Developmental processes and maturation
+- **Sensory Systems**: Perception and sensory processing
+- **Motor Systems**: Action selection and execution
+- **Visualization**: Real-time monitoring and analysis tools
+
+## Advanced Topics
+
+### Memory Management
+
+NLM uses modern C++ memory management practices:
+
+```cpp
+// Smart pointers for automatic memory management
+auto config = std::make_shared<nlm::Config>();
+auto brain = std::make_shared<nlm::Brain>(config);
+
+// Move semantics for efficient transfers
+auto newBrain = std::make_shared<nlm::Brain>(std::move(oldBrain));
+
+// Pimpl idiom for implementation hiding
+class Config {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+```
+
+### Concurrency
+
+Thread-safe operations where appropriate:
+
+```cpp
+// Global logger is thread-safe for read operations
+nlm::Logger::getGlobal().info("Message from multiple threads");
+
+// Configuration updates require external synchronization
+config->set("parameter", value); // Thread-safe
+config->loadFromFile("file");    // Thread-safe
+```
+
+### Performance Optimization
+
+Performance considerations for high-performance applications:
+
+```cpp
+// Use const references for parameter passing
+void processInput(const SensoryInput& input);
+
+// Pre-allocate memory for performance
+std::vector<Neuron> neurons;
+neurons.reserve(config->getOr("neuron_count", 1000));
+
+// Use move operations for temporary objects
+auto temp = expensiveOperation();
+brain->receiveSensoryInput(std::move(temp));
+```
+
+## Error Handling
+
+### Common Error Conditions
+
+- **Configuration errors**: Invalid or missing configuration values
+- **Memory allocation failures**: Out of memory situations
+- **File I/O errors**: Configuration file access issues
+- **Initialization failures**: Brain setup problems
+- **Runtime errors**: Invalid operations during simulation
+
+### Error Code Enum
+
+```cpp
+enum class NLMErrorCode {
+    Success = 0,
+    ConfigFileNotFound = 1,
+    InvalidConfigValue = 2,
+    MemoryAllocationFailed = 3,
+    BrainInitializationFailed = 4,
+    InvalidOperation = 5,
+    FileWriteFailed = 6,
+    SimulationTimeout = 7
+};
+```
+
+### Error Handling Pattern
+
+```cpp
+// Example error handling
+auto result = brain->initialize();
+if (!result) {
+    auto error = nlm::Logger::getGlobal().getLastError();
+    std::cerr << "Brain initialization failed: " << error.message << std::endl;
+    return static_cast<int>(error.code);
+}
+```
+
+## Migration Guide
+
+### From Earlier Versions
+
+Key changes between major versions:
+
+- **Version 0.1.0**: Initial release with basic brain simulation
+- **Version 0.2.0**: Added memory systems and neuromodulation
+- **Version 0.3.0**: Enhanced plasticity rules and learning capabilities
+- **Version 0.4.0**: Integrated cognitive functions and planning
+- **Version 0.5.0**: Added development processes and maturation
+- **Version 0.6.0**: Complete system integration and Phase 6 demo
+
+### API Changes
+
+- **Configuration system**: Complete rewrite with type-safe value access
+- **Memory management**: Transition to modern C++ smart pointers
+- **Logging system**: Enhanced with multiple output sinks
+- **Brain initialization**: Simplified configuration-based setup
+- **Error handling**: Standardized error codes and messaging
+
+## Performance Guidelines
+
+### Memory Usage
+
+- **Memory pools**: Use for frequently allocated objects
+- **Contiguous storage**: For neural populations and connectivity
+- **Sparse matrices**: For large-scale connectivity
+- **Memory-efficient algorithms**: For time and space complexity
+
+### Computational Efficiency
+
+- **Event-driven processing**: Avoid unnecessary computation
+- **Vectorized operations**: Use SIMD instructions where possible
+- **Cache-friendly layouts**: Optimize for memory hierarchy
+- **Parallel processing**: Leverage multi-core architectures
+
+### Scalability Considerations
+
+- **Problem size**: Understand limitations for different neuron counts
+- **Hardware constraints**: Consider available memory and processing power
+- **Network topology**: Evaluate communication overhead
+- **Time stepping**: Balance accuracy with computational cost
+
+## Testing and Validation
+
+### Unit Testing
+
+Each component has comprehensive unit tests:
+
+```bash
+# Run unit tests
+./test_runner --unit
+
+# Run specific test suites
+test_runner --test brain_tests
+
+# Run integration tests
+test_runner --integration
+```
+
+### Performance Testing
+
+Automated performance benchmarking:
+
+```bash
+# Run performance tests
+./benchmark_runner --neural_performance
+
+# Profile specific components
+./profiler --target neuron_dynamics
+```
+
+### System Validation
+
+Integration and system-level testing:
+
+```bash
+# Phase 6 integration test (comprehensive)
+./nlm_phase6_demo
+
+# Phase 3 behavior test
+./nlm_phase3_demo
+
+# Phase 4 cognitive test
+./nlm_phase4_demo
+```
+
+## Contributing
+
+### Code Quality Standards
+
+- **C++20**: Use modern C++ features and best practices
+- **RAII**: Use resource acquisition is initialization pattern
+- **Exception safety**: Ensure strong exception guarantee
+- **Memory safety**: Use smart pointers and avoid raw pointers
+- **Thread safety**: Document thread safety guarantees
+
+### Documentation Standards
+
+- **Header comments**: Document class and method purposes
+- **Inline comments**: Explain complex algorithms and data structures
+- **API documentation**: Provide comprehensive parameter descriptions
+- **Example code**: Include practical usage examples
+
+### Testing Standards
+
+- **Unit tests**: Cover all public interfaces
+- **Integration tests**: Validate system interactions
+- **Performance tests**: Measure scalability and efficiency
+- **Regression tests**: Ensure backward compatibility
+
+## License
+
+MIT License
+
+```text
+Copyright (c) 2024 NLM Project Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## Support and Community
+
+### Bug Reports and Feature Requests
+
+- **GitHub Issues**: Report bugs and request features
+- **Feature Branch**: Submit pull requests for new functionality
+- **Code Review**: Participate in peer code review process
+- **Documentation**: Contribute to API and user documentation
+
+### Community Resources
+
+- **Discord Server**: Real-time discussion and support
+- **Mailing List**: Announcements and updates
+- **Forum**: Technical discussions and help
+- **Slack Channel**: Community collaboration
+
+## Future Development
+
+### Planned Features
+
+- **Hardware acceleration**: GPU and FPGA support
+- **Distributed computing**: Multi-machine simulation capabilities
+- **Advanced learning algorithms**: Deep reinforcement learning integration
+- **Neuroscientific validation**: Comparison with biological systems
+- **Education and training**: Adaptive learning platforms
+- **Commercial applications**: Industry-specific solutions
+
+### Research Directions
+
+- **Brain-like computation**: Neuromorphic engineering
+- **Developmental robotics**: Autonomous robot learning
+- **Cognitive architectures**: Hierarchical intelligent systems
+- **Neural engineering**: Brain-machine interface development
+
+## Acknowledgements
+
+The NLM project builds upon decades of research in:
+
+- **Computational neuroscience**: Neural modeling and simulation
+- **Artificial intelligence**: Machine learning and robotics
+- **Cognitive science**: Mental process understanding
+- **Physics**: Neural dynamics and biophysics
+- **Engineering**: Control systems and automation
+
+Special thanks to the open-source community and scientific contributors who have enabled this research.
+
+---
+
+*This documentation is continually updated with new features and improvements. Please check the NLM website for the latest information.*
+
+**For technical support, please visit the NLM documentation portal at https://docs.nims-project.org**
