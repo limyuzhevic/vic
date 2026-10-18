@@ -64,6 +64,72 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
+#### Performance Optimizations (Phase 5)
+- **OptimizedBrain**: High-performance neural simulation brain with event-driven processing
+- **Structure-of-Arrays (SoA)**: Efficient memory layout for neural computations
+- **Sparse Connectivity**: Memory-efficient neural connectivity representation
+- **Multithreading**: Parallel processing for large-scale neural populations
+- **SIMD Vectorization**: Hardware-accelerated neural computations
+- **Event Queues**: Lock-free ring buffers with time-bucketed delayed spikes
+- **Memory Pools**: Pre-allocated neuron/synapse pools for reduced fragmentation
+
+#### Advanced Features (Phase 5 Extended)
+- **AdvancedOptimizedBrain**: Enhanced brain with profiling, diagnostics, and power-user controls
+- **Performance Monitoring**: Real-time performance statistics and profiling
+- **Adaptive Algorithms**: Dynamic timestep adjustment, homeostatic plasticity, neural pruning
+- **Configuration Export/Import**: Save/load brain configurations
+- **Debug Mode**: Detailed logging for debugging and analysis
+- **Advanced Analytics**: Neural dynamics analysis, plasticity effects analysis
+
+### Phase 5 Performance Infrastructure
+
+#### Event-Driven Processing
+- Only active neurons consume computation
+- Efficient spike event queues
+- Time-bucketed delayed spikes
+- Significant speedups for sparse networks
+
+#### Structure-of-Arrays (SoA)
+- Contiguous neuron state arrays
+- Better cache utilization
+- Improved SIMD vectorization
+- Reduced memory for large networks
+
+#### Sparse Connectivity
+- Adjacency lists instead of dense matrices
+- Efficient synapse lookup
+- Reduced memory for large networks
+- Cache-friendly iteration patterns
+
+#### Multithreading
+- Parallel population updates
+- Work-stealing load balancing
+- Thread-local state accumulation
+- Synchronized spike aggregation
+
+#### SIMD Vectorization
+- SSE (4 floats), AVX2 (8 floats), AVX-512 (16 floats)
+- Vectorized LIF updates
+- Vectorized synaptic integration
+- Vectorized plasticity calculations
+
+#### Advanced Features (Phase 5 Extended)
+- **AdvancedOptimizedBrain**: Enhanced brain with profiling, diagnostics, and power-user controls
+- **Performance Monitoring**: Real-time performance statistics and profiling
+- **Adaptive Algorithms**: Dynamic timestep adjustment, homeostatic plasticity, neural pruning
+- **Configuration Export/Import**: Save/load brain configurations
+- **Debug Mode**: Detailed logging for debugging and analysis
+- **Advanced Analytics**: Neural dynamics analysis, plasticity effects analysis
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_ADVANCED_FEATURES=ON
+make -j4
+```
+
 ## Building
 
 ```bash
@@ -114,27 +180,27 @@ NLM/
 └── configs/
 ```
 
-## Phase Summary
+### Phase Summary
 
-### Phase 1 (Complete)
+#### Phase 1 (Complete)
 - Project skeleton
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+#### Phase 2 (Complete)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
 
-### Phase 3 (Complete)
+#### Phase 3 (Complete)
 - World interaction loop
 - Sensory input and motor output
 - Reward prediction error
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Complete)
+#### Phase 4 (Complete)
 - Neural prediction system
 - Working memory
 - Episodic-like memory
@@ -145,14 +211,16 @@ NLM/
 - Social learning
 - Continual learning
 
-### Phase 5 (Complete)
+#### Phase 5 (Complete)
 - Performance optimizations
 - Memory pools and event queues
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
+- **OptimizedBrain**: High-performance neural simulation brain
+- **AdvancedOptimizedBrain**: Enhanced features with profiling and diagnostics
 
-### Phase 6 (Complete - Final Integration)
+#### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -162,7 +230,147 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
-## Scientific Limitations
+## AdvancedOptimizedBrain Features
+
+### Configuration Options
+The AdvancedOptimizedBrain provides extensive configuration options for power users:
+
+#### Performance Configuration
+- `advanced_max_threads`: Number of threads for parallel processing
+- `advanced_enable_simd`: Enable/disable SIMD vectorization
+- `advanced_enable_multithreading`: Enable/disable multithreading
+- `advanced_enable_event_driven`: Enable/disable event-driven processing
+- `advanced_enable_sparse_connectivity`: Enable/disable sparse connectivity
+
+#### Neural Model Configuration
+- `advanced_neuron_temperature`: Temperature parameter for stochastic neuron behavior
+- `advanced_weight_quantization`: Weight quantization precision
+- `advanced_input_scaling`: Synaptic input scaling factor
+
+#### Plasticity Configuration
+- `advanced_stdp_ltp_weight`: STDP LTP weight
+- `advanced_stdp_ltd_weight`: STDP LTD weight
+- `advanced_stdp_tau`: STDP time constant
+- `advanced_hebbian_rate`: Hebbian learning rate
+
+#### Memory Configuration
+- `advanced_neuron_cache_size`: Cache size for neuron access
+- `advanced_synapse_cache_size`: Cache size for synapse access
+- `advanced_enable_numa_optimization`: Enable NUMA optimization
+
+#### Monitoring Configuration
+- `advanced_enable_profiling`: Enable performance profiling
+- `advanced_profiling_sample_rate`: Profiling sample rate
+- `advanced_output_directory`: Output directory for analysis files
+
+### Power-User Commands
+
+The AdvancedOptimizedBrain provides several power-user commands for advanced usage:
+
+#### Debugging and Analysis
+- `enableDebugMode(bool enable)`: Enable/disable detailed debug logging
+- `setProfilingLevel(size_t level)`: Set profiling verbosity level
+
+#### Configuration Management
+- `exportConfiguration(const std::string& filepath)`: Export current configuration to file
+- `importConfiguration(const std::string& filepath)`: Import configuration from file
+
+#### Advanced Simulation Controls
+- `adaptiveTimestepControl(double targetDt)`: Enable adaptive timestep control
+- `enableHomeostaticPlasticity(bool enable, float targetRate)`: Enable/disable homeostatic plasticity
+- `enableNeuralPruning(bool enable, float threshold)`: Enable/disable neural pruning
+
+### Performance Monitoring
+
+The AdvancedOptimizedBrain includes comprehensive performance monitoring:
+
+#### Real-Time Statistics
+- Neurons per second
+- Spikes per second
+- Synaptic events per second
+- Real-time factor
+- Active and firing neuron counts
+- Pending spike and delayed spike counts
+- Average firing rate
+- Memory usage in MB
+- Step execution time
+
+#### Performance Reports
+The brain generates detailed performance reports including:
+- Time performance statistics
+- Spike frequency analysis
+- Memory usage statistics
+- Activity profiles
+- Neural dynamics analysis
+- Plasticity effects analysis
+
+### Biological Fidelity Improvements
+
+Phase 5 includes several biological fidelity improvements:
+
+#### Adaptive Neuron Models
+- Temperature-based stochastic behavior
+- Weight quantization for realistic neural dynamics
+- Configurable refractory periods
+
+#### Short-Term Plasticity
+- Facilitation and depression mechanisms
+- Time-constant-based dynamics
+- Synaptic efficacy modulation
+
+#### Configurable Inhibitory Circuits
+- Balance excitation and inhibition
+- Tunable inhibitory connection strength
+- Network stability control
+
+#### Homeostatic Plasticity
+- Activity-dependent regulation
+- Target firing rate maintenance
+- Network stability preservation
+
+#### Neural Pruning
+- Eliminate weak connections
+- Maintain network efficiency
+- Adapt to changing environments
+
+## Running Phase 6 Integration Test
+
+```bash
+./nlm_phase6_demo
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+## Running Phase 5 Advanced Features
+
+```bash
+# Create build directory with advanced features enabled
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_ADVANCED_FEATURES=ON
+make -j4
+
+# Run advanced brain demo
+./nlm_phase5_advanced_demo
+```
+
+The Phase 5 advanced demo demonstrates all performance optimizations and advanced features.
+
+## Configuration Files
+
+See `configs/` directory for example configuration files:
+
+- `configs/default_advanced.cfg`: Advanced configuration with all optimizations enabled
+- `configs/performance_tuning.cfg`: Configuration for performance tuning
+- `configs/debug.cfg`: Configuration for debugging and analysis
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
 

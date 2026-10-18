@@ -114,12 +114,43 @@ add_library(nlm_phase3 STATIC
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Performance infrastructure (Phase 5)
+add_library(nlm_performance STATIC
+    src/performance/OptimizedBrain.hpp
+    src/performance/OptimizedBrain.cpp
+    src/performance/AdvancedOptimizedBrain.cpp
+    src/performance/Performance.hpp
+    src/performance/MemoryPool.hpp
+    src/performance/EventQueue.hpp
+    src/performance/SparseConnectivity.hpp
+    src/performance/ParallelProcessing.hpp
+    src/performance/SIMDVectorization.hpp
+    src/performance/CheckpointSystem.hpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_include_directories(nlm_performance PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_performance)
+
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5ExperimentDemo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance nlm_phase5)
+
+# Phase 5 advanced demo executable
+add_executable(nlm_phase5_advanced_demo
+    src/experiments/Phase5AdvancedDemo.cpp
+)
+target_link_libraries(nlm_phase5_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance nlm_phase5)
 
 # Main executable
 add_executable(nlm
