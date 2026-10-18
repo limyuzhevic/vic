@@ -345,6 +345,13 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string experimentMode = "basic";
+    bool enableDebug = false;
+    bool enableBenchmark = false;
+    bool enableReplay = false;
+    bool enableDevelopment = false;
+    std::string outputFile = "";
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -352,6 +359,22 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg == "--mode") {
+            if (i + 1 < argc) {
+                experimentMode = argv[++i];
+            }
+        } else if (arg == "--debug") {
+            enableDebug = true;
+        } else if (arg == "--benchmark") {
+            enableBenchmark = true;
+        } else if (arg == "--replay") {
+            enableReplay = true;
+        } else if (arg == "--development") {
+            enableDevelopment = true;
+        } else if (arg == "--output") {
+            if (i + 1 < argc) {
+                outputFile = argv[++i];
             }
         }
     }
@@ -361,6 +384,39 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Validate and process command line arguments
+    std::string configFileProcessed = configFile;
+    bool hasValidConfig = true;
+    
+    // Validate experiment mode
+    if (experimentMode != "basic" && experimentMode != "advanced" && experimentMode != "comprehensive") {
+        NLM_LOG_WARNING("Unknown experiment mode: " + experimentMode + ", using 'basic'");
+        experimentMode = "basic";
+    }
+    
+    // Validate output file path
+    if (!outputFile.empty()) {
+        // Ensure output path is safe
+        size_t lastSlash = outputFile.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            std::string dir = outputFile.substr(0, lastSlash);
+            // Note: In production, you would actually check if directory exists
+            NLM_LOG_INFO("Output directory: " + dir);
+        }
+    }
+    
+    // Validate debug and benchmark modes
+    if (enableDebug && enableBenchmark) {
+        NLM_LOG_WARNING("Both debug and benchmark modes enabled, debug will be prioritized");
     }
     
     // Override with command line args

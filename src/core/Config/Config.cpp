@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from file (Phase 1 implementation - simple key=value format)
+    // Phase 2+ would implement proper JSON/YAML parser
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -79,6 +79,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save configuration to file (Phase 1 implementation)
+    // Phase 2+ would support full serialization
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;

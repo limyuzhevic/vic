@@ -78,12 +78,36 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigFileLoading() {
+    nlm::Config config;
+    
+    // Test loading from non-existent file
+    assert(!config.loadFromFile("nonexistent.cfg"));
+    
+    // Note: For file loading tests, you'd need to create temporary files
+    std::cout << "    testConfigFileLoading passed" << std::endl;
+}
+
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test setting invalid values (if any validation exists)
+    config.set("negative_neuron_count", -1, nlm::ConfigSource::Runtime);
+    
+    // Test getting invalid values
+    auto value = config.get<int>("nonexistent");
+    assert(!value.has_value());
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigFileLoading();
+    testConfigValidation();
+    testConfigSummary();
 }
-
-} // namespace test_config

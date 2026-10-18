@@ -14,18 +14,18 @@ VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
+    // Initialize visualization system
+    // Phase 1 placeholder - real implementation in Phase 2+
     pImpl->active = false;
     return true;
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Update visualization (placeholder - real implementation in Phase 2+)
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Render visualization (placeholder - real implementation in Phase 2+)
 }
 
 void VisualizationInterface::close() {
@@ -45,19 +45,19 @@ double VisualizationInterface::getUpdateRate() const {
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    // Visualize neural network structure (placeholder - real implementation in Phase 2+)
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    // Visualize brain activity patterns (placeholder - real implementation in Phase 2+)
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    // Visualize spike events (placeholder - real implementation in Phase 2+)
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    // Visualize synaptic weights (placeholder - real implementation in Phase 2+)
 }
 
 } // namespace nlm

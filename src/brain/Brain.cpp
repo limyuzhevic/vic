@@ -93,6 +93,16 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Validate configuration parameters
+        if (!validateConfiguration()) {
+            NLM_LOG_ERROR("Invalid configuration provided");
+            return;
+        // Validate configuration
+        if (!validateConfiguration()) {
+            NLM_LOG_ERROR("Invalid configuration provided");
+            return;
+        }
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
