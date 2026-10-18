@@ -50,17 +50,196 @@
  *   - Lifelong adaptation
  */
 
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
-#include "../experiments/AblationSystem.hpp"
-#include "../experiments/ScalingBenchmark.hpp"
-#include <vector>
-#include <string>
-#include <memory>
-#include <functional>
-#include <unordered_map>
+/**
+ * System profiling and performance monitoring
+ */
+struct SystemProfile {
+    // Basic metrics
+    uint64_t step;
+    size_t totalNeurons;
+    size_t totalSynapses;
+    
+    // Neural activity metrics
+    size_t totalSpikes;
+    size_t firingNeurons;
+    size_t activeNeurons;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    
+    // Memory system metrics
+    size_t workingMemoryActiveTraces;
+    size_t workingMemoryCapacity;
+    float workingMemoryUtilization;
+    size_t episodicMemoryEpisodeCount;
+    size_t episodicMemoryReplayEvents;
+    size_t associativeMemoryAssociationCount;
+    float associativeMemoryStrength;
+    
+    // Neuromodulation metrics
+    float dopamineLevel;
+    float dopaminePlasticityFactor;
+    float curiosityLevel;
+    
+    // Prediction system metrics
+    float predictionAccuracy;
+    float predictionConfidence;
+    
+    // Performance metrics
+    float efficiency;           // Network efficiency score
+    float throughput;          // Operations per second
+    float energyConsumption;    // Relative energy usage
+    double collectionTime;      // Time to collect profile
+    
+    // Resource utilization
+    float cpuUsage;             // Estimated CPU usage (%)
+    float memoryUsage;          // Estimated memory usage (MB)
+    
+    // Timestamps
+    double timestamp;
+    
+    SystemProfile() : step(0), totalNeurons(0), totalSynapses(0),
+                      totalSpikes(0), firingNeurons(0), activeNeurons(0),
+                      averageFiringRate(0.0f), excitationInhibitionRatio(0.0f),
+                      workingMemoryActiveTraces(0), workingMemoryCapacity(0),
+                      workingMemoryUtilization(0.0f), episodicMemoryEpisodeCount(0),
+                      episodicMemoryReplayEvents(0), associativeMemoryAssociationCount(0),
+                      associativeMemoryStrength(0.0f), dopamineLevel(0.0f),
+                      dopaminePlasticityFactor(0.0f), curiosityLevel(0.0f),
+                      predictionAccuracy(0.0f), predictionConfidence(0.0f),
+                      efficiency(0.0f), throughput(0.0f), energyConsumption(0.0f),
+                      collectionTime(0.0), cpuUsage(0.0f), memoryUsage(0.0f),
+                      timestamp(0.0) {}
+};
 
-namespace nlm {
+struct ProfilingConfig {
+    // Profile scope
+    bool profileNeuralActivity;
+    bool profileMemorySystems;
+    bool profileNeuromodulation;
+    bool profilePredictionSystems;
+    bool profileResourceUsage;
+    
+    // Profile frequency
+    double profileInterval;     // seconds between profiles
+    bool continuousProfiling;   // true for real-time profiling
+    
+    // Metrics collection
+    bool collectCPUUsage;
+    bool collectMemoryUsage;
+    bool collectEnergyConsumption;
+    bool collectEfficiencyMetrics;
+    bool collectThroughputMetrics;
+    
+    // Output options
+    std::string profileOutputDir;
+    bool saveProfiles;
+    bool generateAnalysis;
+    bool generateVisualizations;
+    
+    ProfilingConfig() : profileNeuralActivity(true), profileMemorySystems(true),
+                       profileNeuromodulation(true), profilePredictionSystems(true),
+                       profileResourceUsage(true), profileInterval(1.0),
+                       continuousProfiling(false), collectCPUUsage(true),
+                       collectMemoryUsage(true), collectEnergyConsumption(true),
+                       collectEfficiencyMetrics(true), collectThroughputMetrics(true),
+                       saveProfiles(true), generateAnalysis(true), generateVisualizations(true) {}
+};
+
+/**
+ * Enhanced lifetime experiment result with performance profiling data
+ */
+struct EnhancedLifetimeExperimentResult {
+    LifetimeExperimentResult basicResult;
+    
+    // Performance profiling data
+    std::vector<SystemProfile> systemProfiles;
+    std::vector<BenchmarkMetrics> performanceMetrics;
+    
+    // Scalability analysis
+    std::vector<std::pair<size_t, double>> scaleVsEfficiency;
+    std::vector<std::pair<size_t, double>> scaleVsThroughput;
+    
+    // Resource utilization trends
+    std::vector<std::pair<double, float>> timeVsMemoryUsage;
+    std::vector<std::pair<double, float>> timeVsCPUUsage;
+    std::vector<std::pair<double, float>> timeVsEnergyConsumption;
+    
+    // Optimization insights
+    std::vector<std::string> optimizationRecommendations;
+    std::vector<std::string> performanceBottlenecks;
+    std::unordered_map<std::string, float> efficiencyScores;
+    
+    // Statistical analysis
+    struct PerformanceStatistics {
+        float meanEfficiency;
+        float stdDevEfficiency;
+        float meanThroughput;
+        float stdDevThroughput;
+        float meanMemoryUsage;
+        float stdDevMemoryUsage;
+        float meanEnergyConsumption;
+        float stdDevEnergyConsumption;
+        float minEfficiency;
+        float maxEfficiency;
+        float pearsonCorrelation;
+    } statistics;
+    
+    EnhancedLifetimeExperimentResult() : statistics() {}
+};
+
+/**
+ * Performance analysis and optimization recommendations
+ */
+struct PerformanceAnalysis {
+    std::string title;
+    
+    // Performance bottlenecks
+    struct Bottleneck {
+        std::string name;
+        std::string description;
+        float severity;        // 0.0 to 1.0
+        float impact;          // 0.0 to 1.0
+        std::string recommendation;
+        float estimatedGain;   // Expected improvement if fixed
+    };
+    std::vector<Bottleneck> bottlenecks;
+    
+    // Performance trends
+    struct Trend {
+        std::string metric;
+        std::vector<std::pair<double, float>> dataPoints;
+        float trendSlope;
+        float rSquared;
+        std::string description;
+    };
+    std::vector<Trend> trends;
+    
+    // Optimization opportunities
+    struct Optimization {
+        std::string name;
+        std::string technique;
+        float potentialImprovement;
+        float implementationCost;
+        float roi;            // Return on investment
+        std::string description;
+    };
+    std::vector<Optimization> optimizations;
+    
+    // Performance projections
+    struct Projection {
+        std::string scenario;
+        float projectedEfficiency;
+        float projectedThroughput;
+        float projectedMemoryUsage;
+        float timeToImplement;
+    };
+    std::vector<Projection> projections;
+    
+    // Overall assessment
+    float overallScore;
+    std::string assessment;
+    std::vector<std::string> keyFindings;
+};
 
 /**
  * Lifetime experiment configuration
@@ -189,92 +368,145 @@ struct ContinualTask {
     uint64_t stepsBetweenTasks;
 };
 
-/**
- * Phase 5 integrated experiment runner
- */
-class Phase5IntegratedExperiment {
-public:
-    Phase5IntegratedExperiment();
-    ~Phase5IntegratedExperiment();
-    
-    /**
-     * Run the complete lifetime experiment
-     */
-    LifetimeExperimentResult run(
+LifetimeExperimentResult run(
         const LifetimeExperimentConfig& config,
         std::function<std::shared_ptr<class Brain>(const LifetimeExperimentConfig& config)> createBrain,
         std::function<bool(class Brain* brain, uint64_t steps)> runSimulation
     );
     
     /**
-     * Run a single phase
+     * Run the enhanced lifetime experiment with comprehensive performance profiling
      */
-    LifetimePhaseResult runPhase(
+    EnhancedLifetimeExperimentResult runWithProfiling(
+        const LifetimeExperimentConfig& config,
+        std::function<std::shared_ptr<class Brain>(const LifetimeExperimentConfig& config)> createBrain,
+        std::function<bool(class Brain* brain, uint64_t steps)> runSimulation,
+        const ProfilingConfig& profilingConfig = ProfilingConfig()
+    );
+    
+    /**
+     * Generate performance analysis and optimization recommendations
+     */
+    PerformanceAnalysis generatePerformanceAnalysis(
+        const EnhancedLifetimeExperimentResult& result
+    );
+    
+    /**
+     * Profile system performance at a specific point
+     */
+    bool profileSystemPerformance(
         class Brain* brain,
-        const std::string& phaseName,
-        uint64_t startStep,
-        uint64_t endStep,
-        const std::function<void(uint64_t step)>& progressCallback
+        SystemProfile& profile,
+        const ProfilingConfig& config = ProfilingConfig()
     );
     
     /**
-     * Run continual learning experiment with task switching
+     * Calculate network efficiency score
      */
-    LifetimeExperimentResult runContinualLearning(
-        std::shared_ptr<class Brain> brain,
-        const std::vector<ContinualTask>& tasks,
-        size_t cycles = 3
+    float calculateNetworkEfficiency(class Brain* brain);
+    
+    /**
+     * Calculate network throughput
+     */
+    float calculateNetworkThroughput(const SystemProfile& profile);
+    
+    /**
+     * Estimate CPU usage
+     */
+    float estimateCPUUsage(const SystemProfile& profile);
+    
+    /**
+     * Estimate memory usage
+     */
+    float estimateMemoryUsage(const SystemProfile& profile);
+    
+    /**
+     * Estimate energy consumption
+     */
+    float estimateEnergyConsumption(const SystemProfile& profile);
+    
+    /**
+     * Save system profile to file
+     */
+    bool saveSystemProfile(
+        const SystemProfile& profile,
+        const std::string& filepath,
+        const ProfilingConfig& config
     );
     
     /**
-     * Run damage and recovery experiment
+     * Load system profile from file
      */
-    LifetimeExperimentResult runDamageRecovery(
-        std::shared_ptr<class Brain> brain,
-        uint64_t damageStep,
-        float damageFraction,
-        const std::string& damageRegion
+    bool loadSystemProfile(
+        SystemProfile& profile,
+        const std::string& filepath
     );
     
     /**
-     * Run scaling experiment
+     * Compare performance profiles
      */
-    ScalingAnalysis runScalingExperiment(
-        const std::vector<ScaleLevel>& scales,
-        uint64_t stepsPerScale
+    std::vector<SystemProfile> compareProfiles(
+        const std::vector<SystemProfile>& profiles,
+        const std::string& comparisonType = "efficiency"
     );
     
     /**
-     * Run ablation comparison
+     * Generate performance report
      */
-    std::vector<AblationResult> runAblationComparison(
-        const std::string& task,
-        const AblationExperiment& experiment
-    );
-
-private:
-    LifetimeExperimentResult initializeResult(const LifetimeExperimentConfig& config);
-    
-    void savePhaseCheckpoint(
-        class Brain* brain,
-        const std::string& phase,
-        uint64_t step
+    std::string generatePerformanceReport(
+        const EnhancedLifetimeExperimentResult& result,
+        const PerformanceAnalysis& analysis
     );
     
-    LifetimePhaseResult collectPhaseResults(
-        class Brain* brain,
-        const std::string& phaseName,
-        uint64_t startStep,
-        uint64_t endStep
+    /**
+     * Export performance data to JSON
+     */
+    std::string exportPerformanceToJSON(
+        const EnhancedLifetimeExperimentResult& result,
+        const PerformanceAnalysis& analysis
     );
     
-    void generateVisualizations(
-        const LifetimeExperimentResult& result,
-        const std::string& outputDir
+    /**
+     * Import performance data from JSON
+     */
+    bool importPerformanceFromJSON(
+        EnhancedLifetimeExperimentResult& result,
+        PerformanceAnalysis& analysis,
+        const std::string& filepath
     );
     
-    std::string generateReport(const LifetimeExperimentResult& result);
-};
+    /**
+     * Create comprehensive benchmarking report
+     */
+    std::string createBenchmarkingReport(
+        const EnhancedLifetimeExperimentResult& result,
+        const std::vector<BenchmarkMetrics>& benchmarkResults,
+        const PerformanceAnalysis& analysis
+    );
+    
+    /**
+     * Update experiment configuration with optimization recommendations
+     */
+    LifetimeExperimentConfig applyOptimizationRecommendations(
+        const LifetimeExperimentConfig& originalConfig,
+        const PerformanceAnalysis& analysis
+    );
+    
+    /**
+     * Generate visualization data for performance metrics
+     */
+    struct VisualizationData {
+        std::vector<double> timePoints;
+        std::vector<float> efficiencyValues;
+        std::vector<float> throughputValues;
+        std::vector<float> memoryUsageValues;
+        std::vector<float> energyConsumptionValues;
+        std::vector<float> firingRateValues;
+    };
+    
+    VisualizationData generateVisualizationData(
+        const EnhancedLifetimeExperimentResult& result
+    );
 
 /**
  * Multi-seed experiment runner for statistical significance

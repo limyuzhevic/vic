@@ -177,18 +177,45 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // Validate config exists
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain initialization failed: config is null");
+        return false;
+    }
+    
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Brain initialization failed: neuron_count must be > 0");
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Brain initialization failed: region_count must be > 0");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+        auto* region = getRegion(regionId);
+        if (!region) {
+            NLM_LOG_ERROR("Brain initialization failed: created region " + std::to_string(regionId) + " is null");
+            return false;
+        }
     }
+    
+    NLM_LOG_INFO("Brain regions created successfully");
+    
+    return true;
+}
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
@@ -738,6 +765,7 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Reset simulation parameters
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -745,18 +773,58 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Reset neural regions with null checks
     for (auto& region : pImpl->regions) {
-        region->reset();
+        if (region) {
+            region->reset();
+        } else {
+            NLM_LOG_WARNING("Null region found during reset");
+        }
     }
     
-    pImpl->spikeSystem->reset();
+    // Reset integrated systems with null checks
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    } else {
+        NLM_LOG_WARNING("SpikeSystem is null during reset");
+    }
+    
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
+    // Reset memory systems with null checks
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset memory-related pointers that were previously uninitialized
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
+    // Reset neuromodulation systems (they have their own reset methods)
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    
+    // Reset plasticity systems with null checks
+    if (pImpl->stdp) pImpl->stdp->reset();
+    if (pImpl->hebbian) pImpl->hebbian->reset();
+    if (pImpl->structuralPlasticity) pImpl->structuralPlasticity->reset();
+    
+    // Reset development system with null check
+    if (pImpl->developmentSystem) pImpl->developmentSystem->reset();
+    
+    // Reset prediction system with null check
+    if (pImpl->predictionSystem) pImpl->predictionSystem->reset();
+    
+    // Reset cognition systems with null checks
+    if (pImpl->planner) pImpl->planner->reset();
+    if (pImpl->conceptFormation) pImpl->conceptFormation->reset();
+    if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset checkpoint manager with null check
+    if (pImpl->checkpointManager) pImpl->checkpointManager->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -916,20 +984,48 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    // Validate input parameter
+    if (id.index() == 0) {
+        NLM_LOG_WARNING("Attempted to get region with invalid ID: " + std::to_string(id));
+        return nullptr;
+    }
+    
+    // Search for region with null pointer check
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Null region found in regions list");
+            continue;
+        }
+        
         if (region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region not found with ID: " + std::to_string(id));
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    // Validate input parameter
+    if (id.index() == 0) {
+        NLM_LOG_WARNING("Attempted to get region with invalid ID: " + std::to_string(id));
+        return nullptr;
+    }
+    
+    // Search for region with null pointer check
     for (const auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Null region found in regions list (const)");
+            continue;
+        }
+        
         if (region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region not found with ID: " + std::to_string(id));
     return nullptr;
 }
 

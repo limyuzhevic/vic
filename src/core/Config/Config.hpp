@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -78,20 +78,27 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Set default values (higher priority for overrides)
+    void setDefault(const std::string& key, const ConfigValue& value);
     
-    // Remove key
+    // Configuration management
+    bool has(const std::string& key) const;
     void remove(const std::string& key);
+    void clear();
     
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration merging
+    bool mergeFrom(const Config& other);
     
-    // Get configuration summary
+    // Get configuration summary with optional filtering
     std::string summary() const;
+    std::string summary(const std::string& filter) const;
+    
+    // Validation and debugging
+    bool validate(const std::vector<std::pair<std::string, std::function<bool(const ConfigValue&)>>>& validators) const;
+    void logChanges(const Config& oldConfig) const;
     
 private:
     struct Impl;
@@ -100,6 +107,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format specific loading (protected for internal use)
+    bool loadFromSimple(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
 };
 
 } // namespace nlm
