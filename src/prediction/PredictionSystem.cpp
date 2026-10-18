@@ -12,9 +12,12 @@ struct PredictionSystem::Impl {
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
-PredictionSystem::~PredictionSystem() = default;
-
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
+void PredictionSystem::initialize() {
+    // Initialize prediction system with default values
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    pImpl->errorHistory.clear();
+}
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
     return currentState.clone();

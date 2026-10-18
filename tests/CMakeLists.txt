@@ -14,6 +14,10 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_serotonin.cpp
+    test_scientific_validation.cpp
+    test_scientific_validation_main.cpp
+    test_syntax_check.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
