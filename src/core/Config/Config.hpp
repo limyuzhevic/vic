@@ -61,6 +61,11 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Enhanced configuration setup for command-line parameters
+    void setupFromCLI(const std::string& experimentMode, int numNeurons = -1, 
+                     int numRegions = -1, double timestep = -1.0,
+                     const std::string& logLevel = "info");
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     

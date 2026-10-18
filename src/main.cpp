@@ -6,6 +6,10 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced CLI with advanced configuration options and comprehensive help
+// Supports custom configuration files, experiment parameters, and logging levels
+// Provides detailed status output and error reporting
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -28,6 +32,15 @@
 
 using namespace nlm;
 
+// Phase 2 enhanced main with comprehensive CLI support and configuration options
+
+// Forward declarations for CLI functions
+void printHelp();
+void printVersion();
+void setupConfigFromCLI(Config& config, const std::string& experimentMode, 
+                       int numNeurons, int numRegions, double timestep, 
+                       const std::string& logLevel);
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -39,10 +52,10 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - Leaky Integrate-and-Fire (LIF) neurons                    ║
+    ║     - Event-driven spike propagation with delays                ║
+    ║     - STDP and Hebbian plasticity rules                         ║
+    ║     - Structural plasticity                                    ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -322,51 +335,98 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments with enhanced options
     std::string configFile = "configs/default.cfg";
+    std::string experimentMode = "full";
+    std::string logLevel = "info";
+    int numNeurons = -1; // -1 means use config default
+    int numRegions = -1;
+    double timestep = -1.0; // -1.0 means use config default
+    
+    bool showHelp = false;
+    bool showVersion = false;
+    
+    // Parse arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--phase2" || arg == "--neural-comp" || arg == "--demo") {
+            experimentMode = "full";
+        } else if (arg == "--quick" || arg == "--test") {
+            experimentMode = "quick";
+        } else if (arg.substr(0, 7) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                numNeurons = std::atoi(arg.substr(arg.find('=') + 1).c_str());
+            } else if (i + 1 < argc) {
+                numNeurons = std::atoi(argv[++i]);
+            }
+        } else if (arg.substr(0, 8) == "--regions") {
+            if (arg.find('=') != std::string::npos) {
+                numRegions = std::atoi(arg.substr(arg.find('=') + 1).c_str());
+            } else if (i + 1 < argc) {
+                numRegions = std::atoi(argv[++i]);
+            }
+        } else if (arg.substr(0, 10) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                timestep = std::atof(arg.substr(arg.find('=') + 1).c_str());
+            } else if (i + 1 < argc) {
+                timestep = std::atof(argv[++i]);
+            }
+        } else if (arg.substr(0, 12) == "--log-level") {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg == "--stdp" || arg == "--no-stdp") {
+            // STDP handled in config section
+        } else if (arg == "--hebbian" || arg == "--no-hebbian") {
+            // Hebbian plasticity handled in config section
+        } else {
+            // Unknown argument
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            std::cerr << "Use --help for available options" << std::endl;
+            return 1;
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Show help if requested
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    // Show version if requested
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    // Load configuration from file
+    auto config = std::make_shared<Config>();
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Apply enhanced CLI settings
+    setupConfigFromCLI(*config, experimentMode, numNeurons, numRegions, timestep, logLevel);
+    
+    // Override with additional command line args (for backward compatibility)
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (these may be overridden by setupConfigFromCLI)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -382,8 +442,15 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
+    
+    // Log configuration summary
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");

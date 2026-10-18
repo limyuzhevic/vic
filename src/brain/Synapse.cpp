@@ -5,7 +5,6 @@
 
 namespace nlm {
 
-struct Synapse::Impl {
     SynapseId id;
     NeuronId sourceNeuron;
     NeuronId destinationNeuron;
@@ -13,38 +12,43 @@ struct Synapse::Impl {
     Delay delay;  // Synaptic delay in simulation steps
     
     // Synapse type
+    // Excitatory synapses (positive weight), Inhibitory synapses (negative weight)
     SynapseType type;
     
     // Spike history for STDP
+    // Used to track pre-synaptic and post-synaptic spike times for spike-timing-dependent plasticity
     std::vector<Timestamp> preSpikeHistory;
     std::vector<Timestamp> postSpikeHistory;
     
     // Plasticity state
+    // Controls whether this synapse can undergo different types of plasticity
     PlasticityFlags plasticityFlags;
     
     // Short-term plasticity state
-    float shortTermDepression;  // Utilization factor (0-1)
-    float shortTermFacilitation;  // Facilitation factor
-    float lastPreSpikeTime;  // For short-term dynamics
-    float lastPostSpikeTime;
+    // Tsodyks-Markram model for short-term synaptic depression and facilitation
+    float shortTermDepression;  // Utilization factor (0-1), recovery time constant
+    float shortTermFacilitation;  // Facilitation factor (0-1), enhancement of transmission
+    float lastPreSpikeTime;  // Last pre-synaptic spike time (for short-term dynamics)
+    float lastPostSpikeTime;  // Last post-synaptic spike time (for some plasticity rules)
     
     // Eligibility trace for reward-modulated learning
+    // Accumulates synaptic activity to modulate weight changes based on delayed rewards
     float eligibilityTrace;
     
     // Synaptic efficacy (use-dependent modulation)
+    // Represents the current effectiveness of the synapse, modulated by activity
     float efficacy;
     
     // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    static constexpr float MIN_WEIGHT = -1.0f;  // Minimum synaptic weight (strong inhibition)
+    static constexpr float MAX_WEIGHT = 1.0f;   // Maximum synaptic weight (strong excitation)
     
     // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    static constexpr float STP_FACILITATION_TAU = 100.0f;  // Time constant for facilitation (ms)
+    static constexpr float STP_DEPRESSION_TAU = 200.0f;    // Time constant for depression (ms)
+    static constexpr float STP_U_MAX = 1.0f;               // Maximum utilization for depression
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
-};
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;  // Maximum number of spike timestamps to store
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {

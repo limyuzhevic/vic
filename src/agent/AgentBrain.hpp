@@ -110,8 +110,8 @@ private:
     bool curiosityEnabled_;
     
     // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Used to compute novelty by comparing current vision input to previous frame
+    std::vector<float> previousVision_; // TODO: Replace with proper sensory change detection
 };
 
 } // namespace nlm

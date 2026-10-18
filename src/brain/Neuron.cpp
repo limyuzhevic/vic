@@ -5,9 +5,6 @@
 
 namespace nlm {
 
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
@@ -19,13 +16,14 @@ struct Neuron::Impl {
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
+    // These are hardcoded constants for the Leaky Integrate-and-Fire model
+    // C: membrane capacitance (nF), tau: time constant (ms)
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float TIME_CONSTANT = 20.0f;      // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;     // Maximum number of spikes to remember
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
-};
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->id = id;

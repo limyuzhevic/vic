@@ -212,4 +212,62 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+void Config::setupFromCLI(const std::string& experimentMode, int numNeurons, 
+                         int numRegions, double timestep, const std::string& logLevel) {
+    // Apply experiment mode settings
+    if (experimentMode == "quick") {
+        set("neuron_count", 200, ConfigSource::Runtime);
+        set("region_count", 1, ConfigSource::Runtime);
+        set("connection_probability", 0.05f, ConfigSource::Runtime);
+        set("simulation_timestep", 0.001, ConfigSource::Runtime);
+    } else if (experimentMode == "full") {
+        set("neuron_count", 1000, ConfigSource::Runtime);
+        set("region_count", 2, ConfigSource::Runtime);
+        set("connection_probability", 0.1f, ConfigSource::Runtime);
+        set("simulation_timestep", 0.001, ConfigSource::Runtime);
+    }
+    
+    // Apply overrides from command line
+    if (numNeurons > 0) {
+        set("neuron_count", numNeurons, ConfigSource::CommandLine);
+    }
+    if (numRegions > 0) {
+        set("region_count", numRegions, ConfigSource::CommandLine);
+    }
+    if (timestep > 0.0) {
+        set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    }
+    
+    // Set log level
+    std::string logLevelLower = toLower(logLevel);
+    if (logLevelLower == "debug") {
+        set("log_level", "DEBUG", ConfigSource::CommandLine);
+    } else if (logLevelLower == "warning") {
+        set("log_level", "WARNING", ConfigSource::CommandLine);
+    } else if (logLevelLower == "error") {
+        set("log_level", "ERROR", ConfigSource::CommandLine);
+    } else {
+        set("log_level", "INFO", ConfigSource::CommandLine);
+    }
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
 } // namespace nlm
