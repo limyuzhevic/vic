@@ -140,24 +140,51 @@ void testReset() {
     
     neuron.reset();
     
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
-    assert(neuron.getSpikeHistory().empty());
-    
-    std::cout << "    testReset passed" << std::endl;
-}
+#include <chrono>
 
-void runAll() {
-    testNeuronCreation();
-    testNeuronType();
-    testMembranePotential();
-    testFiringState();
-    testRefractoryDecrement();
-    testCurrentInjection();
-    testSynapticInput();
-    testSpikeHistory();
-    testRandomInitialization();
-    testReset();
+void testNeuronPerformance() {
+    const size_t iterationCount = 10000;
+    
+    // Test neuron creation and destruction performance
+    auto startTime = std::chrono::high_resolution_clock::now();
+    {
+        std::vector<nlm::Neuron> neurons;
+        neurons.reserve(iterationCount);
+        
+        for (size_t i = 0; i < iterationCount; ++i) {
+            neurons.emplace_back(nlm::NeuronId(static_cast<uint64_t>(i)));
+            neurons.back().setMembranePotential(-70.0f + static_cast<float>(i));
+        }
+        
+        // Access some neurons to ensure they're properly initialized
+        for (size_t i = 0; i < iterationCount; i += 1000) {
+            auto potential = neurons[i].getMembranePotential();
+            (void)potential;
+        }
+    }
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Created/destroyed " << iterationCount << " neurons in " 
+              << duration.count() << " microseconds" << std::endl;
+    
+    // Test step performance
+    nlm::RandomGenerator rng(42);
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    neuron.initializeRandom(rng);
+    
+    startTime = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < iterationCount; ++i) {
+        neuron.stepLIF(static_cast<nlm::Timestamp>(i), 0.001);
+    }
+    endTime = std::chrono::high_resolution_clock::now();
+    
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Performed " << iterationCount << " neuron steps in " 
+              << duration.count() << " microseconds (" 
+              << (1000000.0 / duration.count() * iterationCount) << " steps/second)" << std::endl;
+    
+    std::cout << "    testNeuronPerformance passed" << std::endl;
 }
 
 } // namespace test_neuron

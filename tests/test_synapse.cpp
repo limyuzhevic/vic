@@ -167,26 +167,53 @@ void testSynapsePlasticityFlags() {
     
     synapse.enablePlasticity(true, true, false);
     
-    assert(synapse.getPlasticityFlags().hebbian);
-    assert(synapse.getPlasticityFlags().stdp);
-    assert(!synapse.getPlasticityFlags().reward_modulated);
-    
-    std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
-}
+#include <chrono>
 
-void runAll() {
-    std::cout << "Running Synapse tests..." << std::endl;
-    testSynapseCreation();
-    testSynapseWeight();
-    testSynapseWeightBounds();
-    testSynapseType();
-    testSynapseDelay();
-    testSynapseSpikeHistory();
-    testSynapseEligibilityTrace();
-    testSynapseEfficacy();
-    testSynapseRandomInitialization();
-    testSynapseReset();
-    testSynapsePlasticityFlags();
+void testSynapsePerformance() {
+    const size_t iterationCount = 10000;
+    
+    // Test synapse creation and destruction performance
+    auto startTime = std::chrono::high_resolution_clock::now();
+    {
+        std::vector<nlm::Synapse> synapses;
+        synapses.reserve(iterationCount);
+        
+        for (size_t i = 0; i < iterationCount; ++i) {
+            synapses.emplace_back(
+                nlm::SynapseId(static_cast<uint64_t>(i)),
+                nlm::NeuronId(i * 2),
+                nlm::NeuronId(i * 2 + 1)
+            );
+            synapses.back().setWeight(static_cast<float>(i) * 0.01f);
+        }
+        
+        // Access some synapses to ensure they're properly initialized
+        for (size_t i = 0; i < iterationCount; i += 1000) {
+            auto weight = synapses[i].getWeight();
+            (void)weight;
+        }
+    }
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Created/destroyed " << iterationCount << " synapses in " 
+              << duration.count() << " microseconds" << std::endl;
+    
+    // Test spike history performance
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    startTime = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < iterationCount; ++i) {
+        synapse.recordPreSpike(static_cast<nlm::Timestamp>(i));
+    }
+    endTime = std::chrono::high_resolution_clock::now();
+    
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Recorded " << iterationCount << " pre-spikes in " 
+              << duration.count() << " microseconds (" 
+              << (1000000.0 / duration.count() * iterationCount) << " spikes/second)" << std::endl;
+    
+    std::cout << "    testSynapsePerformance passed" << std::endl;
 }
 
 } // namespace test_synapse

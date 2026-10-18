@@ -46,52 +46,22 @@ struct ConfigEntry {
 // Main configuration class
 class Config {
 public:
-    Config();
-    ~Config();
+    // Configuration validation
+    bool validate(std::string& errorMessage) const;
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    // Specific validation for common parameter types
+    static bool validateNeuronCount(int64_t count, std::string& errorMessage);
+    static bool validateConnectionProbability(float probability, std::string& errorMessage);
+    static bool validateTimestep(double timestep, std::string& errorMessage);
+    static bool validateWeight(float weight, std::string& errorMessage);
+    static bool validateRate(float rate, std::string& errorMessage);
+    static bool validateString(const std::string& value, std::string& errorMessage);
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Get validation errors for all parameters
+    std::vector<std::string> getValidationErrors() const;
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Check if specific parameter is valid
+    bool isValid(const std::string& key) const;
     
 private:
     struct Impl;

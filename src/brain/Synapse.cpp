@@ -47,32 +47,15 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->sourceNeuron = source;
-    pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
-    pImpl->type = SynapseType::Excitatory;
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
-}
+    : pImpl(std::make_unique<Impl>(id, source, destination)) {}
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }

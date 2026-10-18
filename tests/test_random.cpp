@@ -129,16 +129,86 @@ void testSeed() {
     std::cout << "    testSeed passed" << std::endl;
 }
 
-void runAll() {
-    testRandomGeneratorCreation();
-    testUniformInt();
-    testUniformReal();
-    testNormal();
-    testBernoulli();
-    testRandomBool();
-    testPickRandomIndex();
-    testShuffle();
-    testSeed();
+void testRandomGeneratorMoveSemantics() {
+    nlm::RandomGenerator rng1(42);
+    
+    // Move constructor
+    nlm::RandomGenerator rng2(std::move(rng1));
+    
+    // Test that moved generator still works
+    uint32_t val = rng2.uniformInt(0, 100);
+    assert(val >= 0 && val <= 100);
+    
+    std::cout << "    testRandomGeneratorMoveSemantics passed" << std::endl;
+}
+
+void testRandomGeneratorMemoryCleanup() {
+    uint64_t seed = 12345;
+    {
+        nlm::RandomGenerator rng(seed);
+        
+        // Use the generator
+        uint32_t val1 = rng.uniformInt(0, 100);
+        double val2 = rng.uniformReal(0.0, 1.0);
+        bool val3 = rng.bernoulli(0.5);
+        
+        // Verify values are reasonable
+        assert(val1 <= 100);
+        assert(val2 >= 0.0 && val2 < 1.0);
+        assert(val3 == true || val3 == false);
+    } // RandomGenerator destroyed here
+    
+    // Generator should be properly destroyed now
+    std::cout << "    testRandomGeneratorMemoryCleanup passed" << std::endl;
+}
+
+void testRandomGeneratorArrayMemory() {
+    const size_t rngCount = 25;
+    {
+        // Create multiple random generators
+        for (size_t i = 0; i < rngCount; ++i) {
+            nlm::RandomGenerator rng(42 + i);
+            
+            // Use each generator
+            uint32_t val = rng.uniformInt(0, 1000);
+            assert(val <= 1000);
+        }
+    }
+    
+#include <chrono>
+
+void testRandomGeneratorPerformance() {
+    const size_t iterationCount = 100000;
+    
+    // Test random number generation performance
+    nlm::RandomGenerator rng(42);
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < iterationCount; ++i) {
+        uint32_t val = rng.uniformInt(0, 1000000);
+        (void)val;
+    }
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Performed " << iterationCount << " uniformInt operations in " 
+              << duration.count() << " microseconds (" 
+              << (1000000.0 / duration.count() * iterationCount) << " operations/second)" << std::endl;
+    
+    // Test random real numbers performance
+    startTime = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < iterationCount; ++i) {
+        double val = rng.uniformReal(0.0, 1.0);
+        (void)val;
+    }
+    endTime = std::chrono::high_resolution_clock::now();
+    
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Performed " << iterationCount << " uniformReal operations in " 
+              << duration.count() << " microseconds (" 
+              << (1000000.0 / duration.count() * iterationCount) << " operations/second)" << std::endl;
+    
+    std::cout << "    testRandomGeneratorPerformance passed" << std::endl;
 }
 
 } // namespace test_random

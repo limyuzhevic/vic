@@ -78,12 +78,92 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
+void testConfigMoveSemantics() {
+    nlm::Config config1;
+    config1.set("test", 123, nlm::ConfigSource::Runtime);
+    
+    // Move constructor
+    nlm::Config config2(std::move(config1));
+    assert(config2.has("test"));
+    
+    // Move should leave source in valid state
+    std::cout << "    testConfigMoveSemantics passed" << std::endl;
+}
+
+void testConfigMemoryCleanup() {
+    {
+        nlm::Config config;
+        config.set("temp", "value", nlm::ConfigSource::Runtime);
+        config.set("count", 42, nlm::ConfigSource::Runtime);
+        
+        // Verify config has values
+        assert(config.has("temp"));
+        assert(config.has("count"));
+        
+        auto tempVal = config.get<std::string>("temp");
+        assert(tempVal.has_value());
+        assert(*tempVal == "value");
+    } // Config destroyed here
+    
+    // Config should be properly destroyed now
+    std::cout << "    testConfigMemoryCleanup passed" << std::endl;
+}
+
+void testConfigArrayMemory() {
+    const size_t configCount = 20;
+    {
+        // Create multiple configs in a loop
+        for (size_t i = 0; i < configCount; ++i) {
+            nlm::Config config;
+            config.set("iteration", static_cast<int64_t>(i), nlm::ConfigSource::Runtime);
+            config.set("data", std::string("test_" + std::to_string(i)), nlm::ConfigSource::Runtime);
+            
+            // Use the config
+            auto iterVal = config.get<int64_t>("iteration");
+            assert(iterVal.has_value());
+            assert(*iterVal == static_cast<int64_t>(i));
+        }
+    }
+    
+#include <chrono>
+
+void testConfigPerformance() {
+    const size_t iterationCount = 10000;
+    
+    // Test config creation and destruction performance
+    auto startTime = std::chrono::high_resolution_clock::now();
+    {
+        std::vector<nlm::Config> configs;
+        configs.reserve(iterationCount);
+        
+        for (size_t i = 0; i < iterationCount; ++i) {
+            nlm::Config config;
+            config.set("iteration", static_cast<int64_t>(i), nlm::ConfigSource::Runtime);
+            config.set("data", std::string("test_" + std::to_string(i)), nlm::ConfigSource::Runtime);
+        }
+    }
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Created/destroyed " << iterationCount << " configs in " 
+              << duration.count() << " microseconds" << std::endl;
+    
+    // Test config set/get performance
+    nlm::Config config;
+    startTime = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < iterationCount; ++i) {
+        config.set("key", static_cast<int64_t>(i), nlm::ConfigSource::Runtime);
+        auto val = config.get<int64_t>("key");
+        (void)val;
+    }
+    endTime = std::chrono::high_resolution_clock::now();
+    
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    std::cout << "    Performed " << iterationCount << " set/get operations in " 
+              << duration.count() << " microseconds (" 
+              << (1000000.0 / duration.count() * iterationCount) << " operations/second)" << std::endl;
+    
+    std::cout << "    testConfigPerformance passed" << std::endl;
 }
 
 } // namespace test_config

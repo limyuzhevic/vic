@@ -199,17 +199,194 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Validation implementation
+bool Config::validate(std::string& errorMessage) const {
+    std::vector<std::string> errors;
+    
+    // Validate known parameters
+    if (has("neuron_count")) {
+        auto val = get<int64_t>("neuron_count");
+        if (!validateNeuronCount(val.value(), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto val = get<double>("connection_probability");
+        if (!validateConnectionProbability(static_cast<float>(val.value()), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto val = get<double>("simulation_timestep");
+        if (!validateTimestep(val.value(), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("random_seed")) {
+        auto val = get<int64_t>("random_seed");
+        // Random seed validation - should be reasonable range
+        if (val.value() < 0 || val.value() > 2000000000) {
+            errorMessage = "Random seed must be between 0 and 2,000,000,000";
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("stdp_ltp_weight")) {
+        auto val = get<double>("stdp_ltp_weight");
+        if (!validateWeight(static_cast<float>(val.value()), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("stdp_ltd_weight")) {
+        auto val = get<double>("stdp_ltd_weight");
+        if (!validateWeight(static_cast<float>(val.value()), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("stdp_time_constant")) {
+        auto val = get<double>("stdp_time_constant");
+        if (!validateTimestep(val.value(), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("synaptogenesis_rate")) {
+        auto val = get<double>("synaptogenesis_rate");
+        if (!validateRate(static_cast<float>(val.value()), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    if (has("pruning_rate")) {
+        auto val = get<double>("pruning_rate");
+        if (!validateRate(static_cast<float>(val.value()), errorMessage)) {
+            errors.push_back(errorMessage);
+        }
+    }
+    
+    // If we have any errors, construct the combined message
+    if (!errors.empty()) {
+        errorMessage = "Configuration validation failed:\n";
+        for (const auto& err : errors) {
+            errorMessage += "  - " + err + "\n";
+        }
+        return false;
+    }
+    
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    std::string errorMessage;
+    
+    if (!validate(errorMessage)) {
+        // Parse errorMessage to extract individual errors
+        // For now, just add the full error message as one error
+        errors.push_back(errorMessage);
+    }
+    
+    return errors;
+}
 
-} // namespace nlm
+bool Config::isValid(const std::string& key) const {
+    if (!has(key)) {
+        return true; // Non-existent keys are considered valid
+    }
+    
+    std::string errorMessage;
+    
+    // Type-specific validation
+    auto val = get<std::string>(key);
+    if (val.has_value()) {
+        return validateString(val.value(), errorMessage);
+    }
+    
+    auto valInt = get<int64_t>(key);
+    if (valInt.has_value()) {
+        if (key == "neuron_count") {
+            return validateNeuronCount(valInt.value(), errorMessage);
+        }
+    }
+    
+    auto valDouble = get<double>(key);
+    if (valDouble.has_value()) {
+        if (key == "connection_probability") {
+            return validateConnectionProbability(static_cast<float>(valDouble.value()), errorMessage);
+        } else if (key == "simulation_timestep") {
+            return validateTimestep(valDouble.value(), errorMessage);
+        } else if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || 
+                   key == "synaptogenesis_rate" || key == "pruning_rate") {
+            return validateRate(static_cast<float>(valDouble.value()), errorMessage);
+        } else if (key == "stdp_time_constant") {
+            return validateTimestep(valDouble.value(), errorMessage);
+        }
+    }
+    
+    return true; // Default for unknown parameter types
+}
+
+// Static validation implementations
+bool Config::validateNeuronCount(int64_t count, std::string& errorMessage) {
+    if (count <= 0) {
+        errorMessage = "Neuron count must be positive, got " + std::to_string(count);
+        return false;
+    }
+    if (count > 100000) {
+        errorMessage = "Neuron count seems too large: " + std::to_string(count);
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateConnectionProbability(float probability, std::string& errorMessage) {
+    if (probability < 0.0f || probability > 1.0f) {
+        errorMessage = "Connection probability must be between 0.0 and 1.0, got " + std::to_string(probability);
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateTimestep(double timestep, std::string& errorMessage) {
+    if (timestep <= 0.0) {
+        errorMessage = "Simulation timestep must be positive, got " + std::to_string(timestep);
+        return false;
+    }
+    if (timestep > 1.0) {
+        errorMessage = "Simulation timestep seems too large: " + std::to_string(timestep) + "s";
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateWeight(float weight, std::string& errorMessage) {
+    if (weight < -10.0f || weight > 10.0f) {
+        errorMessage = "Weight value seems unreasonable: " + std::to_string(weight);
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateRate(float rate, std::string& errorMessage) {
+    if (rate < 0.0f || rate > 1.0f) {
+        errorMessage = "Rate must be between 0.0 and 1.0, got " + std::to_string(rate);
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateString(const std::string& value, std::string& errorMessage) {
+    if (value.empty()) {
+        return true; // Empty strings are valid for some settings
+    }
+    if (value.length() > 100) {
+        errorMessage = "String value too long (max 100 characters): " + value.substr(0, 50) + "...";
+        return false;
+    }
+    return true;
+}

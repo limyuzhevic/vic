@@ -1,0 +1,60 @@
+# Build directories
+build/
+build_*
+CMakeFiles/
+
+# Executable and library files
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+
+# Log files
+*.log
+
+# Temporary files
+*~
+*.swp
+
+# IDE files
+.idea/
+.vscode/
+*.vscode
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Python virtual environments
+.venv
+env/
+venv/
+
+# Configuration files
+*.cfg
+*.ini
+*.json
+*.xml
+
+# Documentation
+*.pdf
+*.dvi
+*.aux
+
+# Compiled Python modules
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
