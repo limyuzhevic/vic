@@ -98,8 +98,8 @@ public:
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
-    // Get global logger instance
-    static Logger& getGlobal();
+    // Global logger access
+    static Logger& getInstance();
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);

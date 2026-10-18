@@ -2,8 +2,26 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
+
+// Validation constants
+namespace {
+    constexpr float MIN_MEMBRANE_POTENTIAL = -100.0f;
+    constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;
+    constexpr float MIN_RESTING_POTENTIAL = -90.0f;
+    constexpr float MAX_RESTING_POTENTIAL = -50.0f;
+    constexpr float MIN_THRESHOLD = -60.0f;
+    constexpr float MAX_THRESHOLD = -40.0f;
+    constexpr float MIN_RESET_POTENTIAL = -80.0f;
+    constexpr float MAX_RESET_POTENTIAL = -60.0f;
+    constexpr float MIN_LEAK_CONDUCTANCE = 1.0f;
+    constexpr float MAX_LEAK_CONDUCTANCE = 100.0f;
+    constexpr uint32_t MIN_REFECTORY_PERIOD = 1;
+    constexpr uint32_t MAX_REFECTORY_PERIOD = 100;
+    constexpr size_t MAX_SPIKE_HISTORY_SIZE = 1000;
+}
 
 struct Neuron::Impl {
     NeuronId id;
@@ -18,21 +36,101 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters with validation ranges
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Validation ranges
+    static constexpr float MIN_MEMBRANE_POTENTIAL = -100.0f;
+    static constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;
+    static constexpr float MIN_RESTING_POTENTIAL = -90.0f;
+    static constexpr float MAX_RESTING_POTENTIAL = -50.0f;
+    static constexpr float MIN_THRESHOLD = -60.0f;
+    static constexpr float MAX_THRESHOLD = -40.0f;
+    static constexpr float MIN_RESET_POTENTIAL = -80.0f;
+    static constexpr float MAX_RESET_POTENTIAL = -60.0f;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Validate initial state
+        validateNeuronState();
+    }
+    
+    void validateNeuronState() {
+        // Validate membrane potential
+        if (state.membranePotential < MIN_MEMBRANE_POTENTIAL || 
+            state.membranePotential > MAX_MEMBRANE_POTENTIAL) {
+            state.membranePotential = std::clamp(state.membranePotential, 
+                                               MIN_MEMBRANE_POTENTIAL, MAX_MEMBRANE_POTENTIAL);
+        }
+        
+        // Validate resting potential
+        if (state.restingPotential < MIN_RESTING_POTENTIAL || 
+            state.restingPotential > MAX_RESTING_POTENTIAL) {
+            state.restingPotential = std::clamp(state.restingPotential, 
+                                               MIN_RESTING_POTENTIAL, MAX_RESTING_POTENTIAL);
+        }
+        
+        // Validate threshold
+        if (state.threshold < MIN_THRESHOLD || state.threshold > MAX_THRESHOLD) {
+            state.threshold = std::clamp(state.threshold, MIN_THRESHOLD, MAX_THRESHOLD);
+        }
+        
+        // Validate reset potential
+        if (state.resetPotential < MIN_RESET_POTENTIAL || 
+            state.resetPotential > MAX_RESET_POTENTIAL) {
+            state.resetPotential = std::clamp(state.resetPotential, 
+                                             MIN_RESET_POTENTIAL, MAX_RESET_POTENTIAL);
+        }
+        
+        // Validate leak conductance
+        if (state.leakConductance < MIN_LEAK_CONDUCTANCE || 
+            state.leakConductance > MAX_LEAK_CONDUCTANCE) {
+            state.leakConductance = std::clamp(state.leakConductance, 
+                                              MIN_LEAK_CONDUCTANCE, MAX_LEAK_CONDUCTANCE);
+        }
+        
+        // Validate refractory period
+        if (state.refractoryPeriod < MIN_REFECTORY_PERIOD || 
+            state.refractoryPeriod > MAX_REFECTORY_PERIOD) {
+            state.refractoryPeriod = std::clamp(state.refractoryPeriod, 
+                                               MIN_REFECTORY_PERIOD, MAX_REFECTORY_PERIOD);
+        }
+        
+        // Ensure threshold is above resting potential (physiological constraint)
+        if (state.threshold <= state.restingPotential) {
+            state.threshold = state.restingPotential + 10.0f;  // 10mV above resting
+        }
+        
+        // Ensure reset potential is between resting and threshold
+        if (state.resetPotential < state.restingPotential || 
+            state.resetPotential > state.threshold) {
+            state.resetPotential = state.restingPotential + 
+                                 (state.threshold - state.restingPotential) * 0.5f;  // midpoint
+        }
+    }
+    
+    void clampMembranePotential() {
+        // Clamp membrane potential to biologically plausible range
+        state.membranePotential = std::clamp(state.membranePotential, 
+                                           MIN_MEMBRANE_POTENTIAL, MAX_MEMBRANE_POTENTIAL);
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    if (id.value == 0) {
+        throw std::invalid_argument("Neuron ID cannot be zero");
+    }
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Validate initial state
+    pImpl->validateNeuronState();
 }
 
 Neuron::~Neuron() = default;
@@ -55,14 +153,28 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    if (potential < Impl::MIN_MEMBRANE_POTENTIAL || potential > Impl::MAX_MEMBRANE_POTENTIAL) {
+        throw std::out_of_range("Membrane potential out of valid range");
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+    float newPotential = pImpl->state.membranePotential + delta;
+    if (newPotential < Impl::MIN_MEMBRANE_POTENTIAL || newPotential > Impl::MAX_MEMBRANE_POTENTIAL) {
+        // Clamp to valid range instead of throwing exception for numerical stability
+        pImpl->state.membranePotential = std::clamp(newPotential, 
+                                                  Impl::MIN_MEMBRANE_POTENTIAL, 
+                                                  Impl::MAX_MEMBRANE_POTENTIAL);
+    } else {
+        pImpl->state.membranePotential = newPotential;
+    }
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    if (threshold < Impl::MIN_THRESHOLD || threshold > Impl::MAX_THRESHOLD) {
+        throw std::out_of_range("Threshold out of valid range");
+    }
     pImpl->state.threshold = threshold;
 }
 
@@ -84,6 +196,9 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    if (conductance < Impl::MIN_LEAK_CONDUCTANCE || conductance > Impl::MAX_LEAK_CONDUCTANCE) {
+        throw std::out_of_range("Leak conductance out of valid range");
+    }
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,6 +207,9 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    if (steps < MIN_REFECTORY_PERIOD || steps > MAX_REFECTORY_PERIOD) {
+        throw std::out_of_range("Refractory period out of valid range");
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +218,9 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    if (potential < Impl::MIN_RESTING_POTENTIAL || potential > Impl::MAX_RESTING_POTENTIAL) {
+        throw std::out_of_range("Resting potential out of valid range");
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +229,9 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    if (potential < Impl::MIN_RESET_POTENTIAL || potential > Impl::MAX_RESET_POTENTIAL) {
+        throw std::out_of_range("Reset potential out of valid range");
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -148,10 +272,11 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Prevent spike history overflow
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->spikeHistory.push_back(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
@@ -191,6 +316,11 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep
+    if (dt <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -229,7 +359,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    pImpl->clampMembranePotential();
     
     // Check for spike
     if (V >= threshold) {
@@ -269,6 +399,9 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Validate state after reset
+    pImpl->validateNeuronState();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -287,6 +420,9 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Ensure all parameters are valid
+    pImpl->validateNeuronState();
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
