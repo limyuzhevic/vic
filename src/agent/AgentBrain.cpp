@@ -347,4 +347,20 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+void AgentBrain::enableAllSystems() {
+    rewardModulationEnabled_ = true;
+    structuralPlasticityEnabled_ = true;
+    developmentEnabled_ = true;
+    curiosityEnabled_ = true;
+    
+    NLM_LOG_INFO("All adaptive systems enabled: reward, plasticity, development, curiosity");
+}
+
+void AgentBrain::disableAllSystems() {
+    rewardModulationEnabled_ = false;
+    structuralPlasticityEnabled_ = false;
+    developmentEnabled_ = false;
+    curiosityEnabled_ = false;
+    
+    NLM_LOG_INFO("All adaptive systems disabled");
+}
