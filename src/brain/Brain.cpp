@@ -1,3 +1,9 @@
+// NLM (熙然) - Neural Learning Machine
+// Phase 6: Final Integration
+//
+// This is the main implementation file for the NLM brain.
+// It contains the Brain class implementation with all integrated systems.
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
@@ -19,6 +25,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <numeric>
 
 namespace nlm {
 
@@ -46,6 +53,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +136,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -215,8 +228,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -258,7 +271,12 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
-    
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
+
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
@@ -897,7 +915,6 @@ bool Brain::load(const std::string& filepath) {
         
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1003,8 +1020,6 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1017,13 +1032,9 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
@@ -1037,8 +1048,6 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
@@ -1051,18 +1060,20 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
-
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
@@ -1100,6 +1111,15 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
     }
     
     // Development status
