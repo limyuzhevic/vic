@@ -69,6 +69,22 @@ set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
+# Python bindings source files
+set(PYNLM_BINDINGS_SOURCES
+    bindings_main.cpp
+    bindings_ids.cpp
+    bindings_enums.cpp
+    bindings_config.cpp
+    bindings_sensory.cpp
+    bindings_action.cpp
+    bindings_agent.cpp
+    bindings_world.cpp
+    bindings_brain.cpp
+    bindings_agentbrain.cpp
+    bindings_factory.cpp
+    bindings_pythonic.cpp
+)
+
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
@@ -87,9 +103,10 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+pybind11_add_module(pynlm bindings_main.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_sources(pynlm PRIVATE ${PYNLM_BINDINGS_SOURCES})
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
