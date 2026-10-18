@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "PlasticityRule.hpp"
 
 namespace nlm {

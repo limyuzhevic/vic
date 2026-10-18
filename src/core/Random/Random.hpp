@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
+#include <algorithm>
 
 namespace nlm {
 
@@ -35,6 +37,8 @@ public:
     
     // Random number generation
     // Uniform integer in [min, max]
+    uint32_t uniformInt(int min, int max);
+    uint64_t uniformInt(long min, long max);
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
     
@@ -80,8 +84,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
@@ -92,6 +96,18 @@ private:
 };
 
 // Template implementations
+uint32_t RandomGenerator::uniformInt(int min, int max) {
+    if (min >= max) return static_cast<uint32_t>(min);
+    uint64_t range = static_cast<uint64_t>(max) - static_cast<uint64_t>(min);
+    return static_cast<uint32_t>(uniformInt(static_cast<uint64_t>(min), static_cast<uint64_t>(min) + range));
+}
+
+uint64_t RandomGenerator::uniformInt(long min, long max) {
+    if (min >= max) return static_cast<uint64_t>(min);
+    uint64_t range = static_cast<uint64_t>(max) - static_cast<uint64_t>(min);
+    return uniformInt(static_cast<uint64_t>(min), static_cast<uint64_t>(min) + range);
+}
+
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());
