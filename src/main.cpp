@@ -7,10 +7,11 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
+#include "Brain.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -30,21 +31,21 @@ using namespace nlm;
 
 void printBanner() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                                                              ║
+    ║     NLM — 熙然                                              ║
+    ║     Neural Learning Machine                                 ║
+    ║                                                              ║
     ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
+    ║                                                              ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ║                                                              ║
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -301,8 +302,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)

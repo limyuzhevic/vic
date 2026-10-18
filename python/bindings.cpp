@@ -16,6 +16,41 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Memory system
+#include "../src/memory/Memory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+
+// Prediction system
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+
+// Cognition systems
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+
+// Neuromodulation systems
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+
+// Development system
+#include "../src/development/DevelopmentSystem.hpp"
+
+// Plasticity systems
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+
+// Dynamics systems
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
+
+// Performance
+#include "../src/performance/CheckpointSystem.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -420,6 +455,173 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Memory system bindings
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system for active neural traces)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store a neural trace in working memory")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve a neural trace from working memory")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if working memory contains a neuron")
+        .def("clear", &WorkingMemory::clear, "Clear all working memory traces")
+        .def("getCapacity", &WorkingMemory::getCapacity, "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize, "Get current number of traces")
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"),
+             "Apply decay to all traces");
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system for experience episodes)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve an episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("clear", &EpisodicMemory::clear, "Clear all episodes")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("threshold"),
+             "Consolidate important memories");
+
+    // Prediction system bindings
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for forward models)pbdoc")
+        .def(py::init<>())
+        .def("update", &PredictionSystem::update, py::arg("timestep"),
+             "Update prediction system")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error signal");
+
+    // Cognition system bindings
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planning system for action selection)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"),
+             "Initialize planner with brain reference")
+        .def("update", &NeuralPlanner::update, py::arg("timestep"),
+             "Update planner")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"),
+             "Set planning depth")
+        .def("getAction", &NeuralPlanner::getAction,
+             "Get planned action");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation system from neural patterns)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"),
+             "Initialize concept formation with brain reference")
+        .def("update", &ConceptFormation::update, py::arg("timestep"),
+             "Update concept formation")
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("index"),
+             "Get a concept by index")
+        .def("getConceptCount", &ConceptFormation::getConceptCount,
+             "Get number of concepts");
+
+    // Development system bindings
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system for neural maturation)pbdoc")
+        .def(py::init<>())
+        .def("getStage", &DevelopmentSystem::getStage,
+             "Get current developmental stage")
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("advanceStage", &DevelopmentSystem::advanceStage,
+             "Advance to next developmental stage")
+        .def("getStageName", &DevelopmentSystem::getStageName,
+             "Get stage name as string")
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier,
+             "Get plasticity modifier for current stage")
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge,
+             "Get developmental age (in simulation time)")
+        .def("update", &DevelopmentSystem::update, py::arg("brain"), py::arg("timestep"),
+             "Update development system")
+        .def("update", static_cast<bool (DevelopmentSystem::*)(Brain*, RandomGenerator&, TimestepDuration)>(&DevelopmentSystem::update), 
+             py::arg("brain"), py::arg("rng"), py::arg("dt"));
+
+    // Plasticity system bindings
+    py::class_<STDP>(m, "STDP", R"pbdoc(Spike-Timing Dependent Plasticity)pbdoc")
+        .def(py::init<>())
+        .def("update", &STDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("timestep"),
+             "Apply STDP learning")
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"),
+             "Configure STDP parameters")
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"),
+             "Set LTP weight")
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"),
+             "Set LTD weight");
+
+    py::class_<Hebbian>(m, "Hebbian", R"pbdoc(Hebbian learning rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("timestep"),
+             "Apply Hebbian learning");
+
+    py::class_<StructuralPlasticity>(m, "StructuralPlasticity", R"pbdoc(Structural plasticity for synapse formation)pbdoc")
+        .def(py::init<>())
+        .def("update", &StructuralPlasticity::update, py::arg("brain"), py::arg("rng"),
+             "Apply structural plasticity")
+        .def("setSynaptogenesisRate", &StructuralPlasticity::setSynaptogenesisRate, py::arg("rate"),
+             "Set synaptogenesis rate")
+        .def("setPruningRate", &StructuralPlasticity::setPruningRate, py::arg("rate"),
+             "Set pruning rate");
+
+    // Neuromodulation system bindings
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Base neuromodulator class)pbdoc")
+        .def(py::init<>())
+        .def("update", &Neuromodulator::update, py::arg("timestep"),
+             "Update neuromodulator")
+        .def("getLevel", &Neuromodulator::getLevel,
+             "Get neuromodulator level")
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor,
+             "Get plasticity factor");
+
+    // Spike system bindings
+    py::class_<SpikeSystem>(m, "SpikeSystem", R"pbdoc(Neural spike system with event-driven processing)pbdoc")
+        .def(py::init<>())
+        .def("registerHandler", &SpikeSystem::registerHandler,
+             "Register spike event handler")
+        .def("registerDelayedHandler", &SpikeSystem::registerDelayedHandler,
+             "Register delayed spike event handler")
+        .def("queueSpike", &SpikeSystem::queueSpike, py::arg("event"),
+             "Queue immediate spike")
+        .def("queueDelayedSpike", &SpikeSystem::queueDelayedSpike, py::arg("event"),
+             "Queue delayed spike")
+        .def("processSpikes", &SpikeSystem::processSpikes, py::arg("currentStep"),
+             "Process immediate spikes")
+        .def("processDelayedSpikes", &SpikeSystem::processDelayedSpikes, py::arg("currentStep"), py::arg("currentTime"),
+             "Process delayed spikes")
+        .def("getPendingSpikeCount", &SpikeSystem::getPendingSpikeCount,
+             "Get count of pending spike events")
+        .def("getPendingDelayedCount", &SpikeSystem::getPendingDelayedCount,
+             "Get count of pending delayed spike events")
+        .def("reset", &SpikeSystem::reset, "Reset spike system");
+
+    // Factory functions for integrated systems
+    m.def("createWorkingMemory", []() { return std::make_shared<WorkingMemory>(); },
+          "Create a working memory system");
+    m.def("createEpisodicMemory", []() { return std::make_shared<EpisodicMemory>(); },
+          "Create an episodic memory system");
+    m.def("createPredictionSystem", []() { return std::make_shared<PredictionSystem>(); },
+          "Create a prediction system");
+    m.def("createNeuralPlanner", []() { return std::make_shared<NeuralPlanner>(); },
+          "Create a neural planner");
+    m.def("createConceptFormation", []() { return std::make_shared<ConceptFormation>(); },
+          "Create a concept formation system");
+    m.def("createDevelopmentSystem", []() { return std::make_shared<DevelopmentSystem>(); },
+          "Create a development system");
+    m.def("createSTDP", []() { return std::make_shared<STDP>(); },
+          "Create an STDP plasticity system");
+    m.def("createHebbian", []() { return std::make_shared<Hebbian>(); },
+          "Create a Hebbian plasticity system");
+    m.def("createStructuralPlasticity", []() { return std::make_shared<StructuralPlasticity>(); },
+          "Create a structural plasticity system");
+    m.def("createDopamine", []() { return std::make_shared<Dopamine>(); },
+          "Create a dopamine neuromodulator");
+    m.def("createCuriosity", []() { return std::make_shared<Curiosity>(); },
+          "Create a curiosity neuromodulator");
+    m.def("createNovelty", []() { return std::make_shared<Novelty>(); },
+          "Create a novelty neuromodulator");
+    m.def("createPredictionError", []() { return std::make_shared<PredictionError>(); },
+          "Create a prediction error neuromodulator");
+    m.def("createSpikeSystem", []() { return std::make_shared<SpikeSystem>(); },
+          "Create a spike system");
 }
 
 } // namespace nlm

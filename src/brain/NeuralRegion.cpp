@@ -297,6 +297,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
+    result.reserve(pImpl->populations.size() * 10); // Pre-allocate for performance
     for (auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
@@ -306,11 +307,49 @@ std::vector<Neuron*> NeuralRegion::getAllNeurons() {
 
 std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
+    result.reserve(pImpl->populations.size() * 10); // Pre-allocate for performance
     for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }
     return result;
+}
+
+// Optimized lookup for specific neuron type
+Neuron* NeuralRegion::getFirstNeuronByType(NeuronType type) {
+    for (auto& pop : pImpl->populations) {
+        if (pop->getNeuronType() == type) {
+            auto neurons = pop->getNeurons();
+            if (!neurons.empty()) {
+                return neurons[0];
+            }
+        }
+    }
+    return nullptr;
+}
+
+// Optimized lookup for neuron by ID
+Neuron* NeuralRegion::getNeuronById(NeuronId id) {
+    for (auto& pop : pImpl->populations) {
+        auto neurons = pop->getNeurons();
+        for (auto* neuron : neurons) {
+            if (neuron->getId() == id) {
+                return neuron;
+            }
+        }
+    }
+    return nullptr;
+}
+
+// Get count of neurons by type
+size_t NeuralRegion::getNeuronCountByType(NeuronType type) const {
+    size_t count = 0;
+    for (const auto& pop : pImpl->populations) {
+        if (pop->getNeuronType() == type) {
+            count += pop->getNeuronCount();
+        }
+    }
+    return count;
 }
 
 } // namespace nlm

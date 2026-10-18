@@ -1,28 +1,153 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
+// Include performance optimization headers
+#include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
-#include <cmath>
-#include <sstream>
 
 namespace nlm {
 
-struct Brain::Impl {
+// Optimized indexed lookup methods for Brain class
+// These methods use indexed data structures for O(1) lookup performance
+
+// Find neuron by ID using indexed lookup
+Neuron* Brain::getNeuronById(NeuronId id) {
+    // Use indexed neuron lookup if available
+    auto it = pImpl->neuronIndex.find(id);
+    if (it != pImpl->neuronIndex.end()) {
+        return it->second;
+    }
+    
+    // Fallback to linear search for backward compatibility
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (auto* neuron : neurons) {
+            if (neuron->getId() == id) {
+                return neuron;
+            }
+        }
+    }
+    return nullptr;
+}
+
+// Inject current into neuron using indexed lookup
+void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Use indexed lookup for O(1) performance
+    auto it = pImpl->neuronIndex.find(neuron);
+    if (it != pImpl->neuronIndex.end()) {
+        it->second->injectCurrent(current);
+        return;
+    }
+    
+    // Fallback to original implementation for backward compatibility
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (auto* n : neurons) {
+            if (n->getId() == neuron) {
+                n->injectCurrent(current);
+                return;
+            }
+        }
+    }
+}
+
+// Inject current to all neurons of a specific type using indexed lookup
+void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Use indexed neurons by type for O(1) lookup
+    auto typeIt = pImpl->neuronsByType.find(type);
+    if (typeIt != pImpl->neuronsByType.end()) {
+        for (auto* neuron : typeIt->second) {
+            neuron->injectCurrent(current);
+        }
+        return;
+    }
+    
+    // Fallback to original implementation for backward compatibility
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->injectCurrent(current);
+                }
+            }
+        }
+    }
+}
+
+// Get neuron count by type using indexed lookup
+size_t Brain::getNeuronCountByType(NeuronType type) const {
+    // Use indexed neurons by type for O(1) lookup
+    auto typeIt = pImpl->neuronsByType.find(type);
+    if (typeIt != pImpl->neuronsByType.end()) {
+        return typeIt->second.size();
+    }
+    
+    // Fallback to original calculation
+    size_t count = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                count += pop->getNeuronCount();
+            }
+        }
+    }
+    return count;
+}
+
+// Get first neuron of specific type using indexed lookup
+Neuron* Brain::getFirstNeuronByType(NeuronType type) {
+    // Use indexed neurons by type for O(1) lookup
+    auto typeIt = pImpl->neuronsByType.find(type);
+    if (typeIt != pImpl->neuronsByType.end() && !typeIt->second.empty()) {
+        return typeIt->second[0];
+    }
+    
+    // Fallback to original search
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                auto neurons = pop->getNeurons();
+                if (!neurons.empty()) {
+                    return neurons[0];
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+// Update indexed data structures
+void Brain::updateNeuronIndexes() {
+    // Clear existing indexes
+    pImpl->neuronIndex.clear();
+    pImpl->neuronsByType.clear();
+    
+    // Rebuild indexes for all neurons
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (auto* neuron : neurons) {
+            // Index by ID for O(1) lookup
+            pImpl->neuronIndex[neuron->getId()] = neuron;
+            
+            // Index by type for O(1) type-based lookup
+            pImpl->neuronsByType[neuron->getType()].push_back(neuron);
+        }
+    }
+}
+
+// Get neuron index count
+size_t Brain::getNeuronIndexCount() const {
+    return pImpl->neuronIndex.size();
+}
+
+// Get neurons by type count
+size_t Brain::getNeuronsByTypeCount(NeuronType type) const {
+    auto it = pImpl->neuronsByType.find(type);
+    if (it != pImpl->neuronsByType.end()) {
+        return it->second.size();
+    }
+    return 0;
+}
+
+} // namespace nlm
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
