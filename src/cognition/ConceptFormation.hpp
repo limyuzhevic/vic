@@ -58,19 +58,29 @@ struct DiscoveredConcept {
     // Average stability of instances
     float avgStability;
     
+    // Concept activation level (current relevance)
+    float activationLevel;
+    
+    // Last time concept was activated
+    SimulationStep lastActivationTime;
+    
+    // How many times recently activated (for temporal attention)
+    size_t recentActivationCount;
+    
     DiscoveredConcept() 
-        : id(0), totalObservations(0), avgStability(0) {}
+        : id(0), totalObservations(0), avgStability(0), activationLevel(0.0f), 
+          lastActivationTime(0), recentActivationCount(0) {}
 };
 
-// ConceptFormation: Discovers recurring patterns from experience
-// NOT a predefined taxonomy - concepts emerge through repeated experience
-//
-// Key mechanisms:
-// - Pattern clustering through similarity
-// - Prototype formation through averaging
-// - Instance tracking for stability measurement
-// - Category discovery based on shared properties
-// - No predefined labels or semantic categories
+struct Cluster {
+    size_t centerConceptId;
+    std::vector<size_t> conceptIds;
+    std::vector<float> centerPrototype;
+    float radius;
+    
+    Cluster()
+        : centerConceptId(0), radius(0.0f) {}
+};
 
 class ConceptFormation {
 public:
@@ -134,9 +144,19 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
+    // Get concept activation level
+    float getConceptActivation(size_t conceptId) const;
+
+    // Get concept cluster assignment
+    size_t getConceptCluster(size_t conceptId) const;
+
+    // Get all clusters
+    const std::vector<Cluster>& getClusters() const { return clusters_; }
+
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    void setMaxClusters(size_t m) { maxClusters_ = m; }
 
 private:
     // Create new concept from pattern
@@ -150,122 +170,42 @@ private:
     // Check if concept is stable enough to be considered "discovered"
     bool isConceptStable(size_t conceptId) const;
 
+    // Perform concept clustering
+    void clusterConcepts();
+
+    // Update concept activation based on recent exposure
+    void updateConceptActivation(size_t conceptId, SimulationStep currentTime);
+
+    // Retrieve concept from episodic memory
+    size_t retrieveConceptFromEpisodicMemory(const std::vector<float>& pattern) const;
+
+    // Generalize concept from episodic memory patterns
+    void generalizeConceptFromEpisodicMemory(const std::vector<const EpisodicMemoryItem*>& episodes);
+
+    // Integrate concept with NeuralPlanner
+    void integrateWithNeuralPlanner(size_t conceptId);
+
+    // Link concept to PredictionSystem
+    void linkToPredictionSystem(size_t conceptId);
+
+    // Connect concept to WorkingMemory
+    void connectToWorkingMemory(size_t conceptId);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
+    std::vector<Cluster> clusters_;
+    std::vector<size_t> clusterAssignments_;
+    std::vector<std::vector<float>> conceptCenters_;
     size_t nextConceptId_;
-    
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
-};
-
-// SpatialRepresentation: Learns spatial relationships from experience
-// NOT a map with coordinates - encodes spatial relationships in neural patterns
-//
-// Key mechanisms:
-// - Place neurons form through spatial exploration
-// - Spatial relationships encoded in synaptic connectivity
-// - Path integration through dead reckoning
-// - Landmark associations
-
-class SpatialRepresentation {
-public:
-    SpatialRepresentation();
-    ~SpatialRepresentation();
-
-    void initialize(Brain* brain);
-
-    // Record current position experience
-    void recordPosition(float x, float y, const std::vector<float>& sensoryCues);
-
-    // Get predicted position based on path integration
-    std::pair<float, float> getPredictedPosition() const;
-
-    // Update position estimate based on movement
-    void integrateMovement(float dx, float dy);
-
-    // Get position neuron activation for a given position
-    float getPositionActivation(float x, float y) const;
-
-    // Find place neurons near a position
-    std::vector<NeuronId> getPlaceNeuronsNear(float x, float y, float radius) const;
-
-    // Get grid spacing (if grid cells have formed)
-    float getGridSpacing() const { return gridSpacing_; }
-
-    // Clear spatial representations
-    void clear();
-
-    // Have place cells formed?
-    bool hasPlaceCells() const { return !placeCells_.empty(); }
-
-private:
-    struct PlaceCell {
-        NeuronId neuron;
-        float x;
-        float y;
-        float fieldRadius;
-        float activation;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<PlaceCell> placeCells_;
-    float currentX_;
-    float currentY_;
-    float gridSpacing_;
-    std::vector<float> lastSensoryCue_;
-};
-
-// TemporalRelation: Learns temporal relationships (before, after, sequence)
-// NOT symbolic timestamps - encodes temporal order in neural activity
-
-class TemporalRelation {
-public:
-    TemporalRelation();
-    ~TemporalRelation();
-
-    void initialize(Brain* brain);
-
-    // Record that event A was followed by event B
-    void recordSequence(const std::vector<float>& eventA,
-                      const std::vector<float>& eventB,
-                      float reward);
-
-    // Given event A, predict what comes next
-    std::vector<float> predictNext(const std::vector<float>& eventA) const;
-
-    // Given event B, predict what came before
-    std::vector<float> predictPrevious(const std::vector<float>& eventB) const;
-
-    // Get confidence in prediction
-    float getPredictionConfidence(const std::vector<float>& event) const;
-
-    // Get sequence length
-    size_t getSequenceLength() const { return sequences_.size(); }
-
-    // Clear sequences
-    void clear();
-
-private:
-    struct SequenceLink {
-        std::vector<float> fromEvent;
-        std::vector<float> toEvent;
-        float strength;
-        size_t observationCount;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<SequenceLink> sequences_;
+    size_t maxClusters_;        // Maximum number of clusters for organization
 };
 
 } // namespace nlm

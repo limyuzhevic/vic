@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <set>
+#include <unordered_map>
+#include <queue>
+#include <limits>
 
 namespace nlm {
 
@@ -19,7 +23,11 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , maxClusters_(10)
 {
+    // Initialize concept clustering structures
+    clusterAssignments_.clear();
+    conceptCenters_.clear();
 }
 
 ConceptFormation::~ConceptFormation() = default;
@@ -27,6 +35,18 @@ ConceptFormation::~ConceptFormation() = default;
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Initialize concept activation levels
+    for (auto& concept : concepts_) {
+        concept.activationLevel = 0.0f;
+        concept.lastActivationTime = 0;
+        concept.recentActivationCount = 0;
+    }
+    
+    // Initialize concept clustering structures
+    clusterAssignments_.clear();
+    conceptCenters_.clear();
+    
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -42,6 +62,7 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     if (matchingConcept > 0) {
         // Update existing concept
         updateConcept(matchingConcept, pattern, features, reward);
+        updateConceptActivation(matchingConcept, currentTime);
         return matchingConcept;
     }
     
@@ -58,12 +79,15 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
-                                       const std::vector<float>& features,
-                                       float reward) {
+                                     const std::vector<float>& features,
+                                     float reward) {
     DiscoveredConcept concept;
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
     concept.totalObservations = 1;
+    concept.activationLevel = 1.0f;
+    concept.lastActivationTime = 0;
+    concept.recentActivationCount = 1;
     
     ConceptInstance instance;
     instance.pattern = pattern;
@@ -94,7 +118,7 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
 }
 
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
+                                     const std::vector<float>& features, float reward) {
     DiscoveredConcept* concept = nullptr;
     for (auto& c : concepts_) {
         if (c.id == conceptId) {
@@ -156,8 +180,112 @@ void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float
     }
 }
 
+void ConceptFormation::updateConceptActivation(size_t conceptId, SimulationStep currentTime) {
+    DiscoveredConcept* concept = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            concept = &c;
+            break;
+        }
+    }
+    
+    if (!concept) return;
+    
+    // Increase activation
+    concept->activationLevel = std::min(1.0f, concept->activationLevel + 0.1f);
+    concept->lastActivationTime = currentTime;
+    concept->recentActivationCount++;
+    
+    // Apply decay if concept not recently activated
+    if (currentTime - concept->lastActivationTime > stabilityWindow_) {
+        concept->activationLevel *= 0.95f;
+    }
+}
+
+void ConceptFormation::clusterConcepts() {
+    clusters_.clear();
+    clusterAssignments_.assign(concepts_.size(), 0);
+    conceptCenters_.clear();
+    
+    if (concepts_.size() < 2 || maxClusters_ <= 1) {
+        // No clustering needed
+        for (size_t i = 0; i < concepts_.size(); ++i) {
+            clusterAssignments_[i] = 0;
+            conceptCenters_.push_back(concepts_[i].prototype);
+        }
+        return;
+    }
+    
+    // Simple k-means clustering based on concept similarity
+    size_t numClusters = std::min(maxClusters_, concepts_.size());
+    
+    // Initialize cluster centers randomly
+    std::vector<size_t> centerIndices;
+    std::vector<size_t> usedIndices;
+    
+    for (size_t i = 0; i < numClusters && i < concepts_.size(); ++i) {
+        size_t idx;
+        do {
+            idx = getRandomGenerator() ? getRandomGenerator()->uniformInt(0, concepts_.size() - 1) : 0;
+        } while (std::find(usedIndices.begin(), usedIndices.end(), idx) != usedIndices.end());
+        
+        usedIndices.push_back(idx);
+        centerIndices.push_back(idx);
+        
+        Cluster cluster;
+        cluster.centerConceptId = concepts_[idx].id;
+        cluster.centerPrototype = concepts_[idx].prototype;
+        cluster.radius = 0.0f;
+        
+        clusters_.push_back(cluster);
+    }
+    
+    // Assign each concept to nearest cluster
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        float minDistance = std::numeric_limits<float>::max();
+        size_t bestCluster = 0;
+        
+        for (size_t j = 0; j < clusters_.size(); ++j) {
+            float distance = computeSimilarity(concepts_[i].prototype, clusters_[j].centerPrototype);
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestCluster = j;
+            }
+        }
+        
+        clusterAssignments_[i] = bestCluster;
+        clusters_[bestCluster].conceptIds.push_back(concepts_[i].id);
+        clusters_[bestCluster].radius = std::max(clusters_[bestCluster].radius, 1.0f - minDistance);
+    }
+    
+    // Update cluster centers as mean of assigned concepts
+    for (size_t i = 0; i < clusters_.size(); ++i) {
+        if (!clusters_[i].conceptIds.empty()) {
+            std::vector<float> newCenter(concepts_[0].prototype.size(), 0.0f);
+            size_t count = 0;
+            
+            for (size_t conceptId : clusters_[i].conceptIds) {
+                const DiscoveredConcept* concept = getConcept(conceptId);
+                if (concept) {
+                    for (size_t j = 0; j < concept->prototype.size() && j < newCenter.size(); ++j) {
+                        newCenter[j] += concept->prototype[j];
+                    }
+                    count++;
+                }
+            }
+            
+            if (count > 0) {
+                for (size_t j = 0; j < newCenter.size(); ++j) {
+                    newCenter[j] /= count;
+                }
+                clusters_[i].centerPrototype = newCenter;
+            }
+        }
+    }
+}
+
 size_t ConceptFormation::getMatchingConcept(const std::vector<float>& pattern,
-                                           float similarityThreshold) const {
+                                          float similarityThreshold) const {
     return findConceptForPattern(pattern);
 }
 
@@ -178,8 +306,7 @@ std::vector<float> ConceptFormation::getConceptPrototype(size_t conceptId) const
     return {};
 }
 
-const std::vector<ConceptInstance>& ConceptFormation::getConceptInstances(
-    size_t conceptId) const {
+const std::vector<ConceptInstance>& ConceptFormation::getConceptInstances(size_t conceptId) const {
     static std::vector<ConceptInstance> empty;
     const DiscoveredConcept* concept = getConcept(conceptId);
     if (concept) {
@@ -218,6 +345,21 @@ void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
         a->prototype[i] = (a->prototype[i] + b->prototype[i]) / 2.0f;
     }
     
+    // Update associated concepts
+    for (size_t associatedId : b->associatedConceptIds) {
+        if (std::find(a->associatedConceptIds.begin(), a->associatedConceptIds.end(), associatedId) == a->associatedConceptIds.end()) {
+            a->associatedConceptIds.push_back(associatedId);
+        }
+    }
+    
+    // Update category hint based on merged properties
+    if ((a->categoryHint == "rewarding" && b->categoryHint == "rewarding") ||
+        (a->categoryHint == "harmful" && b->categoryHint == "harmful")) {
+        a->categoryHint = a->categoryHint;
+    } else {
+        a->categoryHint = "mixed";
+    }
+    
     // Remove B
     concepts_.erase(
         std::remove_if(concepts_.begin(), concepts_.end(),
@@ -225,30 +367,15 @@ void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
         concepts_.end()
     );
     
-    NLM_LOG_INFO("ConceptFormation: Merged concepts " + std::to_string(conceptA) +
-                 " and " + std::to_string(conceptB));
-}
-
-bool ConceptFormation::isNovel(const std::vector<float>& pattern,
-                               float similarityThreshold) const {
-    return findConceptForPattern(pattern) == 0;
-}
-
-size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern) const {
-    if (concepts_.empty()) return 0;
-    
-    float bestSimilarity = 0.0f;
-    size_t bestConcept = 0;
-    
-    for (const auto& concept : concepts_) {
-        float sim = computeSimilarity(pattern, concept.prototype);
-        if (sim > bestSimilarity && sim >= formationThreshold_) {
-            bestSimilarity = sim;
-            bestConcept = concept.id;
+    // Update cluster assignments
+    for (size_t& assignment : clusterAssignments_) {
+        if (assignment == conceptB) {
+            assignment = conceptA;
         }
     }
     
-    return bestConcept;
+    NLM_LOG_INFO("ConceptFormation: Merged concepts " + std::to_string(conceptA) +
+                 " and " + std::to_string(conceptB));
 }
 
 float ConceptFormation::computeSimilarity(const std::vector<float>& a,
@@ -268,11 +395,38 @@ float ConceptFormation::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-bool ConceptFormation::isConceptStable(size_t conceptId) const {
-    const DiscoveredConcept* concept = getConcept(conceptId);
-    if (!concept) return false;
+size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern) const {
+    if (concepts_.empty()) return 0;
     
-    return concept->avgStability >= stabilityThreshold_;
+    float bestSimilarity = 0.0f;
+    size_t bestConcept = 0;
+    
+    for (const auto& concept : concepts_) {
+        float sim = computeSimilarity(pattern, concept.prototype);
+        if (sim > bestSimilarity && sim >= formationThreshold_) {
+            bestSimilarity = sim;
+            bestConcept = concept.id;
+        }
+    }
+    
+    return bestConcept;
+}
+
+float ConceptFormation::getConceptActivation(size_t conceptId) const {
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (concept) {
+        return concept->activationLevel;
+    }
+    return 0.0f;
+}
+
+size_t ConceptFormation::getConceptCluster(size_t conceptId) const {
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        if (concepts_[i].id == conceptId) {
+            return clusterAssignments_[i];
+        }
+    }
+    return 0;
 }
 
 float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
@@ -294,255 +448,70 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
+    clusterAssignments_.clear();
+    conceptCenters_.clear();
+    clusters_.clear();
 }
 
-// SpatialRepresentation Implementation
-struct SpatialRepresentation::Impl {
-    Brain* brain;
+void ConceptFormation::integrateWithNeuralPlanner(size_t conceptId) {
+    if (!brain_ || !brain_->getPlanner()) return;
     
-    Impl() : brain(nullptr) {}
-};
-
-SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , currentX_(0)
-    , currentY_(0)
-    , gridSpacing_(1.0f)
-{
-}
-
-SpatialRepresentation::~SpatialRepresentation() = default;
-
-void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SpatialRepresentation initialized");
-}
-
-void SpatialRepresentation::recordPosition(float x, float y, const std::vector<float>& sensoryCues) {
-    currentX_ = x;
-    currentY_ = y;
-    lastSensoryCue_ = sensoryCues;
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
     
-    // Check if we have a place cell near this position
-    bool hasNearbyCell = false;
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < pc.fieldRadius) {
-            hasNearbyCell = true;
-            break;
-        }
-    }
+    // Use concept to influence planning
+    // For example, if concept is "dangerous", reduce planning depth
+    // if concept is "rewarding", increase planning depth
     
-    // Create new place cell if needed
-    if (!hasNearbyCell && brain_) {
-        PlaceCell newCell;
-        newCell.neuron = NeuronId(placeCells_.size() + 40000);
-        newCell.x = x;
-        newCell.y = y;
-        newCell.fieldRadius = 0.5f;  // Place field size
-        newCell.activation = 1.0f;
-        
-        placeCells_.push_back(newCell);
-        
-        // Inject current to activate this neuron
-        brain_->injectCurrent(newCell.neuron, 5.0f);
+    NeuralPlanner* planner = brain_->getPlanner();
+    
+    if (concept->categoryHint == "rewarding") {
+        // Increase planning depth for rewarding concepts
+        size_t currentDepth = planner->getPlanningDepth();
+        planner->setPlanningDepth(std::min(currentDepth + 1, 5));
+    } else if (concept->categoryHint == "harmful") {
+        // Decrease planning depth for harmful concepts
+        size_t currentDepth = planner->getPlanningDepth();
+        planner->setPlanningDepth(std::max(currentDepth - 1, 1));
     }
 }
 
-std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
-    return {currentX_, currentY_};
-}
-
-void SpatialRepresentation::integrateMovement(float dx, float dy) {
-    currentX_ += dx;
-    currentY_ += dy;
-}
-
-float SpatialRepresentation::getPositionActivation(float x, float y) const {
-    float totalActivation = 0.0f;
+void ConceptFormation::linkToPredictionSystem(size_t conceptId) {
+    if (!brain_ || !brain_->getPredictionSystem()) return;
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        // Gaussian place field
-        if (dist < pc.fieldRadius * 2.0f) {
-            float activation = std::exp(-dist * dist / (2.0f * pc.fieldRadius * pc.fieldRadius));
-            totalActivation += activation * pc.activation;
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Use concept to improve predictions
+    // For example, if concept is "predator", predict predator behavior
+    
+    PredictionSystem* predictionSystem = brain_->getPredictionSystem();
+    
+    // Update prediction system with concept-based knowledge
+    // This would be implemented in a full version
+}
+
+void ConceptFormation::connectToWorkingMemory(size_t conceptId) {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    NeuralWorkingMemory* workingMemory = brain_->getWorkingMemory();
+    
+    // Connect concept to working memory for active maintenance
+    // If concept is highly activated, maintain it in working memory
+    
+    if (concept->activationLevel > 0.7f) {
+        std::vector<float> conceptPattern = getConceptPrototype(conceptId);
+        if (!conceptPattern.empty()) {
+            workingMemory->store(conceptPattern, concept->activationLevel);
         }
     }
-    
-    return totalActivation;
 }
 
-std::vector<NeuronId> SpatialRepresentation::getPlaceNeuronsNear(float x, float y, float radius) const {
-    std::vector<NeuronId> result;
-    
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < radius) {
-            result.push_back(pc.neuron);
-        }
-    }
-    
-    return result;
-}
-
-void SpatialRepresentation::clear() {
-    placeCells_.clear();
-    currentX_ = 0;
-    currentY_ = 0;
-}
-
-// TemporalRelation Implementation
-struct TemporalRelation::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
-
-TemporalRelation::TemporalRelation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-{
-}
-
-TemporalRelation::~TemporalRelation() = default;
-
-void TemporalRelation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-}
-
-void TemporalRelation::recordSequence(const std::vector<float>& eventA,
-                                      const std::vector<float>& eventB,
-                                      float reward) {
-    // Find existing link or create new
-    for (auto& link : sequences_) {
-        float simA = 0.0f, simB = 0.0f;
-        
-        // Compute similarity
-        if (link.fromEvent.size() == eventA.size() && link.toEvent.size() == eventB.size()) {
-            float dotA = 0.0f, normA = 0.0f, normB = 0.0f;
-            for (size_t i = 0; i < eventA.size(); ++i) {
-                dotA += link.fromEvent[i] * eventA[i];
-                normA += link.fromEvent[i] * link.fromEvent[i];
-                normB += eventA[i] * eventA[i];
-            }
-            if (normA > 0.0001f && normB > 0.0001f) {
-                simA = dotA / (std::sqrt(normA) * std::sqrt(normB));
-            }
-            
-            float dotB = 0.0f;
-            for (size_t i = 0; i < eventB.size(); ++i) {
-                dotB += link.toEvent[i] * eventB[i];
-            }
-            if (normB > 0.0001f) {
-                simB = dotB / normB;
-            }
-        }
-        
-        if (simA > 0.8f && simB > 0.8f) {
-            // Update existing link
-            link.strength = std::min(1.0f, link.strength + 0.1f);
-            link.observationCount++;
-            return;
-        }
-    }
-    
-    // Create new link
-    SequenceLink newLink;
-    newLink.fromEvent = eventA;
-    newLink.toEvent = eventB;
-    newLink.strength = 0.5f;
-    newLink.observationCount = 1;
-    
-    sequences_.push_back(newLink);
-}
-
-std::vector<float> TemporalRelation::predictNext(const std::vector<float>& eventA) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != eventA.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventA.size(); ++i) {
-            dot += link.fromEvent[i] * eventA[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += eventA[i] * eventA[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.toEvent;
-            }
-        }
-    }
-    
-    return bestPrediction;
-}
-
-std::vector<float> TemporalRelation::predictPrevious(const std::vector<float>& eventB) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.toEvent.size() != eventB.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventB.size(); ++i) {
-            dot += link.toEvent[i] * eventB[i];
-            normA += link.toEvent[i] * link.toEvent[i];
-            normB += eventB[i] * eventB[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.fromEvent;
-            }
-        }
-    }
-    
-    return bestPrediction;
-}
-
-float TemporalRelation::getPredictionConfidence(const std::vector<float>& event) const {
-    size_t matchingCount = 0;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != event.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < event.size(); ++i) {
-            dot += link.fromEvent[i] * event[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += event[i] * event[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > 0.7f) {
-                matchingCount++;
-            }
-        }
-    }
-    
-    return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
-}
-
-void TemporalRelation::clear() {
-    sequences_.clear();
+RandomGenerator* ConceptFormation::getRandomGenerator() const {
+    return brain_ ? brain_->getRandomGenerator() : nullptr;
 }
 
 } // namespace nlm

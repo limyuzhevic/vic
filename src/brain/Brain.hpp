@@ -28,6 +28,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
+class Endorphins;
+class MetaplasticityManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -183,6 +188,29 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+    
+    // New neuromodulators
+    Serotonin* getSerotonin();
+    Norepinephrine* getNorepinephrine();
+    Acetylcholine* getAcetylcholine();
+    Endorphins* getEndorphins();
+    
+    // Advanced metaplasticity
+    MetaplasticityManager* getMetaplasticity();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

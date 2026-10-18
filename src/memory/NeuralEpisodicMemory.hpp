@@ -2,6 +2,9 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include <vector>
 #include <memory>
 #include <deque>
@@ -124,6 +127,60 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
+    // === ADVANCED REPLAY SYSTEMS ===
+
+    // Sleep/Offline Replay - Replay during rest/sleep cycles for consolidation
+    void replayDuringSleep(float sleepIntensity = 1.0f);
+    bool isSleeping() const { return isSleeping_; }
+    void enterSleepState() { isSleeping_ = true; }
+    void exitSleepState() { isSleeping_ = false; }
+
+    // Synaptic Replay - Reactivate synaptic connections during replay for strengthening
+    void replaySynapticPatterns(const std::vector<size_t>& episodeIds, float synapticStrength = 1.0f);
+
+    // Priority-Based Replay - Replay based on memory importance, novelty, reward
+    std::vector<size_t> selectPriorityEpisodes(size_t count,
+                                               const std::vector<float>& neuromodulatorWeights = {}) const;
+    float computeMemoryPriority(const EpisodicMemoryItem& episode) const;
+
+    // Sequence Replay - Replay temporal sequences for pattern completion
+    void replayTemporalSequences(const std::vector<size_t>& episodeIds,
+                                bool forwardOnly = true);
+    std::vector<std::vector<size_t>> extractTemporalSequences(size_t sequenceLength = 5) const;
+
+    // Development-Stage Replay - Different replay strategies for different developmental stages
+    void replayForDevelopmentalStage(DevelopmentalStage stage,
+                                      float plasticityModulator = 1.0f);
+    float getDevelopmentalReplayPriority(const EpisodicMemoryItem& episode,
+                                         DevelopmentalStage stage) const;
+
+    // Neuromodulator-Gated Replay - Control replay timing and strength with neuromodulators
+    void neuromodulatorGatedReplay(const Neuromodulator& modulator, float gateThreshold = 0.5f);
+    bool isNeuromodulatorGatedReplayEnabled(const Neuromodulator& modulator) const;
+    float getNeuromodulatorGatingStrength(const Neuromodulator& modulator) const;
+
+    // Metaplastic Replay Effects - Replay-induced metaplasticity for learning adaptation
+    void applyMetaplasticReplayEffects(const std::vector<size_t>& episodeIds,
+                                      const std::vector<float>& learningHistory);
+    void updateMetaplasticThresholds(const std::vector<size_t>& episodeIds);
+
+    // Multi-System Replay - Replay across working memory, episodic memory, and conceptual memory
+    void crossSystemReplay(const std::vector<size_t>& episodeIds,
+                          NeuralWorkingMemory* workingMemory,
+                          ConceptFormation* conceptFormation = nullptr);
+    void strengthenCrossSystemConnections(const std::vector<size_t>& episodeIds);
+
+    // Consolidation-Graduated Replay - Progressive strengthening during consolidation
+    void graduatedConsolidationReplay(size_t consolidationStage,
+                                     float strengtheningFactor = 1.0f);
+    float getConsolidationProgress(size_t episodeId) const;
+
+    // Advanced replay integration with attention and prediction
+    void attentionGuidedReplay(const std::vector<size_t>& episodeIds,
+                              const std::vector<float>& attentionWeights);
+    void predictionErrorGuidedReplay(const std::vector<size_t>& episodeIds,
+                                    float predictionErrorThreshold);
+
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
@@ -135,6 +192,16 @@ private:
                         SimulationStep* startTime,
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
+
+    // Advanced replay state management
+    bool isSleeping_;
+    std::unordered_map<const Neuromodulator*, bool> neuromodulatorGatedReplay_;
+    std::unordered_map<const Neuromodulator*, float> neuromodulatorGatingStrength_;
+    std::deque<size_t> sleepReplayQueue_;
+    std::vector<std::vector<size_t>> temporalSequences_;
+    std::unordered_map<size_t, float> consolidationProgress_;
+    std::deque<float> metaplasticThresholdHistory_;
+    std::vector<size_t> developmentalStageReplays_;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
