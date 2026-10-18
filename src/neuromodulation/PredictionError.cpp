@@ -16,7 +16,9 @@ struct PredictionError::Impl {
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
-PredictionError::~PredictionError() = default;
+PredictionError::~PredictionError() {
+    delete pImpl;
+}
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;

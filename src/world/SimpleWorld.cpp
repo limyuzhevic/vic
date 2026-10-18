@@ -32,7 +32,11 @@ SimpleWorld::SimpleWorld()
     agent_.reset();
 }
 
-SimpleWorld::~SimpleWorld() = default;
+SimpleWorld::~SimpleWorld() {
+    // Clean up agent
+    agent_.reset();
+    delete pImpl;
+}
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
     width_ = width;

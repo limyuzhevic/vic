@@ -23,7 +23,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 {
 }
 
-NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
+NeuralEpisodicMemory::~NeuralEpisodicMemory() {
+    delete pImpl;
+}
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;

@@ -10,7 +10,9 @@ struct EnvironmentState::Impl {
 
 EnvironmentState::EnvironmentState() : pImpl(new Impl) {}
 
-EnvironmentState::~EnvironmentState() = default;
+EnvironmentState::~EnvironmentState() {
+    delete pImpl;
+}
 
 bool EnvironmentState::is_terminal() const {
     return pImpl->terminal;

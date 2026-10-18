@@ -13,7 +13,9 @@ struct WorkingMemory::Impl {
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 
-WorkingMemory::~WorkingMemory() = default;
+WorkingMemory::~WorkingMemory() {
+    delete pImpl;
+}
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
@@ -74,7 +76,9 @@ struct EpisodicMemory::Impl {
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
 
-EpisodicMemory::~EpisodicMemory() = default;
+EpisodicMemory::~EpisodicMemory() {
+    delete pImpl;
+}
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
@@ -118,7 +122,9 @@ struct SemanticMemory::Impl {
 
 SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
 
-SemanticMemory::~SemanticMemory() = default;
+SemanticMemory::~SemanticMemory() {
+    delete pImpl;
+}
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
     for (auto& fact : pImpl->facts) {
@@ -163,7 +169,9 @@ struct ProceduralMemory::Impl {
 
 ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
 
-ProceduralMemory::~ProceduralMemory() = default;
+ProceduralMemory::~ProceduralMemory() {
+    delete pImpl;
+}
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
     for (auto& skill : pImpl->skills) {
@@ -216,7 +224,9 @@ struct AssociativeMemory::Impl {
 
 AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
 
-AssociativeMemory::~AssociativeMemory() = default;
+AssociativeMemory::~AssociativeMemory() {
+    delete pImpl;
+}
 
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
     for (auto& assoc : pImpl->associations) {

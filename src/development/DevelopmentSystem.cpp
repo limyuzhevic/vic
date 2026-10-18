@@ -15,7 +15,9 @@ struct DevelopmentSystem::Impl {
 
 DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
 
-DevelopmentSystem::~DevelopmentSystem() = default;
+DevelopmentSystem::~DevelopmentSystem() {
+    delete pImpl;
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;

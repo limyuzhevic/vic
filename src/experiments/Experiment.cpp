@@ -21,7 +21,9 @@ Experiment::Experiment(const std::string& name) : pImpl(new Impl) {
     pImpl->name = name;
 }
 
-Experiment::~Experiment() = default;
+Experiment::~Experiment() {
+    delete pImpl;
+}
 
 const std::string& Experiment::getName() const {
     return pImpl->name;

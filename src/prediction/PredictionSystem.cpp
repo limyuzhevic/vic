@@ -12,7 +12,9 @@ struct PredictionSystem::Impl {
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
-PredictionSystem::~PredictionSystem() = default;
+PredictionSystem::~PredictionSystem() {
+    delete pImpl;
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate

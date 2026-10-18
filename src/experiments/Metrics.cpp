@@ -12,7 +12,9 @@ struct Metrics::Impl {
 
 Metrics::Metrics() : pImpl(new Impl) {}
 
-Metrics::~Metrics() = default;
+Metrics::~Metrics() {
+    delete pImpl;
+}
 
 void Metrics::record(const std::string& name, double value) {
     pImpl->metrics[name].push_back(value);

@@ -117,26 +117,189 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ## Part 3: Using the Python Library
 
-### Basic Usage
+### Configuration System Enhancements
 
-#### Creating a Brain
+#### Enhanced Configuration Support
+NLM now supports multiple configuration file formats with enhanced type safety and error reporting:
 
 ```python
 import pynlm
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+# Create enhanced configuration object
+config = pynlm.createConfig()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Load configuration from file (auto-detects format)
+config.loadFromFile("config.json")      # JSON format
+config.loadFromFile("config.yaml")      # YAML format
+config.loadFromFile("config.cfg")       # Simple key=value
 
-# Create and initialize the brain
+# Query configuration with type safety
+neurons = config.getOr<int>("brain.neuron_count", 1000)
+synapse_density = config.getOr<float>("brain.synapse_density", 0.1)
+viz_enabled = config.getOr<bool>("brain.visualization_enabled", False)
+
+# Modify configuration
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.15)
+
+# Export/import capabilities
+json_str = config.exportToJSON()
+yaml_str = config.exportToYAML()
+config.loadFromJSON(json_str)
+```
+
+#### Advanced Configuration Examples
+```python
+# Create configuration and load from different formats
+config = pynlm.createConfig()
+
+# Load JSON configuration
+config.loadFromFile("advanced_config.json")
+
+# Configure brain components
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# Create world with configuration
+world = pynlm.createSimpleWorld()
+world.configure(
+    width=config.getOr<int>("brain.world_width", 20),
+    height=config.getOr<int>("brain.world_height", 20),
+    visionWidth=config.getOr<int>("brain.vision_width", 8),
+    visionHeight=config.getOr<int>("brain.vision_height", 8)
+)
+world.reset()
+
+# Create agent with enhanced configuration
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all subsystems based on configuration
+agent.enableRewardModulation(config.getOr<bool>("neuromodulation.reward.enable", True))
+agent.enableStructuralPlasticity(config.getOr<bool>("development.structural.enable", True))
+agent.enableDevelopment(config.getOr<bool>("development.enable", True))
+agent.enableCuriosity(config.getOr<bool>("neuromodulation.curiosity.enable", True))
+```
+
+#### Command Line Configuration
+```bash
+# Show help with configuration format information
+./nlm --help
+
+# Load JSON configuration
+./nlm --config complex_config.json
+
+# Load YAML configuration
+./nlm --config simple_config.yaml
+
+# Override configuration values
+./nlm --neuron_count=1000 --synapse_density=0.15
+
+# Validate configuration
+./nlm --config config.json --validate
+```
+
+#### Configuration File Formats
+```json
+{
+    "brain.neuron_count": 1000,
+    "brain.synapse_density": 0.15,
+    "brain.visualization_enabled": false,
+    "neuromodulation.reward.enable": true,
+    "development.enable": true,
+    "curiosity.enable": true
+}
+```
+
+```yaml
+brain:
+  neuron_count: 1000
+  synapse_density: 0.15
+  visualization_enabled: false
+
+neuromodulation:
+  reward:
+    enable: true
+
+development:
+  enable: true
+  structural:
+    enable: true
+
+curiosity:
+  enable: true
+```
+
+```
+# Simple key=value format
+brain.neuron_count = 1000
+brain.synapse_density = 0.15
+brain.visualization_enabled = false
+neuromodulation.reward.enable = true
+development.enable = true
+curiosity.enable = true
+```
+
+#### Configuration Validation
+```python
+# Validate configuration
+config = pynlm.createConfig()
+config.loadFromFile("config.json")
+
+# Check if configuration has all required parameters
+if config.has("brain.neuron_count") and config.has("brain.synapse_density"):
+    print("✓ Required parameters present")
+
+# Get configuration statistics
+print(f"Total configuration entries: {config.getEntryCount()}")
+print(f"Default entries: {config.getEntryCountBySource(ConfigSource.Default)}")
+print(f"File entries: {config.getEntryCountBySource(ConfigSource.File)}")
+```
+
+#### Advanced Configuration Management
+```python
+# Configuration schema validation
+class AppConfig:
+    def __init__(self):
+        self.config = pynlm.createConfig()
+        self.schema = self.create_schema()
+    
+    def create_schema(self):
+        """Create configuration schema for validation."""
+        schema = pynlm.ConfigSchema()
+        schema.addEntry("brain.neuron_count", "int", "Number of neurons", 1000, True)
+        schema.addEntry("brain.synapse_density", "float", "Synapse density", 0.1, True)
+        schema.addEntry("brain.visualization_enabled", "bool", "Enable visualization", False, False)
+        return schema
+    
+    def load_from_file(self, filepath):
+        """Load configuration from file with format detection."""
+        self.config.loadFromFile(filepath)
+        
+        # Validate against schema
+        if not self.schema.validate(self.config):
+            errors = self.schema.getErrors(self.config)
+            print("Configuration validation failed:")
+            for error in errors:
+                print(f"  - {error}")
+            return False
+        
+        return True
+    
+    def export_to_json(self):
+        """Export configuration to JSON format."""
+        return self.config.exportToJSON()
+    
+    def import_from_json(self, json_str):
+        """Import configuration from JSON string."""
+        return self.config.loadFromJSON(json_str)
+
+# Usage example
+app_config = AppConfig()
+if app_config.load_from_file("config.json"):
+    print("Configuration loaded and validated successfully")
+    json_output = app_config.export_to_json()
+    print(f"Exported configuration: {json_output}")
 ```
 
 #### Running a Simulation

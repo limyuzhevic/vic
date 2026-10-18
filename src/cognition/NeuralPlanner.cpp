@@ -20,7 +20,9 @@ NeuralPlanner::NeuralPlanner()
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
 
-NeuralPlanner::~NeuralPlanner() = default;
+NeuralPlanner::~NeuralPlanner() {
+    delete pImpl;
+}
 
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
