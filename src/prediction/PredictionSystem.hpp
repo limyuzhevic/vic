@@ -21,6 +21,9 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Set prediction confidence (0.0 = no confidence, 1.0 = full confidence)
+    void setConfidence(float confidence);
+    
     // Get prediction error
     float getPredictionError() const;
     

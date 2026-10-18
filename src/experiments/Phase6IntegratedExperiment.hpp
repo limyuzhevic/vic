@@ -85,6 +85,21 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Advanced Phase 6 options
+    bool enablePredictionLearning;      // Enable prediction system training
+    bool enableConceptLearning;         // Enable concept formation
+    bool enableNeuromodulation;         // Enable neuromodulation effects
+    bool enableMemoryConsolidation;     // Enable memory consolidation
+    bool enableReplayConsolidation;     // Enable replay-based consolidation
+    bool enableDevelopmentalStages;    // Enable developmental stages
+    float neuromodulationStrength;       // Strength of neuromodulation effects
+    float predictionAccuracy;           // Target prediction accuracy
+    size_t maxConcepts;                 // Maximum number of concepts to form
+    size_t conceptStabilityWindow;      // Window for concept stability checking
+    float conceptFormationThreshold;    // Similarity threshold for concept formation
+    size_t replayInterval;              // Interval for memory replay
+    size_t consolidationInterval;      // Interval for memory consolidation
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +108,20 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , enablePredictionLearning(true)
+        , enableConceptLearning(true)
+        , enableNeuromodulation(true)
+        , enableMemoryConsolidation(true)
+        , enableReplayConsolidation(true)
+        , enableDevelopmentalStages(true)
+        , neuromodulationStrength(1.0f)
+        , predictionAccuracy(0.8f)
+        , maxConcepts(100)
+        , conceptStabilityWindow(5)
+        , conceptFormationThreshold(0.7f)
+        , replayInterval(100)
+        , consolidationInterval(1000) {}
 };
 
 /**

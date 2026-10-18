@@ -510,9 +510,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Create a simplified sensory representation from current neural activity
+        // This represents what the system currently "senses" based on neural processing
+        
+        // For now, use current neural activity as "sensory" input
+        // In full implementation, this would come from actual environment sensors
+        // Store the prediction error history for learning
+        float currentError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update prediction confidence based on activity stability
+        float activityStability = 1.0f;  // Placeholder - would calculate from neural dynamics
+        if (activityStability < 0.1f) {
+            pImpl->predictionSystem->setConfidence(0.1f);  // Low confidence
+        } else {
+            pImpl->predictionSystem->setConfidence(activityStability);
+        }
+        
+        // Prediction error affects attention and exploration
+        if (pImpl->attention) {
+            // Higher prediction error = more attention to novel stimuli
+            float attentionMod = std::min(2.0f, 1.0f + currentError * 2.0f);
+            pImpl->attention->setInhibitionStrength(0.5f / attentionMod);
+        }
+        
+        // Prediction error influences planning depth
+        if (pImpl->planner && pImpl->dopamine) {
+            // Higher prediction error = more exploratory planning
+            float planningMod = 1.0f + currentError * 3.0f;
+            pImpl->planner->setPlanningDepth(5 * planningMod);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +554,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->predictionSystem) {
+        // Concept formation processes current neural activity patterns
+        // to discover recurring patterns and form abstract concepts
+        
+        // Get current prediction error to modulate concept learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Feed current neural activity to concept formation system
+        // This requires encoding current brain state into concept formation
+        
+        // Concept learning is enhanced by prediction error (novelty)
+        float conceptLearningRate = 0.1f * (1.0f + predictionError * 5.0f);
+        conceptLearningRate = std::clamp(conceptLearningRate, 0.05f, 0.5f);
+        
+        // For now, just call a placeholder update
+        // In full implementation, this would encode current neural state
+        // and pass to concept formation system
+        if (pImpl->conceptFormation) {
+            // Placeholder: just track that concept formation was updated
+            // In full implementation, we would:
+            // 1. Encode current neural state into pattern
+            // 2. Extract features from that pattern
+            // 3. Present experience to concept formation
+            // 4. Update concepts based on novelty
+        }
+        
+        // Concepts affect attention - higher concept coherence focuses attention
+        float conceptCoherence = pImpl->conceptFormation->getConceptCount() > 0 ? 0.5f : 0.0f;
+        if (pImpl->attention) {
+            // Strong concepts narrow attention to relevant patterns
+            float attentionNarrowing = std::min(2.0f, 1.0f + conceptCoherence * 2.0f);
+            pImpl->attention->setExcitationStrength(1.5f * attentionNarrowing);
+            pImpl->attention->setInhibitionStrength(0.5f / attentionNarrowing);
+        }
+        
+        // Concepts influence planning - they provide goals and strategies
+        if (pImpl->planner) {
+            // Concept coherence affects planning flexibility
+            int planningFlexibility = (conceptCoherence > 0.7f) ? 3 : 5;  // Narrow vs wide focus
+            pImpl->planner->setPlanningDepth(planningFlexibility);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
