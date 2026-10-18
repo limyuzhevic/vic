@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -58,8 +59,14 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from simple key=value format
+    void loadFromSimpleFormat(const std::string& filepath);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -75,6 +82,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -93,6 +101,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    
+    // Validate specific configuration
+    bool validate(const std::string& key) const;
+    
+    // Get configuration statistics
+    std::string getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +117,26 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Type conversion utilities
+    static bool stringToBool(const std::string& str);
+    static int64_t stringToInt64(const std::string& str);
+    static double stringToDouble(const std::string& str);
+    static std::string boolToString(bool value);
+    static std::string intToString(int64_t value);
+    static std::string doubleToString(double value);
+    
+    // Type checking utilities
+    static bool isIntType(const std::string& key);
+    static bool isFloatType(const std::string& key);
+    static bool isStringType(const std::string& key);
+    static bool isBoolType(const std::string& key);
+    
+    // Configuration keys validation
+    static bool isValidKey(const std::string& key);
+    
+    // Configuration value validation
+    static bool isValidValue(const std::string& key, const std::string& value);
 };
 
 } // namespace nlm

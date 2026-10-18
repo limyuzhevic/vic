@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -12,6 +14,11 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    bool includeTimestamp = true;
+    bool includeThreadId = false;
+    bool includeFileLocation = true;
+    std::string logFormat = "[%level] %timestamp %thread %file:%line %function: %message";
+    std::string timestampFormat = "%Y-%m-%d %H:%M:%S";
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -30,26 +37,54 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Format the log message based on the log format
+    std::string formattedMessage = pImpl->logFormat;
     
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
+    // Replace placeholders
+    if (pImpl->includeTimestamp) {
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        char timeBuffer[64];
+        std::strftime(timeBuffer, sizeof(timeBuffer), pImpl->timestampFormat.c_str(), std::localtime(&time));
+        replaceAll(formattedMessage, "%timestamp", std::string(timeBuffer));
     }
+    
+    replaceAll(formattedMessage, "%level", levelToString(entry.level));
+    
+    if (pImpl->includeThreadId) {
+        // Thread ID would be implementation-specific
+        replaceAll(formattedMessage, "%thread", "[main]");
+    }
+    
+    if (pImpl->includeFileLocation) {
+        std::string location = entry.file;
+        if (!entry.file.empty() && entry.line > 0) {
+            location += ":" + std::to_string(entry.line);
+        }
+        replaceAll(formattedMessage, "%file:%line", location);
+        replaceAll(formattedMessage, "%function", entry.function);
+    } else {
+        replaceAll(formattedMessage, "%file:%line %function", "");
+    }
+    
+    replaceAll(formattedMessage, "%message", entry.message);
+    
+    // Add thread ID placeholder replacement if needed
+    replaceAll(formattedMessage, "%thread", "[main]");
+    
+    // Handle colors
+    std::string output;
+    if (pImpl->useColors) {
+        output = levelToColor(entry.level) + formattedMessage + "\033[0m\n";
+    } else {
+        output = formattedMessage + "\n";
+    }
+    
+    std::cout << output;
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
+        pImpl->fileOut << formattedMessage << "\n";
         pImpl->fileOut.flush();
     }
 }
@@ -80,6 +115,26 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
+void ConsoleLogger::setIncludeTimestamp(bool include) {
+    pImpl->includeTimestamp = include;
+}
+
+void ConsoleLogger::setIncludeThreadId(bool include) {
+    pImpl->includeThreadId = include;
+}
+
+void ConsoleLogger::setIncludeFileLocation(bool include) {
+    pImpl->includeFileLocation = include;
+}
+
+void ConsoleLogger::setLogFormat(const std::string& format) {
+    pImpl->logFormat = format;
+}
+
+void ConsoleLogger::setTimestampFormat(const std::string& format) {
+    pImpl->timestampFormat = format;
+}
+
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
@@ -99,6 +154,15 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
         case LogLevel::Error: return "\033[31m";     // Red
         case LogLevel::Critical: return "\033[35m"; // Magenta
         default: return "\033[0m";
+    }
+}
+
+// Utility function to replace all occurrences
+void ConsoleLogger::replaceAll(std::string& str, const std::string& from, const std::string& to) {
+    size_t startPos = 0;
+    while ((startPos = str.find(from, startPos)) != std::string::npos) {
+        str.replace(startPos, from.length(), to);
+        startPos += to.length();
     }
 }
 

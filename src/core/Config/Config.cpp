@@ -19,39 +19,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Try JSON format first
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
     }
     
+    // Try YAML format
+    if (loadFromYAML(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from YAML file: " + filepath);
+        return true;
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    NLM_LOG_INFO("Loading configuration from simple format file: " + filepath);
+    loadFromSimpleFormat(filepath);
     return true;
 }
 

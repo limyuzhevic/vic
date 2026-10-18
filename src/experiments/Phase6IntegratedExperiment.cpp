@@ -246,7 +246,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     return success;
 }
 
-bool Phase6IntegratedExperiment::testMemoryIntegration() {
+void Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
     auto cfg = std::make_shared<Config>();
