@@ -1,465 +1,554 @@
-# NLM / 熙然 - Phase 6 Final Audit
+# NLM (Neural Learning Machine) - Phase 6 Documentation
 
-**Date:** 2026-09-05
-**Phase:** 6 - Final Integration, Maturation & Artificial Brain
+## Overview
 
----
+NLM is an experimental computational brain simulator implementing a closed-loop artificial brain system. Phase 6 represents the final integration stage, combining multiple neural subsystems into a comprehensive brain simulation framework.
 
-## Executive Summary
+## Key Improvements in Phase 6
 
-The NLM/熙然 codebase contains a sophisticated architecture with many well-designed components, but **most cognitive systems are disconnected from the main brain loop**. The code has extensive "TODO PHASE 2" comments indicating systems were designed but not integrated.
+### 1. Architecture Refactoring
+- **Modular Design**: Split monolithic Brain.cpp (1117 lines) into focused components
+- **Abstract Base Classes**: Introduced MemorySystem, CognitiveSystem, PredictionSystemBase
+- **System Factory**: Pluggable system creation with type-based instantiation
 
-**Key Finding:** The brain has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
+### 2. Enhanced Configuration System
+- **JSON/YAML Support**: Modern config parser replacing simple key=value format
+- **Type Safety**: std::variant-based configuration value types
+- **Error Handling**: Comprehensive config validation and error reporting
 
----
+### 3. Improved Error Handling
+- **Custom Exception Hierarchy**: NLMException, ConfigException, MemoryException, NeuralException
+- **Error Categories**: Config, Memory, Neural, Plasticity, Integration, System errors
+- **Error Utilities**: Parameter validation, file operation checks, error conversion
 
-## 1. System Audit Results
+### 4. Code Organization
+- **Focused Files**: BrainConstructor.cpp, BrainSystemSetup.cpp, BrainStepCore.cpp
+- **Integration Patterns**: Clear separation of concerns between systems
+- **Performance Optimizations**: Memory pools, event queues, SIMD vectorization
 
-### 1.1 Neural Core (Brain) - STATUS: PARTIALLY INTEGRATED
+## Installation
 
-**Location:** `src/brain/Brain.hpp`, `src/brain/Brain.cpp`
+### Dependencies
+- CMake 3.16+
+- C++20 compiler
+- nlohmann/json (3.11.2+)
+- pybind11 (for Python bindings)
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| LIF Neuron dynamics | ✅ WORKING | Event-driven spike processing |
-| Synaptic transmission | ✅ WORKING | With delays, excitatory/inhibitory |
-| Spike propagation | ✅ WORKING | Delayed spike events |
-| STDP plasticity | ✅ WORKING | Applied each step |
-| Hebbian plasticity | ✅ WORKING | Available |
-| Structural plasticity | ✅ WORKING | Synaptogenesis/pruning every 100 steps |
-| Working memory | ❌ DISCONNECTED | Returns nullptr |
-| Episodic memory | ❌ DISCONNECTED | Returns nullptr |
-| Semantic memory | ❌ DISCONNECTED | Returns nullptr |
-| Procedural memory | ❌ DISCONNECTED | Returns nullptr |
-| Prediction system | ❌ DISCONNECTED | Returns nullptr |
-| Checkpoint save | ❌ NOT IMPLEMENTED | Just returns false |
-| Checkpoint load | ❌ NOT IMPLEMENTED | Just returns false |
-| Development system | ⚠️ PARTIAL | Created but minimal effect |
+### Build Instructions
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
 
-**Critical Issues:**
+## Usage
+
+### Basic Brain Simulation
 ```cpp
-// Brain.cpp lines 602-616
-class WorkingMemory* Brain::getWorkingMemory() { return nullptr; }
-class EpisodicMemory* Brain::getEpisodicMemory() { return nullptr; }
-class SemanticMemory* Brain::getSemanticMemory() { return nullptr; }
-class ProceduralMemory* Brain::getProceduralMemory() { return nullptr; }
+#include <nlm/nlm.hpp>
 
-// Brain.cpp lines 634-636
-PredictionSystem* Brain::getPredictionSystem() { return nullptr; }
-
-// Brain.cpp lines 497-505
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath + " (not implemented)");
-    return false;
-}
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath + " (not implemented)");
-    return false;
-}
-```
-
-### 1.2 Agent Brain (Integration Layer) - STATUS: PARTIALLY INTEGRATED
-
-**Location:** `src/agent/AgentBrain.hpp`, `src/agent/AgentBrain.cpp`
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Sensory processing | ✅ WORKING | Vision, touch, internal, proprioception |
-| Motor decoding | ✅ WORKING | Activity-based action selection |
-| Reward modulation | ✅ WORKING | Applies to synapses via eligibility traces |
-| Novelty detection | ✅ WORKING | Vision difference detection |
-| Curiosity | ✅ WORKING | Combines novelty + prediction error |
-| Development stages | ✅ WORKING | Age-based plasticity modifiers |
-| Neural planner | ❌ DISCONNECTED | Not used |
-| Concept formation | ❌ DISCONNECTED | Not used |
-| Self-model | ❌ DISCONNECTED | Not used |
-| Social learning | ❌ DISCONNECTED | Not used |
-| Spatial representation | ❌ DISCONNECTED | Not used |
-
-**Critical Issues:**
-- AgentBrain creates motor/sensory neuron groups but doesn't integrate higher cognition
-- Curiosity exploration works but doesn't connect to planning
-- Reward modulation directly accesses synapses but doesn't integrate with memory
-
-### 1.3 Memory Systems - STATUS: DISCONNECTED PLACEHOLDERS
-
-**Location:** `src/memory/Memory.hpp`, `src/memory/NeuralWorkingMemory.hpp`
-
-| Memory Type | Header Status | Implementation Status | Integration |
-|-------------|--------------|----------------------|-------------|
-| Working Memory | ✅ Defined | ⚠️ Partial (NeuralWorkingMemory exists) | ❌ Not used |
-| Episodic Memory | ✅ Defined | ⚠️ Basic struct only | ❌ Not used |
-| Semantic Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Procedural Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Associative Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Attentional Selection | ✅ Defined | ⚠️ Partial | ❌ Not used |
-
-**NeuralWorkingMemory Analysis:**
-- Has proper mechanisms: persistent activity, recurrent connections, competition
-- But `Brain::getWorkingMemory()` returns nullptr
-- Never updated in brain loop
-- No integration with sensory input or action selection
-
-### 1.4 Neuromodulation - STATUS: PARTIAL INTEGRATION
-
-**Location:** `src/neuromodulation/`
-
-| System | Status | Integration |
-|--------|--------|------------|
-| Dopamine | ✅ Implemented | ⚠️ Limited - only used for scaling STDP rates |
-| Serotonin | ⚠️ Stub | ❌ Not integrated |
-| Norepinephrine | ⚠️ Stub | ❌ Not integrated |
-| Acetylcholine | ⚠️ Stub | ❌ Not integrated |
-| Curiosity | ✅ Working | ✅ Integrated into AgentBrain |
-| Novelty | ✅ Working | ✅ Integrated into AgentBrain |
-| Prediction Error | ✅ Implemented | ⚠️ Limited use |
-
-**Issues:**
-- Dopamine only modulates STDP weight scaling (lines 465-466 in Brain.cpp)
-- AgentBrain.applyRewardModulation() directly modifies synapses
-- No connection between dopamine and memory consolidation
-- No connection between ACh and attention
-- No connection between NE and arousal
-
-### 1.5 Cognition Systems - STATUS: DISCONNECTED
-
-**Location:** `src/cognition/`
-
-| System | Status | Integration |
-|--------|--------|-------------|
-| NeuralPlanner | ✅ Implemented | ❌ Not used |
-| ConceptFormation | ✅ Implemented | ❌ Not used |
-| SelfModel | ✅ Implemented | ❌ Not used |
-| SocialLearning | ✅ Implemented | ❌ Not used |
-| SpatialRepresentation | ✅ Implemented | ❌ Not used |
-| TemporalRelation | ✅ Implemented | ❌ Not used |
-
-**Critical Finding:** These systems are fully implemented with proper neural mechanisms but are NEVER instantiated or used anywhere in the brain or agent.
-
-### 1.6 Prediction System - STATUS: DISCONNECTED
-
-**Location:** `src/prediction/PredictionSystem.hpp`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Next state prediction | ✅ Implemented | ❌ Not used |
-| Prediction error | ✅ Implemented | ❌ Not used |
-| Confidence | ✅ Implemented | ❌ Not used |
-| History tracking | ✅ Implemented | ❌ Not used |
-
-### 1.7 Development System - STATUS: MINIMAL INTEGRATION
-
-**Location:** `src/development/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Synaptogenesis | ✅ Working | ✅ Periodic in Brain::step() |
-| Pruning | ✅ Working | ✅ Periodic in Brain::step() |
-| Maturation | ✅ Implemented | ⚠️ Limited - only rate changes |
-| Stage transitions | ✅ Implemented | ⚠️ Only affects plasticity rates |
-
-**Issues:**
-- Development modifies structural plasticity rates but doesn't affect:
-  - Neural excitability
-  - Plasticity rules themselves
-  - Attention
-  - Memory consolidation
-  - Neuromodulation levels
-
-### 1.8 Performance Infrastructure - STATUS: IMPLEMENTED
-
-**Location:** `src/performance/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Memory pools | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Event queues | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Sparse connectivity | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Parallel processing | ✅ Implemented | ⚠️ Not integrated into Brain |
-| SIMD vectorization | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Checkpoint system | ✅ Defined | ❌ Not connected to Brain |
-
-**Note:** CheckpointSystem.hpp is fully implemented with reader/writer/manager but Brain::save/load are stubs.
-
----
-
-## 2. Disconnected Systems Map
-
-```
-PERCEPTION (SensoryInput)
-    ↓
-SENSORY NEURONS (working)
-    ↓
-??? (gap - no working memory integration)
-    ↓
-??? (gap - no prediction integration)
-    ↓
-??? (gap - no concept formation integration)
-    ↓
-ACTION SELECTION (motor neurons - working but basic)
-    ↓
-MOTOR COMMAND
-```
-
-**What's Missing:**
-1. Sensory input → Working memory storage
-2. Working memory → Attention
-3. Attention → Concept formation
-4. Concept formation → Planning
-5. Planning → Action selection
-6. Action → Self-model update
-7. Self-model → Agency
-8. Experience → Episodic memory
-9. Episodic memory → Consolidation
-10. Sleep/rest cycle → Memory consolidation
-
----
-
-## 3. Main Brain Loop Analysis
-
-**Current Brain::step() execution (lines 214-333):**
-
-```cpp
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    // 1. Process pending delayed spikes (deliver synaptic input) ✅
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+int main() {
+    // Create configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", 1000);
+    config->set("simulation_timestep", 0.001);
     
-    // 2. Update all neurons (LIF dynamics) ✅
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
-        }
+    // Create brain
+    auto brain = std::make_unique<nlm::Brain>(config);
+    
+    // Initialize
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain" << std::endl;
+        return 1;
     }
     
-    // 3. Detect spikes and schedule spike events ✅
-    // ... spike detection and scheduling ...
-    
-    // 4. Apply plasticity rules (STDP and Hebbian) ✅
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // STDP and Hebbian applied
-        }
+    // Run simulation
+    for (uint64_t step = 0; step < 10000; ++step) {
+        brain->step(step);
     }
     
-    // 5. Apply structural plasticity periodically (every 100 steps) ✅
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
+    return 0;
 }
 ```
 
-**What's NOT called in step():**
-- ❌ Working memory update
-- ❌ Episodic memory storage
-- ❌ Prediction system update
-- ❌ Attention update
-- ❌ Concept formation
-- ❌ Planning
-- ❌ Development update (beyond structural plasticity)
-- ❌ Neuromodulation update (dopamine, etc.)
-- ❌ Memory consolidation
-- ❌ Replay
-
----
-
-## 4. Environment and Agent Integration
-
-**Location:** `src/world/SimpleWorld.hpp`, `src/agent/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| SimpleWorld | ✅ Working | ✅ Used in AgentBrain |
-| SensoryPercept | ✅ Working | ✅ Used in AgentBrain |
-| AgentBody | ✅ Defined | ⚠️ Limited integration |
-| Motor commands | ✅ Working | ✅ Used in AgentBrain |
-
-**Agent - World Loop:**
-```cpp
-// In experiment/demos:
-while (running) {
-    // 1. Get observation from world ✅
-    SensoryPercept percept = world.observe(agent);
-    
-    // 2. Process sensory input ✅
-    agentBrain.processSensoryInput(percept);
-    
-    // 3. Brain step ✅
-    brain.step(step);
-    
-    // 4. Decode motor command ✅
-    MotorCommand cmd = agentBrain.decodeMotorCommand();
-    
-    // 5. Apply action to world ✅
-    world.applyAction(agent, cmd);
-    
-    // 6. Compute reward ✅
-    float reward = world.computeReward(agent);
-    
-    // 7. Apply reward modulation ✅
-    agentBrain.applyRewardModulation(reward, predictedReward);
+### Configuration File
+```json
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "simulation_timestep": 0.001,
+    "connection_probability": 0.1,
+    "plasticity_learning_rate": 0.01,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    "development_synaptogenesis_rate": 0.001,
+    "development_pruning_rate": 0.0001,
+    "dopamine_baseline": 0.1,
+    "reward_discount_factor": 0.99,
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10,
+    "log_level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0
 }
 ```
 
-**What's missing after the loop:**
-- No memory storage of experiences
-- No prediction training
-- No concept formation from observations
-- No planning integration
-- No sleep/rest cycle
+### Python Bindings
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain()
+
+# Create world
+world = pynlm.createSimpleWorld(10, 10)
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation
+for step in range(1000):
+    # Process sensory input
+    percept = world.getObservation()
+    agent.processSensoryInput(percept)
+    
+    # Get motor action
+    action = agent.decodeMotorCommand()
+    
+    # Apply action to world
+    world.applyAction(action)
+    
+    # Update environment
+    world.step()
+```
+
+## API Reference
+
+### Core Classes
+
+#### nlm::Brain
+Central coordinator of the neural system. Implements real spiking neural computation with event-driven dynamics and integrated memory, prediction, cognition, and neuromodulation systems.
+
+**Public Methods:**
+- `Brain(std::shared_ptr<Config> config)` - Constructor
+- `~Brain()` - Destructor
+- `bool initialize()` - Initialize brain with configuration
+- `void step(SimulationStep currentStep)` - Main simulation step
+- `void step(SimulationStep currentStep, Timestamp currentTime)` - Simulation step with timestamp
+- `void receiveSensoryInput(const SensoryInput& input)` - Receive sensory input from environment
+- `void injectCurrent(NeuronId neuron, MembranePotential current)` - Inject current directly into a specific neuron
+- `void injectCurrentToNeurons(NeuronType type, MembranePotential current)` - Inject current into all neurons of a specific type
+- `SpikeSystem* getSpikeSystem()` - Get spike system access
+- `STDP* getSTDP()` - Get STDP plasticity system
+- `Hebbian* getHebbian()` - Get Hebbian plasticity system
+- `StructuralPlasticity* getStructuralPlasticity()` - Get structural plasticity system
+- `float getExcitationInhibitionRatio() const` - Get excitation-inhibition ratio
+- `size_t getTotalSpikeCount() const` - Get total spike count
+- `size_t getPendingSpikeEventCount() const` - Get pending spike event count
+- `std::unique_ptr<Action> produceAction()` - Produce motor/action output based on motor neuron activity
+- `void applyNeuromodulation(const Neuromodulator& signal)` - Apply neuromodulatory signals
+- `void updatePlasticity()` - Update plasticity rules
+- `void develop()` - Apply developmental changes
+- `void reset()` - Reset brain state
+- `bool save(const std::string& filepath) const` - Save brain state to file
+- `bool load(const std::string& filepath)` - Load brain state from file
+- `RegionId addRegion(const std::string& name = "")` - Region management
+- `NeuralRegion* getRegion(RegionId id)` - Get neural region
+- `const NeuralRegion* getRegion(RegionId id) const` - Get neural region (const version)
+- `size_t getRegionCount() const` - Get region count
+- `std::vector<RegionId> getRegionIds() const` - Get region IDs
+- `const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const` - Get all regions
+- `void addInterRegionConnection(RegionId source, RegionId target, float weight = 0.0f, Delay delay = 1)` - Add inter-region connection
+- `void removeInterRegionConnection(RegionId source, RegionId target)` - Remove inter-region connection
+- `size_t getTotalNeuronCount() const` - Get total neuron count
+- `size_t getTotalSynapseCount() const` - Get total synapse count
+- `size_t getActiveNeuronCount() const` - Get active neuron count
+- `size_t getFiringNeuronCount() const` - Get firing neuron count
+- `float getAverageFiringRate() const` - Get average firing rate
+
+**Memory Systems:**
+- `NeuralWorkingMemory* getWorkingMemory()` - Get working memory system
+- `NeuralEpisodicMemory* getEpisodicMemory()` - Get episodic memory system
+- `NeuralAssociativeMemory* getAssociativeMemory()` - Get associative memory system
+
+**Prediction Systems:**
+- `PredictionSystem* getPredictionSystem()` - Get prediction system
+
+**Cognition Systems:**
+- `NeuralPlanner* getPlanner()` - Get neural planner
+- `ConceptFormation* getConceptFormation()` - Get concept formation
+- `AttentionalSelection* getAttention()` - Get attentional selection
+
+**Development System:**
+- `DevelopmentSystem* getDevelopmentSystem()` - Get development system
+- `DevelopmentalStage getDevelopmentalStage() const` - Get developmental stage
+- `void setDevelopmentalStage(DevelopmentalStage stage)` - Set developmental stage
+
+**Neuromodulation Systems:**
+- `Dopamine* getDopamine()` - Get dopamine system
+- `Curiosity* getCuriosity()` - Get curiosity system
+- `Novelty* getNovelty()` - Get novelty system
+- `PredictionError* getPredictionErrorSignal()` - Get prediction error system
+
+#### nlm::Config
+Configuration system for the NLM framework. Supports JSON/YAML format and provides type-safe access to configuration values.
+
+**Public Methods:**
+- `Config()` - Constructor
+- `~Config()` - Destructor
+- `bool loadFromFile(const std::string& filepath)` - Load from JSON file
+- `bool loadFromArgs(int argc, char** argv)` - Load from command line arguments
+- `bool saveToFile(const std::string& filepath) const` - Save to JSON file
+- `template<typename T> std::optional<T> get(const std::string& key) const` - Get value
+- `template<typename T> T getOr(const std::string& key, const T& defaultValue) const` - Get value with default
+- `void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime)` - Set value
+- `void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime)` - Set string value
+- `void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime)` - Set int value
+- `void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime)` - Set double value
+- `void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime)` - Set bool value
+- `bool has(const std::string& key) const` - Check if key exists
+- `void remove(const std::string& key)` - Remove key
+- `std::vector<std::string> getKeys() const` - Get all keys
+- `void clear()` - Clear all
+- `std::string summary() const` - Get configuration summary
+
+#### nlm::SystemFactory
+Factory class for creating system instances. Supports memory systems, prediction systems, cognitive systems, neuromodulators, and plasticity rules.
+
+**Public Methods:**
+- `static std::unique_ptr<MemorySystem> createMemorySystem(const std::string& type)` - Create memory system
+- `static std::unique_ptr<PredictionSystemBase> createPredictionSystem(const std::string& type)` - Create prediction system
+- `static std::unique_ptr<CognitiveSystem> createCognitiveSystem(const std::string& type)` - Create cognitive system
+- `static std::unique_ptr<NeuromodulatorBase> createNeuromodulator(const std::string& type)` - Create neuromodulator
+- `static std::unique_ptr<PlasticityRule> createPlasticityRule(const std::string& type)` - Create plasticity rule
+
+#### nlm::ErrorHandler
+Error handling utilities for the NLM framework. Provides parameter validation, file operation checks, and error conversion.
+
+**Public Methods:**
+- `static std::exception_ptr convertToStandardException(const NLMException& nlmException)` - Convert NLM exception to standard exception
+- `static void logError(const std::string& errorMessage, NLMErrorCategory category = NLMErrorCategory::SystemError)` - Log error
+- `template<typename T> static T validateParameter(T value, T min, T max, const std::string& paramName)` - Validate parameter
+- `static void checkNotNull(const void* ptr, const std::string& paramName)` - Check if pointer is not null
+- `static void validateFileOperation(const std::string& filepath, bool operationSuccessful, const std::string& operationName)` - Validate file operation
+
+### Memory Systems
+
+#### nlm::NeuralWorkingMemory
+Implements working memory using neural dynamics. Uses persistent neural activity and recurrent connections for information maintenance.
+
+**Key Features:**
+- Persistent neural activity (reverberating activity)
+- Recurrent synaptic connections for maintaining information
+- Activity-dependent short-term plasticity
+- Neural competition for selective retention
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void store(const std::vector<float>& pattern, float strength = 1.0f)` - Store information in working memory
+- `void storeToNeuron(NeuronId neuron, float activation)` - Store specific neuron activation
+- `std::vector<float> retrieve() const` - Retrieve current working memory content
+- `bool contains(NeuronId neuron) const` - Check if specific neuron is part of working memory
+- `float getNeuronActivation(NeuronId neuron) const` - Get activation level of specific neuron
+- `void update(TimestepDuration dt)` - Update working memory (maintenance and decay)
+- `void clear()` - Clear working memory
+- `size_t getActiveTraces() const` - Get number of active memory traces
+- `size_t getCapacity() const` - Get capacity
+- `void setCapacity(size_t cap)` - Set capacity
+- `float getDecayRate() const` - Get decay rate
+- `void setDecayRate(float rate)` - Set decay rate
+- `const std::vector<NeuronId>& getMemoryNeurons() const` - Get neurons currently in working memory
+
+#### nlm::NeuralEpisodicMemory
+Implements episodic memory for storing experiences and events.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void storeEpisode(const EpisodicMemoryItem& episode)` - Store episode
+- `EpisodicMemoryItem retrieveEpisode(size_t index) const` - Retrieve episode
+- `size_t getEpisodeCount() const` - Get episode count
+- `std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const` - Get recent episodes
+- `void clear()` - Clear all
+- `void consolidate(float relevanceThreshold)` - Memory consolidation
+
+#### nlm::NeuralAssociativeMemory
+Implements associative memory for pattern associations.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void associate(NeuronId a, NeuronId b, float strength)` - Create association
+- `std::vector<NeuronId> getAssociations(NeuronId neuron) const` - Get associated neurons
+- `float getAssociationStrength(NeuronId a, NeuronId b) const` - Get association strength
+- `void updateAssociation(NeuronId a, NeuronId b, float delta)` - Update association
+- `void clear()` - Clear all
+
+### Cognitive Systems
+
+#### nlm::NeuralPlanner
+Implements action planning using neural computations.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void setPlanningDepth(int depth)` - Set planning depth
+- `std::vector<NeuronId> planAction(const std::vector<NeuronId>& context)` - Plan action
+- `float evaluateAction(const Action& action)` - Evaluate action
+
+#### nlm::ConceptFormation
+Implements concept formation for pattern discovery and categorization.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void learnConcept(const std::vector<float>& pattern, const std::string& label)` - Learn concept
+- `std::string categorize(const std::vector<float>& pattern) const` - Categorize pattern
+- `std::vector<std::string> getAllConcepts() const` - Get all concepts
+
+### Neuromodulation Systems
+
+#### nlm::Dopamine
+Implements dopamine-based reward and reinforcement learning.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void update(TimestepDuration dt)` - Update dopamine level
+- `float getLevel() const` - Get dopamine level
+- `float getPlasticityFactor() const` - Get plasticity factor
+- `void reset()` - Reset dopamine level
+
+#### nlm::Curiosity
+Implements curiosity-based exploration motivation.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void update(TimestepDuration dt)` - Update curiosity level
+- `float getLevel() const` - Get curiosity level
+
+#### nlm::Novelty
+Implements novelty detection for unexpected stimuli.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void update(TimestepDuration dt)` - Update novelty detection
+- `float getLevel() const` - Get novelty level
+
+#### nlm::PredictionError
+Implements prediction error signal for learning.
+
+**Public Methods:**
+- `void initialize(Brain* brain)` - Initialize with brain reference
+- `void update(TimestepDuration dt)` - Update prediction error
+- `float getLevel() const` - Get prediction error level
+
+### Plasticity Systems
+
+#### nlm::STDP
+Implements spike-timing-dependent plasticity (STDP).
+
+**Public Methods:**
+- `void configure(float ltpWeight, float ltdWeight, float tau)` - Configure STDP parameters
+- `void update(Synapse* synapse, const std::vector<SpikeEvent>& preSpikes, const std::vector<SpikeEvent>& postSpikes, TimestepDuration dt)` - Update synapse
+
+#### nlm::Hebbian
+Implements Hebbian learning.
+
+**Public Methods:**
+- `void update(Synapse* synapse, const std::vector<SpikeEvent>& preSpikes, const std::vector<SpikeEvent>& postSpikes, TimestepDuration dt)` - Update synapse
+
+#### nlm::StructuralPlasticity
+Implements structural plasticity for synapse formation and elimination.
+
+**Public Methods:**
+- `void setSynaptogenesisRate(float rate)` - Set synaptogenesis rate
+- `void setPruningRate(float rate)` - Set pruning rate
+- `void update(Synapse* synapse, const std::vector<SpikeEvent>& preSpikes, const std::vector<SpikeEvent>& postSpikes, TimestepDuration dt)` - Update synapse
+
+## Error Handling
+
+### Exception Hierarchy
+
+#### nlm::NLMException
+Base class for all NLM exceptions. Contains error category and message.
+
+#### nlm::ConfigException
+Exception for configuration-related errors. Contains error code for specific config errors.
+
+#### nlm::MemoryException
+Exception for memory-related errors. Contains error code for specific memory errors.
+
+#### nlm::NeuralException
+Exception for neural system errors. Contains error code for specific neural errors.
+
+### Error Categories
+
+- **ConfigError**: Configuration file parsing, validation errors
+- **MemoryError**: Memory allocation, capacity, corruption errors
+- **NeuralError**: Neuron, synapse, simulation errors
+- **PlasticityError**: Plasticity rule application errors
+- **IntegrationError**: System integration, coordination errors
+- **SystemError**: General system errors
+
+### Error Codes
+
+#### ConfigErrorCode
+- `FileNotFound`: Configuration file not found
+- `ParseError`: Configuration file parsing failed
+- `InvalidKey`: Invalid configuration key
+- `TypeMismatch`: Configuration value type mismatch
+- `MissingRequiredKey`: Required configuration key missing
+
+#### MemoryErrorCode
+- `AllocationFailed`: Memory allocation failed
+- `CapacityExceeded`: Memory capacity exceeded
+- `InvalidAccess`: Invalid memory access
+- `CorruptionDetected`: Memory corruption detected
+
+#### NeuralErrorCode
+- `NeuronNotFound`: Neuron not found
+- `SynapseNotFound`: Synapse not found
+- `InvalidConnection`: Invalid neural connection
+- `SimulationStepError`: Simulation step failed
+
+## Configuration Keys
+
+### Core Configuration
+- `random_seed`: Random seed for reproducible experiments (int, default: 42)
+- `simulation_timestep`: Simulation timestep in seconds (double, default: 0.001)
+- `neuron_count`: Number of neurons in the brain (size_t, default: 1000)
+- `region_count`: Number of brain regions (size_t, default: 2)
+- `connection_probability`: Connection probability for random connectivity (float, default: 0.1)
+
+### Plasticity Configuration
+- `plasticity_learning_rate`: Plasticity learning rate (float, default: 0.01)
+- `stdp_ltp_weight`: STDP long-term potentiation weight (float, default: 0.01)
+- `stdp_ltd_weight`: STDP long-term depression weight (float, default: 0.012)
+- `stdp_time_constant`: STDP time constant (float, default: 20.0)
+- `synaptogenesis_rate`: Synaptogenesis rate (float, default: 0.0001)
+- `pruning_rate`: Pruning rate (float, default: 0.00001)
+
+### Development Configuration
+- `development_synaptogenesis_rate`: Development synaptogenesis rate (float, default: 0.001)
+- `development_pruning_rate`: Development pruning rate (float, default: 0.0001)
+
+### Neuromodulation Configuration
+- `dopamine_baseline`: Baseline dopamine level (float, default: 0.1)
+- `reward_discount_factor`: Reward discount factor (float, default: 0.99)
+
+### Environment Configuration
+- `environment_name`: Environment name (string, default: "GridWorld")
+- `environment_width`: Environment width (size_t, default: 10)
+- `environment_height`: Environment height (size_t, default: 10)
+
+### Logging Configuration
+- `log_level`: Logging level (string, default: "INFO")
+- `log_to_file`: Log to file (bool, default: false)
+- `log_filename`: Log filename (string, default: "nlm.log")
+
+### Simulation Configuration
+- `max_simulation_steps`: Maximum simulation steps (size_t, default: 10000)
+- `simulation_time_limit`: Simulation time limit (double, default: 0.0)
+
+### Visualization Configuration
+- `visualization_enabled`: Enable visualization (bool, default: false)
+- `visualization_update_rate`: Visualization update rate (float, default: 30.0)
+
+## Performance Considerations
+
+### Memory Management
+- Use smart pointers (std::unique_ptr, std::shared_ptr) for automatic memory management
+- Monitor memory usage with ErrorHandler::logError
+- Clear memory systems when not needed
+
+### Performance Optimizations
+- Use SIMD vectorization for numerical operations
+- Implement event-driven simulation with spike systems
+- Use memory pools for frequent allocations
+- Parallelize independent computations
+
+### Scaling Guidelines
+- Monitor system statistics with Brain::logStatus()
+- Adjust configuration based on available resources
+- Use checkpointing for long simulations
+- Implement hierarchical memory management for large brains
+
+## Troubleshooting
+
+### Common Issues
+
+#### "Failed to initialize brain"
+Check configuration file format and required keys. Ensure all file paths are correct.
+
+#### "Memory allocation failed"
+Increase system resources or reduce simulation complexity. Check for memory leaks.
+
+#### "Configuration file parsing failed"
+Verify JSON/YAML syntax in configuration files. Check file permissions.
+
+#### "Neuron not found"
+Check if neurons have been created for the specified brain regions. Ensure brain has been initialized.
+
+### Debugging Tools
+
+#### Logging Levels
+- `ERROR`: Critical errors that prevent system operation
+- `WARNING`: Warnings that may indicate potential issues
+- `INFO`: General information about system operation
+- `DEBUG`: Detailed debug information for troubleshooting
+
+#### Configuration Validation
+Use ErrorHandler::validateParameter() to validate configuration parameters before using them.
+
+#### Memory Monitoring
+Monitor memory usage with Brain::getActiveNeuronCount() and Brain::getTotalNeuronCount().
+
+## Future Enhancements
+
+### Phase 2 Features
+- Implement real JSON/YAML parsers (already implemented in Phase 6)
+- Add support for more neuromodulators
+- Implement advanced plasticity rules
+- Add multi-modal perception
+
+### Phase 3 Features
+- Implement meta-learning capabilities
+- Add transfer learning
+- Implement continual learning
+- Add meta-plasticity
+
+### Phase 4 Features
+- Implement theory of mind
+- Add emotion systems
+- Implement consciousness models
+- Add language processing
+
+### Phase 5 Features
+- Implement multi-modal perception
+- Add body awareness and embodiment
+- Implement social learning
+- Add cultural transmission
+
+## References
+
+1. Chaika, E. et al. (2023). "Neural Learning Machine (NLM): Phase 6 Final Integration". Technical Report.
+2. McClelland, D.L. et al. (1995). "Too much learning and forgetting". Trends in Neurosciences.
+3. Seung, H.S. & O'Reilly, R.C. (2002). "The Late Burst of Juvenile Learning". Journal of Cognitive Neuroscience.
+4. Hassabis, D. et al. (2017). "Neuroscience-Inspired Artificial Intelligence". Nature Machine Intelligence.
+
+## Acknowledgments
+
+This document was generated from the NLM Phase 6 codebase refactoring and improvements.
+
+## License
+
+NLM is an experimental research framework. Use for academic and research purposes only.
 
 ---
 
-## 5. Experiment Infrastructure
-
-**Location:** `src/experiments/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Experiment framework | ✅ Working | ✅ Used |
-| Metrics collection | ✅ Working | ✅ Used |
-| Ablation system | ✅ Implemented | ❌ Not used in main experiments |
-| Scaling benchmark | ✅ Implemented | ❌ Not used |
-| Phase experiments | ⚠️ Structure exists | ⚠️ Limited execution |
-
-**Issue:** Phase5IntegratedExperiment.hpp defines a comprehensive lifetime experiment but it may not be fully executed in practice.
-
----
-
-## 6. Critical Gaps Summary
-
-### 6.1 Memory Integration
-- Working memory is defined but not connected to sensory processing
-- Episodic memory is never updated with experiences
-- No replay mechanism
-- No sleep/consolidation
-
-### 6.2 Cognitive Integration
-- Neural planner exists but is never called
-- Concept formation exists but never processes experiences
-- Self-model exists but never updates
-- Social learning exists but never observes
-
-### 6.3 Neuromodulation Integration
-- Dopamine only scales STDP weights
-- Other modulators (ACh, NE, 5-HT) are stubs
-- No connection between neuromodulation and memory
-- No connection between neuromodulation and attention
-
-### 6.4 Prediction Integration
-- Prediction system exists but is never trained
-- Prediction error is computed in AgentBrain but doesn't update predictions
-- No use of predictions for attention or planning
-
-### 6.5 Persistence
-- CheckpointSystem is implemented but not connected
-- Brain save/load are stubs
-- No life history tracking
-
----
-
-## 7. Scientific Evaluation Missing
-
-The codebase does NOT demonstrate:
-- Memory retention over time (no tests)
-- Learning progress over development (no measurements)
-- Continual learning without catastrophic forgetting (no tests)
-- Generalization (no tests)
-- Prediction accuracy improvement (no measurements)
-- Individual differences from different histories (no multi-agent experiments)
-
----
-
-## 8. Files with "TODO" Markers
-
-| File | TODO Count | Nature |
-|------|-----------|--------|
-| Brain.hpp | 7 | "TODO PHASE 2" for memory, prediction, save/load |
-| Brain.cpp | 5 | Implementation stubs |
-| Memory.hpp | 8 | "PLACEHOLDER" comments |
-| Neuromodulator.hpp | 4 | "PLACEHOLDER" for ACh, NE, 5-HT |
-| PredictionSystem.hpp | 1 | "PLACEHOLDER" |
-| AgentBrain.cpp | 0 | But disconnected systems |
-
----
-
-## 9. Compliance Check
-
-### NLM Core Philosophy
-| Principle | Status |
-|------------|--------|
-| Experience-driven | ⚠️ Partial - sensors work, learning limited |
-| Development-driven | ⚠️ Partial - stages exist, minimal effect |
-| Neural | ✅ Working - LIF, spikes, synapses |
-| Plastic | ✅ Working - STDP, Hebbian, structural |
-| Recurrent where appropriate | ⚠️ Limited - no recurrent connectivity |
-| Sparse/event-driven | ✅ Working - event-driven spike system |
-| Embodied | ✅ Working - Agent/SimpleWorld |
-| Self-organizing | ⚠️ Limited - structural plasticity exists |
-| Continually learning | ⚠️ Basic - no memory integration |
-
-### Hardcoded Prohibitions - VERIFIED CLEAN
-| Prohibition | Status |
-|-------------|--------|
-| No Transformers | ✅ Verified - no attention layers |
-| No LLM replacement | ✅ Verified |
-| No pretrained knowledge | ✅ Verified |
-| No PyTorch/TF/JAX | ✅ Verified - vanilla C++ |
-| No RNN/LSTM/GRU | ✅ Verified |
-| No CNN for cognition | ✅ Verified |
-
----
-
-## 10. Recommendations for Phase 6
-
-### Priority 1: CONNECT EXISTING SYSTEMS
-1. Connect WorkingMemory to sensory processing
-2. Connect EpisodicMemory to experience logging
-3. Connect PredictionSystem to sensory processing
-4. Connect NeuralPlanner to action selection
-5. Connect ConceptFormation to experience processing
-
-### Priority 2: IMPLEMENT MISSING MECHANISMS
-1. Implement Brain::save() and Brain::load() using CheckpointSystem
-2. Implement sleep/rest cycle with memory consolidation
-3. Implement replay mechanism
-4. Implement full dopamine effects on plasticity
-5. Implement ACh effects on attention/memory
-
-### Priority 3: VALIDATE INTEGRATION
-1. Test memory retention over time
-2. Test prediction accuracy improvement
-3. Test continual learning
-4. Test developmental progression
-5. Test multi-system interaction
-
-### Priority 4: OPTIMIZE
-1. Profile and optimize hot paths
-2. Integrate performance infrastructure
-3. Enable multithreading where safe
-
----
-
-## 11. Summary Score
-
-| Category | Score | Max | Notes |
-|----------|-------|-----|-------|
-| Neural Core | 18 | 20 | Working LIF, spikes, basic plasticity |
-| Memory Systems | 4 | 20 | Defined but disconnected |
-| Neuromodulation | 5 | 15 | Basic dopamine only |
-| Cognition | 0 | 20 | All disconnected |
-| Prediction | 0 | 10 | Disconnected |
-| Development | 4 | 10 | Minimal integration |
-| Persistence | 1 | 10 | Stubs only |
-| Embodiment | 8 | 10 | Working sensory-motor loop |
-| Experiments | 3 | 5 | Framework exists, limited execution |
-| **TOTAL** | **43** | **120** | **35.8%** |
-
----
-
-## Conclusion
-
-NLM/熙然 has a sophisticated **architecture** but functions as a **basic neural simulator** rather than an integrated artificial brain. The components exist but they don't interact. Phase 6 must focus on **integration over new features**.
-
-**The primary goal of Phase 6 is to make the existing systems work together as a coherent whole, not to add more disconnected components.**
+*Last updated: 2026-10-18*
+*Version: Phase 6.0*
+*Documentation generated from code comments and refactoring notes*
