@@ -182,15 +182,28 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Replace the global logger with the provided one
+    // This is more advanced than the simple placeholder implementation
+    static std::shared_ptr<Logger> globalLogger;
+    globalLogger = logger;
+    
+    // If there's already a default global logger, add it as a secondary logger
+    // unless we're replacing the only logger
+    if (!globalLogger && Logger::getGlobal().pImpl->loggers.empty()) {
+        Logger::getGlobal().clearLoggers();
+        Logger::getGlobal().addLogger(std::make_shared<ConsoleLogger>());
+    }
 }
 
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+    : level_(level), file_(file), line_(line), function_(function) {
+    // Initialize oss_ in constructor for safety
+    oss_.str(std::string());
+}
 
 LogStream::~LogStream() {
+    // Log immediately with the accumulated message
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
