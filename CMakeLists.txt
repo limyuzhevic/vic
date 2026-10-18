@@ -57,11 +57,9 @@ add_library(nlm_core STATIC
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/Memory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -72,9 +70,11 @@ add_library(nlm_core STATIC
     src/sensory/InternalSignals.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
+    # Agent
+    src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
+    # World
+    src/world/SimpleWorld.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance
+    src/performance/CheckpointSystem.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

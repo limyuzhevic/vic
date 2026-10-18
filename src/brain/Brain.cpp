@@ -421,6 +421,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
+        // Apply prediction error-based neuromodulation
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+            // Update dopamine level based on prediction error (for better integration)
+            // This creates a connection between prediction and neuromodulation
+            float currentDopamine = pImpl->dopamine->getLevel();
+            float updatedDopamine = currentDopamine * 0.9f + 
+                                   predictionError * 0.1f;
+            pImpl->dopamine->setLevel(updatedDopamine);
+        }
+        
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
@@ -511,8 +523,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        std::vector<float> sensoryPattern;
+        
+        // Collect sensory neuron activations
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential);
+            sensoryPattern.push_back(activation);
+        }
+        
+        // Get current motor action
+        ActionType currentAction = ActionType::Wait;
+        auto action = produceAction();
+        if (action) {
+            currentAction = action->getType();
+        }
+        
+        // Update prediction based on sensory pattern and action
+        pImpl->predictionSystem->updatePrediction(sensoryPattern, currentAction);
+        
+        // Store predictions in working memory for later use
+        auto predictedActions = pImpl->predictionSystem->predictBestActions(sensoryPattern);
+        if (!predictedActions.empty() && pImpl->workingMemory) {
+            // Store predictions as neural activity pattern
+            pImpl->workingMemory->store(predictedActions, 
+                                       pImpl->predictionSystem->getPredictionConfidence());
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +561,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // NEW: Use predictions to guide attention
+        if (pImpl->predictionSystem) {
+            // Apply top-down bias from predictions
+            auto predictedActions = pImpl->predictionSystem->getPredictedActions();
+            for (size_t i = 0; i < predictedActions.size() && i < pImpl->motorNeurons.size(); ++i) {
+                NeuronId neuronId = pImpl->motorNeurons[i]->getId();
+                pImpl->attention->applyTopDownBias(neuronId, 0.5f);
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        
+        std::vector<float> currentActivityPattern;
+        
+        // Collect activity from sensory and working memory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential);
+            currentActivityPattern.push_back(activation);
+        }
+        
+        if (pImpl->workingMemory) {
+            auto wmActivity = pImpl->workingMemory->retrieve();
+            currentActivityPattern.insert(currentActivityPattern.end(), 
+                                         wmActivity.begin(), wmActivity.end());
+        }
+        
+        // Process for concept formation
+        if (!currentActivityPattern.empty()) {
+            pImpl->conceptFormation->processPattern(currentActivityPattern);
+            
+            // Get formed concepts and apply to attention
+            auto concepts = pImpl->conceptFormation->getConcepts();
+            for (const auto& concept : concepts) {
+                pImpl->attention->applyTopDownBias(concept.neuronId, concept.relevance);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -597,6 +669,21 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Get current action if available
+    ActionType currentAction = ActionType::Wait;
+    auto action = produceAction();
+    if (action) {
+        currentAction = action->getType();
+    }
+    
+    // Store in prediction system for learning
+    if (pImpl->predictionSystem) {
+        // Convert input values to vector<float>
+        std::vector<float> sensoryVector(values.begin(), values.end());
+        // Train prediction system
+        pImpl->predictionSystem->train(sensoryVector, currentAction);
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -690,6 +777,24 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
+    // Check if we have a prediction system
+    if (pImpl->predictionSystem) {
+        // Get predicted action sequence
+        std::vector<ActionType> predictedActions = 
+            pImpl->predictionSystem->predictBestActions({}, 3);  // Empty state for current
+        
+        if (!predictedActions.empty()) {
+            // Convert to MotorCommand
+            MotorCommand predictedMotor = ActionTypeToMotorCommand(predictedActions[0]);
+            
+            // Check if prediction confidence is high enough
+            float confidence = pImpl->predictionSystem->getPredictionConfidence();
+            if (confidence > 0.7f) {
+                return std::make_unique<Action>(predictedMotor);
+            }
+        }
+    }
+    
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
