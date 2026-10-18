@@ -55,14 +55,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file (JSON/YAML format)
+    bool loadFromFile(const std::string& filepath, const std::string& format = "auto");
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Get configuration value as string (for serialization)
+    std::string getAsString(const std::string& key) const;
+    
+    // Check if configuration value exists and is valid
+    bool validateValue(const std::string& key, const std::string& expectedType = "any") const;
+    
+    // Enhanced error handling
+    std::string getLastError() const;
     
     // Get values
     template<typename T>

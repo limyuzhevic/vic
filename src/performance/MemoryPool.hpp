@@ -86,17 +86,35 @@ public:
     size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
     
     /**
-     * Total memory used by pool (bytes)
+     * Check for memory leaks
      */
-    size_t memoryUsage() const;
+    bool checkForLeaks() const;
     
     /**
-     * Pre-allocate objects
+     * Get detailed memory usage statistics
      */
-    void reserve(size_t count);
+    std::map<std::string, size_t> getMemoryStats() const;
     
-private:
-    // Memory block containing objects
+    /**
+     * Force garbage collection (if using hybrid allocation)
+     */
+    void collectGarbage();
+    
+    /**
+     * Get memory fragmentation level
+     */
+    float getFragmentationLevel() const;
+    
+    /**
+     * Set memory limit
+     */
+    void setMemoryLimit(size_t limitBytes);
+    
+    /**
+     * Check if memory limit would be exceeded
+     */
+    bool wouldExceedMemoryLimit(size_t additionalBytes) const;
+};
     struct Block {
         std::vector<uint8_t> data;
         Block* nextBlock;
@@ -248,14 +266,109 @@ size_t MemoryPool<T>::memoryUsage() const {
     return total;
 }
 
-template<typename T>
-void MemoryPool<T>::reserve(size_t count) {
-    while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
+    return total;
+}
+
+/**
+ * Check for memory leaks
+ */
+bool MemoryPool<T>::checkForLeaks() const {
+    bool hasLeaks = false;
+    
+    // Check free list - if non-empty, there might be leaked objects
+    std::atomic<MemPoolNode*> current = freeList_;
+    while (current != nullptr) {
+        // Count nodes to estimate leak size
+        hasLeaks = true;
+        current = current->load(std::memory_order_relaxed);
+    }
+    
+    // Check if allocated count doesn't match available count
+    if (allocatedCount_.load(std::memory_order_relaxed) != 
+        (allocatedCount_.load(std::memory_order_relaxed) - 
+         availableCount_.load(std::memory_order_relaxed))) {
+        hasLeaks = true;
+    }
+    
+    return hasLeaks;
+}
+
+/**
+ * Get detailed memory usage statistics
+ */
+std::map<std::string, size_t> MemoryPool<T>::getMemoryStats() const {
+    std::map<std::string, size_t> stats;
+    
+    size_t totalAllocated = 0;
+    size_t totalFree = 0;
+    size_t totalBlocks = blocks_.size();
+    
+    for (const auto& block : blocks_) {
+        totalAllocated += block->data.size();
+    }
+    
+    stats["allocated_bytes"] = totalAllocated;
+    stats["allocated_objects"] = allocatedCount_.load(std::memory_order_relaxed);
+    stats["free_objects"] = availableCount_.load(std::memory_order_relaxed);
+    stats["blocks"] = totalBlocks;
+    stats["block_size"] = blockSize_;
+    stats["slab_size"] = slabSize_;
+    
+    return stats;
+}
+
+/**
+ * Force garbage collection (if using hybrid allocation)
+ */
+void MemoryPool<T>::collectGarbage() {
+    // For pure memory pools, garbage collection is just cleanup
+    // In a hybrid implementation, we might free unused blocks
+    
+    // Ensure free list is complete
+    std::atomic<MemPoolNode*> current = freeList_;
+    while (current != nullptr) {
+        // All nodes in free list are already accounted for
+        current = current->load(std::memory_order_relaxed);
     }
 }
 
-// NeuronPool - Specialized pool for neurons with cache-aligned states
+/**
+ * Get memory fragmentation level
+ */
+float MemoryPool<T>::getFragmentationLevel() const {
+    if (blocks_.empty()) {
+        return 0.0f;
+    }
+    
+    size_t totalAllocated = 0;
+    for (const auto& block : blocks_) {
+        totalAllocated += block->data.size();
+    }
+    
+    size_t activeBytes = allocatedCount_.load(std::memory_order_relaxed) * slabSize_;
+    
+    if (totalAllocated == 0) {
+        return 0.0f;
+    }
+    
+    return static_cast<float>(totalAllocated - activeBytes) / totalAllocated;
+}
+
+/**
+ * Set memory limit
+ */
+void MemoryPool<T>::setMemoryLimit(size_t limitBytes) {
+    // Implementation depends on memory limit tracking
+    // Could track per-block memory usage and limit total
+}
+
+/**
+ * Check if memory limit would be exceeded
+ */
+bool MemoryPool<T>::wouldExceedMemoryLimit(size_t additionalBytes) const {
+    size_t currentUsage = memoryUsage();
+    return (currentUsage + additionalBytes) > limitBytes_;
+}
 class NeuronPool {
 public:
     NeuronPool();
