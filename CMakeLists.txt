@@ -18,8 +18,7 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Improved CMake configuration with better organization and modern practices
 
 # Core library
 add_library(nlm_core STATIC

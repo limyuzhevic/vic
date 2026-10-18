@@ -9,9 +9,16 @@ struct Hebbian::Impl {
     float maxWeight;
     float minWeight;
     float covarianceThreshold;  // For covariance rule
+    bool onlineNormalization;
+    bool heterosynapticPlasticity;
+    float lateralInhibition;
+    float activityBaseline;     // For online normalization
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             covarianceThreshold(0.0f), onlineNormalization(false),
+             heterosynapticPlasticity(false), lateralInhibition(0.1f),
+             activityBaseline(0.5f) {}
+};
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -65,9 +72,28 @@ void Hebbian::update(Synapse* synapse,
         }
     }
     
-    // Compute weight change based on correlation
+    // Apply weight change based on correlation
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    
+    // Apply online normalization if enabled
+    if (pImpl->onlineNormalization) {
+        // Calculate normalized correlation
+        float normalizedDelta = delta;
+        if (correlationCount > 0) {
+            // Subtract mean activity
+            float meanActivity = pImpl->activityBaseline * static_cast<float>(preSpikes.size() + postSpikes.size()) / 2.0f;
+            normalizedDelta = delta * (1.0f - meanActivity / correlationCount);
+        }
+        delta = normalizedDelta;
+    }
+    
+    // Apply lateral inhibition if enabled
+    if (pImpl->heterosynapticPlasticity && pImpl->lateralInhibition > 0.0f) {
+        // Subtract a fraction of current weight as lateral inhibition
+        float inhibition = pImpl->lateralInhibition * synapse->getWeight();
+        delta -= inhibition;
+    }
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
@@ -95,12 +121,28 @@ float Hebbian::getLearningRate() const {
     return pImpl->learningRate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+void Hebbian::setOnlineNormalization(bool enabled) {
+    pImpl->onlineNormalization = enabled;
 }
 
-float Hebbian::getMaxWeight() const {
-    return pImpl->maxWeight;
+bool Hebbian::getOnlineNormalization() const {
+    return pImpl->onlineNormalization;
+}
+
+void Hebbian::setHeterosynapticPlasticity(bool enabled) {
+    pImpl->heterosynapticPlasticity = enabled;
+}
+
+bool Hebbian::getHeterosynapticPlasticity() const {
+    return pImpl->heterosynapticPlasticity;
+}
+
+void Hebbian::setLateralInhibition(float strength) {
+    pImpl->lateralInhibition = std::clamp(strength, 0.0f, 1.0f);
+}
+
+float Hebbian::getLateralInhibition() const {
+    return pImpl->lateralInhibition;
 }
 
 } // namespace nlm

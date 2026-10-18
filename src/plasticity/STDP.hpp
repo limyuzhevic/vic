@@ -27,6 +27,15 @@ public:
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
     
+    // Get minimum/maximum weight bounds
+    void setWeightBounds(float minWeight, float maxWeight);
+    float getMinWeight() const;
+    float getMaxWeight() const;
+    
+    // Get synaptic efficacy multiplier
+    float getEfficacyMultiplier() const;
+    void setEfficacyMultiplier(float multiplier);
+    
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
