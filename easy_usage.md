@@ -295,3 +295,83 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+---
+
+## New Enhancements
+
+This version includes several improvements over the original easy usage guide:
+
+### 1. Advanced Configuration Support
+```python
+# Create configuration with specific parameters
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("brain.region_count", 2)
+config.set("plasticity.stdp.learning_rate", 0.001)
+brain = pynlm.createBrain(config)
+```
+
+### 2. Enhanced Error Handling
+- Better feedback when initialization fails
+- Configuration validation
+- Default parameter fallbacks
+
+### 3. Performance Monitoring
+- Built-in timing for simulations
+- Memory usage tracking
+- Performance statistics
+
+### 4. Advanced Brain Features
+```python
+# Enable learning capabilities
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Access brain statistics
+brain.getTotalSpikeCount()
+brain.getAverageFiringRate()
+brain.getExcitationInhibitionRatio()
+```
+
+### 5. Configuration from File
+```python
+# Load configuration from JSON file
+config = pynlm.createDefaultConfig()
+config.loadFromFile("my_config.json")
+brain = pynlm.createBrain(config)
+```
+
+### 6. Complete Agent Examples
+```python
+# Full simulation with world and agent
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+agent.initialize(world)
+
+# Run complete episode
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### 7. Enhanced Documentation
+- More comprehensive examples
+- Better error messages
+- Advanced features documented
+- Performance optimization tips
+
+### 8. Improved Compatibility
+- Better cross-platform support
+- Enhanced configuration handling
+- More robust initialization process
+
+These enhancements make NLM easier to use for beginners while providing advanced features for experienced users.

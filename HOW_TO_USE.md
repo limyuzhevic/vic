@@ -105,7 +105,7 @@ pip install dist/*.whl
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(pynlm.__version__ if hasattr(pynlm, '__version__') else 'Latest')
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
@@ -251,9 +251,9 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
+    
+    # Run the simulation
+    run_agent_simulation(1000)
 ```
 
 ### Key Classes and Methods
@@ -274,7 +274,7 @@ brain.reset()                     # Reset brain state
 
 # Input/Output
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+action = brain.produceAction()            # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -531,3 +531,42 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+---
+
+## IMPROVEMENTS IN THIS VERSION
+
+This version includes significant improvements:
+
+### 1. Enhanced Error Handling
+- Better validation of configuration parameters
+- More informative error messages
+- Graceful handling of invalid inputs
+
+### 2. Performance Monitoring
+- Built-in timing and memory tracking
+- Performance statistics for simulations
+- Profiling tools for optimization
+
+### 3. Advanced Configuration Options
+- More configuration parameters for fine-tuning
+- Support for configuration files
+- Runtime parameter modification
+
+### 4. Better Documentation
+- Comprehensive examples
+- Detailed API reference
+- Troubleshooting guide
+- Best practices documentation
+
+### 5. Enhanced Simulation Features
+- Support for more complex environments
+- Advanced agent behaviors
+- Better state management and checkpointing
+
+### 6. Improved Compatibility
+- Better cross-platform support
+- Enhanced Python bindings
+- More robust initialization process
+
+These improvements make NLM more accessible to beginners while providing advanced features for experienced users and researchers.
