@@ -38,18 +38,24 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    if (neuronsNeeded == 0) return;  // No neurons available
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+        RegionId regionId = neuron.getId() / 1000;
+        auto* region = brain_->getRegion(regionId);
+        if (!region) return;  // Region not found
+        
+        auto* neurons = region->getAllNeurons();
+        if (!neurons) return;  // Neurons not available
+        
+        for (auto* nn : *neurons) {
+            if (nn->getId() == neuron) {
+                nn->injectCurrent(activation * 5.0f);
+                break;
             }
         }
         

@@ -28,8 +28,18 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
-
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    
+    // Custom NLM exception hierarchy
+    py::class_<std::runtime_error>(m, "NLMError", R"pbdoc(NLM runtime error)pbdoc")
+        .def(py::init<const std::string&>());
+    
+    py::class_<std::invalid_argument>(m, "NLMValueError", R"pbdoc(NLM value error)pbdoc")
+        .def(py::init<const std::string&>());
+    
+    py::class_<std::out_of_range>(m, "NLMIndexError", R"pbdoc(NLM index error)pbdoc")
+        .def(py::init<const std::string&>());
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
@@ -416,10 +426,168 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add additional convenience functions
+    m.def("run_agent_simulation", [](std::shared_ptr<Brain> brain, 
+                                  std::shared_ptr<SimpleWorld> world, 
+                                  std::shared_ptr<AgentBrain> agent,
+                                  size_t num_steps) {
+        // Default simulation loop
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto motor_cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motor_cmd, world->getSimulationTime());
+            
+            // Apply reward modulation
+            float reward = percept.getInternal()[0] if (percept.getInternal() and not percept.getInternal().empty()) else 0.0f;
+            agent->applyRewardModulation(reward, 0.0);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+       "Run a complete agent simulation loop");
+
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, size_t num_steps, 
+                               std::shared_ptr<Config> config = nullptr) {
+        if (!config) {
+            config = std::make_shared<Config>();
+        }
+        
+        // Configure for benchmarking
+        config->set("neuron_count", 1000);
+        config->set("simulation_timestep", 0.001);
+        
+        auto benchmark_brain = std::make_shared<Brain>(config);
+        benchmark_brain->initialize();
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (size_t step = 0; step < num_steps; ++step) {
+            benchmark_brain->step(step);
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        std::map<std::string, double> results;
+        results["total_spikes"] = static_cast<double>(benchmark_brain->getTotalSpikeCount());
+        results["firing_neurons"] = static_cast<double>(benchmark_brain->getFiringNeuronCount());
+        results["avg_firing_rate"] = benchmark_brain->getAverageFiringRate();
+        results["time_ms"] = static_cast<double>(duration.count());
+        results["spikes_per_second"] = static_cast<double>(benchmark_brain->getTotalSpikeCount()) / (duration.count() / 1000.0);
+        
+        return results;
+    }, py::arg("brain"), py::arg("num_steps"), py::arg("config") = nullptr,
+       "Benchmark brain performance and return metrics");
+
+    m.def("save_experiment_data", [](const std::string& filename,
+                                   std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   const std::vector<std::map<std::string, double>>& metrics) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filename);
+        }
+        
+        file << "# NLM Experiment Data" << std::endl;
+        file << "# Generated: " << std::chrono::system_clock::now() << std::endl;
+        file << "# Brain Statistics:" << std::endl;
+        file << "neuron_count: " << brain->getTotalNeuronCount() << std::endl;
+        file << "synapse_count: " << brain->getTotalSynapseCount() << std::endl;
+        file << "firing_neurons: " << brain->getFiringNeuronCount() << std::endl;
+        file << "average_firing_rate: " << brain->getAverageFiringRate() << std::endl;
+        file << "total_spikes: " << brain->getTotalSpikeCount() << std::endl;
+        file << "excitation_inhibition_ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        file << "development_stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        file << "\n# World Statistics:" << std::endl;
+        file << "width: " << world->getWidth() << std::endl;
+        file << "height: " << world->getHeight() << std::endl;
+        file << "simulation_time: " << world->getSimulationTime() << std::endl;
+        
+        file << "\n# Time Series Metrics:" << std::endl;
+        file << "step,total_spikes,firing_neurons,avg_firing_rate" << std::endl;
+        
+        for (size_t i = 0; i < metrics.size(); ++i) {
+            file << i << ","
+                 << metrics[i]["total_spikes"] << ","
+                 << metrics[i]["firing_neurons"] << ","
+                 << metrics[i]["avg_firing_rate"] << std::endl;
+        }
+        
+        file.close();
+    }, py::arg("filename"), py::arg("brain"), py::arg("world"), py::arg("metrics"),
+       "Save experiment data to CSV file");
+
+    m.def("load_experiment_data", [](const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for reading: " + filename);
+        }
+        
+        std::string line;
+        std::vector<std::map<std::string, double>> metrics;
+        bool in_header = true;
+        size_t step = 0;
+        
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            
+            if (in_header && line.find(",") == std::string::npos) {
+                in_header = false;
+                continue;
+            }
+            
+            std::stringstream ss(line);
+            std::string token;
+            std::vector<std::string> tokens;
+            while (std::getline(ss, token, ',')) {
+                tokens.push_back(token);
+            }
+            
+            if (tokens.size() >= 4) {
+                std::map<std::string, double> data_point;
+                data_point["step"] = static_cast<double>(step);
+                data_point["total_spikes"] = std::stod(tokens[1]);
+                data_point["firing_neurons"] = std::stod(tokens[2]);
+                data_point["avg_firing_rate"] = std::stod(tokens[3]);
+                metrics.push_back(data_point);
+                step++;
+            }
+        }
+        
+        file.close();
+        return metrics;
+    }, py::arg("filename"), "Load experiment data from CSV file");
+
+    m.def("compare_experiments", [](const std::vector<std::pair<std::string, std::vector<std::map<std::string, double>>>> experiments) {
+        std::map<std::string, std::map<std::string, double>> results;
+        
+        for (const auto& experiment : experiments) {
+            const std::string& name = experiment.first;
+            const std::vector<std::map<std::string, double>>& metrics = experiment.second;
+            
+            double total_spikes = 0.0;
+            double total_firing = 0.0;
+            double total_firing_rate = 0.0;
+            size_t count = 0;
+            
+            for (const auto& data : metrics) {
+                total_spikes += data.at("total_spikes");
+                total_firing += data.at("firing_neurons");
+                total_firing_rate += data.at("avg_firing_rate");
+                count++;
+            }
+            
+            if (count > 0) {
+                results[name]["avg_total_spikes"] = total_spikes / count;
+                results[name]["avg_firing_neurons"] = total_firing / count;
+                results[name]["avg_firing_rate"] = total_firing_rate / count;
+                results[name]["steps"] = static_cast<double>(count);
+            }
+        }
+        
+        return results;
+    }, py::arg("experiments"), "Compare multiple experiment datasets");
 
 } // namespace nlm
