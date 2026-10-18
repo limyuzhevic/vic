@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
 
@@ -48,128 +49,489 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+// Configuration utilities
+namespace config_utils {
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
-    
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+    bool validateConfig(const std::shared_ptr<Config>& config) {
+        if (!config) {
+            NLM_LOG_ERROR("Configuration is null");
+            return false;
+        }
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        // Check required parameters
+        std::vector<std::string> requiredParams = {
+            "random_seed",
+            "simulation_timestep",
+            "neuron_count",
+            "region_count",
+            "connection_probability"
+        };
+        
+        bool hasRequiredParams = true;
+        for (const auto& param : requiredParams) {
+            if (!config->has(param)) {
+                NLM_LOG_WARNING("Missing required parameter: " + param);
+                hasRequiredParams = false;
             }
         }
         
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Validate parameter ranges
+        if (config->has("simulation_timestep")) {
+            double timestep = config->getOr<double>("simulation_timestep", 0.001);
+            if (timestep <= 0.0) {
+                NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be positive.");
+                hasRequiredParams = false;
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        if (config->has("neuron_count")) {
+            int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+            if (neuronCount <= 0 || neuronCount > 1000000) {
+                NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be 1-1,000,000.");
+                hasRequiredParams = false;
+            }
         }
+        
+        if (config->has("region_count")) {
+            int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+            if (regionCount <= 0 || regionCount > 100) {
+                NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be 1-100.");
+                hasRequiredParams = false;
+            }
+        }
+        
+        if (config->has("connection_probability")) {
+            float connProb = config->getOr<float>("connection_probability", 0.15f);
+            if (connProb < 0.0f || connProb > 1.0f) {
+                NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connProb) + ". Must be 0.0-1.0.");
+                hasRequiredParams = false;
+            }
+        }
+        
+        if (config->has("random_seed")) {
+            int64_t seed = config->getOr<int64_t>("random_seed", 42);
+            if (seed < 0) {
+                NLM_LOG_ERROR("Invalid random_seed: " + std::to_string(seed) + ". Must be non-negative.");
+                hasRequiredParams = false;
+            }
+        }
+        
+        return hasRequiredParams;
     }
     
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
-        
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+    void logConfigSummary(const std::shared_ptr<Config>& config) {
+        if (!config) {
+            NLM_LOG_ERROR("Config is null in logConfigSummary");
             return;
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration Summary:");
         
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        // Safely get and log each configuration parameter
+        auto logParam = [config](const std::string& key, const std::string& defaultValue) {
+            if (config->has(key)) {
+                try {
+                    std::optional<std::string> val = config->get<std::string>(key);
+                    if (val.has_value()) {
+                        NLM_LOG_INFO("  " + key + ": " + val.value());
+                    } else {
+                        NLM_LOG_WARNING("  " + key + ": Failed to parse as string");
+                    }
+                } catch (...) {
+                    NLM_LOG_WARNING("  " + key + ": Type conversion error");
+                }
+            } else {
+                NLM_LOG_INFO("  " + key + ": " + defaultValue + " (default)");
+            }
+        };
         
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
+        logParam("random_seed", "42");
+        logParam("simulation_timestep", "0.001");
+        logParam("neuron_count", "500");
+        logParam("region_count", "1");
+        logParam("connection_probability", "0.15");
+        logParam("plasticity_learning_rate", "0.01");
+        logParam("stdp_ltp_weight", "0.02");
+        logParam("stdp_ltd_weight", "0.015");
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+        NLM_LOG_INFO("");
+    }
+    
+    bool loadConfigFromFile(const std::string& filepath, std::shared_ptr<Config>& config) {
+        if (!config) {
+            NLM_LOG_ERROR("Config is null in loadConfigFromFile");
+            return false;
         }
         
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+        if (config->loadFromFile(filepath)) {
+            NLM_LOG_INFO("Loaded configuration from: " + filepath);
+            return true;
         } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+            NLM_LOG_WARNING("Using default configuration. Could not load from: " + filepath);
+            return false;
         }
     }
-};
+}
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+// Logging utilities
+namespace log_utils {
     
-    // Inject current into a few neurons and see if spikes propagate
+    void logPhaseHeader(const std::string& phaseName, const std::string& description) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== " + phaseName + " ===");
+        NLM_LOG_INFO(description);
+        NLM_LOG_INFO("");
+    }
+    
+    void logTestResult(const std::string& testName, bool success, const std::string& details = "") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Test: " + testName);
+        
+        if (success) {
+            NLM_LOG_INFO("  ✓ PASSED");
+        } else {
+            NLM_LOG_ERROR("  ✗ FAILED");
+            if (!details.empty()) {
+                NLM_LOG_ERROR("  Details: " + details);
+            }
+        }
+        
+        if (!details.empty()) {
+            NLM_LOG_INFO("  Info: " + details);
+        }
+    }
+}
+
+// Command-line interface utilities
+namespace cli_utils {
+    
+    struct CommandLineOptions {
+        std::string configFile = "configs/default.cfg";
+        std::string outputFile;
+        std::string logLevel = "INFO";
+        bool verbose = false;
+        bool quiet = false;
+        bool help = false;
+        bool version = false;
+        bool listTests = false;
+        
+        // Test mode options
+        bool runAllTests = true;
+        bool runBasicConnectivity = false;
+        bool runPlasticityExperiment = false;
+        bool runStdpVerification = false;
+        
+        // Brain configuration options
+        int64_t randomSeed = 42;
+        double simulationTimestep = 0.001;
+        int64_t neuronCount = 500;
+        int64_t regionCount = 1;
+        float connectionProbability = 0.15f;
+        
+        // Experiment parameters
+        size_t plasticitySteps = 1000;
+        int stdpTrials = 50;
+        float inputCurrent = 30.0f;
+    };
+    
+    void printUsage(const char* programName) {
+        std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+        std::cout << std::endl;
+        std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  --help, -h                    Show this help message and exit" << std::endl;
+        std::cout << "  --version                     Show version information and exit" << std::endl;
+        std::cout << "  --list-tests                  List available test modes and exit" << std::endl;
+        std::cout << "  --config FILE                 Load configuration from FILE (default: configs/default.cfg)" << std::endl;
+        std::cout << "  --output FILE                 Save experiment results to FILE" << std::endl;
+        std::cout << "  --verbose, -v                 Enable verbose output" << std::endl;
+        std::cout << "  --quiet, -q                   Suppress non-essential output" << std::endl;
+        std::cout << "  --log-level LEVEL             Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Test Mode Options:" << std::endl;
+        std::cout << "  --basic-connectivity          Run only basic connectivity test" << std::endl;
+        std::cout << "  --plasticity                 Run only plasticity experiment" << std::endl;
+        std::cout << "  --stdp-verification           Run only STDP verification test" << std::endl;
+        std::cout << "  --no-tests                    Run no tests (for configuration only)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Brain Configuration Options:" << std::endl;
+        std::cout << "  --random-seed SEED            Set random seed" << std::endl;
+        std::cout << "  --simulation-timestep TIME    Set simulation timestep (seconds)" << std::endl;
+        std::cout << "  --neuron-count COUNT          Set number of neurons" << std::endl;
+        std::cout << "  --region-count COUNT          Set number of brain regions" << std::endl;
+        std::cout << "  --connection-prob PROB        Set connection probability (0.0-1.0)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Experiment Parameters:" << std::endl;
+        std::cout << "  --plasticity-steps STEPS      Set number of plasticity experiment steps" << std::endl;
+        std::cout << "  --stdp-trials TRIALS          Set number of STDP trials" << std::endl;
+        std::cout << "  --input-current CURRENT       Set input current for experiments" << std::endl;
+    }
+    
+    bool parseCommandLineArgs(int argc, char** argv, CommandLineOptions& options) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            if (arg == "--help" || arg == "-h") {
+                options.help = true;
+                continue;
+            }
+            
+            if (arg == "--version") {
+                options.version = true;
+                continue;
+            }
+            
+            if (arg == "--list-tests") {
+                options.listTests = true;
+                continue;
+            }
+            
+            if (arg == "--verbose" || arg == "-v") {
+                options.verbose = true;
+                continue;
+            }
+            
+            if (arg == "--quiet" || arg == "-q") {
+                options.quiet = true;
+                continue;
+            }
+            
+            if (arg == "--basic-connectivity") {
+                options.runAllTests = false;
+                options.runBasicConnectivity = true;
+                continue;
+            }
+            
+            if (arg == "--plasticity") {
+                options.runAllTests = false;
+                options.runPlasticityExperiment = true;
+                continue;
+            }
+            
+            if (arg == "--stdp-verification") {
+                options.runAllTests = false;
+                options.runStdpVerification = true;
+                continue;
+            }
+            
+            if (arg == "--no-tests") {
+                options.runAllTests = false;
+                continue;
+            }
+            
+            if (arg.find("--config") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    options.configFile = argv[++i];
+                }
+                continue;
+            }
+            
+            if (arg.find("--output") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.outputFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    options.outputFile = argv[++i];
+                }
+                continue;
+            }
+            
+            if (arg.find("--log-level") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.logLevel = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    options.logLevel = argv[++i];
+                }
+                continue;
+            }
+            
+            // Brain configuration options
+            if (arg.find("--random-seed") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.randomSeed = std::stoll(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.randomSeed = std::stoll(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--simulation-timestep") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.simulationTimestep = std::stod(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.simulationTimestep = std::stod(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--neuron-count") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.neuronCount = std::stoll(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.neuronCount = std::stoll(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--region-count") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.regionCount = std::stoll(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.regionCount = std::stoll(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--connection-prob") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.connectionProbability = std::stof(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.connectionProbability = std::stof(argv[++i]);
+                }
+                continue;
+            }
+            
+            // Experiment parameters
+            if (arg.find("--plasticity-steps") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.plasticitySteps = std::stoull(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.plasticitySteps = std::stoull(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--stdp-trials") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.stdpTrials = std::stoi(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.stdpTrials = std::stoi(argv[++i]);
+                }
+                continue;
+            }
+            
+            if (arg.find("--input-current") == 0) {
+                if (arg.find('=') != std::string::npos) {
+                    options.inputCurrent = std::stof(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    options.inputCurrent = std::stof(argv[++i]);
+                }
+                continue;
+            }
+            
+            // Standard config parsing (backward compatibility)
+            if (arg.find("--config") == 0 && arg.find('=') == std::string::npos && 
+                (i + 1 < argc && argv[i+1][0] != '-')) {
+                options.configFile = argv[++i];
+                continue;
+            }
+        }
+        
+        return true;
+    }
+    
+    void applyCommandLineOptions(std::shared_ptr<Config>& config, const CommandLineOptions& options) {
+        if (!config) {
+            NLM_LOG_ERROR("Config is null in applyCommandLineOptions");
+            return;
+        }
+        
+        // Apply command-line overrides
+        config->set("random_seed", options.randomSeed, ConfigSource::CommandLine);
+        config->set("simulation_timestep", options.simulationTimestep, ConfigSource::CommandLine);
+        config->set("neuron_count", options.neuronCount, ConfigSource::CommandLine);
+        config->set("region_count", options.regionCount, ConfigSource::CommandLine);
+        config->set("connection_probability", options.connectionProbability, ConfigSource::CommandLine);
+    }
+    
+    void listAvailableTests() {
+        std::cout << "Available test modes:" << std::endl;
+        std::cout << "  1. Basic Connectivity Test" << std::endl;
+        std::cout << "     - Injects current into neurons" << std::endl;
+        std::cout << "     - Verifies spike propagation" << std::endl;
+        std::cout << "     - Tests basic network functionality" << std::endl;
+        std::cout << std::endl;
+        std::cout << "  2. Plasticity Learning Experiment" << std::endl;
+        std::cout << "     - Applies repeated input patterns" << std::endl;
+        std::cout << "     - Enables STDP and Hebbian plasticity" << std::endl;
+        std::cout << "     - Records synaptic weight changes" << std::endl;
+        std::cout << std::endl;
+        std::cout << "  3. STDP Verification" << std::endl;
+        std::cout << "     - Tests spike-timing dependent plasticity" << std::endl;
+        std::cout << "     - Verifies pre-before-post potentiation" << std::endl;
+        std::cout << "     - Measures weight changes" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Default: All three tests are run" << std::endl;
+    }
+    
+    bool saveResultsToFile(const std::string& filepath, const std::shared_ptr<Brain>& brain, 
+                          const CommandLineOptions& options) {
+        if (!brain) {
+            NLM_LOG_ERROR("Brain is null in saveResultsToFile");
+            return false;
+        }
+        
+        try {
+            std::ofstream file(filepath);
+            if (!file.is_open()) {
+                NLM_LOG_ERROR("Cannot open output file: " + filepath);
+                return false;
+            }
+            
+            file << "NLM Phase 2 Experiment Results" << std::endl;
+            file << "===============================" << std::endl;
+            file << std::endl;
+            file << "Configuration:" << std::endl;
+            file << "  Random seed: " << brain->getConfig()->getOr<int64_t>("random_seed", 42) << std::endl;
+            file << "  Simulation timestep: " << brain->getConfig()->getOr<double>("simulation_timestep", 0.001) << "s" << std::endl;
+            file << "  Neuron count: " << brain->getConfig()->getOr<int64_t>("neuron_count", 500) << std::endl;
+            file << "  Region count: " << brain->getConfig()->getOr<int64_t>("region_count", 1) << std::endl;
+            file << "  Connection probability: " << brain->getConfig()->getOr<float>("connection_probability", 0.15f) << std::endl;
+            file << std::endl;
+            file << "Experiment Results:" << std::endl;
+            file << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+            file << "  Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+            file << "  Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+            file << "  Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+            file << "  Excitation/inhibition ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+            file << "  Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+            file << std::endl;
+            file << "Date: " << __DATE__ << std::endl;
+            file << "Time: " << __TIME__ << std::endl;
+            
+            file.close();
+            NLM_LOG_INFO("Results saved to: " + filepath);
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Exception in saveResultsToFile: " + std::string(e.what()));
+            return false;
+        }
+    }
+}
+}
+
+// Test 1: Basic connectivity test
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    log_utils::logPhaseHeader("Test 1: Basic Neural Connectivity", 
+                             "Inject current into neurons and verify spike propagation");
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null in runBasicConnectivityTest");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Could not find region 1 for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("  No neurons found!");
         return;
     }
     
@@ -192,70 +554,100 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        log_utils::logTestResult("Basic Connectivity", true, 
+                                 "Generated " + std::to_string(spikes) + " spikes");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                         " thresh=" + std::to_string(neurons[i]->getThreshold()));
         }
+        log_utils::logTestResult("Basic Connectivity", false, 
+                                 "No spikes generated despite input");
     }
 }
 
+// Test 2: Plasticity learning experiment
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    log_utils::logPhaseHeader("Test 2: Plasticity Learning Experiment", 
+                             "Apply repeated input patterns to stimulate synaptic changes");
     
-    LearningExperiment experiment(brain, 42);
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null in runPlasticityExperiment");
+        return;
+    }
+    
+    experiment_utils::LearningExperiment experiment(brain, 42);
     
     // Record initial state
-    experiment.recordInitialState();
+    if (!experiment.recordInitialState()) {
+        NLM_LOG_ERROR("Failed to record initial state");
+        return;
+    }
     
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
+    // Enable plasticity
+    if (!experiment_utils::setupPlasticity(brain.get())) {
+        NLM_LOG_ERROR("Failed to setup plasticity");
+        return;
     }
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
+    const size_t totalSteps = 1000;
+    const float inputCurrent = 30.0f;
+    
+    for (SimulationStep step = 0; step < totalSteps; ++step) {
+        // Apply input pattern
+        experiment_utils::applyInputPattern(brain.get(), step, totalSteps, inputCurrent, 
+                                            brain->getTotalNeuronCount() / 4);
         
         brain->step(step, step * 0.001);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
     // Record final state
-    experiment.recordFinalState();
+    if (!experiment.recordFinalState()) {
+        NLM_LOG_ERROR("Failed to record final state");
+        return;
+    }
     
     // Compute and display statistics
-    experiment.computeStatistics();
+    experiment.computeAndLogStatistics();
+    log_utils::logTestResult("Plasticity Experiment", true, 
+                             "Completed " + std::to_string(totalSteps) + " steps");
 }
 
+// Test 3: STDP verification
 void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    log_utils::logPhaseHeader("Test 3: STDP Verification", 
+                             "Verify that spike-timing dependent plasticity (STDP) works correctly");
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null in runStdpVerification");
+        return;
+    }
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Could not find region 1 for STDP test");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_ERROR("  Not enough synapses for STDP test");
+        log_utils::logTestResult("STDP Verification", false, 
+                                 "Only " + std::to_string(synapses.size()) + " synapses available");
         return;
     }
     
@@ -267,19 +659,21 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                     " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
-    for (int trial = 0; trial < 50; ++trial) {
+    auto neurons = region->getAllNeurons();
+    const int trials = 50;
+    
+    for (int trial = 0; trial < trials; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
         
-        auto neurons = region->getAllNeurons();
         if (neurons.size() >= 2) {
             preNeuron = neurons[0];
             postNeuron = neurons[1];
@@ -298,30 +692,71 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
+    float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+                     " after: " + std::to_string(synapses[i]->getWeight()) +
+                     " (Δ=" + std::to_string(delta) + ")");
+        totalDelta += delta;
     }
     
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+        log_utils::logTestResult("STDP Verification", true, 
+                                 "Total Δ = " + std::to_string(totalDelta));
     } else if (totalDelta < -0.001f) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        log_utils::logTestResult("STDP Verification", false, 
+                                 "Total Δ = " + std::to_string(totalDelta) + " (reversed)");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        log_utils::logTestResult("STDP Verification", false, 
+                                 "Total Δ = " + std::to_string(totalDelta) + " (no change)");
     }
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    cli_utils::CommandLineOptions options;
+    if (!cli_utils::parseCommandLineArgs(argc, argv, options)) {
+        NLM_LOG_ERROR("Failed to parse command line arguments");
+        return 1;
+    }
+    
+    // Handle help and version options
+    if (options.help) {
+        printBanner();
+        cli_utils::printUsage(argv[0]);
+        return 0;
+    }
+    
+    if (options.version) {
+        printBanner();
+        std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+        std::cout << "Version: 0.1.0" << std::endl;
+        std::cout << "Built for Phase 6: Final Integration" << std::endl;
+        return 0;
+    }
+    
+    if (options.listTests) {
+        printBanner();
+        cli_utils::listAvailableTests();
+        return 0;
+    }
+    
+    // Set logging level based on command line options
+    if (options.quiet) {
+        // Temporarily reduce log level for quiet mode
+        // (This would require access to the Logger class)
+        NLM_LOG_INFO("Running in quiet mode - suppressing non-essential output");
+    }
+    
+    if (options.verbose) {
+        NLM_LOG_INFO("Running in verbose mode - detailed output enabled");
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -344,29 +779,19 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config_utils::loadConfigFromFile(options.configFile, config)) {
+        NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Apply command-line options
+    cli_utils::applyCommandLineOptions(config, options);
+    
+    // Apply command line args (backward compatibility)
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (overridden by command line)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -383,14 +808,12 @@ int main(int argc, char** argv) {
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    config_utils::logConfigSummary(config);
+    
+    // Validate configuration
+    if (!config_utils::validateConfig(config)) {
+        NLM_LOG_ERROR("Configuration validation failed. Using defaults.");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +832,50 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on command line options
+    bool anyTestRun = false;
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (options.runAllTests || options.runBasicConnectivity) {
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        anyTestRun = true;
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (options.runAllTests || options.runPlasticityExperiment) {
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        anyTestRun = true;
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (options.runAllTests || options.runStdpVerification) {
+        // Run Test 3: STDP verification
+        runStdpVerification(brain);
+        anyTestRun = true;
+    }
+    
+    if (!anyTestRun && options.runAllTests) {
+        NLM_LOG_ERROR("No tests were run. Please specify test modes.");
+        return 1;
+    }
+    
+    if (!anyTestRun) {
+        NLM_LOG_WARNING("No tests were selected. Use --basic-connectivity, --plasticity, or --stdp-verification");
+    }
+    
+    // Save results to file if requested
+    if (!options.outputFile.empty()) {
+        if (!cli_utils::saveResultsToFile(options.outputFile, brain, options)) {
+            NLM_LOG_ERROR("Failed to save results to: " + options.outputFile);
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
