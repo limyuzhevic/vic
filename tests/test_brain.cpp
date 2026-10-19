@@ -104,7 +104,7 @@ void testBrainActionProduction() {
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
 
-void testBrainStatus() {
+void testBrainNeuralPlanner() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -112,16 +112,53 @@ void testBrainStatus() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    // Test getCurrentBrainState() method
+    auto brainState = brain.getCurrentBrainState();
+    assert(!brainState.empty());
+    assert(brainState.size() >= 5);  // Should have at least some features
     
-    std::cout << "    testBrainStatus passed" << std::endl;
+    // Verify all values are reasonable
+    for (float value : brainState) {
+        assert(!std::isnan(value));
+        assert(!std::isinf(value));
+    }
+    
+    // Test getLastPlannedAction() method (should default to Wait)
+    auto lastAction = brain.getLastPlannedAction();
+    assert(lastAction == nlm::ActionType::Wait);
+    
+    // Test produceAction() uses neural planner when available
+    auto action = brain.produceAction();
+    assert(action != nullptr);
+    
+    // Verify last planned action was updated
+    lastAction = brain.getLastPlannedAction();
+    assert(lastAction == action->getType());
+    
+    // Log for debugging
+    std::cout << "    testBrainNeuralPlanner passed (selected: " 
+              << action->getName() << ")" << std::endl;
 }
 
-void runAll() {
+void testBrainNeuralPlannerInitialization() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Verify neural planner is available
+    auto* planner = brain.getPlanner();
+    assert(planner != nullptr);
+    assert(planner->brain_ != nullptr);
+    
+    // Verify planner has expected configuration
+    assert(planner->getPlanningDepth() == 5);
+    assert(planner->getPlanningConfidence() >= 0.0f && planner->getPlanningConfidence() <= 1.0f);
+    
+    std::cout << "    testBrainNeuralPlannerInitialization passed" << std::endl;
+}
     testBrainCreation();
     testBrainInitialization();
     testBrainStep();

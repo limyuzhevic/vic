@@ -97,6 +97,10 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
+    // Produce motor/action output (neural planner version)
+    // For neural planner integration
+    ActionType produceActionType();
+    
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
@@ -155,12 +159,22 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
+    // Get current brain state for neural planning
+    std::vector<float> getCurrentBrainState() const;
+
+    // Get last planned action
+    ActionType getLastPlannedAction() const;
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+    const ConceptFormation* getConceptFormation() const;
+
+    // Get the most recently formed concept ID
+    size_t getLastConceptId() const;
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     

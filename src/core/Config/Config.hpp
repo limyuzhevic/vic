@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
 
 namespace nlm {
 
@@ -96,6 +97,9 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Private set method to avoid recursion
+    void setPrivate(const std::string& key, const ConfigValue& value, ConfigSource source);
     
     // Internal helpers
     static std::string trim(const std::string& str);
