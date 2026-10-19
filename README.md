@@ -76,11 +76,88 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Command Line Interface
+
+NLM now includes a comprehensive command-line interface (`nlm-cli`):
+
+```bash
+./nlm-cli --help
+```
+
+**Available Commands:**
+
+- **brain** - Brain management (create, initialize, step, save/load)
+- **experiment** - Run experiments (demo, test, explore, lifelong, integrate)
+- **config** - Configuration management (load, save, show, set)
+- **log** - Logging control (level, file, status)
+- **checkpoint** - Checkpoint operations (save, load, list)
+- **explore** - Explore brain state and structure
+- **batch** - Run batch operations (simulate, checkpoint, train, test)
+- **export** - Export brain data to various formats
+
+**Basic Examples:**
+
+```bash
+# Create and initialize a brain
+./nlm-cli brain create
+./nlm-cli brain initialize
+
+# Run 1000 simulation steps
+./nlm-cli brain step 1000
+
+# Run Phase 6 integration demo
+./nlm-cli experiment demo
+
+# Load configuration from file
+./nlm-cli config load my_settings.json
+
+# Save brain state
+./nlm-cli brain save brain_state.bin
+
+# Load brain state
+./nlm-cli brain load brain_state.bin
+
+# Run exploration experiment
+./nlm-cli experiment explore
+
+# Run batch simulation
+./nlm-cli batch simulate 500
+
+# Export brain statistics
+./nlm-cli brain status
+./nlm-cli export stats brain_stats.txt
+```
+
+## Python Bindings
+
+NLM provides Python bindings via `pynlm`:
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Create brain
+brain = pynlm.createBrain(config)
+
+# Initialize brain
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+# Save brain state
+brain.save("brain_state.bin")
+```
 
 ## Project Structure
 
@@ -101,18 +178,47 @@ NLM/
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
+│   ├── memory/         # Memory systems (integrated)
+│   ├── prediction/      # Prediction systems (integrated)
+│   ├── cognition/       # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
+│   ├── motor/          # Motor system
+│   ├── environment/    # Environment interface
+│   ├── experiments/    # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
+├── nlm-cli/            # Command line interface
+│   ├── nlm-cli.cpp
+│   └── *.hpp
 ├── tests/
 └── configs/
 ```
+
+## Quick Start
+
+1. **Build the project:**
+   ```bash
+   mkdir build && cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run the integration demo:**
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+3. **Use the command-line interface:**
+   ```bash
+   ./nlm-cli --help
+   ./nlm-cli experiment demo
+   ```
+
+4. **Run tests:**
+   ```bash
+   cd build
+   ctest
+   ```
 
 ## Phase Summary
 
@@ -162,68 +268,94 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
-## Scientific Limitations
+## Key Improvements in Phase 6
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### 1. Comprehensive Integration
+- **Working Memory**: Transient active information storage with competitive dynamics
+- **Episodic Memory**: Experience encoding with pattern completion and temporal indexing
+- **Associative Memory**: Pattern-based associations and concept formation
+- **Prediction System**: Temporal sequence learning and action consequence prediction
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+### 2. Neuromodulation Systems
+- **Dopamine**: Reward prediction and reinforcement learning
+- **Curiosity**: Exploration motivation and intrinsic reward
+- **Novelty**: Novelty detection for information seeking
+- **Prediction Error**: Error signals for learning and adaptation
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+### 3. Cognitive Architecture
+- **Attentional Selection**: Competitive attention with lateral inhibition
+- **Neural Planner**: Predictive action selection using learned consequences
+- **Concept Formation**: Pattern discovery without pre-labeled categories
+- **Self-Model**: Sensorimotor self-awareness and body schema
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+### 4. Developmental System
+- **Stage Progression**: Initial → Critical Period → Maturation → Adult → Aging
+- **Plasticity Modulation**: Age-dependent changes in learning rates
+- **Experience-Dependent Maturation**: Structural and functional changes over time
 
-## Architecture Philosophy
+### 5. Advanced Features
+- **Event-Driven Spike Processing**: Efficient neural computation
+- **Memory Replay**: Consolidation during sleep/rest cycles
+- **Checkpoint Persistence**: Save/load brain state for long-term studies
+- **Parallel Processing**: Efficient use of multi-core architectures
 
-The NLM brain operates as a closed-loop system:
+## Command Line Interface (nlm-cli)
 
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+The new `nlm-cli` provides comprehensive control over the neural simulation:
+
+### Brain Management
+- Create and initialize brains with custom configurations
+- Run simulation steps with various input patterns
+- Save and load brain states for long-term experiments
+- Monitor brain statistics and performance metrics
+
+### Experiment Framework
+- Run Phase 6 integration demo with comprehensive testing
+- Execute specific test suites (connectivity, plasticity, STDP)
+- Run exploration experiments with parameter sweeps
+- Perform lifelong learning simulations
+- Verify system integration and connections
+
+### Configuration and Logging
+- Load/save configuration files in JSON format
+- Set log levels and add file logging
+- Monitor system status and performance
+- Configure simulation parameters and constraints
+
+### Advanced Operations
+- Batch processing for large-scale simulations
+- Export brain data to various formats
+- Explore brain structure and state
+- Checkpoint management for long-running experiments
+
+## Python Bindings (pynlm)
+
+The Python bindings provide a high-level interface to the NLM framework:
+
+- **Brain Control**: Create, initialize, and simulate neural systems
+- **Sensory Integration**: Connect to world models and perception
+- **Action Control**: Generate motor commands from neural activity
+- **Memory Management**: Access working and episodic memory systems
+- **Export/Import**: Save and load brain states for analysis
+
+## Testing
+
+The project includes comprehensive test suites:
+
+- **Unit Tests**: Test individual components (neuron, synapse, plasticity)
+- **Integration Tests**: Verify system connections and interactions
+- **Performance Tests**: Benchmark different configurations
+- **Regression Tests**: Ensure stability across updates
+
+Run tests with:
+```bash
+cd build
+ctest
 ```
 
 ## License
 
-MIT
+MIT License - See LICENSE file for details.
 
 ## Authors
 

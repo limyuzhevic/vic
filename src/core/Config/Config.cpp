@@ -19,27 +19,46 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Log the start of file loading operation
+    NLM_LOG_INFO("Loading configuration from: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+        NLM_LOG_ERROR("File may not exist or may have insufficient permissions");
         return false;
     }
     
+    // Track file parsing errors
+    std::vector<std::string> errors;
+    size_t lineNumber = 0;
+    
     std::string line;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        try {
+            // Parse simple key=value pairs with validation
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                errors.push_back("Line " + std::to_string(lineNumber) + ": Missing '=' separator");
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key format
+            if (key.empty()) {
+                errors.push_back("Line " + std::to_string(lineNumber) + ": Empty key");
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,14 +67,39 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Basic validation of value format
+            if (value.empty() && !key.empty()) {
+                // Empty values are allowed for boolean false, etc.
+                // But we'll log a warning for debugging
+                NLM_LOG_WARN("Empty value for key: " + key);
+            }
+            
             set(key, value, ConfigSource::File);
+            
+        } catch (const std::exception& e) {
+            errors.push_back("Line " + std::to_string(lineNumber) + ": " + std::string(e.what()));
+            continue;
         }
     }
     
+    // Log any parsing errors
+    if (!errors.empty()) {
+        NLM_LOG_WARN("Configuration file parsing completed with " + std::to_string(errors.size()) + " errors:");
+        for (const auto& error : errors) {
+            NLM_LOG_WARN("  " + error);
+        }
+    }
+    
+    NLM_LOG_INFO("Configuration loaded: " + std::to_string(pImpl->entries.size()) + " entries");
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_LOG_INFO("Loading configuration from command line arguments");
+    
+    // Track argument parsing errors
+    std::vector<std::string> errors;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,28 +109,113 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty()) {
+                    errors.push_back("Argument '" + arg + "': Empty key after '--'");
+                    continue;
+                }
+                
+                // Remove leading/trailing spaces from key
+                key = trim(key);
+                if (key.empty()) {
+                    errors.push_back("Argument '" + arg + "': Empty key after '--'");
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_INFO("  Command line: " + key + " = " + (value.length() > 50 ? value.substr(0, 47) + "..." : value));
+                
+            } else {
+                errors.push_back("Argument '" + arg + "': Missing '=' separator");
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            key = trim(key);
+            if (key.empty()) {
+                errors.push_back("Argument '" + arg + "': Empty key after '-'");
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_INFO("  Command line: " + key + " = " + (value.length() > 50 ? value.substr(0, 47) + "..." : value));
+            
+        } else if (arg[0] == '-') {
+            errors.push_back("Argument '" + arg + "': Missing value for flag");
         }
     }
+    
+    // Log any parsing errors
+    if (!errors.empty()) {
+        NLM_LOG_WARN("Command line argument parsing completed with " + std::to_string(errors.size()) + " errors:");
+        for (const auto& error : errors) {
+            NLM_LOG_WARN("  " + error);
+        }
+    }
+    
+    NLM_LOG_INFO("Command line configuration loaded: " + std::to_string(pImpl->entries.size()) + " entries");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
         return false;
     }
     
+    // Write configuration in a simple key=value format
+    // This format is easy to parse and human-readable
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description as comment
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings to handle special characters
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Handle basic types (int, int64_t, double, bool)
+                file << value;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -115,14 +244,37 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key format
+    if (key.empty()) {
+        NLM_LOG_ERROR("Config key cannot be empty");
+        return;
+    }
+    
+    // Remove leading/trailing spaces from key
+    std::string trimmedKey = trim(key);
+    if (trimmedKey.empty()) {
+        NLM_LOG_ERROR("Config key cannot be empty after trimming: '" + key + "'");
+        return;
+    }
+    
+    // Log configuration change
+    NLM_LOG_INFO("Setting configuration: " + trimmedKey + " = " + 
+                 (std::holds_alternative<std::string>(value) && std::get<std::string>(value).length() > 50 ? 
+                  std::get<std::string>(value).substr(0, 47) + "..." : 
+                  std::visit([](const auto& v) { return std::to_string(v); }, value)) +
+                 " (source: " + std::to_string(static_cast<int>(source)) + ")");
+    
+    // Update or add the configuration entry
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&trimmedKey](const ConfigEntry& e) { return e.key == trimmedKey; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_INFO("  Updated existing configuration entry");
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(trimmedKey, value, source);
+        NLM_LOG_INFO("  Added new configuration entry");
     }
 }
 
@@ -143,8 +295,14 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    std::string trimmedKey = trim(key);
+    if (trimmedKey.empty()) {
+        NLM_LOG_WARN("Empty key provided to has()");
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&trimmedKey](const ConfigEntry& e) { return e.key == trimmedKey; });
 }
 
 void Config::remove(const std::string& key) {
