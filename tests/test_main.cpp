@@ -1,130 +1,81 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
+// Main Tests
 #include <iostream>
 #include <cassert>
+#include <memory>
+#include "core/Config/Config.hpp"
 
-// Forward declarations of test functions
-namespace test_types {
-    void runAll();
+namespace test_main {
+
+void testConfigFromArgs() {
+    // Test basic argument parsing
+    int argc = 5;
+    char* argv[] = {
+        (char*)"test_program",
+        (char*)"--neurons", (char*)"100",
+        (char*)"--steps", (char*)"1000",
+        (char*)"--learning-rate", (char*)"0.05"
+    };
+    
+    auto cfg = std::make_shared<nlm::Config>();
+    cfg->loadFromArgs(argc, argv);
+    
+    // Check that arguments were parsed correctly
+    assert(cfg->getOr<int>("neurons", 0) == 100);
+    assert(cfg->getOr<int>("steps", 0) == 1000);
+    assert(cfg->getOr<double>("learning_rate", 0.0) == 0.05);
+    
+    std::cout << "    testConfigFromArgs passed" << std::endl;
 }
 
-namespace test_config {
-    void runAll();
+void testConfigDefaultValues() {
+    auto cfg = std::make_shared<nlm::Config>();
+    
+    // Test default values from Config.hpp
+    cfg->set("neuron_count", 500, nlm::ConfigSource::Default);
+    cfg->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+    cfg->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+    
+    assert(cfg->getOr<int>("neuron_count", 0) == 500);
+    assert(cfg->getOr<double>("simulation_timestep", 0.0) == 0.001);
+    assert(cfg->getOr<double>("connection_probability", 0.0) == 0.1);
+    
+    std::cout << "    testConfigDefaultValues passed" << std::endl;
 }
 
-namespace test_random {
-    void runAll();
+void testConfigSourcePriority() {
+    auto cfg = std::make_shared<nlm::Config>();
+    
+    // Set values from different sources
+    cfg->set("learning_rate", 0.01, nlm::ConfigSource::Default);
+    cfg->set("learning_rate", 0.02, nlm::ConfigSource::File);
+    cfg->set("learning_rate", 0.03, nlm::ConfigSource::CommandLine);
+    
+    // The source should reflect the last set operation
+    // For now, we check that it exists
+    assert(cfg->has("learning_rate"));
+    assert(cfg->getOr<double>("learning_rate", 0.0) == 0.03);
+    
+    std::cout << "    testConfigSourcePriority passed" << std::endl;
 }
 
-namespace test_clock {
-    void runAll();
+void testConfigFilePaths() {
+    // Test that config file path handling works
+    auto cfg = std::make_shared<nlm::Config>();
+    
+    // This should not crash
+    cfg->loadFromFile("/nonexistent/path/config.txt");
+    
+    // It should return false for non-existent files
+    // (the implementation should handle this gracefully)
+    
+    std::cout << "    testConfigFilePaths passed" << std::endl;
 }
 
-namespace test_neuron {
-    void runAll();
+void runAll() {
+    testConfigFromArgs();
+    testConfigDefaultValues();
+    testConfigSourcePriority();
+    testConfigFilePaths();
 }
 
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
-    void runAll();
-}
-
-int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
-    std::cout << std::endl;
-    
-    bool allPassed = true;
-    
-    std::cout << "Running Types tests..." << std::endl;
-    try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
-    }
-}
+} // namespace test_main

@@ -202,6 +202,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
+    // Validate input parameters
+    if (std::isnan(currentTime) || std::isinf(currentTime)) {
+        return false; // Invalid time, skip
+    }
+    if (dt <= 0.0) {
+        return false; // Invalid timestep, skip
+    }
+    
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
@@ -286,7 +294,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(static_cast<uint32_t>(2), static_cast<uint32_t>(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

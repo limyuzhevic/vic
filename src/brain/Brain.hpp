@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MemorySystem; // New unified memory system
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,16 +138,22 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ================ MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    class MemorySystem;
+    MemorySystem* getMemorySystem();
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Backward compatibility with neural memory interfaces
+    // These will be available for code that expects the old interfaces
+    class NeuralWorkingMemory;
+    class NeuralEpisodicMemory;
+    class NeuralAssociativeMemory;
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Old-style memory access (deprecated but supported for compatibility)
+    NeuralWorkingMemory* getNeuralWorkingMemory();
+    NeuralEpisodicMemory* getNeuralEpisodicMemory();
+    NeuralAssociativeMemory* getNeuralAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     

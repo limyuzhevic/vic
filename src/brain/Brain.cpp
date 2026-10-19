@@ -9,6 +9,7 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../memory/MemorySystem.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -29,9 +30,12 @@ struct Brain::Impl {
     std::vector<InterRegionConnection> interRegionConnections;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<MemorySystem> memorySystem;
+    
+    // ========== BACKWARD COMPATIBILITY ==========
+    std::unique_ptr<NeuralWorkingMemory> neuralWorkingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> neuralEpisodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> neuralAssociativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -109,9 +113,18 @@ struct Brain::Impl {
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        neuralWorkingMemory = std::make_unique<NeuralWorkingMemory>();
+        neuralEpisodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        neuralAssociativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize unified memory system
+        memorySystem = std::make_unique<MemorySystem>(this);
+        memorySystem->initialize();
+        
+        // Initialize backward compatibility pointers
+        workingMemory = neuralWorkingMemory.get();
+        episodicMemory = neuralEpisodicMemory.get();
+        associativeMemory = neuralAssociativeMemory.get();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -231,16 +244,19 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
+    // Initialize working memory (backward compatibility)
+    pImpl->neuralWorkingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    // Initialize episodic memory (backward compatibility)
+    pImpl->neuralEpisodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize associative memory (backward compatibility)
+    pImpl->neuralAssociativeMemory->initialize(this);
+    
+    // Initialize unified memory system
+    pImpl->memorySystem->initialize();
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -401,9 +417,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 4: Update memory systems ==========
+    if (pImpl->memorySystem) {
+        pImpl->memorySystem->updateAll(currentStep, pImpl->timestep);
+    } else {
+        // Fallback to old system for backward compatibility
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -482,8 +503,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+        if (pImpl->memorySystem) {
+            // Unified system handles episodic memory
+            // Store current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
@@ -505,7 +527,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+            // Convert to neural pattern for memory system
+            std::vector<float> sensoryPattern;
+            for (size_t i = 0; i < episode.activeNeurons.size() && i < episode.neuronActivations.size(); ++i) {
+                sensoryPattern.push_back(episode.neuronActivations[i]);
+            }
+            
+            if (!sensoryPattern.empty() && pImpl->memorySystem) {
+                pImpl->memorySystem->propagateToLowerLevels(sensoryPattern, episode.reward);
+            }
+        } else {
+            // Old episodic memory (backward compatibility)
+            if (pImpl->episodicMemory) {
+                // Capture current brain state as an episode
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Store active neurons
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->isFiring() || 
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                                episode.activeNeurons.push_back(neuron->getId());
+                                episode.neuronActivations.push_back(
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            }
+                        }
+                    }
+                }
+                
+                // Store reward in episode
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
         }
     }
     
@@ -538,11 +595,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    if (currentStep % pImpl->replayInterval == 0) {
+        if (pImpl->memorySystem) {
+            // Unified system handles replay
+            pImpl->memorySystem->replayAll();
+        } else if (pImpl->episodicMemory) {
+            // Get episodes for replay (backward compatibility)
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
         }
     }
     
@@ -577,9 +639,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    if (currentStep % pImpl->consolidationInterval == 0) {
+        if (pImpl->memorySystem) {
+            // Unified system handles consolidation
+            pImpl->memorySystem->consolidateAll(0.3f);
+        } else if (pImpl->episodicMemory) {
+            // Consolidate important memories, remove weak ones (backward compatibility)
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -598,20 +665,31 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
+    // Prepare sensory pattern for memory systems
+    std::vector<float> sensoryPattern;
+    for (size_t i = 0; i < numSensory && i < values.size(); ++i) {
         // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
+        float normalizedValue = static_cast<float>(values[i]) * 10.0f;
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        sensoryPattern.push_back(normalizedValue / 10.0f);  // Normalize for memory
+    }
+    
+    // Store in unified memory system if available
+    if (pImpl->memorySystem && !sensoryPattern.empty()) {
+        // Store in working memory level
+        pImpl->memorySystem->propagateToLowerLevels(sensoryPattern, 1.0f);
+        
+        // Also store in higher levels (semantic learning)
+        pImpl->memorySystem->propagateToHigherLevels(sensoryPattern, 0.5f);
+    } else if (pImpl->workingMemory) {
+        // Fallback to old working memory
+        for (size_t i = 0; i < std::min(numSensory, values.size()); ++i) {
+            if (values[i] > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), values[i] / 10.0f);
+            }
         }
     }
 }
@@ -753,9 +831,15 @@ void Brain::reset() {
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->memorySystem) {
+        pImpl->memorySystem->clearAll();
+    } else {
+        // Backward compatibility
+        if (pImpl->workingMemory) pImpl->workingMemory->clear();
+        if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+        if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    }
+    
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
@@ -1005,6 +1089,12 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
+// New unified memory system
+MemorySystem* Brain::getMemorySystem() {
+    return pImpl->memorySystem.get();
+}
+
+// Backward compatibility - old neural memory interfaces
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1015,6 +1105,19 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// Additional backward compatibility accessors
+NeuralWorkingMemory* Brain::getNeuralWorkingMemory() {
+    return pImpl->neuralWorkingMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getNeuralEpisodicMemory() {
+    return pImpl->neuralEpisodicMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getNeuralAssociativeMemory() {
+    return pImpl->neuralAssociativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
@@ -1090,11 +1193,17 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
     // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    if (pImpl->memorySystem) {
+        NLM_LOG_INFO("Working memory load: " + std::to_string(pImpl->memorySystem->getSystemLoad()));
+        NLM_LOG_INFO("Total memory usage: " + std::to_string(pImpl->memorySystem->getTotalMemoryUsage()));
+    } else {
+        // Backward compatibility
+        if (pImpl->workingMemory) {
+            NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        }
+        if (pImpl->episodicMemory) {
+            NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        }
     }
     
     // Neuromodulation status

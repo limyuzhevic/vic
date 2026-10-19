@@ -1,6 +1,7 @@
 #include "NeuralPopulation.hpp"
 #include <algorithm>
 #include <numeric>
+#include <cmath>
 
 namespace nlm {
 
@@ -44,23 +45,46 @@ bool NeuralPopulation::isEmpty() const {
 }
 
 Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
-    if (index >= pImpl->neurons.size()) {
-        return nullptr;
+    try {
+        if (pImpl->neurons.empty() || index >= pImpl->neurons.size()) {
+            return nullptr;
+        }
+        // Additional validation for null pointer
+        if (!pImpl->neurons[index]) {
+            return nullptr;
+        }
+        return pImpl->neurons[index];
+    } catch (...) {
+        return nullptr; // Handle any errors gracefully
     }
-    return pImpl->neurons[index];
 }
 
 const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
-    if (index >= pImpl->neurons.size()) {
-        return nullptr;
+    try {
+        if (pImpl->neurons.empty() || index >= pImpl->neurons.size()) {
+            return nullptr;
+        }
+        // Additional validation for null pointer
+        if (!pImpl->neurons[index]) {
+            return nullptr;
+        }
+        return pImpl->neurons[index];
+    } catch (...) {
+        return nullptr; // Handle any errors gracefully
     }
-    return pImpl->neurons[index];
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
-    if (pImpl->size < pImpl->neurons.size()) {
-        pImpl->size = pImpl->neurons.size();
+    try {
+        if (!neuron) {
+            return; // Don't add null neurons
+        }
+        pImpl->neurons.push_back(neuron);
+        if (pImpl->size < pImpl->neurons.size()) {
+            pImpl->size = pImpl->neurons.size();
+        }
+    } catch (...) {
+        // Handle memory allocation errors gracefully
     }
 }
 
@@ -100,21 +124,32 @@ size_t NeuralPopulation::getFiringCount() const {
 }
 
 float NeuralPopulation::getAverageFiringRate() const {
-    if (pImpl->neurons.empty()) {
-        return 0.0f;
+    try {
+        if (pImpl->neurons.empty()) {
+            return 0.0f;
+        }
+        float sum = 0.0f;
+        for (const auto* neuron : pImpl->neurons) {
+            if (!neuron) {
+                continue; // Skip null neurons
+            }
+            sum += neuron->getFiringRate();
+        }
+        return sum / static_cast<float>(pImpl->neurons.size());
+    } catch (...) {
+        return 0.0f; // Handle any errors gracefully
     }
-    float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
-        sum += neuron->getFiringRate();
-    }
-    return sum / static_cast<float>(pImpl->neurons.size());
 }
 
 float NeuralPopulation::getActivityLevel() const {
-    if (pImpl->neurons.empty()) {
-        return 0.0f;
+    try {
+        if (pImpl->neurons.empty()) {
+            return 0.0f;
+        }
+        return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    } catch (...) {
+        return 0.0f; // Handle any errors gracefully
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
@@ -124,16 +159,33 @@ void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+    try {
+        // Validate input time
+        if (std::isnan(currentTime) || std::isinf(currentTime)) {
+            return; // Invalid time, skip
+        }
+        
+        for (auto* neuron : pImpl->neurons) {
+            if (neuron) {
+                neuron->step(currentTime);
+            }
+        }
+    } catch (...) {
+        // Handle any errors gracefully
     }
 }
 
 void NeuralPopulation::reset() {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->reset();
+    try {
+        for (auto* neuron : pImpl->neurons) {
+            if (neuron) {
+                neuron->reset();
+            }
+        }
+        pImpl->membranePotentials.clear();
+    } catch (...) {
+        // Handle any errors gracefully
     }
-    pImpl->membranePotentials.clear();
 }
 
 std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
@@ -146,33 +198,47 @@ std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
 }
 
 void NeuralPopulation::recordActivity() {
-    pImpl->membranePotentials.clear();
-    pImpl->membranePotentials.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
-        pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+    try {
+        pImpl->membranePotentials.clear();
+        pImpl->membranePotentials.reserve(pImpl->neurons.size());
+        for (const auto* neuron : pImpl->neurons) {
+            if (neuron) {
+                pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+            }
+        }
+    } catch (...) {
+        // Handle any errors gracefully
     }
 }
 
 float NeuralPopulation::getMeanMembranePotential() const {
-    if (pImpl->membranePotentials.empty()) {
-        return 0.0f;
+    try {
+        if (pImpl->membranePotentials.empty()) {
+            return 0.0f;
+        }
+        float sum = std::accumulate(pImpl->membranePotentials.begin(), 
+                                     pImpl->membranePotentials.end(), 0.0f);
+        return sum / static_cast<float>(pImpl->membranePotentials.size());
+    } catch (...) {
+        return 0.0f; // Handle any errors gracefully
     }
-    float sum = std::accumulate(pImpl->membranePotentials.begin(), 
-                                 pImpl->membranePotentials.end(), 0.0f);
-    return sum / static_cast<float>(pImpl->membranePotentials.size());
 }
 
 float NeuralPopulation::getVarianceMembranePotential() const {
-    if (pImpl->membranePotentials.size() < 2) {
-        return 0.0f;
+    try {
+        if (pImpl->membranePotentials.size() < 2) {
+            return 0.0f;
+        }
+        float mean = getMeanMembranePotential();
+        float sumSquares = 0.0f;
+        for (float v : pImpl->membranePotentials) {
+            float diff = v - mean;
+            sumSquares += diff * diff;
+        }
+        return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
+    } catch (...) {
+        return 0.0f; // Handle any errors gracefully
     }
-    float mean = getMeanMembranePotential();
-    float sumSquares = 0.0f;
-    for (float v : pImpl->membranePotentials) {
-        float diff = v - mean;
-        sumSquares += diff * diff;
-    }
-    return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
 }
 
 } // namespace nlm
