@@ -139,6 +139,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable  
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Test runner executable
+add_executable(test_runner
+    test_runner.cpp
+)
+target_link_libraries(test_runner PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

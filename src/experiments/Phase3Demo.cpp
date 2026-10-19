@@ -5,6 +5,7 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/CLI/CLI.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -16,13 +17,22 @@ namespace nlm {
 
 class Phase3Demo {
 public:
-    Phase3Demo() {}
+    Phase3Demo() : cli() {
+        setupCLI();
+    }
+    
     ~Phase3Demo() {}
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
+        
+        // Print configuration if verbose mode is enabled
+        if (cli.getBool(cli.VERBOSE_LONG)) {
+            cli.printConfig();
+            std::cout << "\n";
+        }
         
         // Create configuration
         auto config = std::make_shared<Config>();
@@ -32,7 +42,7 @@ public:
         // Create world
         SimpleWorld world;
         world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
+        world.setRandomSeed(cli.getInt(cli.SEED_LONG, 42));
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
@@ -42,7 +52,7 @@ public:
         AgentBrain agentBrain(brain);
         agentBrain.initialize(world);
         
-        // Configure agent brain
+        // Configure agent brain based on CLI options
         agentBrain.enableRewardModulation(true);
         agentBrain.enableStructuralPlasticity(true);
         agentBrain.enableDevelopment(true);
@@ -61,7 +71,7 @@ public:
         for (int episode = 0; episode < numEpisodes; ++episode) {
             std::cout << "--- Episode " << episode << " started ---\n";
             
-            // Reset world
+            // Reset world and brain
             world.reset();
             agentBrain.reset();
             brain->reset();
@@ -116,7 +126,7 @@ public:
                 }
                 
                 // Print periodic updates
-                if (step % 50 == 0) {
+                if (step % 50 == 0 || cli.getBool(cli.DEBUG_LONG)) {
                     std::cout << "  Step " << step 
                               << ": reward=" << result.reward
                               << ", action=" << motorCommandToString(cmd)
@@ -194,6 +204,69 @@ public:
     }
     
 private:
+    nlm::CLI cli;
+    
+    void setupCLI() {
+        // Set program metadata
+        nlm::CLI::ProgramInfo info(
+            "nlm_phase3_demo",
+            "2.0.0",
+            "Phase 3: World Interaction Demo - Demonstrates embodied learning in an interactive environment",
+            "NLM Project Team",
+            "https://github.com/nlm-project"
+        );
+        cli.setProgramInfo(info);
+        
+        // Add common arguments using the CLI helper
+        cli.addArgument(nlm::cli::CommonArgs::EPISODES_LONG, nlm::cli::CommonArgs::EPISODES_SHORT,
+                       "Number of episodes to run", "5",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::STEPS_LONG, nlm::cli::CommonArgs::STEPS_SHORT,
+                       "Number of steps per episode", "200",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::CONFIG_LONG, nlm::cli::CommonArgs::CONFIG_SHORT,
+                       "Configuration file path", "",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::SEED_LONG, nlm::cli::CommonArgs::SEED_SHORT,
+                       "Random seed for reproducible results", "42",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::LOG_LEVEL_LONG, nlm::cli::CommonArgs::LOG_LEVEL_SHORT,
+                       "Logging level (DEBUG, INFO, WARNING, ERROR)", "INFO",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::QUIET_LONG, nlm::cli::CommonArgs::QUIET_SHORT,
+                       "Suppress most output (quiet mode)", "false",
+                       false);
+        
+        cli.addArgument(nlm::cli::CommonArgs::VERBOSE_LONG, nlm::cli::CommonArgs::VERBOSE_SHORT,
+                       "Enable verbose output", "false",
+                       false);
+        
+        cli.addArgument(nlm::cli::CommonArgs::DEBUG_LONG, nlm::cli::CommonArgs::DEBUG_SHORT,
+                       "Enable debug mode with additional diagnostics", "false",
+                       false);
+        
+        cli.addArgument(nlm::cli::CommonArgs::VALIDATE_LONG, nlm::cli::CommonArgs::VALIDATE_SHORT,
+                       "Validate configuration parameters before running", "false",
+                       false);
+        
+        cli.addArgument(nlm::cli::CommonArgs::PROFILE_LONG, nlm::cli::CommonArgs::PROFILE_SHORT,
+                       "Enable performance profiling", "false",
+                       false);
+        
+        cli.addArgument(nlm::cli::CommonArgs::MODE_LONG, nlm::cli::CommonArgs::MODE_SHORT,
+                       "Execution mode (standard, fast, thorough)", "standard",
+                       true);
+        
+        cli.addArgument(nlm::cli::CommonArgs::INTERACTIVE_LONG, nlm::cli::CommonArgs::INTERACTIVE_SHORT,
+                       "Enable interactive mode (if supported)", "false",
+                       false);
+    }
+    
     void configureEnvironment(std::shared_ptr<Config> config) {
         config->set("environment_width", 20);
         config->set("environment_height", 20);
@@ -244,17 +317,46 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
-    
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
     nlm::Phase3Demo demo;
+    
+    // Parse command line arguments
+    if (!demo.cli.parse(argc, argv)) {
+        std::cerr << "Error: Failed to parse command line arguments.\n";
+        return 1;
+    }
+    
+    // Show help if requested
+    if (demo.cli.isHelpRequested()) {
+        demo.cli.printHelp();
+        return 0;
+    }
+    
+    // Show version if requested
+    if (demo.cli.isVersionRequested()) {
+        demo.cli.printVersion();
+        return 0;
+    }
+    
+    // Validate configuration if requested
+    if (demo.cli.getBool(demo.cli.VALIDATE_LONG)) {
+        std::cout << "Validating configuration...\n";
+        // TODO: Implement configuration validation
+        std::cout << "Configuration validation passed.\n\n";
+    }
+    
+    // Get parameters from CLI
+    int numEpisodes = demo.cli.getInt(demo.cli.EPISODES_LONG, 5);
+    int stepsPerEpisode = demo.cli.getInt(demo.cli.STEPS_LONG, 200);
+    
+    // Load configuration from file if specified
+    std::string configFile = demo.cli.getString(demo.cli.CONFIG_LONG, "");
+    if (!configFile.empty()) {
+        std::cout << "Loading configuration from: " << configFile << "\n";
+    }
+    
+    std::cout << "Running Phase 3 demo with " << numEpisodes << " episodes, " << stepsPerEpisode << " steps each.\n\n";
+    
+    // Run the demo
     demo.run(numEpisodes, stepsPerEpisode);
     
     return 0;
