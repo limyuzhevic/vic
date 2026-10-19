@@ -456,7 +456,9 @@ pynlm.WorldObjectType.Marker
 
 ## Part 5: Example Scripts
 
-### Minimal Example
+### Basic Examples (Beginner)
+
+#### Minimal Example
 
 ```python
 import pynlm
@@ -473,7 +475,7 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+#### Environment Interaction
 
 ```python
 import pynlm
@@ -494,6 +496,220 @@ for _ in range(500):
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(0)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```
+
+### Advanced Usage Examples
+
+#### Research Configuration
+
+```python
+import pynlm
+
+# Create a research configuration with custom parameters
+config = pynlm.createResearchConfig(
+    description="Neural development study",
+    neuronCount=2000,
+    regionCount=3,
+    connectionProb=0.15,
+    enablePlasticity=True,
+    enableDevelopment=True,
+    enableNeuromodulation=True
+)
+
+# Create brain with research config
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run analysis
+analysis = pynlm.analyzeBrainActivity(brain, windowSize=500)
+print(f"Research Results:")
+print(f"  Neurons: {analysis['total_neurons']}")
+print(f"  Connectivity: {analysis['connectivity_density']:.4f}")
+print(f"  Firing rate: {analysis['avg_firing_rate']:.2f} Hz")
+```
+
+#### Advanced Training with Episode Management
+
+```python
+import pynlm
+
+# Setup environment and agent
+brain = pynlm.createQuickBrain(1000)
+world = pynlm.createRandomWorld(width=20, height=20)
+agent = pynlm.createTrainingAgent(brain, world)
+
+# Run multiple training episodes
+episodes = []
+for episode in range(10):
+    print(f"Episode {episode + 1}/10")
+    
+    # Run one episode
+    spikes, firing = pynlm.runEpisode(agent, world, 200)
+    
+    # Collect statistics
+    episodes.append({
+        'episode': episode + 1,
+        'spike_count': spikes,
+        'firing_neurons': firing,
+        'spike_rate': spikes / 200.0
+    })
+    
+    print(f"  Spikes: {spikes}, Firing: {firing}")
+
+# Analyze training results
+total_spikes = sum(e['spike_count'] for e in episodes)
+avg_firing = sum(e['firing_neurons'] for e in episodes) / len(episodes)
+
+print(f"\nTraining Summary:")
+print(f"  Total episodes: {len(episodes)}")
+print(f"  Average spikes per episode: {total_spikes / len(episodes):.1f}")
+print(f"  Average firing neurons: {avg_firing:.1f}")
+```
+
+#### Performance Profiling
+
+```python
+import pynlm
+
+# Setup for performance testing
+brain = pynlm.createQuickBrain(500)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=6, visionHeight=6)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Profile simulation performance
+print("Profiling simulation performance...")
+spikes, firing, speed, duration_ms = pynlm.profileSimulation(
+    brain, world, 1000, warmUpSteps=100
+)
+
+print(f"Performance Results:")
+print(f"  Simulation speed: {speed:.1f} steps/second")
+print(f"  Total execution time: {duration_ms:.1f} ms")
+print(f"  Final spike count: {spikes}")
+print(f"  Final firing neurons: {firing}")
+```
+
+#### Context Manager for Clean World Management
+
+```python
+import pynlm
+
+# Using context manager for clean world management
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=10, visionHeight=10)
+
+print("Running simulation with context manager...")
+with world:
+    for step in range(200):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 50 == 0:
+            stats = brain.getStatistics()
+            print(f"Step {step}: {stats['firing_neurons']} neurons firing")
+
+print("Simulation completed and world reset!")
+```
+
+#### Batch Processing for Research
+
+```python
+import pynlm
+import numpy as np
+
+# Create research brain
+brain = pynlm.createQuickBrain(1000)
+brain.initialize()
+
+# Generate research data using batch processing
+print("Running batch processing experiment...")
+
+# Create multiple input patterns
+inputs = []
+steps = []
+
+# Pattern 1: Simple tonic input
+vision1 = pynlm.createSensoryGrid(8, 8, np.ones(64) * 0.5)
+inputs.append(vision1)
+steps.append(10)
+
+# Pattern 2: Center-surround
+values2 = np.zeros(64)
+values2[32] = 1.0  # Center
+for i in range(64):
+    if i != 32:
+        values2[i] = -0.1  # Surround
+vision2 = pynlm.createSensoryGrid(8, 8, values2)
+inputs.append(vision2)
+steps.append(20)
+
+# Pattern 3: Random input
+values3 = np.random.randn(64) * 0.1
+vision3 = pynlm.createSensoryGrid(8, 8, values3)
+inputs.append(vision3)
+steps.append(15)
+
+# Run batch processing
+results = pynlm.batchStep(brain, inputs, steps)
+
+print(f"Batch processing results:")
+print(f"  Final spike count: {results[-1]}")
+print(f"  Spike evolution: {results}")
+```
+
+#### Continuous Simulation with Statistics
+
+```python
+import pynlm
+
+# Setup continuous simulation
+brain = pynlm.createQuickBrain(1200)
+brain.initialize()
+
+world = pynlm.createRandomWorld(width=25, height=25)
+agent = pynlm.createTrainingAgent(brain, world)
+
+print("Running continuous simulation...")
+print("Step, Spikes, Firing, Reward, Novelty")
+
+# Run continuous simulation
+for step in range(500):
+    world.update(0.05)
+    
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Collect statistics
+    spikes = brain.getTotalSpikeCount()
+    firing = brain.getFiringNeuronCount()
+    curiosity = agent.getCuriosityLevel()
+    novelty = agent.getNoveltyLevel()
+    
+    if step % 50 == 0:
+        print(f"{step}, {spikes}, {firing}, {curiosity:.3f}, {novelty:.3f}")
+
+# Final statistics
+final_stats = brain.getStatistics()
+print(f"\nSimulation completed!")
 ```
 
 ---
