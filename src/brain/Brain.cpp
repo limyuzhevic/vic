@@ -232,32 +232,32 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
+    pImpl->workingMemory->initialize();
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    pImpl->episodicMemory->initialize();
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    pImpl->associativeMemory->initialize();
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
+    pImpl->planner->initialize();
     pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
+    pImpl->conceptFormation->initialize();
     
-    pImpl->attention->initialize(this);
+    pImpl->attention->initialize();
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    pImpl->novelty->initialize();
+    pImpl->curiosity->initialize();
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
