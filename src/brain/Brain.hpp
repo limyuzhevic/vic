@@ -64,6 +64,30 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
+    // Initialize all integrated systems
+    bool initializeSystems();
+    
+    // Initialize plasticity systems
+    void initializePlasticitySystems();
+    
+    // Initialize memory systems
+    void initializeMemorySystems();
+    
+    // Initialize cognition systems
+    void initializeCognitionSystems();
+    
+    // Initialize neuromodulation systems
+    void initializeNeuromodulationSystems();
+    
+    // Configure systems with settings from config
+    void configureSystems();
+    
+    // Setup spike handlers for event-driven processing
+    void setupSpikeHandlers();
+    
+    // Setup checkpoint manager
+    void setupCheckpointManager();
+    
     // Main simulation step
     void step(SimulationStep currentStep);
     
