@@ -9,6 +9,7 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -65,6 +66,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Last sensory pattern for novelty detection
+    std::vector<float> lastSensoryPattern;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
@@ -92,6 +96,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastSensoryPattern() // Empty pattern initially
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -130,7 +135,10 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
+        // Configure novelty detection
+        novelty->setLevel(0.0f);  // Start with no novelty
+        
+        // Initialize novelty detection with brain reference
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
@@ -409,7 +417,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
+        // Convert sensory input to pattern for novelty detection
+        std::vector<float> currentPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (const auto* neuron : pImpl->sensoryNeurons) {
+                currentPattern.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Detect novelty using previous pattern
+        pImpl->novelty->detectNovelty(currentPattern, pImpl->lastSensoryPattern);
+        
+        // Update novelty level (decay over time)
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Store current pattern for next comparison
+        pImpl->lastSensoryPattern = std::move(currentPattern);
+        
+        // Apply novelty effects on neural excitability
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.0f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Novelty increases excitability to promote exploration
+                        float noveltyExcitability = noveltyLevel * 0.5f;
+                        neuron->injectCurrent(noveltyExcitability);
+                    }
+                }
+            }
+        }
     }
     
     // Update curiosity
@@ -613,6 +650,17 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Update last sensory pattern for novelty detection
+    // This will be used in the step function to detect changes
+    pImpl->lastSensoryPattern.clear();
+    for (size_t i = 0; i < numSensory; ++i) {
+        float normalizedValue = 0.0f;
+        if (i < values.size()) {
+            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        }
+        pImpl->lastSensoryPattern.push_back(normalizedValue);
     }
 }
 
@@ -895,9 +943,75 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match synapses by source/destination neurons
+        if (synapseData.weight.size() == synapseData.sourceNeuron.size() &&
+            synapseData.weight.size() == synapseData.destinationNeuron.size()) {
+            
+            for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+                uint64_t sourceIdx = synapseData.sourceNeuron[i];
+                uint64_t destIdx = synapseData.destinationNeuron[i];
+                float weight = synapseData.weight[i];
+                Delay delay = synapseData.delay[i];
+                uint8_t synapseType = synapseData.synapseType[i];
+                float eligibilityTrace = synapseData.eligibilityTrace[i];
+                
+                // Find matching synapse in the brain
+                bool synapseFound = false;
+                for (auto& region : pImpl->regions) {
+                    // Look for source neuron in all populations
+                    auto neurons = region->getAllNeurons();
+                    Neuron* sourceNeuron = nullptr;
+                    for (auto* n : neurons) {
+                        if (n->getId().index() == sourceIdx) {
+                            sourceNeuron = n;
+                            break;
+                        }
+                    }
+                    
+                    if (!sourceNeuron) continue;
+                    
+                    // Look for destination neuron in all populations
+                    Neuron* destNeuron = nullptr;
+                    for (auto* n : neurons) {
+                        if (n->getId().index() == destIdx) {
+                            destNeuron = n;
+                            break;
+                        }
+                    }
+                    
+                    if (!destNeuron) continue;
+                    
+                    // Find synapse connecting these two neurons
+                    auto synapses = region->getSynapses();
+                    for (auto* syn : synapses) {
+                        if (syn->getSourceNeuron().index() == sourceIdx &&
+                            syn->getDestinationNeuron().index() == destIdx) {
+                            
+                            // Update synapse properties
+                            syn->setWeight(weight);
+                            syn->setDelay(delay);
+                            syn->setType(static_cast<SynapseType>(synapseType));
+                            syn->setEligibilityTrace(eligibilityTrace);
+                            
+                            synapseFound = true;
+                            NLM_LOG_INFO("Loaded synapse: " + std::to_string(sourceIdx) + " -> " + std::to_string(destIdx) +
+                                " (weight: " + std::to_string(weight) + ")");
+                            break;
+                        }
+                    }
+                }
+                
+                if (!synapseFound) {
+                    NLM_LOG_WARNING("Could not find synapse between neurons " + std::to_string(sourceIdx) + 
+                        " and " + std::to_string(destIdx) + ". Keeping existing or creating new.");
+                }
+            }
+            
+            NLM_LOG_INFO("Applied " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
+        } else {
+            NLM_LOG_ERROR("Synapse data inconsistency in checkpoint");
+            return false;
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1079,15 +1193,67 @@ RandomGenerator* Brain::getRandomGenerator() {
 
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    
+    // Structure to hold all statistics collected in a single pass
+    struct CollectedStatistics {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t totalActiveNeurons;
+        float totalFiringRate;
+        float totalExcitatory;
+        float totalInhibitory;
+    };
+    
+    // Helper function to collect all statistics in one pass through regions
+    static CollectedStatistics collectAllStatistics(const std::vector<std::unique_ptr<NeuralRegion>>& regions) {
+        CollectedStatistics stats;
+        stats.totalNeurons = 0;
+        stats.totalSynapses = 0;
+        stats.totalActiveNeurons = 0;
+        stats.totalFiringRate = 0.0f;
+        stats.totalExcitatory = 0.0f;
+        stats.totalInhibitory = 0.0f;
+        
+        for (const auto& region : regions) {
+            stats.totalNeurons += region->getTotalNeuronCount();
+            stats.totalSynapses += region->getSynapseCount();
+            stats.totalActiveNeurons += region->getActiveNeuronCount();
+            stats.totalFiringRate += region->getAverageFiringRate();
+            
+            // Collect E/I ratio data in the same pass
+            for (const auto& syn : region->getSynapses()) {
+                float weight = syn->getWeight();
+                if (weight > 0) {
+                    stats.totalExcitatory += weight;
+                } else {
+                    stats.totalInhibitory += std::abs(weight);
+                }
+            }
+        }
+        
+        return stats;
+    }
+    
+    // Collect all statistics in a single pass
+    auto stats = collectAllStatistics(pImpl->regions);
+    
+    // Log statistics
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Total neurons: " + std::to_string(stats.totalNeurons));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(stats.totalSynapses));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(stats.totalActiveNeurons));
     NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
     NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
     NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Calculate average firing rate (avoid division by zero)
+    float avgFiringRate = pImpl->regions.empty() ? 0.0f : stats.totalFiringRate / static_cast<float>(pImpl->regions.size());
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(avgFiringRate));
+    
+    // Calculate E/I ratio
+    float eiRatio = stats.totalInhibitory > 0.0f ? stats.totalExcitatory / stats.totalInhibitory : 
+                   (stats.totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f);
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(eiRatio));
     
     // Memory system status
     if (pImpl->workingMemory) {

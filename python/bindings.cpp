@@ -400,26 +400,98 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add missing Novelty class binding
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Neural novelty detection system)pbdoc")
+        .def("getLevel", &Novelty::getLevel,
+             "Get the current novelty level (0.0-1.0)")
+        .def("update", &Novelty::update, py::arg("dt"),
+             "Update novelty level (decay over time)")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"),
+             "Set novelty level directly");
+    
+    // Add Dopamine class binding for completeness
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulation system)pbdoc")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get dopamine level (0.0-1.0)")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get dopamine-modulated plasticity factor");
+    
+    // Add Curiosity class binding
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulation system)pbdoc")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get curiosity level (0.0-1.0)");
+    
+    // Add PredictionError class binding
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signal)pbdoc")
+        .def("getLevel", &PredictionError::getLevel,
+             "Get prediction error level");
+    
+    // Add helper functions for common operations
+    m.def("run_simple_demo", [](std::shared_ptr<Brain> brain, size_t steps, 
+                               std::shared_ptr<SimpleWorld> world) {
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        float totalReward = 0.0f;
+        
+        for (size_t i = 0; i < steps; ++i) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i, i * 0.001);
+            
+            auto cmd = agent->decodeMotorCommand();
+            auto result = world->applyMotorCommand(cmd, i * 0.001);
+            
+            totalReward += result.reward;
+            agent->applyRewardModulation(result.reward, 0.0f);
+            
+            if (i % 100 == 0) {
+                // Log progress every 100 steps
+            }
+        }
+        
+        return totalReward / steps;
+    }, py::arg("brain"), py::arg("steps"), py::arg("world"),
+       "Run a simple simulation demo and return average reward");
+    
+    m.def("create_demo_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        return config;
+    }, "Create a default configuration suitable for demos");
+    
+    m.def("compare_brain_states", [](std::shared_ptr<Brain> brain1, 
+                                      std::shared_ptr<Brain> brain2) {
+        float reward1 = brain1->getTotalSpikeCount();
+        float reward2 = brain2->getTotalSpikeCount();
+        float rate1 = brain1->getAverageFiringRate();
+        float rate2 = brain2->getAverageFiringRate();
+        
+        std::map<std::string, float> comparison;
+        comparison["spike_ratio"] = reward1 / (reward2 + 0.001f);
+        comparison["firing_rate_ratio"] = rate1 / (rate2 + 0.001f);
+        comparison["excitatory_inhibition_ratio1"] = brain1->getExcitationInhibitionRatio();
+        comparison["excitatory_inhibition_ratio2"] = brain2->getExcitationInhibitionRatio();
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"),
+       "Compare two brain states and return metrics");
+    
+    m.def("export_brain_for_analysis", [](std::shared_ptr<Brain> brain, 
+                                          const std::string& filepath) {
+        if (brain->save(filepath)) {
+            return true;
+        }
+        return false;
+    }, py::arg("brain"), py::arg("filepath"),
+       "Export brain state for external analysis (e.g., in Python/Matlab)");
 
 } // namespace nlm
