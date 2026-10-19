@@ -142,27 +142,573 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    // Enhanced Config class with Pythonic API
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM system.
+        
+        Provides access to NLM simulation parameters including neuron properties,
+        world settings, memory system parameters, and developmental stages.
+        
+        Examples:
+            >>> config = Config.createDefault()
+            >>> config = Config.fromFile("nlm_config.json")
+            >>> config = Config()
+            >>> config.set("neuron.excitatory_strength", 1.2)
+    )pbdoc")
+    .def(py::init<>())
+    .def(py::init<const std::string&>(), py::arg("filepath"),
+         R"pbdoc(
+         Create configuration loaded from file.
+         
+         Args:
+             filepath: Path to configuration file
+         Returns:
+             Config instance with loaded configuration
+         )pbdoc")
+    .def_static("createDefault", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set sensible defaults for NLM simulation
+        config->set("neuron.count", int64_t(500), ConfigSource::Default);
+        config->set("neuron.excitatory_strength", 1.0f, ConfigSource::Default);
+        config->set("neuron.inhibitory_strength", 1.0f, ConfigSource::Default);
+        config->set("neuron.threshold", 0.5f, ConfigSource::Default);
+        config->set("neuron.reset_potential", -0.6f, ConfigSource::Default);
+        config->set("neuron.membrane_time_constant", 0.02f, ConfigSource::Default);
+        config->set("neuron.refractory_period", 2.0f, ConfigSource::Default);
+        
+        config->set("synapse.max_connections_per_neuron", int64_t(50), ConfigSource::Default);
+        config->set("synapse.connection_probability", 0.15f, ConfigSource::Default);
+        config->set("synapse.max_weight", 2.0f, ConfigSource::Default);
+        config->set("synapse.min_weight", -2.0f, ConfigSource::Default);
+        
+        config->set("simulation.timestep", 0.001, ConfigSource::Default);
+        config->set("simulation.max_steps", int64_t(10000), ConfigSource::Default);
+        
+        config->set("world.width", int64_t(16), ConfigSource::Default);
+        config->set("world.height", int64_t(16), ConfigSource::Default);
+        config->set("world.cell_size", 0.5f, ConfigSource::Default);
+        
+        config->set("random.seed", int64_t(42), ConfigSource::Default);
+        
+        // Enable all learning systems by default
+        config->set("plasticity.stdp_enabled", true, ConfigSource::Default);
+        config->set("plasticity.hebbian_enabled", true, ConfigSource::Default);
+        config->set("plasticity.structural_enabled", true, ConfigSource::Default);
+        config->set("development.enabled", true, ConfigSource::Default);
+        config->set("memory.working_memory_enabled", true, ConfigSource::Default);
+        config->set("memory.episodic_memory_enabled", true, ConfigSource::Default);
+        config->set("memory.associative_memory_enabled", true, ConfigSource::Default);
+        
+        config->set("neuromodulation.dopamine_enabled", true, ConfigSource::Default);
+        config->set("neuromodulation.curiosity_enabled", true, ConfigSource::Default);
+        config->set("neuromodulation.novelty_enabled", true, ConfigSource::Default);
+        
+        config->set("prediction.enabled", true, ConfigSource::Default);
+        config->set("cognition.planner_enabled", true, ConfigSource::Default);
+        config->set("cognition.concept_formation_enabled", true, ConfigSource::Default);
+        config->set("cognition.attention_enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, R"pbdoc(
+        Create a default configuration with sensible defaults for NLM simulation.
+        
+        Returns:
+            Config instance with optimized default values
+        )pbdoc")
+    .def_static("fromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw py::key_error("Failed to load configuration from file: " + filepath);
+        }
+        return config;
+    }, py::arg("filepath"),
+        R"pbdoc(
+        Create and load configuration from file.
+        
+        Args:
+            filepath: Path to configuration file
+        
+        Returns:
+            Config instance with loaded configuration
+        
+        Raises:
+            KeyError: If file cannot be loaded
+        )pbdoc")
+    .def_static("fromDict", [](py::dict dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (auto item : dict) {
+            std::string key = py::str(item.first).cast<std::string>();
+            py::object value = item.second;
+            
+            // Convert Python value to ConfigValue
+            try {
+                if (value.is(py::int_())) {
+                    config->set(key, value.cast<int64_t>());
+                } else if (value.is(py::float_())) {
+                    config->set(key, value.cast<double>());
+                } else if (value.is(py::bool_())) {
+                    config->set(key, value.cast<bool>());
+                } else {
+                    config->set(key, value.cast<std::string>());
+                }
+            } catch (const std::exception& e) {
+                throw py::value_error("Error setting configuration key " + key + ": " + std::string(e.what()));
+            }
+        }
+        return config;
+    }, py::arg("dict"),
+        R"pbdoc(
+        Create configuration from Python dictionary.
+        
+        Args:
+            dict: Dictionary with configuration key-value pairs
+        
+        Returns:
+            Config instance
+        
+        Examples:
+            >>> config = Config.fromDict({
+            ...     "neuron.count": 500,
+            ...     "world.width": 16,
+            ...     "world.height": 16,
+            ...     "plasticity.stdp_enabled": True
+            ... })
+        )pbdoc")
+    .def("toDict", [](const Config& self) {
+        py::dict result;
+        for (const auto& key : self.getKeys()) {
+            auto value = self.get<std::string>(key);
+            if (value) {
+                result[key.c_str()] = value.value();
+            } else {
+                // Try other types
+                auto intVal = self.get<int64_t>(key);
+                if (intVal) {
+                    result[key.c_str()] = intVal.value();
+                } else {
+                    auto doubleVal = self.get<double>(key);
+                    if (doubleVal) {
+                        result[key.c_str()] = doubleVal.value();
+                    } else {
+                        auto boolVal = self.get<bool>(key);
+                        if (boolVal) {
+                            result[key.c_str()] = boolVal.value();
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }, R"pbdoc(
+        Convert configuration to Python dictionary.
+        
+        Returns:
+            Dictionary with all configuration key-value pairs
+        )pbdoc")
+    .def("validate", &validateConfig, py::arg("config"),
+         R"pbdoc(
+        Validate configuration consistency.
+        
+        Args:
+            config: Configuration to validate
+        
+        Returns:
+            Tuple of (is_valid, errors_list)
+            
+        Raises:
+            ValueError: If configuration is invalid
+        )pbdoc")
+    .def("merge", &mergeConfig, py::arg("config"), py::arg("other_config"),
+         R"pbdoc(
+        Merge another configuration into this one.
+        
+        Args:
+            other_config: Configuration to merge (other_config takes precedence)
+        )pbdoc")
+    .def("clone", []() { return std::make_shared<Config>(*this); },
+         "Create a copy of this configuration")
+    .def("loadFromFile", [](Config& self, const std::string& filepath) {
+        if (filepath.empty()) {
+            throw py::value_error("File path cannot be empty");
+        }
+        return self.loadFromFile(filepath);
+    }, py::arg("filepath"),
+        R"pbdoc(
+        Load configuration from file.
+        
+        Args:
+            filepath: Path to configuration file
+        
+        Returns:
+            True if file loaded successfully, False otherwise
+        
+        Raises:
+            ValueError: If filepath is empty
+        )pbdoc")
+    .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+        return self.loadFromArgs(argc, argv);
+    }, py::arg("argc"), py::arg("argv"),
+        "Load configuration from command line arguments")
+    .def("saveToFile", [](Config& self, const std::string& filepath) {
+        if (filepath.empty()) {
+            throw py::value_error("File path cannot be empty");
+        }
+        return self.saveToFile(filepath);
+    }, py::arg("filepath"),
+        R"pbdoc(
+        Save configuration to file.
+        
+        Args:
+            filepath: Path to save configuration file
+        
+        Returns:
+            True if file saved successfully, False otherwise
+        
+        Raises:
+            ValueError: If filepath is empty
+        )pbdoc")
+    .def("has", &Config::has, py::arg("key"),
+         "Check if a configuration key exists")
+    .def("getKeys", &Config::getKeys,
+         "Get all configuration keys")
+    .def("clear", &Config::clear,
+         "Clear all configuration entries")
+    .def("summary", &Config::summary,
+         "Get a summary string of the configuration")
+    .def("__repr__", [](const Config& cfg) {
+        return "<Config: " + cfg.summary() + ">";
+    }, "String representation of configuration")
+    // Enhanced getters with type conversion
+    .def("get", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+        if (self.has(key)) {
+            // Try to get the appropriate type based on default value type
+            if (defaultValue.is(py::int_())) {
+                auto val = self.get<int64_t>(key);
+                return val.has_value() ? py::cast(val.value()) : defaultValue;
+            } else if (defaultValue.is(py::float_())) {
+                auto val = self.get<double>(key);
+                return val.has_value() ? py::cast(val.value()) : defaultValue;
+            } else if (defaultValue.is(py::bool_())) {
+                auto val = self.get<bool>(key);
+                return val.has_value() ? py::cast(val.value()) : defaultValue;
+            } else if (defaultValue.is(py::str())) {
+                auto val = self.get<std::string>(key);
+                return val.has_value() ? py::cast(val.value()) : defaultValue;
+            }
+        }
+        return defaultValue;
+    }, py::arg("key"), py::arg("default") = nullptr,
+        R"pbdoc(
+        Get configuration value with Pythonic interface.
+        
+        Args:
+            key: Configuration key (dot notation supported)
+            default: Default value if key doesn't exist
+        
+        Returns:
+            Configuration value or default
+        
+        Examples:
+            >>> config.get("neuron.count", 500)
+            >>> config.get("world.width", 16)
+            >>> config.get("plasticity.stdp_enabled", True)
+        )pbdoc")
+    // Enhanced setters with validation
+    .def("set", [](Config& self, const std::string& key, const py::object& value) {
+        if (value.is(py::int_())) {
+            self.set(key, value.cast<int64_t>());
+        } else if (value.is(py::float_())) {
+            self.set(key, value.cast<double>());
+        } else if (value.is(py::bool_())) {
+            self.set(key, value.cast<bool>());
+        } else if (value.is(py::str())) {
+            self.set(key, value.cast<std::string>());
+        } else {
+            throw py::type_error("Unsupported value type for configuration key: " + key);
+        }
+    }, py::arg("key"), py::arg("value"),
+        R"pbdoc(
+        Set configuration value.
+        
+        Args:
+            key: Configuration key (dot notation supported)
+            value: Value to set (int, float, bool, or string)
+        
+        Examples:
+            >>> config.set("neuron.count", 500)
+            >>> config.set("world.width", 16)
+            >>> config.set("plasticity.stdp_enabled", True)
+        )pbdoc")
+    // Convenience getters for common NLM parameters
+    .def("getNeuronCount", &Config::getOr<int64_t>, py::arg("defaultValue") = 500,
+         "Get neuron count with default")
+    .def("getWorldSize", [](const Config& self) {
+        int64_t width = self.getOr<int64_t>("world.width", 16);
+        int64_t height = self.getOr<int64_t>("world.height", 16);
+        return std::make_pair(width, height);
+    }, "Get world dimensions as (width, height) tuple")
+    .def("getSimulationTimestep", &Config::getOr<double>, py::arg("defaultValue") = 0.001,
+         "Get simulation timestep with default")
+    .def("getMaxSteps", &Config::getOr<int64_t>, py::arg("defaultValue") = 10000,
+         "Get maximum simulation steps with default")
+    // Brain creation helpers
+    .def_static("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"),
+        R"pbdoc(
+        Create a brain with configuration and auto-initialize.
+        
+        Args:
+            config: Configuration for the brain
+        
+        Returns:
+            Initialized brain instance
+        
+        Examples:
+            >>> config = Config.createDefault()
+            >>> brain = Config.createBrain(config)
+        )pbdoc")
+    .def_static("createBrainFromFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = Config::fromFile(filepath);
+        return Config::createBrain(config);
+    }, py::arg("filepath"),
+        R"pbdoc(
+        Create and initialize a brain from configuration file.
+        
+        Args:
+            filepath: Path to configuration file
+        
+        Returns:
+            Initialized brain instance
+        )pbdoc")
+    // World creation helpers
+    .def_static("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, R"pbdoc(
+        Create a simple world for NLM simulation.
+        
+        Returns:
+            SimpleWorld instance
+        
+        Examples:
+            >>> world = Config.createSimpleWorld()
+            >>> world.configure(16, 16, 8, 8)  # width, height, vision_width, vision_height
+        )pbdoc")
+    .def_static("createSimpleWorldWithConfig", [](const Config& config) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(
+            config.getOr<int64_t>("world.width", 16),
+            config.getOr<int64_t>("world.height", 16),
+            config.getOr<int64_t>("world.vision_width", 8),
+            config.getOr<int64_t>("world.vision_height", 8)
+        );
+        return world;
+    }, py::arg("config"),
+        R"pbdoc(
+        Create and configure a simple world from configuration.
+        
+        Args:
+            config: Configuration with world settings
+        
+        Returns:
+            Configured SimpleWorld instance
+        )pbdoc")
+    // Agent creation helpers
+    .def_static("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"),
+        R"pbdoc(
+        Create an agent brain interface.
+        
+        Args:
+            brain: The underlying brain instance
+        
+        Returns:
+            AgentBrain instance
+        
+        Examples:
+            >>> brain = Config.createBrain(config)
+            >>> agent = Config.createAgentBrain(brain)
+        )pbdoc")
+    .def_static("createAgentBrainWithWorld", [](std::shared_ptr<Brain> brain, const SimpleWorld& world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        R"pbdoc(
+        Create an agent brain with world initialization.
+        
+        Args:
+            brain: The underlying brain instance
+            world: World to initialize the agent with
+        
+        Returns:
+            Initialized AgentBrain instance
+        )pbdoc")
+
+    // Configuration validation and merging helper functions
+    bool validateConfig(const Config& config) {
+        bool isValid = true;
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        const std::vector<std::string> requiredKeys = {
+            "neuron.count",
+            "world.width", 
+            "world.height",
+            "simulation.timestep"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config.has(key)) {
+                isValid = false;
+                errors.push_back("Missing required configuration key: " + key);
+            }
+        }
+        
+        // Validate value ranges
+        if (config.has("neuron.count")) {
+            auto count = config.get<int64_t>("neuron.count");
+            if (count && (*count <= 0 || *count > 1000000)) {
+                isValid = false;
+                errors.push_back("Invalid neuron count: " + std::to_string(*count));
+            }
+        }
+        
+        if (config.has("world.width")) {
+            auto width = config.get<int64_t>("world.width");
+            if (width && (*width <= 0 || *width > 1000)) {
+                isValid = false;
+                errors.push_back("Invalid world width: " + std::to_string(*width));
+            }
+        }
+        
+        if (config.has("world.height")) {
+            auto height = config.get<int64_t>("world.height");
+            if (height && (*height <= 0 || *height > 1000)) {
+                isValid = false;
+                errors.push_back("Invalid world height: " + std::to_string(*height));
+            }
+        }
+        
+        if (config.has("simulation.timestep")) {
+            auto timestep = config.get<double>("simulation.timestep");
+            if (timestep && (*timestep <= 0.0 || *timestep > 1.0)) {
+                isValid = false;
+                errors.push_back("Invalid simulation timestep: " + std::to_string(*timestep));
+            }
+        }
+        
+        // Log errors for debugging
+        for (const auto& error : errors) {
+            NLM_LOG_WARN("Config validation error: " + error);
+        }
+        
+        return isValid;
+    }
+    
+    void mergeConfig(Config& config, const Config& other) {
+        for (const auto& key : other.getKeys()) {
+            if (other.has(key)) {
+                auto value = other.get<std::string>(key);
+                if (value) {
+                    config.set(key, *value);
+                } else {
+                    auto intVal = other.get<int64_t>(key);
+                    if (intVal) {
+                        config.set(key, *intVal);
+                    } else {
+                        auto doubleVal = other.get<double>(key);
+                        if (doubleVal) {
+                            config.set(key, *doubleVal);
+                        } else {
+                            auto boolVal = other.get<bool>(key);
+                            if (boolVal) {
+                                config.set(key, *boolVal);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // High-level simulation helper functions
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>
+    createSimulationSetup(const Config& config) {
+        // Create brain
+        auto brain = Config::createBrain(config);
+        
+        // Create world
+        auto world = Config::createSimpleWorldWithConfig(config);
+        
+        // Create agent
+        auto agent = Config::createAgentBrainWithWorld(brain, *world);
+        
+        // Configure agent based on config
+        agent->enableRewardModulation(config.getOr<bool>("neuromodulation.reward_enabled", true));
+        agent->enableStructuralPlasticity(config.getOr<bool>("neuromodulation.structural_enabled", true));
+        agent->enableDevelopment(config.getOr<bool>("neuromodulation.development_enabled", true));
+        agent->enableCuriosity(config.getOr<bool>("neuromodulation.curiosity_enabled", true));
+        
+        return std::make_tuple(brain, world, agent);
+    }
+
+    // Module-level convenience functions
+    std::shared_ptr<Config> createDefaultConfig() {
+        auto config = std::make_shared<Config>();
+        return config;
+    }
+    
+    std::shared_ptr<Brain> createBrainFromDefaults() {
+        auto config = createDefaultConfig();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }
+    
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>
+    createReadySimulation() {
+        auto config = createDefaultConfig();
+        return createSimulationSetup(*config);
+    // Module-level convenience functions
+    std::shared_ptr<Config> createDefaultConfig() {
+        auto config = std::make_shared<Config>();
+        return config;
+    }
+    
+    std::shared_ptr<Brain> createBrainFromDefaults() {
+        auto config = createDefaultConfig();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }
+    
+    std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>
+    createReadySimulation() {
+        auto config = createDefaultConfig();
+        return createSimulationSetup(*config);
+    }
+
+    // Now add these as module-level functions
+    m.def("createDefaultConfig", []() {
+        return createDefaultConfig();
+    }, "Create a default configuration with sensible defaults")
+    .def("createBrainFromDefaults", []() {
+        return createBrainFromDefaults();
+    }, "Create a brain with default configuration and auto-initialize")
+    .def("createReadySimulation", []() {
+        auto result = createReadySimulation();
+        auto brain = std::get<0>(result);
+        auto world = std::get<1>(result);
+        auto agent = std::get<2>(result);
+        
+        // Return as Python tuple-like object
+        return py::make_tuple(brain, world, agent);
+    }, "Create a ready-to-use simulation with brain, world, and agent");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
