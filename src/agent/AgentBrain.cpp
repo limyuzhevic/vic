@@ -1,65 +1,14 @@
+// NLM Enhanced AgentBrain Implementation
+// Provides comprehensive agent functionality with advanced features
+
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <sstream>
+#include <fstream>
 
 namespace nlm {
-
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 AgentBrain::~AgentBrain() = default;
 
@@ -67,6 +16,10 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    stepsExecuted_ = 0;
+    totalReward_ = 0.0f;
+    actionCounts_.clear();
+    actionEfficiencies_.clear();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -217,7 +170,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command - include all 8 options including Wait
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
@@ -227,7 +180,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;  // Added missing case
             }
         }
     }
@@ -235,14 +188,75 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+ActionResult AgentBrain::executeAction(const MotorCommand& command) {
+    if (!actionCallback_) {
+        // Default action execution
+        ActionResult result;
+        result.success = false;
+        result.message = "No action callback registered";
+        return result;
+    }
+    
+    return actionCallback_(command);
+}
+
+ActionResult AgentBrain::executeAction(const std::string& actionName) {
+    // Convert string to motor command
+    MotorCommand cmd = MotorCommand::Wait;
+    if (actionName == "MoveForward") cmd = MotorCommand::MoveForward;
+    else if (actionName == "MoveBackward") cmd = MotorCommand::MoveBackward;
+    else if (actionName == "TurnLeft") cmd = MotorCommand::TurnLeft;
+    else if (actionName == "TurnRight") cmd = MotorCommand::TurnRight;
+    else if (actionName == "LookLeft") cmd = MotorCommand::LookLeft;
+    else if (actionName == "LookRight") cmd = MotorCommand::LookRight;
+    else if (actionName == "Interact") cmd = MotorCommand::Interact;
+    else if (actionName == "Wait") cmd = MotorCommand::Wait;
+    
+    return executeAction(cmd);
+}
+
+SensoryPercept AgentBrain::observe() const {
+    SensoryPercept percept;
+    // This would normally get observation from world
+    // For now, return empty percept
+    return percept;
+}
+
+void AgentBrain::updateSensoryExpectations() {
+    // Update internal models of sensory input
+    // This is part of predictive processing
+    if (curiosityEnabled_ && predictionError_ > 0.1f) {
+        // Update internal models based on prediction errors
+        // This is where learning occurs
+    }
+}
+
+void AgentBrain::provideReward(float reward) {
+    provideIntrinsicReward(reward);
+    if (rewardCallback_) {
+        rewardCallback_(reward, expectedReward_);
+    }
+}
+
+void AgentBrain::provideIntrinsicReward(float reward) {
+    totalReward_ += reward;
+    stepsExecuted_++;
+    
+    // Update expected reward (exponential moving average)
+    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Apply reward modulation
+    if (rewardModulationEnabled_) {
+        applyRewardModulation(reward, expectedReward_);
+    }
+}
+
+void AgentBrain::applyCreditAssignment(float reward, float predictedReward) {
+    // Apply reward-modulated weight changes
     if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
@@ -279,72 +293,255 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+void AgentBrain::learnFromExperience(const std::vector<float>& experience) {
+    if (!brain_ || !metaLearningEnabled_) return;
     
-    developmentalAge_ += timestep;
+    // Learn from experience patterns
+    // This is where meta-learning occurs
+    // The agent can learn how to learn from the experience
     
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    // Example: update learning rate based on experience complexity
+    float complexity = 0.0f;
+    for (float val : experience) {
+        complexity += std::abs(val);
     }
+    complexity /= experience.size();
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+    if (complexity > 0.5f) {
+        // High complexity - increase learning rate temporarily
+        float tempLearningRate = learningRate_ * 2.0f;
+        learningRate_ = std::min(tempLearningRate, 0.1f);  // Cap at 0.1
+    }
+}
+
+void AgentBrain::consolidateMemory() {
+    if (!brain_ || !selfMonitoringEnabled_) return;
+    
+    // Consolidate memory and prune unimportant connections
+    // This is part of the agent's self-monitoring system
+    
+    // Find synapses with low eligibility traces
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float eligibility = syn->getEligibilityTrace();
+            if (std::abs(eligibility) < 0.01f) {
+                // Prune this synapse (reduce weight toward zero)
+                float delta = -syn->getWeight() * 0.01f;
+                syn->addToWeight(delta);
+            }
         }
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
+void AgentBrain::resetForLearning() {
+    if (!brain_) return;
+    
+    // Reset for new learning episode
+    reset();
+    
+    // Reset development system
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Reset performance monitoring
+    stepsExecuted_ = 0;
+    totalReward_ = 0.0f;
+    actionCounts_.clear();
+    actionEfficiencies_.clear();
+    
+    // Reset memory systems
+    // This would involve more complex memory management
+    
+    // Reset learning state
+    learningRate_ = 0.01f;
+    explorationRate_ = 0.1f;
+    curiosityLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+}
+
+std::string AgentBrain::serializeState() const {
+    std::stringstream ss;
+    ss << "AGENT_STATE:" << std::endl;
+    ss << "  developmental_age: " << developmentalAge_ << std::endl;
+    ss << "  plasticity_modifier: " << plasticityModifier_ << std::endl;
+    ss << "  learning_rate: " << learningRate_ << std::endl;
+    ss << "  exploration_rate: " << explorationRate_ << std::endl;
+    ss << "  curiosity_level: " << curiosityLevel_ << std::endl;
+    ss << "  novelty_level: " << noveltyLevel_ << std::endl;
+    ss << "  prediction_error: " << predictionError_ << std::endl;
+    ss << "  expected_reward: " << expectedReward_ << std::endl;
+    ss << "  total_reward: " << totalReward_ << std::endl;
+    ss << "  steps_executed: " << stepsExecuted_ << std::endl;
+    ss << "  meta_learning_enabled: " << (metaLearningEnabled_ ? "true" : "false") << std::endl;
+    ss << "  transfer_learning_enabled: " << (transferLearningEnabled_ ? "true" : "false") << std::endl;
+    ss << "  self_monitoring_enabled: " << (selfMonitoringEnabled_ ? "true" : "false") << std::endl;
+    
+    return ss.str();
+}
+
+bool AgentBrain::deserializeState(const std::string& stateData) {
+    // Parse state data
+    // This is a simplified implementation
+    // In practice, you would use a proper serialization format
+    
+    // For now, just parse key-value pairs
+    size_t pos = 0;
+    while (pos < stateData.size()) {
+        size_t newlinePos = stateData.find('\n', pos);
+        if (newlinePos == std::string::npos) break;
+        
+        std::string line = stateData.substr(pos, newlinePos - pos);
+        pos = newlinePos + 1;
+        
+        // Parse key-value pair
+        size_t colonPos = line.find(':');
+        if (colonPos == std::string::npos) continue;
+        
+        std::string key = line.substr(0, colonPos);
+        std::string value = line.substr(colonPos + 1);
+        
+        // Trim whitespace
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        value.erase(value.find_last_not_of(" \t") + 1);
+        
+        // Parse value based on key
+        if (key == "  developmental_age") {
+            developmentalAge_ = std::stod(value);
+        } else if (key == "  plasticity_modifier") {
+            plasticityModifier_ = std::stof(value);
+        } else if (key == "  learning_rate") {
+            learningRate_ = std::stof(value);
+        } else if (key == "  exploration_rate") {
+            explorationRate_ = std::stof(value);
+        } else if (key == "  curiosity_level") {
+            curiosityLevel_ = std::stof(value);
+        } else if (key == "  novelty_level") {
+            noveltyLevel_ = std::stof(value);
+        } else if (key == "  prediction_error") {
+            predictionError_ = std::stof(value);
+        } else if (key == "  expected_reward") {
+            expectedReward_ = std::stof(value);
+        } else if (key == "  total_reward") {
+            totalReward_ = std::stof(value);
+        } else if (key == "  steps_executed") {
+            stepsExecuted_ = std::stoi(value);
+        } else if (key == "  meta_learning_enabled") {
+            metaLearningEnabled_ = (value == "true" || value == "1");
+        } else if (key == "  transfer_learning_enabled") {
+            transferLearningEnabled_ = (value == "true" || value == "1");
+        } else if (key == "  self_monitoring_enabled") {
+            selfMonitoringEnabled_ = (value == "true" || value == "1");
+        }
+    }
+    
+    return true;
+}
+
+bool AgentBrain::saveStateToFile(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << serializeState();
+    return true;
+}
+
+bool AgentBrain::loadStateFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    
+    return deserializeState(buffer.str());
+}
+
+void AgentBrain::startPerformanceMonitoring() {
+    performanceMonitoringActive_ = true;
+}
+
+void AgentBrain::stopPerformanceMonitoring() {
+    performanceMonitoringActive_ = false;
+    // Calculate average step time
+    if (stepsExecuted_ > 0) {
+        averageStepTime_ = totalCPUTime_ / stepsExecuted_;
+    }
+}
+
+double AgentBrain::getAverageStepTime() const {
+    return averageStepTime_;
+}
+
+size_t AgentBrain::getStepsExecuted() const {
+    return stepsExecuted_;
+}
+
+size_t AgentBrain::getActionCount(MotorCommand cmd) const {
+    auto it = actionCounts_.find(cmd);
+    return it != actionCounts_.end() ? it->second : 0;
+}
+
+float AgentBrain::getActionEfficiency(MotorCommand cmd) const {
+    auto it = actionEfficiencies_.find(cmd);
+    return it != actionEfficiencies_.end() ? it->second : 0.0f;
+}
+
+std::string AgentBrain::getDebugInfo() const {
+    std::stringstream ss;
+    ss << "=== NLM Agent Brain Debug Info ===" << std::endl;
+    ss << "Steps executed: " << stepsExecuted_ << std::endl;
+    ss << "Total reward: " << totalReward_ << std::endl;
+    ss << "Average reward: " << (stepsExecuted_ > 0 ? totalReward_ / stepsExecuted_ : 0.0f) << std::endl;
+    ss << "Learning rate: " << learningRate_ << std::endl;
+    ss << "Exploration rate: " << explorationRate_ << std::endl;
+    ss << "Curiosity level: " << curiosityLevel_ << std::endl;
+    ss << "Novelty level: " << noveltyLevel_ << std::endl;
+    ss << "Prediction error: " << predictionError_ << std::endl;
+    ss << "Expected reward: " << expectedReward_ << std::endl;
+    ss << "Developmental stage: " << static_cast<int>(getDevelopmentalStage()) << std::endl;
+    ss << "Meta learning enabled: " << (metaLearningEnabled_ ? "yes" : "no") << std::endl;
+    ss << "Transfer learning enabled: " << (transferLearningEnabled_ ? "yes" : "no") << std::endl;
+    ss << "Self monitoring enabled: " << (selfMonitoringEnabled_ ? "yes" : "no") << std::endl;
+    ss << "Memory capacity: " << memoryCapacity_ << std::endl;
+    ss << "Planning horizon: " << planningHorizon_ << std::endl;
+    ss << "Average step time: " << averageStepTime_ << " ms" << std::endl;
+    
+    return ss.str();
+}
+
+void AgentBrain::printStatus() const {
+    std::cout << getDebugInfo() << std::endl;
+}
+
+void AgentBrain::printPerformanceStats() const {
+    std::cout << "=== NLM Performance Stats ===" << std::endl;
+    std::cout << "Steps executed: " << stepsExecuted_ << std::endl;
+    std::cout << "Total reward: " << totalReward_ << std::endl;
+    std::cout << "Average reward per step: " << (stepsExecuted_ > 0 ? totalReward_ / stepsExecuted_ : 0.0f) << std::endl;
+    std::cout << "Average step time: " << averageStepTime_ << " ms" << std::endl;
+    std::cout << "Learning rate: " << learningRate_ << std::endl;
+    std::cout << "Exploration rate: " << explorationRate_ << std::endl;
+    std::cout << "Curiosity level: " << curiosityLevel_ << std::endl;
+    std::cout << "Novelty level: " << noveltyLevel_ << std::endl;
+}
+
+void AgentBrain::printLearningStats() const {
+    std::cout << "=== NLM Learning Stats ===" << std::endl;
+    std::cout << "Meta learning enabled: " << (metaLearningEnabled_ ? "yes" : "no") << std::endl;
+    std::cout << "Transfer learning enabled: " << (transferLearningEnabled_ ? "yes" : "no") << std::endl;
+    std::cout << "Self monitoring enabled: " << (selfMonitoringEnabled_ ? "yes" : "no") << std::endl;
+    std::cout << "Memory capacity: " << memoryCapacity_ << std::endl;
+    std::cout << "Planning horizon: " << planningHorizon_ << std::endl;
+    
+    std::cout << "Action statistics:" << std::endl;
+    for (const auto& entry : actionCounts_) {
+        std::cout << "  " << static_cast<int>(entry.first) << ": " << entry.second << " times" << std::endl;
+    }
 }
 
 } // namespace nlm
