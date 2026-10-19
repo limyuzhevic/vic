@@ -26,6 +26,11 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("NeuralEpisodicMemory::initialize called with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
@@ -35,6 +40,12 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
+    
+    // Validate episode before storing
+    if (!validateEpisode(stored)) {
+        NLM_LOG_WARNING("NeuralEpisodicMemory: Invalid episode discarded");
+        return;
+    }
     
     episodes_.push_back(stored);
     
@@ -572,6 +583,39 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
+                                                 const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.empty()) return 0.0f;
+    
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+bool NeuralEpisodicMemory::validateEpisode(const EpisodicMemoryItem& episode) const {
+    // Basic validation rules
+    if (episode.activeNeurons.empty() && episode.sensoryState.empty()) {
+        NLM_LOG_DEBUG("NeuralEpisodicMemory: Episode has no active neurons or sensory data");
+    }
+    
+    // Check for reasonable activation values
+    for (float activation : episode.neuronActivations) {
+        if (std::isnan(activation) || std::isinf(activation)) {
+            NLM_LOG_WARNING("NeuralEpisodicMemory: Invalid activation value in episode");
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 } // namespace nlm

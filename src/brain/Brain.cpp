@@ -174,13 +174,69 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+// Helper function for safe neuron collection with null checks
+    auto collectNeuronsForIO = [this](NeuralPopulation* population, 
+                                      std::vector<Neuron*>& neuronVector) {
+        if (!population) {
+            NLM_LOG_WARNING("Population pointer is null - cannot collect neurons for I/O");
+            return false;
+        }
+        
+        const auto& neurons = population->getNeurons();
+        if (neurons.empty()) {
+            NLM_LOG_DEBUG("Population has no neurons to collect");
+            return true; // Not an error, just nothing to collect
+        }
+        
+        neuronVector.reserve(neuronVector.size() + neurons.size());
+        for (auto* neuron : neurons) {
+            if (neuron) {
+                neuronVector.push_back(neuron);
+            } else {
+                NLM_LOG_WARNING("Null neuron found in population - skipping");
+            }
+        }
+        
+        return true;
+    };
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    /*
+     * Brain Initialization (Phase 6 - Integrated)
+     * 
+     * This method performs comprehensive initialization of the complete artificial brain system:
+     * 1. Validates configuration parameters and sets up neural architecture
+     * 2. Creates brain regions with appropriate population distributions
+     * 3. Establishes sensory and motor neuron interfaces for input/output
+     * 4. Initializes all integrated cognitive and memory systems
+     * 
+     * Returns true if initialization succeeds, false otherwise.
+     */
+    
+    // Get configuration values with error checking
+    size_t neuronCount = 0;
+    size_t regionCount = 0;
+    float connectionProbability = 0.1f;
+    
+    try {
+        neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        
+        // Validate configuration values
+        if (neuronCount == 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: must be > 0, using default 1000");
+            neuronCount = 1000;
+        }
+        if (regionCount == 0) {
+            NLM_LOG_ERROR("Invalid region_count: must be > 0, using default 1");
+            regionCount = 1;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error reading config: ") + e.what() + ". Using defaults");
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -194,30 +250,123 @@ bool Brain::initialize() {
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+        if (!region) {
+            NLM_LOG_ERROR("Failed to create neurons in region " + std::to_string(i + 1) +
+                         " - region pointer is null");
+            continue;
         }
+        
+        // Add populations with error checking
+        PopulationId sensoryPopId = INVALID_POPULATION_ID;
+        PopulationId internalPopId = INVALID_POPULATION_ID;
+        PopulationId motorPopId = INVALID_POPULATION_ID;
+        
+        try {
+            sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+            internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+            motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error adding populations to region ") + std::to_string(i + 1) +
+                         std::string(": ") + e.what());
+            continue;
+        }
+        
+        // Collect sensory and motor neurons for I/O using safe helper
+        auto* sensoryPop = (sensoryPopId != INVALID_POPULATION_ID) ? 
+                          region->getPopulation(sensoryPopId) : nullptr;
+        auto* motorPop = (motorPopId != INVALID_POPULATION_ID) ? 
+                        region->getPopulation(motorPopId) : nullptr;
+        
+        collectNeuronsForIO(sensoryPop, pImpl->sensoryNeurons);
+        collectNeuronsForIO(motorPop, pImpl->motorNeurons);
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                    ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                    std::to_string(region->getTotalNeuronCount()) + " neurons");
+    }
+    
+    // Validate we have at least some neurons for operation
+    if (pImpl->sensoryNeurons.empty()) {
+        NLM_LOG_WARNING("No sensory neurons created - input functionality may be limited");
+    }
+    if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("No motor neurons created - output functionality may be limited");
+    }
+    size_t neuronCount = 0;
+    size_t regionCount = 0;
+    float connectionProbability = 0.1f;
+    
+    try {
+        neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        
+        // Validate configuration values
+        if (neuronCount == 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: must be > 0, using default 1000");
+            neuronCount = 1000;
+        }
+        if (regionCount == 0) {
+            NLM_LOG_ERROR("Invalid region_count: must be > 0, using default 1");
+            regionCount = 1;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error reading config: ") + e.what() + ". Using defaults");
+    }
+    
+    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                 std::to_string(regionCount) + " regions");
+    
+    // Create regions
+    for (size_t i = 0; i < regionCount; ++i) {
+        addRegion("Region_" + std::to_string(i + 1));
+    }
+    
+    // Create neurons across regions
+    size_t neuronsPerRegion = neuronCount / regionCount;
+    for (size_t i = 0; i < regionCount; ++i) {
+        auto* region = getRegion(RegionId(i + 1));
+        if (!region) {
+            NLM_LOG_ERROR("Failed to create neurons in region " + std::to_string(i + 1) +
+                         " - region pointer is null");
+            continue;
+        }
+        
+        // Add populations with error checking
+        PopulationId sensoryPopId = INVALID_POPULATION_ID;
+        PopulationId internalPopId = INVALID_POPULATION_ID;
+        PopulationId motorPopId = INVALID_POPULATION_ID;
+        
+        try {
+            sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+            internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+            motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error adding populations to region ") + std::to_string(i + 1) +
+                         std::string(": ") + e.what());
+            continue;
+        }
+        
+        // Collect sensory and motor neurons for I/O using safe helper
+        auto* sensoryPop = (sensoryPopId != INVALID_POPULATION_ID) ? 
+                          region->getPopulation(sensoryPopId) : nullptr;
+        auto* motorPop = (motorPopId != INVALID_POPULATION_ID) ? 
+                        region->getPopulation(motorPopId) : nullptr;
+        
+        collectNeuronsForIO(sensoryPop, pImpl->sensoryNeurons);
+        collectNeuronsForIO(motorPop, pImpl->motorNeurons);
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                    ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                    std::to_string(region->getTotalNeuronCount()) + " neurons");
+    }
+    
+    // Validate we have at least some neurons for operation
+    if (pImpl->sensoryNeurons.empty()) {
+        NLM_LOG_WARNING("No sensory neurons created - input functionality may be limited");
+    }
+    if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("No motor neurons created - output functionality may be limited");
     }
     
     // Initialize connectivity with random weights
@@ -268,10 +417,19 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        // Find destination neuron and deliver synaptic input with safety checks
+        if (event.destination_neuron == 0) {
+            NLM_LOG_WARNING("Delayed spike event has null destination neuron - skipping");
+            return;
+        }
+        
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
+                if (!neuron) {
+                    NLM_LOG_WARNING("Null neuron found in region during delayed spike processing - skipping");
+                    continue;
+                }
                 if (neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
@@ -280,10 +438,12 @@ bool Brain::initialize() {
                     } else {
                         neuron->receiveInhibitoryInput(-synapticCurrent);
                     }
-                    return;
+                    return;  // Successfully delivered spike
                 }
             }
         }
+        
+        NLM_LOG_DEBUG("Delayed spike event not delivered - destination neuron not found");
     });
     
     // Configure checkpoint manager
@@ -389,7 +549,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
+                    if (pImpl->workingMemory && neuron) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }

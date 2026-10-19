@@ -135,6 +135,9 @@ private:
                         SimulationStep* startTime,
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
+    
+    // Validate episode before storing
+    bool validateEpisode(const EpisodicMemoryItem& episode) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
