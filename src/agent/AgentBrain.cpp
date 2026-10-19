@@ -21,6 +21,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
+    previousVision_.clear();  // Clear any potential uninitialized state
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
