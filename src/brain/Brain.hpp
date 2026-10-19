@@ -1,5 +1,93 @@
 #pragma once
 
+/**
+ * @file Brain.hpp
+ * @brief Main brain class implementing Phase 6: Integrated Artificial Brain
+ * @author NLM Framework
+ * @version 6.0
+ * @date 2024
+ * 
+ * @details
+ * The Brain class represents the central coordinator of the neural system,
+ * implementing real spiking neural computation with event-driven dynamics and
+ * integrated memory, prediction, cognition, and neuromodulation systems.
+ * 
+ * This is Phase 6 of the NLM framework, representing the complete integration
+ * of all neural subsystems into a unified artificial brain architecture.
+ * 
+ * @section architecture Architecture Overview
+ * The Brain implements a complete integrated brain simulation with the following
+ * key components:
+ * 
+ * 1. **Phase 2: Real Neural Computation**
+ *    - Spiking neural dynamics with LIF neurons
+ *    - Event-driven spike transmission
+ *    - Synaptic plasticity (STDP, Hebbian, neuromodulated)
+ * 
+ * 2. **Memory Systems Integration**
+ *    - Working memory: Transient active information storage
+ *    - Episodic memory: Experience-based learning and replay
+ *    - Associative memory: Pattern association and generalization
+ * 
+ * 3. **Prediction System**
+ *    - Sensory prediction and error computation
+ *    - Predictive coding and Bayesian inference
+ * 
+ * 4. **Cognition Systems**
+ *    - Neural planning for goal-directed behavior
+ *    - Concept formation for pattern discovery
+ *    - Attentional selection for focus and filtering
+ * 
+ * 5. **Development System**
+ *    - Activity-dependent structural changes
+ *    - Plasticity rate modulation through developmental stages
+ *    - Synaptogenesis and pruning
+ * 
+ * 6. **Neuromodulation Systems**
+ *    - Dopamine: Reward prediction error and reinforcement learning
+ *    - Curiosity: Exploration motivation and intrinsic reward
+ *    - Novelty: Novelty detection for exploration
+ *    - Prediction Error: General prediction error signals
+ * 
+ * @section brain_loop Brain Simulation Loop
+ * The main simulation loop (Brain::step) implements the complete integrated
+ * brain processing pipeline:
+ * 
+ * 1. **STEP 1**: Process pending delayed spikes (deliver synaptic input)
+ * 2. **STEP 2**: Update all neurons (LIF dynamics)
+ * 3. **STEP 3**: Detect spikes and schedule spike events
+ * 4. **STEP 4**: Update working memory (maintenance and competition)
+ * 5. **STEP 5**: Apply neuromodulation effects on neural excitability
+ * 6. **STEP 6**: Apply plasticity rules (STDP and Hebbian with neuromodulation)
+ * 7. **STEP 7**: Update episodic memory with current experience
+ * 8. **STEP 8**: Update prediction system
+ * 9. **STEP 9**: Update attention system
+ * 10. **STEP 10**: Update concept formation
+ * 11. **STEP 11**: Apply structural plasticity (synaptogenesis and pruning)
+ * 12. **STEP 12**: Replay important memories (during rest or periodically)
+ * 13. **STEP 13**: Apply development effects
+ * 14. **STEP 14**: Periodic memory consolidation
+ * 15. **STEP 15**: Checkpoint management
+ * 
+ * @section thread_safety Thread Safety
+ * The Brain class is **NOT thread-safe**. All access to brain state must be
+ * synchronized by external synchronization mechanisms. The brain maintains
+ * internal state that should not be modified concurrently.
+ * 
+ * @section performance Performance Considerations
+ * - Event-driven spike processing for efficiency
+ * - Integration of multiple systems reduces memory overhead
+ * - Configurable checkpointing for long simulations
+ * - Adaptive plasticity based on neuromodulation
+ * 
+ * @section configuration Configuration
+ * Configuration is loaded from file or command line arguments via the Config
+ * class. Key parameters include neuron count, region count, connection
+ * probability, simulation timestep, and various subsystem parameters.
+ * 
+ * @note This implementation requires C++11 or later for modern C++ features.
+ */
+
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -11,7 +99,7 @@
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for integrated systems
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -29,25 +117,62 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
+/**
+ * @brief Long-range connection between neural regions
+ * 
+ * Represents inter-regional connectivity that enables communication between
+ * different brain regions. These connections can have delays and plasticity flags
+ * that control learning dynamics across regions.
+ */
 struct InterRegionConnection {
+    /** Source region ID */
     RegionId sourceRegion;
+    /** Target region ID */
     RegionId targetRegion;
+    /** Synaptic weight of the connection */
     float weight;
+    /** Transmission delay in simulation steps */
     Delay delay;
+    /** Plasticity rules applicable to this connection */
     PlasticityFlags plasticityFlags;
     
+    /**
+     * @brief Default constructor
+     * Creates a zero-weight connection with default delay and no plasticity.
+     */
     InterRegionConnection()
         : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
     
+    /**
+     * @brief Parameterized constructor
+     * @param src Source region ID
+     * @param tgt Target region ID
+     * @param w Initial synaptic weight (default: 0.0)
+     * @param d Transmission delay in steps (default: 1)
+     */
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+/**
+ * @class Brain
+ * @brief Main brain class implementing Phase 6: Integrated Artificial Brain
+ * @details
+ * The Brain class serves as the central coordinator of the neural system,
+ * managing all integrated subsystems and coordinating their interaction.
+ * 
+ * Key responsibilities:
+ * - Initialize and manage all neural subsystems
+ * - Process the complete brain simulation loop
+ * - Handle sensory input and motor output
+ * - Manage memory systems (working, episodic, associative)
+ * - Coordinate prediction, cognition, development, and neuromodulation
+ * - Provide checkpointing and state persistence
+ * - Log system status and statistics
+ * 
+ * The brain uses a pImpl pattern for implementation hiding, with all complex
+ * internal state encapsulated in the private Impl class.
+ */
 class Brain {
 public:
     // Create brain with configuration
