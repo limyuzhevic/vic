@@ -1,0 +1,747 @@
+# Advanced NLM Configuration Tool
+# nlm-config - Command-line configuration management for NLM
+
+**Version 1.0 - Advanced Configuration Management**
+
+This tool provides comprehensive configuration management capabilities for the NLM (Neural Learning Machine) framework. It allows advanced users to:
+
+- Create configuration templates
+- Validate and modify configuration files
+- Batch process configurations
+- Export configurations in multiple formats
+- Generate configuration reports
+- Apply machine learning-driven configuration optimizations
+
+## Quick Start
+
+```bash
+# Create a configuration template
+nlm-config init my_project.cfg
+
+# Validate existing configuration
+nlm-config validate my_config.cfg
+
+# View configuration details
+nlm-config show my_config.cfg
+
+# Modify configuration interactively
+nlm-config edit my_config.cfg
+
+# Generate optimized configuration for specific use case
+nlm-config optimize learning_config.cfg --target memory
+
+# Export configuration for analysis
+nlm-config export learning_config.cfg --format json
+
+# Compare two configurations
+nlm-config diff baseline.cfg optimized.cfg
+
+# Apply configuration changes
+nlm-config apply optimized.cfg --target brain1
+
+# Batch process multiple configurations
+nlm-config batch process *.cfg --output optimized/
+
+# Generate configuration statistics
+nlm-config stats learning_config.cfg
+
+# Create configuration template for specific experiment
+nlm-config template create memory_learning.cfg --template memory
+
+# Load configuration from database or remote source
+nlm-config load database://experiments/v1 --output config.cfg
+
+# Save configuration to database or remote storage
+nlm-config save config.cfg database://experiments/v2
+
+# Compare configuration performance metrics
+nlm-config benchmark baseline.cfg optimized.cfg --metrics performance
+```
+
+## Configuration Formats
+
+### Standard Format (.cfg)
+```ini
+# NLM Configuration File
+# Format: INI-style with support for sections
+
+[basic_settings]
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 1
+connection_probability = 0.1
+
+[learning_parameters]
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+
+[structural_plasticity]
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+[memory_system]
+working_memory_capacity = 100
+max_episodes = 1000
+
+[neuromodulation]
+dopamine_level = 0.5
+curiosity_drive = 0.3
+novelty_threshold = 0.7
+
+[development]
+development_rate = 0.1
+plasticity_decay = 0.95
+
+[performance]
+replay_interval = 100
+consolidation_interval = 1000
+checkpoint_enabled = true
+checkpoint_path = ./checkpoints
+
+[output]
+log_level = info
+save_stats = true
+export_format = binary
+```
+
+### JSON Format (.json)
+```json
+{
+  "basic_settings": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.1
+  },
+  "learning_parameters": {
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_tau": 20.0
+  },
+  "structural_plasticity": {
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001
+  }
+}
+```
+
+### YAML Format (.yaml)
+```yaml
+basic_settings:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.1
+
+learning_parameters:
+  stdp_ltp_weight: 0.01
+  stdp_ltd_weight: 0.012
+  stdp_tau: 20.0
+
+structural_plasticity:
+  synaptogenesis_rate: 0.0001
+  pruning_rate: 0.00001
+```
+
+## Command Reference
+
+### nlm-config init
+Create a new configuration file with template or defaults.
+
+```bash
+# Create basic configuration template
+nlm-config init my_config.cfg
+
+# Create specialized configuration template
+nlm-config init memory_learning.cfg --template memory
+
+# Create configuration with specific parameters
+nlm-config init optimized.cfg --neurons 5000 --max_steps 10000
+
+# Create configuration with file template
+nlm-config init project.cfg --template custom_template.ini
+```
+
+### nlm-config validate
+Validate configuration file syntax and semantics.
+
+```bash
+# Validate single configuration file
+nlm-config validate my_config.cfg
+
+# Validate all configuration files in directory
+nlm-config validate configs/
+
+# Validate with strict mode (prohibit warnings)
+nlm-config validate my_config.cfg --strict
+
+# Validate with custom schema
+nlm-config validate my_config.cfg --schema brain_schema.json
+```
+
+### nlm-config show
+Display configuration details and statistics.
+
+```bash
+# Show complete configuration
+nlm-config show my_config.cfg
+
+# Show only specific sections
+nlm-config show my_config.cfg --sections basic_settings learning_parameters
+
+# Show configuration with statistics
+nlm-config show my_config.cfg --stats
+
+# Show configuration in specific format
+nlm-config show my_config.cfg --format json
+```
+
+### nlm-config edit
+Edit configuration interactively or programmatically.
+
+```bash
+# Edit configuration with text editor
+nlm-config edit my_config.cfg
+
+# Edit configuration with programmatic changes
+nlm-config edit my_config.cfg --set basic_settings.neuron_count 2000
+
+# Edit multiple parameters
+nlm-config edit my_config.cfg \
+  --set learning_parameters.stdp_ltp_weight 0.02 \
+  --set structural_plasticity.synaptogenesis_rate 0.0002
+```
+
+### nlm-config optimize
+Generate optimized configuration based on target use case.
+
+```bash
+# Optimize for memory learning
+nlm-config optimize memory_config.cfg --target memory
+
+# Optimize for development study
+nlm-config optimize dev_config.cfg --target development
+
+# Optimize for speed (smaller network)
+nlm-config optimize fast_config.cfg --target speed
+
+# Optimize using machine learning
+nlm-config optimize ml_config.cfg --target learning --ml-model performance_model.pkl
+
+# Optimize for specific metrics
+nlm-config optimize metrics_config.cfg --target memory --metrics episodes learning_rate
+```
+
+### nlm-config export
+Export configuration to different formats.
+
+```bash
+# Export to JSON
+nlm-config export config.cfg --format json --output json_config.json
+
+# Export to YAML
+nlm-config export config.cfg --format yaml --output yaml_config.yaml
+
+# Export to XML
+nlm-config export config.cfg --format xml --output xml_config.xml
+
+# Export with compression
+nlm-config export config.cfg --format gzip --output compressed_config.gz
+
+# Export with transformation
+nlm-config export config.cfg --format json --transform "scale_neurons 2.0"
+```
+
+### nlm-config diff
+Compare two configuration files.
+
+```bash
+# Simple diff
+nlm-config diff baseline.cfg optimized.cfg
+
+# Detailed diff with statistics
+nlm-config diff baseline.cfg optimized.cfg --detailed
+
+# Diff with context
+nlm-config diff baseline.cfg optimized.cfg --context 5
+
+# Diff specific sections
+nlm-config diff baseline.cfg optimized.cfg --sections learning_parameters structural_plasticity
+```
+
+### nlm-config apply
+Apply configuration changes to target systems.
+
+```bash
+# Apply configuration to current brain instance
+nlm-config apply config.cfg --target current
+
+# Apply configuration to new brain instance
+nlm-config apply config.cfg --target brain1
+
+# Apply configuration with validation
+nlm-config apply config.cfg --target brain1 --validate
+
+# Apply multiple configuration files
+nlm-config apply config1.cfg config2.cfg config3.cfg --target brain1
+```
+
+### nlm-config batch
+Process multiple configuration files in batch mode.
+
+```bash
+# Process all configurations
+nlm-config batch process *.cfg --output processed/
+
+# Batch validate configurations
+nlm-config batch validate configs/*.cfg --output validation_report.json
+
+# Batch optimize configurations
+nlm-config batch optimize configs/*.cfg --target memory --output optimized/
+
+# Batch export configurations
+nlm-config batch export configs/*.cfg --format json --output exports/
+```
+
+### nlm-config stats
+Generate configuration statistics and analysis.
+
+```bash
+# Generate basic statistics
+nlm-config stats my_config.cfg
+
+# Generate detailed statistics
+nlm-config stats my_config.cfg --detailed
+
+# Generate performance statistics
+nlm-config stats my_config.cfg --metrics performance
+
+# Generate memory statistics
+nlm-config stats my_config.cfg --metrics memory
+
+# Generate statistics report
+nlm-config stats my_config.cfg --format json --output stats.json
+```
+
+### nlm-config template
+Create and manage configuration templates.
+
+```bash
+# Create predefined template
+nlm-config template create memory_learning.cfg --template memory
+
+# Create custom template
+nlm-config template create my_template.cfg --name "My Custom Template"
+
+# List available templates
+nlm-config template list
+
+# Load template
+nlm-config template load memory_learning.cfg
+
+# Save template
+nlm-config template save my_template.cfg
+```
+
+### nlm-config benchmark
+Run benchmarks on configurations.
+
+```bash
+# Benchmark configuration performance
+nlm-config benchmark config.cfg --metrics performance memory
+
+# Compare multiple configurations
+nlm-config benchmark config1.cfg config2.cfg config3.cfg --metrics all
+
+# Run benchmark with simulation
+nlm-config benchmark config.cfg --simulate --duration 1000
+
+# Generate benchmark report
+nlm-config benchmark config.cfg --format json --output benchmark.json
+```
+
+### nlm-config load / nlm-config save
+Load and save configurations from/to external sources.
+
+```bash
+# Load configuration from database
+nlm-config load database://experiments/v1 --output config.cfg
+
+# Load configuration from remote URL
+nlm-config load https://example.com/config.json --output config.json
+
+# Save configuration to database
+nlm-config save config.cfg database://experiments/v2
+
+# Save configuration to remote URL
+nlm-config save config.json https://example.com/config.json
+
+# Load/save with authentication
+nlm-config load remote://user:pass@host/config.cfg --output config.cfg
+```
+
+## Template System
+
+### Predefined Templates
+
+#### Memory Learning Template
+Optimized for memory formation and retention:
+```ini
+[basic_settings]
+neuron_count = 2000
+region_count = 2
+connection_probability = 0.15
+
+[learning_parameters]
+stdp_ltp_weight = 0.015
+stdp_ltd_weight = 0.01
+stdp_tau = 15.0
+
+[memory_system]
+working_memory_capacity = 200
+max_episodes = 5000
+consolidation_interval = 500
+
+[neuromodulation]
+dopamine_level = 0.8
+curiosity_drive = 0.6
+novelty_threshold = 0.5
+```
+
+#### Development Study Template
+Optimized for developmental studies:
+```ini
+[basic_settings]
+neuron_count = 1000
+region_count = 1
+connection_probability = 0.1
+
+[development]
+development_rate = 0.2
+plasticity_decay = 0.9
+
+[neuromodulation]
+dopamine_level = 0.3
+curiosity_drive = 0.7
+novelty_threshold = 0.8
+
+[structural_plasticity]
+synaptogenesis_rate = 0.0005
+pruning_rate = 0.00005
+```
+
+#### Fast Performance Template
+Optimized for speed and efficiency:
+```ini
+[basic_settings]
+neuron_count = 500
+region_count = 1
+connection_probability = 0.05
+
+[learning_parameters]
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.018
+stdp_tau = 25.0
+
+[performance]
+replay_interval = 200
+consolidation_interval = 2000
+checkpoint_enabled = false
+```
+
+### Custom Template Creation
+
+```bash
+# Create template from existing configuration
+nlm-config template create my_template.cfg my_config.cfg --name "My Custom Template"
+
+# Extract sections for template
+nlm-config template extract memory_learning.cfg --sections memory_system neuromodulation development
+
+# Merge templates
+nlm-config template merge base_template.cfg learning_template.cfg --output merged.cfg
+```
+
+## Machine Learning Integration
+
+The configuration tool supports integration with machine learning models for intelligent configuration optimization:
+
+### ML-Based Optimization
+
+```bash
+# Optimize using neural network model
+nlm-config optimize ml_config.cfg --target learning --ml-model neural_optimizer.pkl
+
+# Optimize using genetic algorithm
+nlm-config optimize ga_config.cfg --target performance --algorithm genetic
+
+# Optimize using bayesian optimization
+nlm-config optimize bayes_config.cfg --target memory --algorithm bayesian
+```
+
+### Model Training
+
+```bash
+# Train model to predict optimal configurations
+nlm-config ml train training_configs/ --model optimizer.pkl
+
+# Evaluate model performance
+nlm-config ml evaluate optimizer.pkl test_configs/ --metrics rmse accuracy
+
+# Deploy model for optimization
+nlm-config ml deploy optimizer.pkl --api-endpoint https://api.example.com/optimize
+```
+
+## Advanced Features
+
+### Configuration Validation
+
+#### Schema Validation
+```bash
+# Validate against JSON schema
+nlm-config validate config.cfg --schema brain_schema.json
+
+# Validate against custom rules
+nlm-config validate config.cfg --rules custom_validation.json
+```
+
+#### Semantic Validation
+```bash
+# Check for conflicts
+nlm-config validate config.cfg --check conflicts
+
+# Validate consistency
+nlm-config validate config.cfg --check consistency
+
+# Validate parameter ranges
+nlm-config validate config.cfg --check ranges
+```
+
+### Configuration Analysis
+
+#### Performance Analysis
+```bash
+# Analyze computational requirements
+nlm-config analyze config.cfg --aspect computational
+
+# Analyze memory requirements
+nlm-config analyze config.cfg --aspect memory
+
+# Analyze learning efficiency
+nlm-config analyze config.cfg --aspect learning
+```
+
+#### Quality Assessment
+```bash
+# Assess configuration quality
+nlm-config quality assess config.cfg
+
+# Compare with best practices
+nlm-config quality compare config.cfg --standard nlm_best_practices
+
+# Identify optimization opportunities
+nlm-config quality optimize config.cfg
+```
+
+### Automation and CI/CD
+
+#### Integration with CI/CD Pipelines
+```bash
+# Validate configurations in CI
+nlm-config validate configs/*.cfg --fail-on-error
+
+# Optimize configurations for production
+nlm-config optimize prod_config.cfg --target production --automated
+
+# Generate configuration reports for documentation
+nlm-config report generate config.cfg --format markdown > docs/configuration.md
+```
+
+## Installation and Usage
+
+### System Requirements
+- C++17 or higher
+- CMake 3.16 or higher
+- Python 3.8 or higher (for ML integration)
+- pip packages: numpy, scikit-learn, keras/tensorflow (optional)
+
+### Build Instructions
+```bash
+# Clone repository
+cd /path/to/nlm
+cmake -B build -H.
+make -C build -j4
+
+# Install
+make install -C build
+```
+
+### Quick Start Script
+```bash
+#!/bin/bash
+
+# Quick start configuration setup
+
+echo "Setting up NLM configuration..."
+
+# Create project directory
+mkdir -p nlm_projects/my_project/configs
+mkdir -p nlm_projects/my_project/checkpoints
+mkdir -p nlm_projects/my_project/exports
+
+# Initialize main configuration
+nlm-config init nlm_projects/my_project/configs/main.cfg
+
+# Create specialized configurations
+nlm-config template create nlm_projects/my_project/configs/memory.cfg --template memory
+nlm-config template create nlm_projects/my_project/configs/development.cfg --template development
+
+# Validate configurations
+nlm-config validate nlm_projects/my_project/configs/*.cfg
+
+# Generate report
+nlm-config stats nlm_projects/my_project/configs/main.cfg --format json > nlm_projects/my_project/analysis/main_stats.json
+
+echo "Configuration setup complete!"
+echo "You can now run NLM experiments using configurations in nlm_projects/my_project/configs/"
+```
+
+## Examples
+
+### Example 1: Memory Learning Experiment
+```bash
+#!/bin/bash
+
+# Memory Learning Configuration Setup
+
+# Create memory learning configuration
+nlm-config init memory_learning.cfg --template memory
+
+# Optimize for memory performance
+nlm-config optimize memory_learning.cfg --target memory --ml-model memory_optimizer.pkl
+
+# Validate configuration
+nlm-config validate memory_learning.cfg
+
+# Run NLM with configuration
+./nlm --config memory_learning.cfg --demo memory
+
+# Export results
+nlm-config export memory_learning.cfg --format json --output memory_learning_analysis.json
+```
+
+### Example 2: Development Study
+```bash
+#!/bin/bash
+
+# Development Study Configuration Setup
+
+# Create development configuration
+nlm-config init development.cfg --template development
+
+# Apply developmental modifications
+nlm-config edit development.cfg \
+  --set development.development_rate 0.3 \
+  --set neuromodulation.curiosity_drive 0.8
+
+# Validate and run experiment
+nlm-config validate development.cfg
+./nlm --config development.cfg --demo development
+```
+
+### Example 3: Batch Processing
+```bash
+#!/bin/bash
+
+# Batch Configuration Processing
+
+# Process all configurations
+nlm-config batch process configs/*.cfg --output optimized/
+
+# Validate all processed configurations
+nlm-config batch validate optimized/*.cfg --output validation_report.json
+
+# Generate comparative analysis
+for config in optimized/*.cfg; do
+    nlm-config stats "$config" --format json >> comparative_analysis.json
+done
+
+echo "Batch processing complete! Results in optimized/ directory"
+```
+
+## Configuration File Reference
+
+### Parameter Categories
+
+#### Basic Settings
+- `random_seed`: Random number generator seed
+- `simulation_timestep`: Simulation time step in seconds
+- `neuron_count`: Total number of neurons
+- `region_count`: Number of neural regions
+- `connection_probability`: Probability of synaptic connections
+
+#### Learning Parameters
+- `stdp_ltp_weight`: STDP long-term potentiation weight
+- `stdp_ltd_weight`: STDP long-term depression weight
+- `stdp_tau`: STDP time constant in milliseconds
+
+#### Structural Plasticity
+- `synaptogenesis_rate`: Rate of new synapse formation
+- `pruning_rate`: Rate of synapse elimination
+
+#### Memory System
+- `working_memory_capacity`: Maximum working memory capacity
+- `max_episodes`: Maximum number of episodic memories
+- `replay_interval`: Interval between memory replays
+- `consolidation_interval`: Interval between memory consolidations
+
+#### Neuromodulation
+- `dopamine_level`: Dopamine system activity level
+- `curiosity_drive`: Curiosity system drive strength
+- `novelty_threshold`: Novelty detection threshold
+
+#### Development
+- `development_rate`: Rate of developmental changes
+- `plasticity_decay`: Rate of plasticity reduction with age
+
+#### Performance
+- `replay_interval`: Frequency of memory replay
+- `consolidation_interval`: Frequency of memory consolidation
+- `checkpoint_enabled`: Whether checkpointing is enabled
+- `checkpoint_path`: Path for checkpoint files
+
+#### Output
+- `log_level`: Logging verbosity level
+- `save_stats`: Whether to save statistics
+- `export_format`: Default export format
+
+## Support and Documentation
+
+### Online Resources
+- Documentation: https://docs.nln-project.org/configuration
+- Examples: https://examples.nln-project.org/configuration
+- GitHub: https://github.com/nlm-project/nlm-config
+
+### Community Support
+- GitHub Issues: https://github.com/nlm-project/nlm-config/issues
+- Stack Overflow: Use tags `nlm` and `neural-learning-machine`
+- Discord: https://discord.nln-project.org
+
+### Commercial Support
+Available through NLM Professional Services for enterprise deployments and custom implementations.
+
+## License
+
+MIT License. See LICENSE file for details.
+
+## Copyright
+
+© 2024-2025 NLM Project Contributors. All rights reserved.
+
+---
+
+This advanced configuration tool provides comprehensive capabilities for managing complex NLM configurations, from simple templates to machine learning-driven optimizations, supporting everything from quick prototyping to enterprise-scale deployment.
