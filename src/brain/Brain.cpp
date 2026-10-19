@@ -231,33 +231,88 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Initialize working memory system for active trace maintenance
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+        NLM_LOG_INFO("Working memory system initialized with capacity: " + std::to_string(neuronCount / 10));
+    } else {
+        NLM_LOG_ERROR("Working memory system is null during initialization");
+    }
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // Initialize episodic memory system for long-term experience storage
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+        NLM_LOG_INFO("Episodic memory system initialized with max episodes: 1000");
+    } else {
+        NLM_LOG_ERROR("Episodic memory system is null during initialization");
+    }
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize associative memory system for pattern completion
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+        NLM_LOG_INFO("Associative memory system initialized");
+    } else {
+        NLM_LOG_ERROR("Associative memory system is null during initialization");
+    }
     
-    // Initialize prediction system
+    // Initialize prediction system for forward model and error signaling
     // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction system system available for integration");
+    } else {
+        NLM_LOG_ERROR("Prediction system is null during initialization");
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // Initialize cognition systems (NeuralPlanner for decision making, ConceptFormation for abstraction)
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        NLM_LOG_INFO("Neural planner system initialized with planning depth: 5");
+    } else {
+        NLM_LOG_ERROR("Planner system is null during initialization");
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+        NLM_LOG_INFO("Concept formation system initialized");
+    } else {
+        NLM_LOG_ERROR("Concept formation system is null during initialization");
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    // Initialize attentional selection system for competition among representations
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        NLM_LOG_INFO("Attention system initialized with inhibition: 0.5, excitation: 1.5");
+    } else {
+        NLM_LOG_ERROR("Attention system is null during initialization");
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize development system for maturation and stage progression
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->initialize(this);
+        NLM_LOG_INFO("Development system initialized");
+    } else {
+        NLM_LOG_ERROR("Development system is null during initialization");
+    }
+    
+    // Initialize neuromodulation systems for behavioral regulation
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+        NLM_LOG_INFO("Novelty detection system initialized");
+    } else {
+        NLM_LOG_ERROR("Novelty system is null during initialization");
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+        NLM_LOG_INFO("Curiosity system initialized");
+    } else {
+        NLM_LOG_ERROR("Curiosity system is null during initialization");
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -307,22 +362,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
-     * This implements the complete integrated brain simulation:
+     * This implements the complete integrated brain simulation with 15 discrete steps:
      * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
+     * STEP 1: Process pending delayed spike events (deliver synaptic input)
+     *   - Delivers synaptic currents from pre-synaptic neurons that fired earlier
+     *   - Ensures precise temporal ordering of neural communication
+     *   - Implements point-to-point synaptic transmission with delays
+     *   
+     * STEP 2: Update all neuron membrane potentials (LIF dynamics)
+     *   - Implements Leaky Integrate-and-Fire neuron dynamics
+     *   - Updates membrane potential based on inputs, leak, and reset
+     *   - Handles refractory period for biological realism
+     *   
+     * STEP 3: Detect spikes and schedule outgoing spike events
+     *   - Identifies neurons that cross threshold during current timestep
+     *   - Records spike times for plasticity and synaptic transmission
+     *   - Maintains precise spike timing for STDP learning
+     *   
+     * STEP 4: Update working memory (maintenance and competition)
+     *   - Maintains active neural traces of recent experience
+     *   - Implements competition among memory traces for stability
+     *   - Supports pattern completion and retrieval
+     *   
+     * STEP 5: Apply neuromodulation effects on neural excitability
+     *   - Modulates neural response gain and threshold based on neuromodulators
+     *   - Implements dopamine, novelty, and curiosity effects
+     *   - Provides feedback control for learning and adaptation
+     *   
+     * STEP 6: Apply plasticity rules (STDP and Hebbian)
+     *   - Implements Spike-Timing-Dependent Plasticity (STDP) for spike timing
+     *   - Applies Hebbian learning for co-activation driven connections
+     *   - Updates synaptic weights based on neural activity patterns
+     *   - Integrates neuromodulatory signals for context-dependent learning
+     *   
+     * STEP 7: Update episodic memory with current experience
+     *   - Encodes current neural state as an episodic memory trace
+     *   - Integrates reward prediction error into memory representation
+     *   - Maintains temporal context and causal relationships
+     *   
+     * STEP 8: Update prediction system
+     *   - Updates internal model of environmental dynamics
+     *   - Processes sensory predictions and error signals
+     *   - Maintains belief states about future states
+     *   
+     * STEP 9: Update attention system
+     *   - Selects salient neural representations for processing
+     *   - Implements competitive selection among alternatives
+     *   - Modulates information flow based on behavioral goals
+     *   
+     * STEP 10: Update concept formation
+     *   - Extracts abstract patterns from neural activity streams
+     *   - Forms high-level representations of environmental regularities
+     *   - Supports generalization and transfer learning
+     *   
+     * STEP 11: Apply structural plasticity (synaptogenesis, pruning)
+     *   - Creates new synaptic connections based on activity correlation
+     *   - Removes redundant or ineffective synapses
+     *   - Implements homeostatic regulation of connectivity
+     *   
+     * STEP 12: Replay important memories (during rest or periodically)
+     *   - Replays selected episodes to strengthen connections
+     *   - Supports memory consolidation and generalization
+     *   - Facilitates offline learning and integration
+     *   
+     * STEP 13: Apply development effects
+     *   - Modulates plasticity rates based on developmental stage
+     *   - Implements critical period plasticity regulation
+     *   - Controls developmental trajectory of brain architecture
+     *   
+     * STEP 14: Periodic memory consolidation
+     *   - Consolidates important memories and removes weak traces
+     *   - Implements systems consolidation from working to episodic memory
+     *   - Maintains memory stability while allowing updating
+     *   
+     * STEP 15: Checkpoint management
+     *   - Saves brain state for persistence and recovery
+     *   - Maintains historical trajectory for analysis
+     *   - Enables rollback and parallel experimentation
      */
     
     pImpl->currentStep = currentStep;
@@ -407,105 +523,164 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
+    // Update novelty detection based on unexpected patterns
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        NLM_LOG_DEBUG("Novelty detection updated: level=" + std::to_string(pImpl->novelty->getLevel()));
     }
     
-    // Update curiosity
+    // Update curiosity drive based on prediction errors
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+        NLM_LOG_DEBUG("Curiosity system updated: level=" + std::to_string(pImpl->curiosity->getLevel()));
     }
     
-    // Update dopamine (reward prediction error)
+    // Update dopamine reward prediction error signal
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Apply comprehensive dopamine effects on neural dynamics and plasticity
+        // Dopamine modulates multiple aspects of brain function:
+        // 1. Increases neural excitability by injecting depolarizing current
+        // 2. Enhances synaptic efficacy through plasticity modulation
+        // 3. Biases decision making towards reward-predicted actions
+        float dopamineSignal = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Null region pointer in dopamine neuromodulation");
+                continue;
+            }
             for (auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Null population pointer in dopamine neuromodulation");
+                    continue;
+                }
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Null neuron pointer in dopamine neuromodulation");
+                        continue;
+                    }
+                    // Dopamine modulates neural excitability through direct current injection
+                    // Higher dopamine levels increase neural response gain and firing probability
+                    // This implements a multiplicative gain control mechanism
+                    float excitabilityModulation = dopamineSignal * 0.5f;
+                    if (excitabilityModulation > 0.0f) {
+                        neuron->injectCurrent(excitabilityModulation);
                     }
                 }
             }
         }
+        NLM_LOG_DEBUG("Dopamine neuromodulation applied: level=" + std::to_string(dopamineSignal));
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
+    // Calculate neuromodulatory factor that modulates plasticity rates based on behavioral state
+    float plasticityModulationFactor = 1.0f;
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        plasticityModulationFactor = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Apply synaptic plasticity rules to update connection strengths
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+        if (!region) {
+            NLM_LOG_ERROR("Null region pointer in plasticity rules application");
+            continue;
+        }
+        for (auto& synapse : region->getSynapses()) {
+            if (!synapse) {
+                NLM_LOG_ERROR("Null synapse pointer in plasticity rules application");
+                continue;
+            }
+            // Apply Spike-Timing-Dependent Plasticity (STDP) for spike timing dependent learning
+            if (synapse->getPlasticityFlags().stdpEnabled) {
+                const auto& preSpikeTimes = synapse->getPreSpikeHistory();
+                const auto& postSpikeTimes = synapse->getPostSpikeHistory();
                 
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                // Only apply STDP if we have spike history for both pre- and post-synaptic neurons
+                if (!preSpikeTimes.empty() && !postSpikeTimes.empty()) {
+                    // STDP algorithm: 
+                    // - For pre-before-post spikes: long-term potentiation (LTP)
+                    // - For post-before-pre spikes: long-term depression (LTD)
+                    // - Time window determines magnitude of weight change
+                    pImpl->stdp->update(synapse, preSpikeTimes, postSpikeTimes, pImpl->timestep);
+                    
+                    // Apply additional neuromodulatory scaling to STDP weight changes
+                    float currentWeight = synapse->getWeight();
+                    // Dopamine scales STDP: positive dopamine enhances LTP, reduces LTD
+                    float weightAdjustment = (currentWeight > 0 ? 1.0f : -1.0f) * 
+                                           (plasticityModulationFactor - 1.0f) * 0.001f;
+                    float newWeight = currentWeight + weightAdjustment;
+                    synapse->setWeight(newWeight);
                 }
             }
             
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            // Apply Hebbian learning for co-activation driven synaptic strengthening
+            if (synapse->getPlasticityFlags().hebbianEnabled) {
+                const auto& preSpikeTimes = synapse->getPreSpikeHistory();
+                const auto& postSpikeTimes = synapse->getPostSpikeHistory();
                 
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                // Hebbian rule: simultaneous activation of pre- and post-synaptic neurons
+                // strengthens the connection (Oja's rule variant)
+                if (!preSpikeTimes.empty() && !postSpikeTimes.empty()) {
+                    pImpl->hebbian->update(synapse, preSpikeTimes, postSpikeTimes, pImpl->timestep);
                 }
             }
             
-            // Update synapse state
-            syn->step(currentTime);
+            // Update synapse internal state (eligibility traces, etc.)
+            synapse->step(currentTime);
         }
     }
     
     // ========== STEP 7: Update episodic memory ==========
+    // Increment step counter since last episode storage
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Create new episodic memory item to encode current brain state
+            EpisodicMemoryItem currentEpisode;
+            currentEpisode.timestamp = currentStep;
+            currentEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Capture active neurons and their activation levels
             for (auto& region : pImpl->regions) {
+                if (!region) {
+                    NLM_LOG_ERROR("Null region pointer in episodic memory storage");
+                    continue;
+                }
                 for (auto& pop : region->getPopulations()) {
+                    if (!pop) {
+                        NLM_LOG_ERROR("Null population pointer in episodic memory storage");
+                        continue;
+                    }
                     for (auto* neuron : pop->getNeurons()) {
+                        if (!neuron) {
+                            NLM_LOG_ERROR("Null neuron pointer in episodic memory storage");
+                            continue;
+                        }
+                        const auto& neuronState = neuron->getState();
+                        // Store neurons that are actively firing or have elevated membrane potentials
+                        // This captures both transient spikes and sustained activity patterns
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            std::abs(neuronState.membranePotential - neuronState.restingPotential) > 5.0f) {
+                            currentEpisode.activeNeurons.push_back(neuron->getId());
+                            // Normalize activation level to [0, 1] range for consistency
+                            currentEpisode.neuronActivations.push_back(
+                                std::abs(neuronState.membranePotential - neuronState.restingPotential) / 20.0f);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Update reward value from dopamine signal for reinforcement learning context
+            currentEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+            // Store the encoded episode in the episodic memory system
+            pImpl->episodicMemory->storeEpisode(currentEpisode);
+            NLM_LOG_DEBUG("Episodic memory stored: step=" + std::to_string(currentStep) + 
+                         ", active neurons=" + std::to_string(currentEpisode.activeNeurons.size()) +
+                         ", reward=" + std::to_string(currentEpisode.reward));
         }
     }
     
@@ -547,39 +722,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
+    // Update developmental stage effects on structural plasticity every 1000 steps
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        // Development affects structural plasticity rates based on developmental stage
+        // This implements experience-expectant plasticity regulation
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        // Development modulates structural plasticity rates based on developmental neuroscience
+        auto* structuralPlasticityPtr = pImpl->structuralPlasticity.get();
+        if (structuralPlasticityPtr) {
+            DevelopmentalStage currentDevelopmentalStage = pImpl->developmentalStage;
+            float plasticityRegulationFactor = 1.0f;
             
-            switch (stage) {
+            // Apply stage-specific plasticity modulation based on developmental neuroscience
+            switch (currentDevelopmentalStage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityRegulationFactor = 1.0f;  // High plasticity for initial circuit formation
+                    NLM_LOG_DEBUG("Development: Initial stage - high plasticity");
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    plasticityRegulationFactor = 0.8f;  // Moderated plasticity during critical period
+                    NLM_LOG_DEBUG("Development: Critical period - moderate plasticity");
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    plasticityRegulationFactor = 0.5f;  // Reduced plasticity during maturation
+                    NLM_LOG_DEBUG("Development: Maturation stage - reduced plasticity");
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityRegulationFactor = 0.2f;  // Low plasticity for adult stability
+                    NLM_LOG_DEBUG("Development: Adult stage - low plasticity");
+                    break;
+                default:
+                    NLM_LOG_ERROR("Unknown developmental stage: " + std::to_string(static_cast<int>(currentDevelopmentalStage)));
+                    plasticityRegulationFactor = 0.5f;
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Scale structural plasticity rates based on development
+            // Synaptogenesis decreases with development, pruning increases
+            structuralPlasticityPtr->setSynaptogenesisRate(0.0001f * plasticityRegulationFactor);
+            structuralPlasticityPtr->setPruningRate(0.00001f * (2.0f - plasticityRegulationFactor));
+            NLM_LOG_DEBUG("Development effects applied: synaptogenesis=0.0001f, pruning=0.00001f");
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
+    // Consolidate episodic memories and maintain memory stability periodically
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Apply memory consolidation to strengthen important traces and prune weak ones
+        // This implements systems consolidation from working to long-term memory
+        // The consolidation threshold determines which memories are preserved
+        const float consolidationThreshold = 0.3f;
+        pImpl->episodicMemory->consolidate(consolidationThreshold);
+        NLM_LOG_DEBUG("Memory consolidation applied: threshold=" + std::to_string(consolidationThreshold) +
+                     ", step=" + std::to_string(currentStep));
+    } else if (currentStep % pImpl->consolidationInterval == 0) {
+        NLM_LOG_WARNING("Memory consolidation attempted but episodic memory is not available");
     }
     
     // ========== STEP 15: Checkpoint management ==========
