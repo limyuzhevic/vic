@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/ExperimentManagement.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -420,6 +421,168 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // ============================================================================
+    // Context Managers
+    // ============================================================================
+
+    py::class_<nlm::BrainContextManager>(m, "BrainContextManager", 
+        R"pbdoc(Context manager for brain initialization and cleanup)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>())
+        .def("getBrain", &nlm::BrainContextManager::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the managed brain object")
+        .def("getBrainPtr", &nlm::BrainContextManager::getBrainPtr,
+             "Get shared pointer to the managed brain");
+
+    py::class_<nlm::SimulationRunner>(m, "SimulationRunner",
+        R"pbdoc(Context manager for simulation loops)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>(),
+             py::arg("brain"), py::arg("world"), py::arg("agentBrain") = nullptr)
+        .def("start", &nlm::SimulationRunner::start, py::arg("maxSteps") = 0,
+             "Start simulation loop")
+        .def("stop", &nlm::SimulationRunner::stop,
+             "Stop simulation loop")
+        .def("step", &nlm::SimulationRunner::step,
+             "Execute one simulation step")
+        .def("runSteps", &nlm::SimulationRunner::runSteps, py::arg("steps"),
+             "Run multiple simulation steps")
+        .def("isRunning", &nlm::SimulationRunner::isRunning,
+             "Check if simulation is running")
+        .def("getCurrentStep", &nlm::SimulationRunner::getCurrentStep,
+             "Get current step count")
+        .def("getMaxSteps", &nlm::SimulationRunner::getMaxSteps,
+             "Get maximum steps")
+        .def("getBrain", &nlm::SimulationRunner::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get brain reference")
+        .def("getWorld", &nlm::SimulationRunner::getWorld,
+             py::return_value_policy::reference_internal,
+             "Get world reference");
+
+    // ============================================================================
+    // Batch Operations
+    // ============================================================================
+
+    py::class_<nlm::BatchOperations>(m, "BatchOperations",
+        R"pbdoc(Class for batch operations on brain simulation)pbdoc")
+        .def_static("runSteps", &nlm::BatchOperations::runSteps,
+                    py::arg("brain"), py::arg("steps"), py::arg("times") = std::vector<Timestamp>(),
+                    "Run multiple steps at once")
+        .def_static("processSensoryInputs", &nlm::BatchOperations::processSensoryInputs,
+                    py::arg("brain"), py::arg("inputs"),
+                    "Process multiple sensory inputs")
+        .def_static("getBatchStats", &nlm::BatchOperations::getBatchStats,
+                    py::arg("brain"), py::arg("startStep"), py::arg("endStep"),
+                    "Get statistics for multiple steps");
+
+    // ============================================================================
+    // Convenience Methods
+    // ============================================================================
+
+    py::class_<nlm::ConvenienceMethods>(m, "ConvenienceMethods",
+        R"pbdoc(Class for convenience methods and common workflows)pbdoc")
+        .def_static("configureBrain", &nlm::ConvenienceMethods::configureBrain,
+                    py::arg("brain"), py::arg("configDict"),
+                    "Configure brain from Python dictionary")
+        .def_static("quickSimulation", &nlm::ConvenienceMethods::quickSimulation,
+                    py::arg("neuronCount"), py::arg("steps"),
+                    "Quick setup and run simulation")
+        .def_static("runEpisode", &nlm::ConvenienceMethods::runEpisode,
+                    py::arg("agentBrain"), py::arg("world"), py::arg("maxSteps") = 1000,
+                    "Run complete agent episode");
+
+    // ============================================================================
+    // Builder Pattern
+    // ============================================================================
+
+    py::class_<nlm::ConfigBuilder>(m, "ConfigBuilder",
+        R"pbdoc(Builder class for constructing configurations)pbdoc")
+        .def(py::init<>())
+        .def("set", &nlm::ConfigBuilder::set, py::arg("key"), py::arg("value"),
+             "Set configuration value")
+        .def("set", [](nlm::ConfigBuilder& self, const std::string& key, double value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"), 
+             "Set configuration value (double)")
+        .def("set", [](nlm::ConfigBuilder& self, const std::string& key, const std::string& value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (string)")
+        .def("set", [](nlm::ConfigBuilder& self, const std::string& key, bool value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (bool)")
+        .def("add", &nlm::ConfigBuilder::add, py::arg("key"), py::arg("value"),
+             "Add value to configuration")
+        .def("build", &nlm::ConfigBuilder::build,
+             "Build and return the configuration");
+
+    py::class_<nlm::SimulationBuilder>(m, "SimulationBuilder",
+        R"pbdoc(Builder class for setting up complete simulations)pbdoc")
+        .def(py::init<>())
+        .def("withWorldSize", &nlm::SimulationBuilder::withWorldSize,
+             py::arg("width"), py::arg("height"),
+             "Configure world size")
+        .def("withConfig", &nlm::SimulationBuilder::withConfig,
+             py::arg("configDict"),
+             "Configure with dictionary")
+        .def("withBrain", &nlm::SimulationBuilder::withBrain,
+             py::arg("brain"),
+             "Set brain for simulation")
+        .def("withAgentBrain", &nlm::SimulationBuilder::withAgentBrain,
+             py::arg("agentBrain"),
+             "Set agent brain for simulation")
+        .def("build", &nlm::SimulationBuilder::build,
+             "Build and return simulation components");
+
+    // ============================================================================
+    // Experiment Management
+    // ============================================================================
+
+    py::class_<nlm::ExperimentLogger>(m, "ExperimentLogger",
+        R"pbdoc(Class for recording simulation results)pbdoc")
+        .def(py::init<>())
+        .def("recordMetric", &nlm::ExperimentLogger::recordMetric,
+             py::arg("name"), py::arg("value"),
+             "Record a metric value")
+        .def("recordStep", &nlm::ExperimentLogger::recordStep,
+             py::arg("brain"), py::arg("step"),
+             "Record step data")
+        .def("addNote", &nlm::ExperimentLogger::addNote,
+             py::arg("note"),
+             "Add a note to the experiment")
+        .def("getExperiment", &nlm::ExperimentLogger::getExperiment,
+             py::return_value_policy::reference_internal,
+             "Get the experiment object")
+        .def("getMetrics", &nlm::ExperimentLogger::getMetrics,
+             py::return_value_policy::reference_internal,
+             "Get the metrics object");
+
+    py::class_<nlm::ResultsAnalyzer>(m, "ResultsAnalyzer",
+        R"pbdoc(Class for analyzing batch results)pbdoc")
+        .def_static("analyze", &nlm::ResultsAnalyzer::analyze,
+                    py::arg("experiment"),
+                    "Analyze experiment results")
+        .def_static("analyze", &nlm::ResultsAnalyzer::analyze,
+                    py::arg("metrics"),
+                    "Analyze metrics collection");
+
+    // ============================================================================
+    // Factory Functions
+    // ============================================================================
+
+    m.def("createBrainContextManager", [](std::shared_ptr<Config> config) {
+        return std::make_shared<nlm::BrainContextManager>(config);
+    }, py::arg("config"), "Create a brain context manager");
+
+    m.def("createSimulationRunner", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agentBrain) {
+        return std::make_shared<nlm::SimulationRunner>(brain, world, agentBrain);
+    }, py::arg("brain"), py::arg("world"), py::arg("agentBrain") = nullptr, "Create a simulation runner");
+
+    m.def("createExperimentLogger", []() {
+        return std::make_shared<nlm::ExperimentLogger>();
+    }, "Create an experiment logger");
 }
 
 } // namespace nlm

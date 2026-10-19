@@ -83,12 +83,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     if (!file.is_open()) {
         return false;
     }
-    
+
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the config value based on its type
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << val[i];
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << val[i];
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << "\"" << val[i] << "\"";
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << val;  // For basic types (int, double, bool, etc.)
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
-    
+
     return true;
 }
 
