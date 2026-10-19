@@ -18,6 +18,38 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+## Quick Start
+
+### For Users
+1. **Build from source**:
+   ```bash
+   mkdir build && cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j$(nproc)
+   ./nlm
+   ```
+
+2. **Use Python bindings**:
+   ```bash
+   pip install -e .
+   ```
+
+3. **Run basic tests**:
+   ```bash
+   ./nlm --help  # See available options
+   ./nlm_phase3_demo  # Run Phase 3 demo
+   ```
+
+### For Contributors
+1. **Fork and clone** the repository
+2. **Run tests** to ensure everything works:
+   ```bash
+   mkdir build && cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Debug
+   make -j$(nproc)
+   ctest --output-on-failure
+   ```
+
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
@@ -66,52 +98,105 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Project (Recommended for Development)
+
 ```bash
+# Create build directory
 mkdir build
 cd build
+
+# Configure with CMake (Release build for best performance)
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+
+# Build all targets (using all available CPU cores)
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Python Package (User-Friendly)
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install in development mode
+pip install -e .
+
+# Or install from source
+pip install .
+```
+
+### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
 ```
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main Simulation
 ```bash
-./nlm_phase6_demo
+./nlm [--config configs/your_config.cfg]
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── CMakeLists.txt                    # Main build configuration
+├── README.md                          # This file
+├── pyproject.toml                     # Python package configuration
+├── docs/                              # Documentation
+│   ├── ARCHITECTURE.md                # System architecture overview
+│   ├── SCIENCE.md                     # Scientific background
+│   ├── ROADMAP.md                     # Development roadmap
+│   ├── EXPERIMENTS.md                 # Experiment descriptions
+│   ├── LIMITATIONS.md                 # Current limitations
+│   └── PHASE6_FINAL_AUDIT.md          # Phase 6 audit report
+├── src/                               # Source code
+│   ├── core/                          # Core utilities and types
+│   ├── brain/                         # Neural components (integrated)
+│   ├── dynamics/                      # Neural dynamics
+│   ├── plasticity/                    # Plasticity rules
+│   ├── development/                   # Developmental system
+│   ├── neuromodulation/               # Neuromodulators (integrated)
+│   ├── memory/                        # Memory systems (integrated)
+│   ├── prediction/                    # Prediction systems (integrated)
+│   ├── cognition/                     # Cognitive mechanisms (integrated)
+│   ├── sensory/                       # Sensory processing
+│   ├── motor/                         # Motor system
+│   ├── environment/                   # Environment interface
+│   ├── experiments/                   # Experiment framework (Phase 6)
+│   └── visualization/                 # Visualization
+├── tests/                             # Test suite
+│   ├── CMakeLists.txt                 # Test build configuration
+│   └── ...                            # Test files
+├── configs/                           # Configuration files
+├── python/                            # Python bindings
+│   ├── bindings.cpp                   # Pybind11 bindings
+│   └── CMakeLists.txt                 # Python bindings build
+├── .kilo/                             # Kilo development framework
+└── ...                                # Other project files
 ```
 
 ## Phase Summary
@@ -228,3 +313,43 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Getting Help
+
+- **Documentation**: See `docs/ARCHITECTURE.md` and `docs/SCIENCE.md`
+- **Python Usage**: See `HOW_TO_USE.md` and `easy_usage.md`
+- **Issue Tracking**: Report issues on GitHub
+- **Development**: See `.kilo/` directory for development tools
+
+## Quick Contributing Guide
+
+1. **Read the documentation** first - understand the architecture
+2. **Run tests** before making changes
+3. **Follow the code style** - modern C++20 with clear comments
+4. **Update documentation** when adding new features
+5. **Write tests** for new functionality
+6. **Run benchmarks** when optimizing performance
+
+## Development Commands
+
+The project includes Kilo development framework for enhanced development experience:
+
+```bash
+# Check available Kilo commands
+.kilo/command/*.md
+
+# Run development workflows
+.kilo/agent/*.md
+
+# Check agent manager
+AGENTS.md
+```
+
+## Future Improvements
+
+Based on Phase 6 analysis, future development focuses on:
+- Enhanced Python API with more advanced features
+- Better configuration validation and schema
+- Plugin architecture for extensibility
+- Improved debugging and visualization tools
+- Performance optimizations for large-scale simulations

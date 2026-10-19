@@ -18,8 +18,41 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Performance optimization options
+option(NLM_ENABLE_PERF_OPTIMIZATIONS "Enable performance optimizations" ON)
+option(NLM_ENABLE_ASSERTIONS "Enable debug assertions" OFF)
+option(NLM_ENABLE_PROFILING "Enable profiling support" OFF)
+option(NLM_ENABLE_BENCHMARKING "Enable benchmarking support" OFF)
+option(NLM_BUILD_TESTS "Build test suite" ON)
+option(NLM_BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Platform-specific optimizations
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # GCC/Clang optimizations
+    if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+        add_compile_options(-O3 -march=native -flto)
+    endif()
+    
+    # Link-time optimization
+    if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -flto")
+        set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} -flto")
+    endif()
+elseif(MSVC)
+    # MSVC optimizations
+    if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+        add_compile_options(/O2 /GL /LTCG)
+    endif()
+endif()
+
+# Debug builds
+if(NLM_ENABLE_ASSERTIONS AND NOT NLM_ENABLE_PERF_OPTIMIZATIONS)
+    add_compile_options(-g -O0)
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -87,16 +120,23 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Performance optimizations for core library
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm_core PRIVATE -march=native -flto)
+    target_link_libraries(nlm_core PUBLIC -flto)
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
+# Performance optimizations for agent system
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm_agent PRIVATE -march=native -flto)
+endif()
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +144,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +152,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,26 +160,45 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Performance optimizations for main executable
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm PRIVATE -march=native -flto)
+endif()
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Performance optimizations for demo executable
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm_phase3_demo PRIVATE -march=native -flto)
+endif()
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Performance optimizations for demo executable
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm_phase4_demo PRIVATE -march=native -flto)
+endif()
 
 # Testing
 enable_testing()

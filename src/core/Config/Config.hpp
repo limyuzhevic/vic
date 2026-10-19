@@ -25,22 +25,37 @@ using ConfigValue = std::variant<
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    // Built into the code
+    File,       // Loaded from configuration file
+    CommandLine, // Set via command line arguments
+    Runtime     // Set at runtime by code
 };
 
-// Configuration entry
+// Helper function to convert ConfigSource to string
+inline const char* configSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
+}
+
+// Configuration entry with enhanced metadata
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    uint64_t lastModified;  // Timestamp when entry was last modified
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), 
+                   description(), lastModified(0) {}
+    
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", uint64_t timestamp = 0)
+        : key(k), value(v), source(s), description(desc), lastModified(timestamp) {}
 };
 
 // Main configuration class
@@ -55,43 +70,59 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Configuration management methods
     bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Enhanced value getters with type safety
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Enhanced setters with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Configuration validation and management
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
+    bool validate() const;  // Validate configuration consistency
     
-    // Get all keys
+    // Get configuration metadata
     std::vector<std::string> getKeys() const;
+    ConfigSource getSource(const std::string& key) const;  // Get source of a specific key
+    std::string getDescription(const std::string& key) const;  // Get description
     
-    // Clear all
-    void clear();
+    // Batch operations for efficiency
+    void setMultiple(const std::vector<std::pair<std::string, ConfigValue>>& keyValues);
+    std::map<std::string, ConfigValue> getAllAsMap() const;
     
-    // Get configuration summary
+    // Statistics and analysis
+    size_t getEntryCount() const;
+    size_t getEntryCount(ConfigSource source) const;  // Count entries from specific source
+    std::vector<ConfigEntry> getEntries() const;  // Get all entries with metadata
     std::string summary() const;
+    std::string getDebugInfo() const;  // Detailed debug information
+    
+    // Export and import
+    std::string exportToJSON() const;
+    bool importFromJSON(const std::string& jsonString);
+    
+    // Configuration snapshots and comparison
+    std::string createSnapshot() const;
+    bool restoreFromSnapshot(const std::string& snapshot);
+    bool hasChanged(const std::string& key, const std::string& snapshot) const;
+    
+    // Merge operations
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    void mergeFromFile(const std::string& filepath);  // Merge another config file
     
 private:
     struct Impl;
