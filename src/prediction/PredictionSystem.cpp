@@ -10,6 +10,11 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
+void PredictionSystem::initialize(class Brain* brain) {
+    // TODO PHASE 2: Implement real initialization
+    // For now, it's a placeholder - prediction system is passive
+}
+
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
@@ -56,5 +61,3 @@ void PredictionSystem::clearHistory() {
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
-
-} // namespace nlm

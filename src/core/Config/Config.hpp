@@ -97,6 +97,15 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Load from simple key=value file format
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Load from JSON file format
+    bool loadFromJSONFile(const std::string& filepath);
+    
+    // Load from YAML file format
+    bool loadFromYAMLFile(const std::string& filepath);
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
