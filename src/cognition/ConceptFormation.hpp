@@ -98,6 +98,10 @@ public:
     // Get a specific concept
     const DiscoveredConcept* getConcept(size_t conceptId) const;
 
+    // Update concept formation based on prediction error
+    // Higher prediction error indicates need for new concept formation or updating existing concepts
+    void processPredictionError(float predictionError);
+
     // Get concept prototype
     std::vector<float> getConceptPrototype(size_t conceptId) const;
 
@@ -156,6 +160,10 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // State variables for concept formation
+    bool conceptsReset_;
+    bool resetAttempted_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept

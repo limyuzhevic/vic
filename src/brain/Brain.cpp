@@ -75,6 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Last sensory input for prediction system
+    std::unique_ptr<class SensoryInput> lastSensoryInput;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +95,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastSensoryInput(nullptr)
+    {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -511,8 +516,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system to learn from sensory input and maintain prediction error
+        // This is the core prediction mechanism for continual learning
+        pImpl->predictionSystem->train(pImpl->lastSensoryInput);
+        
+        // Apply prediction error to neuromodulation (dopamine, curiosity)
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError != 0.0f) {
+            // Update prediction error signal for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setError(predictionError);
+            }
+            
+            // Use prediction error to modulate attention and learning
+            if (pImpl->attention) {
+                // Higher prediction error increases attention to novel stimuli
+                float attentionGain = std::min(1.0f, predictionError * 2.0f);
+                pImpl->attention->setInhibitionStrength(0.5f - attentionGain * 0.3f);
+                pImpl->attention->setExcitationStrength(1.5f + attentionGain * 0.5f);
+            }
+            
+            // Update concept formation with prediction error
+            if (pImpl->conceptFormation) {
+                // Prediction error drives concept discovery
+                pImpl->conceptFormation->processPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +556,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->lastSensoryInput) {
+        // Convert sensory input to pattern for concept formation
+        const auto& sensoryData = pImpl->lastSensoryInput->getData();
+        if (!sensoryData.empty()) {
+            // Create simplified feature representation for concept formation
+            // In a full implementation, this would use neural encoding
+            std::vector<float> conceptPattern = sensoryData;
+            std::vector<float> conceptFeatures = sensoryData;
+            
+            // Process this experience for concept formation
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                conceptPattern, conceptFeatures, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, 
+                currentStep
+            );
+            
+            // If concept formation found a pattern, integrate with working memory
+            if (conceptId > 0) {
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    // Add concept prototype to working memory if not already there
+                    if (!pImpl->workingMemory->contains(conceptId)) {
+                        // Map concept ID to neuron ID for storage
+                        NeuronId conceptNeuronId(conceptId + 10000);  // Offset from regular neuron IDs
+                        pImpl->workingMemory->storeToNeuron(conceptNeuronId, 0.5f);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -589,6 +644,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Store input for prediction system
+    pImpl->lastSensoryInput = input.clone();
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -690,9 +748,40 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using neural planner for intelligent planning
+    // Try to use the neural planner for better action selection
     
+    if (pImpl->planner && pImpl->lastSensoryInput) {
+        // Get current state from sensory input
+        const auto& sensoryData = pImpl->lastSensoryInput->getData();
+        if (!sensoryData.empty()) {
+            // Use neural planner to plan action sequence
+            // For now, get the planned action for current state
+            std::vector<float> currentState = sensoryData;
+            
+            // Set target reward based on dopamine level (exploration drive)
+            float targetReward = 1.0f;
+            if (pImpl->dopamine) {
+                targetReward = pImpl->dopamine->getLevel();
+            }
+            
+            ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+            
+            // If planner provided a good action (not just wait), use it
+            if (plannedAction != ActionType::Wait) {
+                auto action = std::make_unique<Action>(plannedAction);
+                
+                // Store action plan in working memory for later evaluation
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->storeToNeuron(NeuronId(plannedAction), 0.8f);
+                }
+                
+                return action;
+            }
+        }
+    }
+    
+    // Fallback to simple motor neuron-based action selection
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -780,7 +869,7 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
+        // Save neural network state (neurons and synapses)
         NeuronCheckpointData neuronData;
         neuronData.membranePotential.reserve(getTotalNeuronCount());
         neuronData.restingPotential.reserve(getTotalNeuronCount());
@@ -826,6 +915,89 @@ bool Brain::save(const std::string& filepath) const {
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Save working memory state
+        if (pImpl->workingMemory) {
+            std::vector<float> workingMemoryData = pImpl->workingMemory->retrieve();
+            if (!workingMemoryData.empty()) {
+                std::vector<uint64_t> memoryNeurons;
+                memoryNeurons.reserve(workingMemoryData.size());
+                for (float activation : workingMemoryData) {
+                    if (activation > 0.01f) {
+                        memoryNeurons.push_back(static_cast<uint64_t>(memoryNeurons.size()));
+                    }
+                }
+                writer.writeWorkingMemory(memoryNeurons);
+            }
+        }
+        
+        // Save episodic memory state
+        if (pImpl->episodicMemory) {
+            auto episodes = pImpl->episodicMemory->getAllEpisodes();
+            if (!episodes.empty()) {
+                std::vector<EpisodicMemoryItem> episodeData;
+                for (const auto* episode : episodes) {
+                    episodeData.push_back(*episode);
+                }
+                writer.writeEpisodicMemory(episodeData);
+            }
+        }
+        
+        // Save prediction system state
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            std::vector<float> errorHistory = pImpl->predictionSystem->getErrorHistory();
+            
+            PredictionSystemData predData;
+            predData.error = predictionError;
+            predData.confidence = confidence;
+            predData.errorHistory = errorHistory;
+            predData.lastUpdate = static_cast<size_t>(pImpl->currentStep);
+            
+            writer.writePredictionSystem(predData);
+        }
+        
+        // Save attention system state
+        if (pImpl->attention) {
+            std::vector<NeuronId> attentionWinners = pImpl->attention->getWinners();
+            std::vector<RegionId> attendedRegions = pImpl->attention->getAttendedRegions();
+            
+            AttentionData attnData;
+            attnData.winners = attentionWinners;
+            attnData.attendedRegions = attendedRegions;
+            attnData.inhibitionStrength = pImpl->attention->getInhibitionStrength();
+            attnData.excitationStrength = pImpl->attention->getExcitationStrength();
+            
+            writer.writeAttentionSystem(attnData);
+        }
+        
+        // Save concept formation state
+        if (pImpl->conceptFormation) {
+            auto concepts = pImpl->conceptFormation->getConcepts();
+            if (!concepts.empty()) {
+                writer.writeConceptFormation(concepts);
+            }
+        }
+        
+        // Save development system state
+        if (pImpl->developmentSystem) {
+            DevelopmentData devData;
+            devData.stage = pImpl->developmentalStage;
+            devData.age = static_cast<double>(pImpl->currentStep * pImpl->timestep);
+            writer.writeDevelopmentSystem(devData);
+        }
+        
+        // Save neuromodulation state
+        if (pImpl->dopamine) {
+            NeuromodulationData neuromodData;
+            neuromodData.dopamineLevel = pImpl->dopamine->getLevel();
+            neuromodData.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+            neuromodData.noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            neuromodData.predictionError = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+            
+            writer.writeNeuromodulationData(neuromodData);
         }
         
         // Finalize
@@ -898,6 +1070,93 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Restore working memory
+        if (pImpl->workingMemory) {
+            std::vector<uint64_t> workingMemoryNeurons;
+            if (reader.readWorkingMemory(workingMemoryNeurons)) {
+                for (uint64_t neuronId : workingMemoryNeurons) {
+                    pImpl->workingMemory->storeToNeuron(NeuronId(neuronId), 0.5f);
+                }
+            }
+        }
+        
+        // Restore episodic memory
+        if (pImpl->episodicMemory) {
+            std::vector<EpisodicMemoryItem> episodicData;
+            if (reader.readEpisodicMemory(episodicData)) {
+                for (const auto& item : episodicData) {
+                    pImpl->episodicMemory->storeEpisode(item);
+                }
+            }
+        }
+        
+        // Restore prediction system
+        if (pImpl->predictionSystem) {
+            PredictionSystemData predData;
+            if (reader.readPredictionSystem(predData)) {
+                // Reconstruct prediction system state
+                // This is a simplified reconstruction - in a real implementation,
+                // we would need to store and restore the actual prediction model
+                for (float error : predData.errorHistory) {
+                    pImpl->predictionSystem->updatePredictions(
+                        *pImpl->lastSensoryInput, *pImpl->lastSensoryInput);
+                }
+            }
+        }
+        
+        // Restore attention system
+        if (pImpl->attention) {
+            AttentionData attnData;
+            if (reader.readAttentionSystem(attnData)) {
+                // Reconstruct attention system state
+                for (NeuronId winner : attnData.winners) {
+                    pImpl->attention->applyTopDownBias(winner, 0.5f);
+                }
+                pImpl->attention->setInhibitionStrength(attnData.inhibitionStrength);
+                pImpl->attention->setExcitationStrength(attnData.excitationStrength);
+            }
+        }
+        
+        // Restore concept formation
+        if (pImpl->conceptFormation) {
+            std::vector<DiscoveredConcept> conceptData;
+            if (reader.readConceptFormation(conceptData)) {
+                // Reconstruct concept formation state
+                for (const auto& concept : conceptData) {
+                    // Reconstruct concept from its stored state
+                    // This is a simplified reconstruction
+                    for (const auto& instance : concept.instances) {
+                        pImpl->conceptFormation->presentExperience(
+                            instance.pattern, instance.features, instance.avgReward, 0);
+                    }
+                }
+            }
+        }
+        
+        // Restore development system
+        if (pImpl->developmentSystem) {
+            DevelopmentData devData;
+            if (reader.readDevelopmentSystem(devData)) {
+                pImpl->developmentalStage = devData.stage;
+                // Reconstruct development progress
+                double developmentalAge = devData.age;
+                size_t estimatedSteps = static_cast<size_t>(developmentalAge / pImpl->timestep);
+                pImpl->currentStep = estimatedSteps;
+                pImpl->currentTime = developmentalAge;
+            }
+        }
+        
+        // Restore neuromodulation state
+        if (pImpl->dopamine) {
+            NeuromodulationData neuromodData;
+            if (reader.readNeuromodulationData(neuromodData)) {
+                // Reconstruct neuromodulation state
+                // Note: This is a simplified reconstruction
+                // In a real implementation, we would need to store and restore
+                // the actual neuromodulation system states
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

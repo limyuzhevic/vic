@@ -19,6 +19,8 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , conceptsReset_(false)
+    , resetAttempted_(false)
 {
 }
 
@@ -294,6 +296,34 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
+}
+
+void ConceptFormation::processPredictionError(float predictionError) {
+    // Prediction error drives concept formation
+    // High prediction error indicates unexpected input that may require new concepts
+    
+    if (predictionError > 0.7f) {
+        // Very high prediction error - reset to be more receptive to new concepts
+        conceptsReset_ = true;
+        resetAttempted_ = true;
+        
+        // Add small random perturbations to current concepts to make them more flexible
+        for (auto& concept : concepts_) {
+            for (auto& instance : concept.instances) {
+                // Add small noise to prototype to encourage exploration
+                for (size_t i = 0; i < instance.pattern.size(); ++i) {
+                    if (instance.pattern.size() > 0) {
+                        instance.pattern[i] += (rand() / (float)RAND_MAX - 0.5f) * 0.1f;
+                        // Clamp to reasonable range
+                        instance.pattern[i] = std::max(0.0f, std::min(1.0f, instance.pattern[i]));
+                    }
+                }
+            }
+        }
+    }
+    
+    // Use prediction error to adjust learning rate
+    formationThreshold_ = std::max(0.3f, std::min(0.9f, formationThreshold_ + predictionError * 0.1f));
 }
 
 // SpatialRepresentation Implementation
