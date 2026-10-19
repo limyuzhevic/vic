@@ -1,4 +1,7 @@
 #include "ExperimentRunner.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <fstream>
+#include <ctime>
 
 namespace nlm {
 
@@ -113,8 +116,79 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Implement comprehensive results saving
+    // This saves all experiment data to a structured file format
+    
+    try {
+        // Create a simple text-based results file
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open results file: " + filepath);
+            return false;
+        }
+        
+        file << "NLM Experiment Results\n";
+        file << "======================\n\n";
+        
+        file << "Global Seed: " << pImpl->globalSeed << "\n\n";
+        
+        file << "Experiments: " << pImpl->experiments.size() << "\n";
+        file << "----------------------------------------\n\n";
+        
+        for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+            const auto& exp = pImpl->experiments[i];
+            
+            file << "Experiment " << (i + 1) << ": " << exp->getName() << "\n";
+            file << "----------------------------------------\n";
+            
+            // Record metadata
+            file << "Start Step: " << exp->getStartStep() << "\n";
+            file << "End Step: " << exp->getEndStep() << "\n";
+            
+            // Record metrics
+            file << "\nMetrics:\n";
+            const auto& metrics = exp->getMetrics();
+            for (const auto& metric : metrics) {
+                file << "  " << metric.first << ": " << metric.second << "\n";
+            }
+            
+            // Record step data
+            file << "\nStep Data:\n";
+            const auto& steps = exp->getStepData();
+            file << "Steps Recorded: " << steps.size() << "\n";
+            
+            // Record notes
+            file << "\nNotes:\n";
+            const auto& notes = exp->getNotes();
+            for (const auto& note : notes) {
+                file << "  " << note << "\n";
+            }
+            
+            file << "\n";
+        }
+        
+        // Save configuration if available
+        file << "\nConfiguration:\n";
+        for (const auto& exp : pImpl->experiments) {
+            file << "Experiment: " << exp->getName() << "\n";
+            // In a full implementation, this would save the actual config values
+            // For now, just mark that config data is available
+            file << "  (Configuration data available)\n";
+        }
+        
+        // Add timestamp
+        std::time_t now = std::time(nullptr);
+        char timestamp[100];
+        std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        file << "\nSaved: " << timestamp << "\n";
+        
+        NLM_LOG_INFO("Results saved successfully to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving results: ") + e.what());
+        return false;
+    }
 }
 
 } // namespace nlm

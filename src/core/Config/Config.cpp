@@ -19,9 +19,32 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first
+    try {
+        // Check if file has .json extension or starts with {
+        if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json" || 
+            filepath.find(".json") != std::string::npos) {
+            return loadFromJSONFile(filepath);
+        } else {
+            // Try to parse as JSON by checking first character
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            char firstChar;
+            file >> firstChar;
+            file.seekg(0, std::ios::beg);
+            
+            if (firstChar == '{') {
+                return loadFromJSONFile(filepath);
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING(std::string("JSON parser failed: ") + e.what() + std::string(", falling back to simple parser"));
+    }
     
+    // Fall back to simple key=value parser for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -49,6 +72,112 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // For now, implement a simple JSON parser that handles key-value pairs
+    // In a full implementation, this would use a proper JSON library like nlohmann/json
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parsing for key-value pairs
+    // This handles basic JSON format like {"key": "value", "number": 123}
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                       std::istreambuf_iterator<char>());
+    
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key (" or after { or after ,)
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break; // No more keys
+        }
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        key = trim(key);
+        
+        // Find next : and then value
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) {
+            break;
+        }
+        
+        size_t valueStart = content.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Find end of value (either next " for string or next , or })
+        size_t valueEnd;
+        char nextChar = content[valueStart];
+        
+        if (nextChar == '"') {
+            // String value
+            valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (nextChar == '{' || nextChar == '[') {
+            // Object or array - skip for now
+            size_t bracketPos = content.find(nextChar == '{' ? '}' : ']', valueStart);
+            if (bracketPos == std::string::npos) {
+                break;
+            }
+            pos = bracketPos + 1;
+        } else {
+            // Numeric value
+            valueEnd = content.find_first_of(',}', valueStart);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string value = content.substr(valueStart, valueEnd - valueStart);
+            value = trim(value);
+            
+            // Try to parse as different types
+            try {
+                // Try integer
+                size_t posInt;
+                int intValue = std::stoi(value, &posInt);
+                if (posInt == value.size()) {
+                    set(key, intValue, ConfigSource::File);
+                } else {
+                    // Try float
+                    size_t posFloat;
+                    float floatValue = std::stof(value, &posFloat);
+                    if (posFloat == value.size()) {
+                        set(key, floatValue, ConfigSource::File);
+                    } else {
+                        // Try bool
+                        if (value == "true" || value == "false") {
+                            bool boolValue = (value == "true");
+                            set(key, boolValue, ConfigSource::File);
+                        } else {
+                            // String
+                            set(key, value, ConfigSource::File);
+                        }
+                    }
+                }
+            } catch (...) {
+                // If parsing fails, treat as string
+                set(key, value, ConfigSource::File);
+            }
+            
+            pos = valueEnd + 1;
         }
     }
     
