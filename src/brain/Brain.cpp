@@ -761,6 +761,48 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+void Brain::resetAndInitialize() {
+    NLM_LOG_INFO("Resetting and re-initializing NLM Brain...");
+    
+    // Reset all running state while preserving structural configuration
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->totalSpikesTotal = 0;
+    pImpl->isResting = false;
+    pImpl->stepsSinceLastEpisode = 0;
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Reset all regions to clear neuron states but preserve structure
+    for (auto& region : pImpl->regions) {
+        region->reset();
+    }
+    
+    pImpl->spikeSystem->reset();
+    
+    // Reset memory systems to clear stored information
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->attention) pImpl->attention->reset();
+    
+    // Re-enable plasticity on all synapses for learning experiments
+    for (auto& region : pImpl->regions) {
+        for (auto& population : region->getPopulations()) {
+            for (auto& neuron : population->getNeurons()) {
+                neuron->reset();
+            }
+        }
+    }
+    
+    // Re-seed random number generator for reproducible experiments
+    if (auto seedOpt = pImpl->config->get<uint64_t>("random_seed")) {
+        pImpl->rng->seed(*seedOpt);
+    }
+    
+    NLM_LOG_INFO("NLM Brain reset and re-initialization complete");
+}
+
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     

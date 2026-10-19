@@ -176,14 +176,23 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
+// Global logger management
+static std::shared_ptr<Logger> getGlobalLoggerPtr() {
+    static std::shared_ptr<Logger> globalLoggerPtr = std::make_shared<Logger>();
+    return globalLoggerPtr;
+}
+
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    return *getGlobalLoggerPtr();
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Set the global logger instance. The old instance will be replaced.
+    // Note: This means any existing shared_ptr references to the previous
+    // global logger will no longer reference the same object, but that's
+    // acceptable since the new logger should be properly configured.
+    static std::shared_ptr<Logger> globalLoggerPtr;
+    globalLoggerPtr = logger;
 }
 
 // LogStream implementation

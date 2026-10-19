@@ -103,15 +103,20 @@ public:
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
     
-    // Apply developmental changes (called automatically in step)
+// Apply developmental changes (called automatically in step)
     void develop();
-    
+
     // Reset brain state
     void reset();
-    
+
+    // Reset brain and reinitialize for learning experiments
+    // More efficient than reset() + initialize() as it preserves
+    // structural connectivity while resetting running state
+    void resetAndInitialize();
+
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
-    
+
     // Load brain state from file
     bool load(const std::string& filepath);
     
