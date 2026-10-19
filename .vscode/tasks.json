@@ -1,0 +1,20 @@
+{
+    "tasks": {
+        "actions": {
+            "cmake.configureTask": {
+                "command": "cmake",
+                "args": ["-S", "${workspaceFolder}", "-B", "${workspaceFolder}/build", "-DCMAKE_BUILD_TYPE=Debug", "-DBUILD_TESTS=ON", "-DNLM_ENABLE_SANITIZERS=ON"]
+            },
+            "cmake.buildTask": {
+                "command": "cmake",
+                "args": ["--build", "${workspaceFolder}/build", "--parallel"],
+                "problemMatcher": "$gcc"
+            },
+            "cmake.testTask": {
+                "command": "ctest",
+                "args": ["--output-on-failure"],
+                "problemMatcher": "$gtest"
+            }
+        }
+    }
+}

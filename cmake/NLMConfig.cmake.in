@@ -1,0 +1,62 @@
+set(NLM_VERSION @PROJECT_VERSION@)
+
+# Include the exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Add imported targets to the build
+foreach(_target ${NLM_TARGETS})
+    if(TARGET NLM::${_target})
+        add_library(${_target} INTERFACE IMPORTED)
+        # Handle include directories
+        get_target_property(_interface_include_directories NLM::${_target} INTERFACE_INCLUDE_DIRECTORIES)
+        if(_interface_include_directories)
+            set_target_properties(${_target} PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${_interface_include_directories}"
+            )
+        endif()
+        # Handle compile definitions
+        get_target_property(_interface_compile_definitions NLM::${_target} INTERFACE_COMPILE_DEFINITIONS)
+        if(_interface_compile_definitions)
+            set_target_properties(${_target} PROPERTIES
+                INTERFACE_COMPILE_DEFINITIONS "${_interface_compile_definitions}"
+            )
+        endif()
+        # Handle link libraries
+        get_target_property(_interface_link_libraries NLM::${_target} INTERFACE_LINK_LIBRARIES)
+        if(_interface_link_libraries)
+            set_target_properties(${_target} PROPERTIES
+                INTERFACE_LINK_LIBRARIES "${_interface_link_libraries}"
+            )
+        endif()
+    endif()
+endforeach()
+
+# Provide NLM namespace targets
+set(NLM_CORE_TARGET NLM::nlm_core)
+set(NLM_AGENT_TARGET NLM::nlm_agent)
+set(NLM_WORLD_TARGET NLM::nlm_world)
+set(NLM_PHASE3_TARGET NLM::nlm_phase3)
+set(NLM_PHASE4_TARGET NLM::nlm_phase4)
+
+# Provide convenience functions
+function(nlm_add_executable target)
+    add_executable(${target} ${ARGN})
+    target_link_libraries(${target} NLM::nlm_core)
+    setup_compile_options(${target})
+endfunction()
+
+function(nlm_add_library target)
+    add_library(${target} ${ARGN})
+    target_link_libraries(${target} NLM::nlm_core)
+    setup_compile_options(${target})
+endfunction()
+
+# Find and configure dependencies
+find_package(Doxygen QUIET)
+if(DOXYGEN_FOUND)
+    message(STATUS "Found Doxygen: ${DOXYGEN_VERSION}")
+endif()
+
+# Print summary
+message(STATUS "NLM CMake configuration complete")
+message(STATUS "Imported targets available: NLM::nlm_core, NLM::nlm_agent, NLM::nlm_world, NLM::nlm_phase3, NLM::nlm_phase4")

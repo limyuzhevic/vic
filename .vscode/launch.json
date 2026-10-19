@@ -1,0 +1,130 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "NLM - Debug Configuration",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm",
+            "args": [
+                "--simulation-duration=3600",
+                "--time-step=0.001",
+                "--visualization=true"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set stop on exception",
+                    "text": "catch throw",
+                    "ignoreFailures": true
+                }
+            ],
+            "sourceFileMap": {
+                "/workspace/app/src": "${workspaceFolder}/src"
+            },
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/core",
+                "${workspaceFolder}/src/brain",
+                "${workspaceFolder}/src/dynamics",
+                "${workspaceFolder}/src/plasticity",
+                "${workspaceFolder}/src/development",
+                "${workspaceFolder}/src/neuromodulation",
+                "${workspaceFolder}/src/memory",
+                "${workspaceFolder}/src/prediction",
+                "${workspaceFolder}/src/cognition",
+                "${workspaceFolder}/src/sensory",
+                "${workspaceFolder}/src/motor",
+                "${workspaceFolder}/src/environment",
+                "${workspaceFolder}/src/experiments",
+                "${workspaceFolder}/src/visualization"
+            ],
+            "preLaunchTask": "CMake: build active target"
+        },
+        {
+            "name": "NLM - Phase 6 Demo",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm_phase6_demo",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "sourceFileMap": {
+                "/workspace/app/src": "${workspaceFolder}/src"
+            },
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/core",
+                "${workspaceFolder}/src/brain",
+                "${workspaceFolder}/src/dynamics",
+                "${workspaceFolder}/src/plasticity",
+                "${workspaceFolder}/src/development",
+                "${workspaceFolder}/src/neuromodulation",
+                "${workspaceFolder}/src/memory",
+                "${workspaceFolder}/src/prediction",
+                "${workspaceFolder}/src/cognition",
+                "${workspaceFolder}/src/sensory",
+                "${workspaceFolder}/src/motor",
+                "${workspaceFolder}/src/environment",
+                "${workspaceFolder}/src/experiments",
+                "${workspaceFolder}/src/visualization"
+            ],
+            "preLaunchTask": "CMake: build active target"
+        },
+        {
+            "name": "NLM - Unit Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb"
+        },
+        {
+            "name": "NLM - Memory Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm",
+            "args": ["--memory-monitor"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable memory debugging",
+                    "text": "target record-random 1000",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: build active target"
+        }
+    ]
+}

@@ -1,0 +1,177 @@
+{
+    "name": "NLM - Development Environment",
+    "folderType": "mixed",
+    "settings": {
+        "cmake.sourceDirectory": "${workspaceFolder}",
+        "cmake.buildDirectory": "${workspaceFolder}/build",
+        "cmake.generator": "Ninja",
+        "cmake.configureArgs": [
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DBUILD_TESTS=ON",
+            "-DBUILD_DOCS=ON"
+        ],
+        "cmake.debugSettings": [
+            "-DCMAKE_BUILD_TYPE=Debug",
+            "-DNLM_ENABLE_SANITIZERS=ON"
+        ],
+        "clangd.path": "clangd",
+        "clangd.formatting": false,
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "files.eol": "\n",
+        "files.autoSave": "afterDelay",
+        "files.autoSaveDelay": 1000,
+        "search.exclude": {
+            "**/.git": true,
+            "**/.vscode": true,
+            "**/.idea": true,
+            "**/build": true,
+            "**/.build": true,
+            "**/__pycache__": true,
+            "**/*.pyc": true,
+            "**/.pytest_cache": true
+        },
+        "files.watcherExclude": {
+            "**/build": true,
+            "**/.git": true
+        },
+        "cSpell.words": [
+            "synaptogenesis",
+            "maturation",
+            "neuromodulation",
+            "dopamine",
+            "curiosity",
+            "novelty",
+            "prediction",
+            "plasticity",
+            "Hebbian",
+            "STDP",
+            "LIF",
+            "corticogenesis"
+        ],
+        "C_Cpp.intelliSenseEngine": "clangd",
+        "C_Cpp.clangdFallback": true,
+        "C_Cpp.errorSquiggles": "Enabled"
+    },
+    "configurations": [
+        {
+            "name": "Debug",
+            "generator": "Ninja",
+            "configureArgs": [
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DNLM_ENABLE_SANITIZERS=ON",
+                "-DNLM_ENABLE_COVERAGE=ON",
+                "-DBUILD_TESTS=ON"
+            ],
+            "buildArgs": [],
+            "overrideCMakeExecutable": "cmake",
+            "cmakeOutputPath": "${workspaceFolder}/build_debug"
+        },
+        {
+            "name": "Release",
+            "generator": "Ninja",
+            "configureArgs": [
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DBUILD_DOCS=ON"
+            ],
+            "buildArgs": [],
+            "overrideCMakeExecutable": "cmake",
+            "cmakeOutputPath": "${workspaceFolder}/build"
+        }
+    ],
+    "launch": [
+        {
+            "name": "Launch NLM",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: build active target"
+        },
+        {
+            "name": "Launch Phase 6 Demo",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm_phase6_demo",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: build active target"
+        },
+        {
+            "name": "Debug Unit Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm_test",
+            "args": ["--gtest_list_tests"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Build All",
+            "type": "cppbuild",
+            "command": "cmake --build ${workspaceFolder}/build --parallel",
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "Configure Debug",
+            "type": "cppbuild",
+            "command": "cmake -S ${workspaceFolder} -B ${workspaceFolder}/build_debug -DCMAKE_BUILD_TYPE=Debug -DNLM_ENABLE_SANITIZERS=ON -DNLM_ENABLE_COVERAGE=ON -DBUILD_TESTS=ON",
+            "group": "build",
+            "problemMatcher": "$cmake"
+        },
+        {
+            "label": "Configure Release",
+            "type": "cppbuild",
+            "command": "cmake -S ${workspaceFolder} -B ${workspaceFolder}/build -DCMAKE_BUILD_TYPE=Release -DBUILD_DOCS=ON",
+            "group": "build",
+            "problemMatcher": "$cmake"
+        },
+        {
+            "label": "Run Tests",
+            "type": "cppbuild",
+            "command": "cd ${workspaceFolder}/build && ctest --output-on-failure",
+            "group": "test",
+            "problemMatcher": "$gtest"
+        },
+        {
+            "label": "Generate Documentation",
+            "type": "cppbuild",
+            "command": "cmake --build ${workspaceFolder}/build --target docs",
+            "group": "build",
+            "problemMatcher": "$cmake"
+        }
+    ]
+}

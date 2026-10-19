@@ -1,0 +1,37 @@
+<project version="4">
+  <component name="CMakeWorkspace">
+    <option name="cmakeExecutablePath" value="$PROJECT_DIR$/cmake/cmake-3.27.7-linux-x86_64/bin/cmake" />
+    <option name="generator" value="Ninja" />
+    <option name="multiToolchainMode" value="false" />
+    <option name="projectOpenLanguage" value="CMake" />
+  </component>
+  <component name="CMakeWorkspaceCaches">
+    <option name="value">
+      <list>
+        <option value="$PROJECT_DIR$/build" />
+      </list>
+    </option>
+  </component>
+  <component name="CMakeSettings">
+    <option name="currentKit" value="Linux-Ninja" />
+    <option name="kits">
+      <option name="name" value="Linux-Ninja" />
+      <option name="cmakeExecutable" value="cmake" />
+      <option name="generator" value="Ninja" />
+      <option name="compilerExecutable" value="g++" />
+      <option name="buildSystemDirectory" />
+      <option name="makeAlternative" value="ninja" />
+    </option>
+  </component>
+  <component name="CMakeProjectsWorkspace">
+    <option name="value">
+      <list>
+        <option value="$PROJECT_DIR$/CMakeLists.txt" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectManager">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+</project>

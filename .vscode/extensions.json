@@ -1,0 +1,15 @@
+{
+    "recommendations": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "github.copilot",
+        "streetsidesoftware.code-spell-checker",
+        "editorconfig.editorconfig",
+        "eamodio.gitlens",
+        "Johnstoncode.cpptools-modified-files",
+        "vadimcn.vscode-lldb",
+        "PierrickLaserme.cpptools-helpers",
+        "batisteo.vscode-lengthometer"
+    ]
+}
