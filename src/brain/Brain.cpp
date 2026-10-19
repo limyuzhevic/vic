@@ -1,24 +1,4 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../core/Constants.hpp"
 
 namespace nlm {
 
@@ -130,24 +110,24 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        // Configure STDP parameters with constants as defaults
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", nlm::STDP_LTP_WEIGHT_DEFAULT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", nlm::STDP_LTD_WEIGHT_DEFAULT);
+        float tau = config->getOr<float>("stdp_tau", nlm::STDP_TIME_CONSTANT);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        // Configure structural plasticity with constants as defaults
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", nlm::SYNAPTAGENESIS_RATE_MAIN);
+        float pruningRate = config->getOr<float>("pruning_rate", nlm::PRUNING_RATE_MAIN);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Get timestep with constant default
+        timestep = config->getOr<double>("simulation_timestep", nlm::SIMULATION_TIMESTEP);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        // Get integration intervals from config with constants as defaults
+        replayInterval = config->getOr<size_t>("replay_interval", nlm::REPLAY_INTERVAL);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", nlm::CONSOLIDATION_INTERVAL);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -477,18 +457,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
+    // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {

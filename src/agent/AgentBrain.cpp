@@ -1,7 +1,4 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include "../core/Constants.hpp"
 
 namespace nlm {
 
@@ -91,8 +88,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity with scaling factor
+            float current = vision[i] * nlm::VISION_SCALE_FACTOR;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +98,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * nlm::TOUCH_SENSORS_DEFAULT * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +107,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * nlm::VISION_SCALE_FACTOR * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }

@@ -62,6 +62,9 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    # Performance - Memory Management
+    src/performance/MemoryPool.cpp
+    src/performance/EnhancedMemoryManagement.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp

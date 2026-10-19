@@ -1,48 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
 // Main configuration class
 class Config {
 public:
@@ -55,7 +10,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,13 +48,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    // Helper function to parse and validate config values
+    static void parseConfigValue(const std::string& key, const std::string& value);
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

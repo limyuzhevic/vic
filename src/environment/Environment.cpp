@@ -1,4 +1,5 @@
 #include "Environment.hpp"
+#include "../core/Constants.hpp"
 
 namespace nlm {
 
@@ -35,7 +36,7 @@ struct GridWorldEnvironment::Impl {
     EnvironmentState state;
     
     Impl(int w, int h) : width(w), height(h), agentX(0), agentY(0), 
-                         goalX(w-1), goalY(h-1), steps(0), maxSteps(1000), done(false) {}
+                         goalX(w-1), goalY(h-1), steps(0), maxSteps(nlm::ENVIRONMENT_MAX_STEPS), done(false) {}
 };
 
 GridWorldEnvironment::GridWorldEnvironment(int width, int height) 
@@ -85,9 +86,9 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
     }
     
     // Check if reached goal
-    float reward = -0.01f;  // Small negative reward for each step
+    float reward = nlm::ENVIRONMENT_STEP_REWARD;  // Small negative reward for each step
     if (pImpl->agentX == pImpl->goalX && pImpl->agentY == pImpl->goalY) {
-        reward = 1.0f;
+        reward = nlm::ENVIRONMENT_GOAL_REWARD;
         pImpl->done = true;
         pImpl->state.set_terminal(true);
         done_ = true;
