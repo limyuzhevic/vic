@@ -1,0 +1,1615 @@
+# NLM Command Line Tools
+
+This directory contains command line tools for interacting with the NLM (Neural Learning Machine) framework. These tools provide convenient interfaces for common tasks like running simulations, managing configurations, analyzing results, and debugging.
+
+## Tool Overview
+
+The command line tools are organized into categories:
+
+### Core Tools
+- `nlm-run`: Run simulations with various configurations
+- `nlm-config`: Configuration management and validation
+- `nlm-stats`: Statistical analysis and reporting
+- `nlm-bench`: Performance benchmarking
+- `nlm-validate`: Configuration and simulation validation
+- `nlm-visualize`: Basic visualization and plotting
+
+### Development Tools
+- `nlm-dev`: Development and debugging utilities
+- `nlm-template`: Create template configurations and examples
+- `nlm-export`: Export simulation results to various formats
+- `nlm-import`: Import external data and configurations
+
+### Research Tools
+- `nlm-experiment`: Run research experiments
+- `nlm-analysis`: Advanced analysis of simulation data
+- `nlm-compare`: Compare simulation results
+- `nlm-reproduce`: Reproduce experiments with specific configurations
+
+## Installation
+
+### System Installation
+
+```bash
+# Install all command line tools
+sudo apt install nlm-tools  # (if available via package manager)
+
+# Or install from source
+pip install -e .
+
+# Make tools available in PATH
+export PATH="$PATH:/usr/local/bin"
+```
+
+### Development Installation
+
+```bash
+# For development, make sure tools are in PATH
+cd /workspace/app
+pip install -e .
+make tools-install  # (if available)
+```
+
+## Core Command Line Tools
+
+### 1. nlm-run: Run Simulations
+
+**Usage**:
+
+```bash
+nlm-run [OPTIONS] CONFIG_FILE
+
+Options:
+  --steps N                   Number of simulation steps (default: 100)
+  --neurons N                 Number of neurons (default: 1000)
+  --world-width W             World width (default: 20)
+  --world-height H            World height (default: 20)
+  --config KEY=VALUE          Additional configuration parameters
+  --output FILE               Output results to file (default: results.json)
+  --verbose                   Enable verbose output
+  --debug                     Enable debug output
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Run basic simulation
+nlm-run config1.cfg
+
+# Run with custom parameters
+nlm-run config1.cfg --steps 500 --neurons 2000 --world-width 30 --world-height 30
+
+# Run with additional configuration
+nlm-run config1.cfg --config plasticity.stdp.learning_rate=0.02 --config neuromod.curiosity.scale=1.5
+
+# Run with output file
+nlm-run config1.cfg --output my_results.json
+
+# Run in verbose mode
+nlm-run config1.cfg --verbose
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import run_simulation
+
+# Run simulation with configuration
+results = run_simulation(
+    config_file="config1.cfg",
+    steps=500,
+    neurons=2000,
+    world_config={"width": 30, "height": 30}
+)
+
+# Run simulation with custom parameters
+results = run_simulation(
+    neurons=1000,
+    connection_probability=0.15,
+    learning_rate=0.01
+)
+
+print(f"Simulation completed with {results['total_spikes']} spikes")
+print(f"Average firing rate: {results['average_firing_rate']:.3f}")
+```
+
+### 2. nlm-config: Configuration Management
+
+**Usage**:
+
+```bash
+nlm-config [COMMAND] [OPTIONS]
+
+Commands:
+  create [NAME]               Create new configuration
+  load FILE                   Load configuration from file
+  save FILE                   Save configuration to file
+  validate FILE               Validate configuration
+  list                       List all configurations
+  delete NAME                 Delete configuration
+  info NAME                   Show configuration information
+  update NAME KEY=VALUE       Update configuration value
+  diff FILE1 FILE2            Compare two configurations
+
+Options:
+  --format FORMAT             Output format (json, yaml, ini, cfg) (default: json)
+  --template TEMPLATE         Use template for new configuration
+  --validate-only             Only validate, don't save
+  --force                     Force overwrite existing configuration
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Create new configuration
+nlm-config create my_config
+
+# Load configuration
+nlm-config load my_config.json
+
+# Save configuration
+nlm-config save my_config.json
+
+# Validate configuration
+nlm-config validate my_config.json
+
+# List configurations
+nlm-config list
+
+# Update configuration
+nlm-config update my_config brain.neuron_count=2000
+
+# Compare configurations
+nlm-config diff config1.json config2.json
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import ConfigManager
+
+# Create configuration
+config = ConfigManager.create("my_config")
+
+# Load configuration
+config = ConfigManager.load("my_config.json")
+
+# Validate configuration
+validation = ConfigManager.validate("my_config.json")
+if validation.is_valid:
+    print("Configuration is valid")
+else:
+    print(f"Validation errors: {validation.errors}")
+
+# Update configuration
+ConfigManager.update("my_config", "brain.neuron_count", 2000)
+
+# List configurations
+configs = ConfigManager.list()
+for name, info in configs.items():
+    print(f"{name}: {info['neuron_count']} neurons")
+```
+
+### 3. nlm-stats: Statistical Analysis
+
+**Usage**:
+
+```bash
+nlm-stats [OPTIONS] RESULTS_FILE
+
+Options:
+  --metric METRIC             Metric to analyze (spikes, firing_rate, curiosity, novelty)
+  --period PERIOD             Time period for analysis (all, episode, step)
+  --output FILE               Output statistics to file (default: stats.txt)
+  --format FORMAT             Output format (text, json, csv, yaml) (default: text)
+  --threshold VALUE           Threshold for filtering (default: 0.0)
+  --sort-by FIELD             Sort results by field (default: timestamp)
+  --reverse                   Reverse sort order
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Get basic statistics
+nlm-stats results.json
+
+# Analyze specific metrics
+nlm-stats results.json --metric firing_rate --period episode
+
+# Filter by threshold
+nlm-stats results.json --metric curiosity --threshold 0.5
+
+# Output in CSV format
+nlm-stats results.json --format csv --output analysis.csv
+
+# Sort by firing rate
+nlm-stats results.json --sort-by firing_rate --reverse
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import StatisticsAnalyzer
+
+# Analyze results file
+stats = StatisticsAnalyzer.analyze("results.json")
+
+# Get specific metric statistics
+firing_rate_stats = StatisticsAnalyzer.get_metric_stats("results.json", "firing_rate")
+print(f"Average firing rate: {firing_rate_stats['mean']:.3f}")
+print(f"Standard deviation: {firing_rate_stats['std']:.3f}")
+
+# Filter by threshold
+curiosity_stats = StatisticsAnalyzer.filter_by_threshold(
+    "results.json", "curiosity", 0.5
+)
+
+# Export statistics
+StatisticsAnalyzer.export_stats("results.json", "analysis.csv", format="csv")
+```
+
+### 4. nlm-bench: Performance Benchmarking
+
+**Usage**:
+
+```bash
+nlm-bench [OPTIONS] CONFIG_FILE
+
+Options:
+  --steps N                   Number of simulation steps (default: 100)
+  --repetitions R             Number of repetitions (default: 3)
+  --warmup-steps W            Warmup steps (default: 10)
+  --metric METRIC             Performance metric (time, memory, spikes) (default: time)
+  --output FILE               Output benchmark results (default: benchmark.json)
+  --format FORMAT             Output format (json, csv, yaml) (default: json)
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Run basic benchmark
+nlm-bench config1.cfg
+
+# Run with custom parameters
+nlm-bench config1.cfg --steps 500 --repetitions 5 --metric time
+
+# Run memory benchmark
+nlm-bench config1.cfg --metric memory --output memory_benchmark.json
+
+# Run warmup
+nlm-bench config1.cfg --warmup-steps 50
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import PerformanceBenchmark
+
+# Run benchmark
+benchmark = PerformanceBenchmark.run("config1.cfg", steps=500, repetitions=5)
+
+# Get benchmark results
+results = benchmark.get_results()
+print(f"Average steps per second: {results['steps_per_second']:.1f}")
+print(f"Average time per step: {results['avg_step_time']*1000:.2f} ms")
+print(f"Memory usage: {results['memory_usage_mb']:.1f} MB")
+
+# Compare benchmarks
+comparison = PerformanceBenchmark.compare([benchmark1, benchmark2])
+print(f"Performance difference: {comparison['performance_diff']:.2f}%")
+```
+
+### 5. nlm-validate: Configuration and Simulation Validation
+
+**Usage**:
+
+```bash
+nlm-validate [TYPE] [FILE] [OPTIONS]
+
+Types:
+  config                     Validate configuration file
+  simulation                 Validate simulation results
+  brain                      Validate brain state
+  world                      Validate world state
+  agent                      Validate agent state
+
+Options:
+  --strict                   Enable strict validation
+  --fix                      Attempt to fix validation errors
+  --output FILE              Output validation report (default: validation.txt)
+  --format FORMAT            Output format (text, json, xml) (default: text)
+  --help                     Show help message
+```
+
+**Examples**:
+
+```bash
+# Validate configuration
+nlm-validate config my_config.json
+
+# Validate simulation results
+nlm-validate simulation results.json
+
+# Validate with strict mode
+nlm-validate config my_config.json --strict
+
+# Fix validation errors
+nlm-validate config my_config.json --fix
+
+# Output in JSON format
+nlm-validate simulation results.json --format json --output report.json
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import Validator
+
+# Validate configuration
+config_validation = Validator.validate_config("my_config.json")
+if config_validation.is_valid:
+    print("Configuration is valid")
+else:
+    print(f"Validation errors: {config_validation.errors}")
+
+# Fix configuration
+fixed_config = Validator.fix_config("my_config.json")
+
+# Validate simulation
+results_validation = Validator.validate_simulation("results.json")
+print(f"Simulation validity: {results_validation.is_valid}")
+print(f"Number of issues: {len(results_validation.issues)}")
+```
+
+### 6. nlm-visualize: Basic Visualization
+
+**Usage**:
+
+```bash
+nlm-visualize [DATA_FILE] [OPTIONS]
+
+Options:
+  --type PLOT_TYPE            Plot type (spike_train, firing_rate, curiosity, novelty)
+  --xlabel TEXT              X-axis label (default: Time/Step)
+  --ylabel TEXT              Y-axis label (default: Value)
+  --title TEXT               Plot title
+  --output FILE              Output plot file (default: plot.png)
+  --width N                  Plot width (default: 800)
+  --height N                 Plot height (default: 600)
+  --style STYLE              Plot style (default: seaborn)
+  --save-data                Save plot data to file
+  --show                     Display plot (GUI mode)
+  --help                     Show help message
+```
+
+**Examples**:
+
+```bash
+# Create spike train plot
+nlm-visualize results.json --type spike_train --output spikes.png
+
+# Create firing rate plot
+nlm-visualize results.json --type firing_rate --title "Firing Rate Over Time"
+
+# Create curiosity plot
+nlm-visualize results.json --type curiosity --xlabel "Episode" --ylabel "Curiosity Level"
+
+# Create multiple plots
+nlm-visualize results.json --type firing_rate --output firing_rate.png
+nlm-visualize results.json --type curiosity --output curiosity.png
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import Visualizer
+
+# Create spike train plot
+Visualizer.create_spike_train_plot("results.json", "spikes.png")
+
+# Create firing rate plot
+Visualizer.create_firing_rate_plot(
+    "results.json", 
+    "firing_rate.png", 
+    title="Firing Rate Over Time"
+)
+
+# Create curiosity plot
+Visualizer.create_curiosity_plot(
+    "results.json",
+    "curiosity.png", 
+    xlabel="Episode",
+    ylabel="Curiosity Level"
+)
+
+# Create custom plot
+Visualizer.create_custom_plot(
+    "results.json",
+    "custom.png",
+    plot_type="firing_rate",
+    title="Custom Plot",
+    xlabel="Time (s)",
+    ylabel="Firing Rate (Hz)"
+)
+```
+
+## Development Tools
+
+### 1. nlm-dev: Development and Debugging Utilities
+
+**Usage**:
+
+```bash
+nlm-dev [COMMAND] [OPTIONS]
+
+Commands:
+  debug                      Debug simulation
+  profile                     Profile simulation performance
+  trace                       Enable tracing
+  monitor                     Monitor system resources
+  dump                       Dump debug information
+  leak-check                  Check for memory leaks
+  benchmark                   Run performance benchmarks
+  config                      Display configuration
+
+Options:
+  --simulation STEPS         Number of simulation steps (default: 100)
+  --config FILE               Configuration file (default: default.cfg)
+  --output FILE               Output file (default: debug_output.txt)
+  --format FORMAT             Output format (text, json, yaml) (default: text)
+  --level LEVEL               Log level (debug, info, warn, error)
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Debug simulation
+nlm-dev debug --simulation 200 --config my_config.cfg
+
+# Profile performance
+nlm-dev profile --simulation 500 --config test.cfg
+
+# Monitor system resources
+nlm-dev monitor --simulation 100
+
+# Dump debug information
+nlm-dev dump --simulation 50 --output debug_info.json
+
+# Check for memory leaks
+nlm-dev leak-check --simulation 200
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import Debugger
+
+# Debug simulation
+debugger = Debugger(debug_simulation=True, log_level="debug")
+results = debugger.run_simulation(steps=100)
+
+# Profile performance
+profiler = Debugger(profile_simulation=True)
+profile_results = profiler.run_simulation(steps=200)
+
+# Monitor system resources
+monitor = Debugger(monitor_resources=True)
+monitor_results = monitor.run_simulation(steps=150)
+
+# Dump debug information
+debug_info = Debugger.dump_debug_info(steps=50)
+
+# Check for memory leaks
+leak_report = Debugger.check_memory_leaks(steps=200)
+```
+
+### 2. nlm-template: Create Template Configurations
+
+**Usage**:
+
+```bash
+nlm-template [COMMAND] [TEMPLATE_NAME] [OPTIONS]
+
+Commands:
+  list                       List available templates
+  create NAME                Create new template
+  show NAME                  Show template content
+  apply NAME OUTPUT_FILE      Apply template to create configuration
+  modify NAME KEY=VALUE       Modify template parameter
+  delete NAME                 Delete template
+
+Options:
+  --template-type TYPE       Template type (brain, world, agent, full)
+  --description DESC         Template description
+  --author AUTHOR            Template author
+  --category CAT              Template category (research, production, testing)
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# List templates
+nlm-template list
+
+# Create basic brain template
+nlm-template create basic_brain --template-type brain --description "Basic brain configuration"
+
+# Show template
+nlm-template show basic_brain
+
+# Apply template
+nlm-template apply basic_brain my_config.json
+
+# Create full system template
+nlm-template create research_template --template-type full
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import TemplateManager
+
+# List templates
+templates = TemplateManager.list()
+for name, info in templates.items():
+    print(f"{name}: {info['description']} ({info['category']})")
+
+# Create template
+template = TemplateManager.create(
+    "basic_brain",
+    template_type="brain",
+    description="Basic brain configuration for testing",
+    author="NLM Team",
+    category="testing"
+)
+
+# Show template
+print(TemplateManager.show("basic_brain"))
+
+# Apply template
+config = TemplateManager.apply("basic_brain", "my_config.json")
+
+# Modify template
+TemplateManager.modify("basic_brain", "brain.neuron_count", 2000)
+```
+
+### 3. nlm-export: Export Results
+
+**Usage**:
+
+```bash
+nlm-export [FORMAT] [SOURCE] [OPTIONS]
+
+Formats:
+  json                      Export to JSON format
+  csv                       Export to CSV format
+  yaml                      Export to YAML format
+  sqlite                    Export to SQLite database
+  matlab                    Export to MATLAB format
+  rdata                     Export to R data format
+
+Options:
+  --output FILE              Output file (default: export.ext)
+  --include-header          Include header in CSV export
+  --compression LEVEL       Compression level (0-9) (default: 0)
+  --overwrite                Overwrite output file if exists
+  --help                     Show help message
+```
+
+**Examples**:
+
+```bash
+# Export to JSON
+nlm-export json results.json --output my_results.json
+
+# Export to CSV
+nlm-export csv results.json --output results.csv --include-header
+
+# Export to SQLite
+nlm-export sqlite results.json --output simulation.db
+
+# Export with compression
+nlm-export json results.json --output compressed_results.json --compression 6
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import Exporter
+
+# Export to JSON
+Exporter.export_to_json("results.json", "my_results.json")
+
+# Export to CSV
+Exporter.export_to_csv("results.json", "results.csv", include_header=True)
+
+# Export to SQLite
+Exporter.export_to_sqlite("results.json", "simulation.db")
+
+# Export to YAML
+Exporter.export_to_yaml("results.json", "results.yaml")
+
+# Export with compression
+Exporter.export_to_json("results.json", "compressed_results.json", compression_level=6)
+```
+
+### 4. nlm-import: Import External Data
+
+**Usage**:
+
+```bash
+nlm-import [SOURCE] [OPTIONS]
+
+Options:
+  --format FORMAT            Source format (json, csv, matlab, npy, npz)
+  --config FILE              Configuration file (default: default.cfg)
+  --map-columns MAPPING      Column mapping for CSV (format: target:col1,col2,...)
+  --filter-conditions FILTER Filter conditions for data selection
+  --output FILE              Output file (default: imported_data.json)
+  --overwrite                Overwrite output file if exists
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Import from JSON
+nlm-import simulation_data.json --format json
+
+# Import from CSV with column mapping
+nlm-import experimental_data.csv --format csv --map-columns brain:neurons,plasticity:lr
+
+# Import with filter conditions
+nlm-import data.npy --format npy --filter-conditions "steps>100 && neurons>500"
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import Importer
+
+# Import from JSON
+data = Importer.import_from_json("simulation_data.json")
+
+# Import from CSV
+config = Importer.import_from_csv(
+    "experimental_data.csv",
+    column_mapping={"brain": "neurons", "plasticity": "lr"}
+)
+
+# Import from MATLAB
+matlab_data = Importer.import_from_matlab("simulation.mat")
+
+# Import from NumPy
+numpy_data = Importer.import_from_numpy("data.npy")
+```
+
+## Research Tools
+
+### 1. nlm-experiment: Run Research Experiments
+
+**Usage**:
+
+```bash
+nlm-experiment [EXPERIMENT_TYPE] [OPTIONS]
+
+Experiment Types:
+  parameter_sweep              Parameter sweep experiment
+  reinforcement_learning        Reinforcement learning experiment
+  developmental_study          Developmental study experiment
+  curiosity_experiment          Curiosity-driven exploration experiment
+  memory_test                  Memory capacity test experiment
+  comparison_study             Comparative experiment study
+
+Options:
+  --config FILE               Configuration file (default: default.cfg)
+  --parameters FILE           Parameters file for experiment
+  --output DIR                Output directory (default: experiment_results)
+  --repetitions R             Number of repetitions (default: 1)
+  --workers W                 Number of worker processes (default: 1)
+  --timeout T                 Timeout in seconds (default: 3600)
+  --verbose                   Enable verbose output
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Run parameter sweep experiment
+nlm-experiment parameter_sweep --parameters params.json
+
+# Run reinforcement learning experiment
+nlm-experiment reinforcement_learning --config rl_config.cfg
+
+# Run developmental study
+nlm-experiment developmental_study --output dev_study_results
+
+# Run parameter sweep with multiple workers
+nlm-experiment parameter_sweep --parameters params.json --repetitions 5 --workers 4
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import ExperimentRunner
+
+# Run parameter sweep experiment
+experiment = ExperimentRunner(
+    experiment_type="parameter_sweep",
+    parameters_file="params.json",
+    config_file="default.cfg"
+)
+results = experiment.run()
+
+# Run reinforcement learning experiment
+rl_experiment = ExperimentRunner(
+    experiment_type="reinforcement_learning",
+    config_file="rl_config.cfg"
+)
+rl_results = rl_experiment.run(repetitions=3)
+
+# Run developmental study
+dev_experiment = ExperimentRunner(
+    experiment_type="developmental_study",
+    output_dir="dev_study_results"
+)
+dev_results = dev_experiment.run()
+```
+
+### 2. nlm-analysis: Advanced Data Analysis
+
+**Usage**:
+
+```bash
+nlm-analysis [DATA_FILE] [ANALYSIS_TYPE] [OPTIONS]
+
+Analysis Types:
+  time_series               Time series analysis
+  pattern_detection         Pattern detection analysis
+  anomaly_detection         Anomaly detection analysis
+  correlation_analysis      Correlation analysis
+  clustering_analysis       Clustering analysis
+  regression_analysis       Regression analysis
+  statistical_test          Statistical test analysis
+
+Options:
+  --window SIZE              Window size for analysis (default: 100)
+  --threshold THRESHOLD      Threshold for analysis (default: 0.05)
+  --output FILE              Output analysis results (default: analysis.json)
+  --plot                     Generate plots for analysis
+  --export-data              Export analysis data
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Time series analysis
+nlm-analysis results.json time_series --window 200 --output time_analysis.json
+
+# Pattern detection
+nlm-analysis results.json pattern_detection --threshold 0.1 --plot
+
+# Anomaly detection
+nlm-analysis results.json anomaly_detection --threshold 0.01
+
+# Correlation analysis
+nlm-analysis results.json correlation_analysis --output correlation_results.json
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import DataAnalyzer
+
+# Time series analysis
+analyzer = DataAnalyzer("results.json", "time_series")
+time_series_results = analyzer.run(window_size=200)
+
+# Pattern detection
+pattern_analyzer = DataAnalyzer("results.json", "pattern_detection")
+pattern_results = pattern_analyzer.run(threshold=0.1)
+
+# Anomaly detection
+anomaly_analyzer = DataAnalyzer("results.json", "anomaly_detection")
+anomaly_results = anomaly_analyzer.run(threshold=0.01)
+
+# Correlation analysis
+corr_analyzer = DataAnalyzer("results.json", "correlation_analysis")
+corr_results = corr_analyzer.run()
+```
+
+### 3. nlm-compare: Compare Simulation Results
+
+**Usage**:
+
+```bash
+nlm-compare [FILE1] [FILE2] [OPTIONS]
+
+Options:
+  --metrics METRICS           Metrics to compare (spikes, firing_rate, curiosity)
+  --output FILE               Output comparison results (default: comparison.json)
+  --format FORMAT             Output format (json, text, csv) (default: json)
+  --statistical-test         Perform statistical tests
+  --visualization            Generate comparison plots
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Compare two result files
+nlm-compare results1.json results2.json
+
+# Compare specific metrics
+nlm-compare results1.json results2.json --metrics spikes firing_rate curiosity
+
+# Compare with statistical tests
+nlm-compare results1.json results2.json --statistical-test
+
+# Generate comparison plots
+nlm-compare results1.json results2.json --visualization --output comparison_plots
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import ResultComparator
+
+# Compare two result files
+comparator = ResultComparator("results1.json", "results2.json")
+comparison = comparator.compare()
+
+# Compare specific metrics
+metric_comparison = comparator.compare_metrics(["spikes", "firing_rate", "curiosity"])
+
+# Perform statistical tests
+statistical_comparison = comparator.compare_with_statistics()
+
+# Generate comparison plots
+comparison.visualize("comparison_plots")
+```
+
+### 4. nlm-reproduce: Reproduce Experiments
+
+**Usage**:
+
+```bash
+nlm-reproduce [EXPERIMENT_ID] [OPTIONS]
+
+Options:
+  --config-override KEY=VALUE Override configuration parameters
+  --seed SEED                Random seed for reproducibility
+  --output-dir DIR            Output directory (default: reproduced_results)
+  --format FORMAT             Output format (json, csv, pickle) (default: json)
+  --validate-only            Only validate, don't run
+  --help                      Show help message
+```
+
+**Examples**:
+
+```bash
+# Reproduce experiment with ID
+nlm-reproduce experiment_123
+
+# Reproduce with configuration overrides
+nlm-reproduce experiment_456 --config-override brain.neuron_count=2000 --config-override plasticity.stdp.learning_rate=0.01
+
+# Reproduce with specific random seed
+nlm-reproduce experiment_789 --seed 42
+
+# Validate without running
+nlm-reproduce experiment_999 --validate-only
+```
+
+**Python Interface**:
+
+```python
+from nlm.tools import ExperimentReproducer
+
+# Reproduce experiment
+reproducer = ExperimentReproducer("experiment_123")
+results = reproducer.reproduce()
+
+# Reproduce with configuration overrides
+reproducer_with_override = ExperimentReproducer(
+    "experiment_456",
+    config_overrides={"brain.neuron_count": 2000, "plasticity.stdp.learning_rate": 0.01}
+)
+results_with_override = reproducer_with_override.reproduce()
+
+# Reproduce with specific random seed
+reproducer_seed = ExperimentReproducer(
+    "experiment_789",
+    seed=42
+)
+results_seed = reproducer_seed.reproduce()
+```
+
+## Installation and Setup
+
+### System Installation
+
+```bash
+# Install system package (if available)
+sudo apt install nlm-tools  # Ubuntu/Debian
+brew install nlm-tools    # macOS
+choco install nlm-tools   # Windows (if available)
+
+# Or install from source
+pip install -e .
+make install-tools         # (if available)
+```
+
+### Development Setup
+
+```bash
+# Clone the repository
+cd /workspace/app
+
+# Install Python dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Build command line tools
+python setup.py develop
+make build-tools         # (if available)
+
+# Make tools executable
+chmod +x bin/nlm-*      # (if tools are in bin/ directory)
+```
+
+### Environment Setup
+
+```bash
+# Set up environment variables
+export NLM_HOME=/path/to/nlm
+export PATH="$NLM_HOME/bin:$PATH"
+
+# Create configuration directory
+mkdir -p ~/.config/nlm
+mkdir -p ~/.local/share/nlm
+
+# Set up example configurations
+nlm-config create basic ~.config/nlm/basic.json
+nlm-config create research ~.config/nlm/research.json
+```
+
+## Configuration
+
+### Tool Configuration
+
+Tools can be configured via:
+
+1. **Environment Variables**:
+```bash
+export NLM_CONFIG_PATH=/path/to/config
+export NLM_LOG_LEVEL=debug
+export NLM_DEFAULT_STEPS=500
+```
+
+2. **Configuration Files**:
+```bash
+# Create ~/.config/nlm/tools.ini
+[nlm-tools]
+config_path = /path/to/config
+log_level = info
+verbose = true
+
+[nlm-run]
+steps = 100
+neurons = 1000
+
+[nlm-bench]
+repetitions = 3
+warmup_steps = 10
+```
+
+3. **Command Line Arguments**:
+```bash
+# Tools can read configuration from command line
+nlm-run --steps 500 --neurons 2000
+```
+
+### Configuration File Format
+
+#### Basic Configuration
+
+```ini
+[nlm-tools]
+# General NLM tools settings
+config_path = /path/to/config
+log_level = info
+verbose = false
+output_format = json
+timeout = 3600
+
+# Default simulation settings
+steps = 100
+neurons = 1000
+world_width = 20
+world_height = 20
+
+# Performance settings
+parallel_processing = true
+simd_optimization = true
+memory_pool_size = 10000
+```
+
+#### Tool-Specific Configuration
+
+```ini
+[nlm-run]
+steps = 200
+neurons = 2000
+world_width = 30
+world_height = 30
+output_file = results.json
+
+[nlm-bench]
+repetitions = 5
+warmup_steps = 50
+metric = time
+output_file = benchmark.json
+
+[nlm-validate]
+strict = false
+fix = false
+output_file = validation.txt
+
+[nlm-experiment]
+output_dir = experiment_results
+repetitions = 3
+workers = 1
+timeout = 1800
+```
+
+## Usage Examples
+
+### Running Tools
+
+#### Basic Simulation Run
+
+```bash
+# Run simple simulation
+nlm-run --steps 200 --neurons 1000
+
+# Run with custom configuration
+nlm-run --config brain.neuron_count=2000 --config plasticity.stdp.learning_rate=0.01
+
+# Run and save results
+nlm-run --steps 500 --neurons 2000 --output my_results.json
+```
+
+#### Configuration Management
+
+```bash
+# Create new configuration
+nlm-config create my_research_config
+
+# Load configuration
+nlm-config load research_config.json
+
+# Save configuration with custom name
+nlm-config save my_config.json
+
+# Validate configuration
+nlm-config validate my_config.json
+```
+
+#### Performance Benchmarking
+
+```bash
+# Run basic benchmark
+nlm-bench config1.cfg
+
+# Run detailed benchmark
+nlm-bench config1.cfg --steps 500 --repetitions 5 --metric time
+
+# Run memory benchmark
+nlm-bench config1.cfg --metric memory --output memory_benchmark.json
+```
+
+#### Experiment Running
+
+```bash
+# Run parameter sweep experiment
+nlm-experiment parameter_sweep --parameters params.json
+
+# Run reinforcement learning experiment
+nlm-experiment reinforcement_learning --config rl_config.cfg
+
+# Run multiple repetitions
+nlm-experiment parameter_sweep --parameters params.json --repetitions 10 --workers 4
+```
+
+#### Data Analysis
+
+```bash
+# Analyze simulation results
+nlm-stats results.json --metric firing_rate --period episode
+
+# Perform time series analysis
+nlm-analysis results.json time_series --window 200 --output time_analysis.json
+
+# Compare simulation results
+nlm-compare results1.json results2.json --metrics spikes firing_rate curiosity
+```
+
+#### Tool Development
+
+```bash
+# Create new tool template
+nlm-template create my_tool --template-type brain
+
+# Apply template to create configuration
+nlm-template apply my_tool my_config.json
+
+# Modify template
+nlm-template modify my_tool brain.neuron_count=3000
+```
+
+### Python Integration
+
+#### Using Tools in Python Scripts
+
+```python
+import sys
+sys.path.append('/path/to/nlm/tools')
+
+from nlm.tools import run_simulation, ConfigManager, StatisticsAnalyzer
+
+# Run simulation using command line tool interface
+sim_results = run_simulation(
+    config_file="config.json",
+    steps=500,
+    neurons=2000,
+    world_config={"width": 30, "height": 30}
+)
+
+# Manage configurations using command line tool interface
+config = ConfigManager.load("my_config.json")
+config.setInt("brain.neuron_count", 3000)
+config.saveToFile("updated_config.json")
+
+# Analyze results using command line tool interface
+stats = StatisticsAnalyzer.analyze("results.json")
+stats.get_metric_stats("firing_rate")
+```
+
+#### Custom Tool Creation
+
+```python
+from nlm.tools import BaseTool, ToolArgument
+from typing import Dict, Any
+
+class CustomSimulationTool(BaseTool):
+    """Custom simulation tool extending NLM tools."""
+    
+    def __init__(self):
+        super().__init__("custom-simulation", "Custom simulation tool")
+        self.add_argument("steps", ToolArgument(int, "Number of simulation steps"))
+        self.add_argument("neurons", ToolArgument(int, "Number of neurons"))
+        self.add_argument("learning_rate", ToolArgument(float, "Learning rate"))
+    
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        # Custom simulation logic
+        config = pynlm.createDefaultConfig()
+        config.setInt("brain.neuron_count", arguments["neurons"])
+        config.setFloat("plasticity.stdp.learning_rate", arguments["learning_rate"])
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        for step in range(arguments["steps"]):
+            brain.step(step)
+        
+        return {
+            "total_spikes": brain.getTotalSpikeCount(),
+            "firing_rate": brain.getAverageFiringRate()
+        }
+
+# Register and use custom tool
+from nlm.tools import ToolRegistry
+tool_registry = ToolRegistry()
+tool_registry.register_tool(CustomSimulationTool())
+
+# Use the tool
+results = tool_registry.run_tool("custom-simulation", {
+    "steps": 100,
+    "neurons": 1000,
+    "learning_rate": 0.01
+})
+```
+
+## Development and Contributing
+
+### Development Setup
+
+```bash
+# Clone the repository
+cd /workspace/app
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Install NLM tools
+pip install -e .
+
+# Make tools executable
+chmod +x bin/nlm-*
+
+# Set up development environment
+export PYTHONPATH="$PYTHONPATH:$(pwd)/tools"
+export NLM_TOOLS_PATH="$(pwd)/tools"
+```
+
+### Creating New Tools
+
+#### Tool Template
+
+```bash
+# Create new tool template
+mkdir -p tools/my_tool
+mkdir -p tools/my_tool/scripts
+mkdir -p tools/my_tool/tests
+
+# Create main tool file
+tools/my_tool/__init__.py
+tools/my_tool/main.py
+tools/my_tool/config.py
+tools/my_tool/utils.py
+
+# Create test files
+tools/my_tool/tests/test_basic.py
+tools/my_tool/tests/test_integration.py
+```
+
+#### Tool Structure
+
+```python
+# tools/my_tool/__init__.py
+from .main import MyTool
+from .config import MyToolConfig
+from .utils import MyToolUtils
+
+__all__ = ['MyTool', 'MyToolConfig', 'MyToolUtils']
+
+# tools/my_tool/main.py
+from nlm.tools import BaseTool
+from typing import Dict, Any
+
+class MyTool(BaseTool):
+    def __init__(self):
+        super().__init__(
+            name="my-tool",
+            description="My custom NLM tool"
+        )
+        self.add_argument("input_file", str, "Input file path")
+        self.add_argument("output_file", str, "Output file path", optional=True)
+    
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        # Tool implementation
+        pass
+
+# tools/my_tool/config.py
+class MyToolConfig:
+    def __init__(self):
+        self.default_config = {
+            "input_file": "",
+            "output_file": "",
+            "verbose": False,
+            "timeout": 3600
+        }
+    
+    def get_config(self, overrides: Dict[str, Any]) -> Dict[str, Any]:
+        config = self.default_config.copy()
+        config.update(overrides)
+        return config
+
+# tools/my_tool/utils.py
+import pynlm
+from typing import List, Dict
+
+class MyToolUtils:
+    @staticmethod
+    def create_brain_from_config(config: Dict[str, Any]) -> pynlm.Brain:
+        """Create brain from configuration dictionary."""
+        nlm_config = pynlm.createDefaultConfig()
+        
+        for key, value in config.items():
+            if isinstance(value, int):
+                nlm_config.setInt(key, value)
+            elif isinstance(value, float):
+                nlm_config.setFloat(key, value)
+            elif isinstance(value, bool):
+                nlm_config.setBool(key, value)
+            elif isinstance(value, str):
+                nlm_config.setString(key, value)
+        
+        brain = pynlm.createBrain(nlm_config)
+        brain.initialize()
+        return brain
+    
+    @staticmethod
+    def analyze_results(results: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze simulation results."""
+        analysis = {}
+        
+        # Basic statistics
+        analysis['total_spikes'] = results.get('total_spikes', 0)
+        analysis['firing_rate'] = results.get('firing_rate', 0.0)
+        analysis['neuron_count'] = results.get('neuron_count', 0)
+        
+        # Advanced statistics
+        if 'spike_timestamps' in results:
+            analysis['spike_frequency'] = len(results['spike_timestamps']) / max(1, results.get('total_time', 1))
+        
+        return analysis
+```
+
+### Testing Tools
+
+```bash
+# Run tool tests
+pytest tools/my_tool/tests/
+
+# Run specific test
+pytest tools/my_tool/tests/test_basic.py -v
+
+# Run integration tests
+pytest tools/my_tool/tests/test_integration.py -v
+
+# Generate test coverage
+pytest tools/my_tool/tests/ --cov=tools/my_tool --cov-report=html
+```
+
+### Documentation
+
+#### Tool Documentation
+
+```python
+# tools/my_tool/docs.md
+# My Tool Documentation
+
+## Overview
+This tool performs custom simulation tasks using the NLM framework.
+
+## Usage
+
+```bash
+nlm-my-tool INPUT_FILE [--output OUTPUT_FILE] [--verbose]
+```
+
+## Arguments
+
+- `INPUT_FILE`: Path to input configuration file
+- `--output OUTPUT_FILE`: Path to output file (optional)
+- `--verbose`: Enable verbose output
+
+## Examples
+
+```bash
+# Basic usage
+nlm-my-tool config.json
+
+# With output file
+nlm-my-tool config.json --output results.json
+
+# Verbose mode
+nlm-my-tool config.json --verbose
+```
+
+## Python API
+
+```python
+from nlm.tools import MyTool
+
+tool = MyTool()
+results = tool.run({
+    "input_file": "config.json",
+    "output_file": "results.json",
+    "verbose": False
+})
+```
+
+## Configuration
+
+The tool supports the following configuration options:
+
+- `input_file`: Input configuration file path
+- `output_file`: Output file path
+- `verbose`: Enable verbose output
+- `timeout`: Maximum execution time
+
+## Error Handling
+
+The tool handles the following error conditions:
+
+- Invalid input file
+- Configuration errors
+- Simulation errors
+- Output file errors
+```
+```
+
+### Tool Testing
+
+```python
+# tools/my_tool/tests/test_basic.py
+import unittest
+from nlm.tools import MyTool
+
+class TestMyTool(unittest.TestCase):
+    def setUp(self):
+        self.tool = MyTool()
+    
+    def test_tool_creation(self):
+        self.assertIsNotNone(self.tool)
+        self.assertEqual(self.tool.name, "my-tool")
+    
+    def test_run_with_valid_input(self):
+        # Test tool execution
+        result = self.tool.run({
+            "input_file": "test_config.json",
+            "output_file": "test_results.json"
+        })
+        self.assertIn("total_spikes", result)
+        self.assertIn("firing_rate", result)
+    
+    def test_run_with_invalid_input(self):
+        # Test error handling
+        with self.assertRaises(Exception):
+            self.tool.run({
+                "input_file": "invalid_file.json"
+            })
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+## Tool Examples
+
+### Example 1: Data Analysis Tool
+
+```bash
+# Create data analysis tool
+nlm-template create data-analysis --template-type agent
+
+# Apply template
+nlm-template apply data-analysis data_analysis_tool.py
+
+# Use the tool
+nlm-data-analysis results.json --metric firing_rate --output analysis.csv
+```
+
+### Example 2: Simulation Runner Tool
+
+```bash
+# Create simulation runner tool
+nlm-template create sim-runner --template-type brain
+
+# Apply template
+nlm-template apply sim-runner simulation_runner.py
+
+# Run simulation
+nlm-sim-runner config.json --steps 500 --neurons 2000
+```
+
+### Example 3: Experiment Manager Tool
+
+```bash
+# Create experiment manager tool
+nlm-template create experiment-manager --template-type full
+
+# Apply template
+nlm-template apply experiment-manager experiment_manager.py
+
+# Run experiments
+nlm-experiment-manager parameter_sweep --parameters params.json
+```
+
+## Tool Best Practices
+
+### Code Quality
+
+1. **Follow Python conventions**: Use PEP 8 style guide
+2. **Add type hints**: Include type annotations for better IDE support
+3. **Comprehensive documentation**: Document all public APIs
+4. **Error handling**: Handle all error conditions gracefully
+5. **Testing**: Include comprehensive unit and integration tests
+6. **Performance**: Optimize for performance where needed
+7. **Modularity**: Design tools with clear separation of concerns
+8. **Extensibility**: Make tools easily extensible for future enhancements
+
+### Performance
+
+1. **Memory management**: Efficient memory usage and cleanup
+2. **Parallel processing**: Use parallel processing where beneficial
+3. **Caching**: Cache frequently used data
+4. **Configuration optimization**: Optimize configuration loading and parsing
+5. **Logging**: Use appropriate logging levels for performance monitoring
+
+### User Experience
+
+1. **Intuitive interface**: Command line interface should be intuitive and self-documenting
+2. **Help system**: Provide comprehensive help and documentation
+3. **Error messages**: Clear and actionable error messages
+4. **Progress reporting**: Report progress for long-running operations
+5. **Output formatting**: Format output for readability
+6. **Configuration management**: Easy configuration management
+7. **Documentation**: Comprehensive documentation and examples
+
+### Integration
+
+1. **Python API**: Provide Python API for programmatic use
+2. **Command line**: Provide command line interface for system integration
+3. **Configuration files**: Support multiple configuration file formats
+4. **Input/output**: Support various input and output formats
+5. **Plugin architecture**: Allow for plugin-based extensions
+6. **Testing integration**: Integrate with testing frameworks
+7. **CI/CD integration**: Support continuous integration and deployment
+
+## Contributing
+
+### How to Contribute
+
+1. **Fork the repository**: Create your own fork
+2. **Create a branch**: Work on your feature in a dedicated branch
+3. **Make changes**: Implement your changes
+4. **Write tests**: Add tests for your changes
+5. **Update documentation**: Update documentation and examples
+6. **Submit pull request**: Submit your changes as a pull request
+
+### Code Review
+
+1. **Review changes**: Review all changes for quality and consistency
+2. **Run tests**: Run all tests to ensure no regressions
+3. **Check documentation**: Verify documentation is accurate and complete
+4. **Test examples**: Test examples to ensure they work correctly
+5. **Performance testing**: Perform performance testing if needed
+
+### Style Guidelines
+
+1. **Code style**: Follow PEP 8 and project conventions
+2. **Documentation**: Write clear and comprehensive documentation
+3. **Testing**: Write comprehensive tests
+4. **Comments**: Add comments for complex code
+5. **Commit messages**: Write descriptive commit messages
+6. **Branch naming**: Use clear and descriptive branch names
+
+### Testing Guidelines
+
+1. **Unit tests**: Write unit tests for all new functionality
+2. **Integration tests**: Write integration tests for tool interactions
+3. **Performance tests**: Write performance tests for performance-critical functionality
+4. **Regression tests**: Write regression tests to prevent regressions
+5. **Documentation tests**: Test documentation examples
+6. **Code coverage**: Maintain high code coverage
+
+---
+
+This comprehensive command line tools suite provides powerful interfaces for interacting with the NLM framework. The tools are designed to be modular, extensible, and user-friendly, supporting both command line and Python API usage.
+
+The tools enable users to:
+
+1. **Run simulations** with various configurations and parameters
+2. **Manage configurations** through intuitive command line interfaces
+3. **Analyze results** with advanced statistical and visualization tools
+4. **Benchmark performance** to optimize simulations
+5. **Validate configurations** and simulation results
+6. **Run experiments** with various experimental paradigms
+7. **Compare results** across different simulation runs
+8. **Reproduce experiments** with specific configurations
+9. **Export results** to various formats
+10. **Import external data** for analysis
+
+The tools are designed to be easily extensible, allowing users to create custom tools for specific research needs. All tools provide both command line and Python API interfaces, making them flexible for different use cases.
+
+The command line tools suite significantly enhances the usability and functionality of the NLM framework, making it more accessible to users with different skill levels and requirements.

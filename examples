@@ -1,0 +1,1201 @@
+# Examples Directory
+
+This directory contains practical examples and tutorials for using the NLM (Neural Learning Machine) framework. All examples are designed to be runnable and demonstrate different aspects of the NLM simulation capabilities.
+
+## Example Structure
+
+Each example follows this pattern:
+
+```python
+"""
+Example name: Brief description of what this example demonstrates.
+
+This example shows how to:
+- Setup the simulation environment
+- Create and configure brain components
+- Run simulations
+- Analyze results
+
+Expected output:
+- Console output showing simulation progress
+- Printed statistics and metrics
+"""
+
+import pynlm
+import time
+
+def main():
+    # Example implementation
+    print("Starting NLM example...")
+    
+    # Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(100):
+        brain.step(step)
+    
+    # Results
+    print(f"Simulation completed. Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Example Files
+
+### 1. BasicBrainSimulation.py
+
+Basic neural network simulation demonstrating core brain functionality.
+
+### 2. AgentWorldExample.py
+
+Complete agent-world interaction example showing how an agent perceives and interacts with its environment.
+
+### 3. LearningBrain.py
+
+Example demonstrating learning and adaptation through plasticity mechanisms.
+
+### 4. WorldExploration.py
+
+Example showing agent exploration and discovery in complex environments.
+
+### 5. ConfigExamples.py
+
+Various configuration examples showing different brain setups and parameter combinations.
+
+### 6. AdvancedBrainDesign.py
+
+Advanced example demonstrating complex brain architectures and customizations.
+
+### 7. PerformanceBenchmarks.py
+
+Performance benchmarking example for measuring simulation speed and efficiency.
+
+### 8. ResearchExperiments.py
+
+Example frameworks for research experiments and parameter sweeps.
+
+## Running Examples
+
+### From Python Scripts
+
+```bash
+# Run individual examples
+cd examples
+python BasicBrainSimulation.py
+python AgentWorldExample.py
+python LearningBrain.py
+
+# Run all examples
+python run_all_examples.py
+```
+
+### Using Python Module
+
+```bash
+# Import and run examples programmatically
+import examples.BasicBrainSimulation
+examples.BasicBrainSimulation.main()
+```
+
+### Command Line Interface
+
+```bash
+# Some examples may have command line argument support
+python examples/BasicBrainSimulation.py --steps 500
+python examples/AgentWorldExample.py --width 30 --height 30
+```
+
+## Example Templates
+
+### Template 1: Simple Simulation
+
+```python
+"""
+Simple Neural Network Simulation
+
+This example demonstrates the basic steps of NLM simulation:
+1. Create and configure a brain
+2. Initialize the brain
+3. Run simulation steps
+4. Analyze results
+"""
+
+import pynlm
+
+def simple_simulation(neuron_count=1000, steps=100):
+    """Run a simple simulation with specified parameters."""
+    print(f"Running simple simulation with {neuron_count} neurons for {steps} steps")
+    
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", neuron_count)
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(steps):
+        brain.step(step)
+    
+    # Analyze results
+    return {
+        'total_neurons': brain.getTotalNeuronCount(),
+        'total_spikes': brain.getTotalSpikeCount(),
+        'firing_neurons': brain.getFiringNeuronCount(),
+        'average_firing_rate': brain.getAverageFiringRate(),
+        'e_i_ratio': brain.getExcitationInhibitionRatio()
+    }
+
+if __name__ == "__main__":
+    results = simple_simulation()
+    print("Simulation Results:")
+    for key, value in results.items():
+        print(f"  {key}: {value}")
+```
+
+### Template 2: Agent Simulation
+
+```python
+"""
+Complete Agent-Environment Simulation
+
+This example demonstrates a complete agent simulation with:
+- Brain with neural processing
+- World environment for interaction
+- Agent interface between brain and world
+- Learning and adaptation capabilities
+"""
+
+import pynlm
+
+def run_agent_simulation(world_config=None, brain_config=None, steps=500):
+    """Run a complete agent simulation."""
+    print(f"Running agent simulation for {steps} steps")
+    
+    # Setup world
+    world = pynlm.createSimpleWorld()
+    if world_config:
+        world.configure(**world_config)
+    else:
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # Setup brain
+    config = pynlm.createDefaultConfig()
+    if brain_config:
+        for key, value in brain_config.items():
+            if isinstance(value, int):
+                config.setInt(key, value)
+            elif isinstance(value, float):
+                config.setFloat(key, value)
+            elif isinstance(value, bool):
+                config.setBool(key, value)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Setup agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable learning capabilities
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    # Run simulation
+    for step in range(steps):
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Brain processes input and produces output
+        brain.step(step)
+        
+        # Agent decides on action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0  # Could be computed from percept
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Log progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev stage: {brain.getDevelopmentalStage()}")
+    
+    return {
+        'world_stats': {
+            'width': world.getWidth(),
+            'height': world.getHeight(),
+            'simulation_time': world.getSimulationTime()
+        },
+        'brain_stats': {
+            'total_neurons': brain.getTotalNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_rate': brain.getAverageFiringRate(),
+            'e_i_ratio': brain.getExcitationInhibitionRatio(),
+            'development_stage': brain.getDevelopmentalStage()
+        },
+        'agent_stats': {
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'prediction_error': agent.getPredictionError(),
+            'neuromodulation': agent.getNeuromodulationLevel()
+        }
+    }
+
+if __name__ == "__main__":
+    # Run with custom configurations
+    world_config = {
+        'width': 30,
+        'height': 30,
+        'visionWidth': 12,
+        'visionHeight': 12
+    }
+    
+    brain_config = {
+        'brain.neuron_count': 2000,
+        'plasticity.stdp.learning_rate': 0.01,
+        'neuromod.curiosity.scale': 1.5
+    }
+    
+    results = run_agent_simulation(world_config, brain_config, steps=500)
+    
+    print("\nFinal Results:")
+    print(f"World: {results['world_stats']['width']}x{results['world_stats']['height']}")
+    print(f"Neurons: {results['brain_stats']['total_neurons']}")
+    print(f"Spikes: {results['brain_stats']['total_spikes']}")
+    print(f"Firing rate: {results['brain_stats']['firing_rate']:.3f}")
+    print(f"Curiosity: {results['agent_stats']['curiosity']:.3f}")
+```
+
+### Template 3: Learning Example
+
+```python
+"""
+Learning and Plasticity Example
+
+This example demonstrates how NLM learns through:
+- Spike-Timing-Dependent Plasticity (STDP)
+- Reward-modulated learning
+- Developmental changes over time
+- Memory consolidation
+"""
+
+import pynlm
+import numpy as np
+
+def learning_example():
+    """Run learning example with measurable results."""
+    print("Running learning example...")
+    
+    # Create configuration optimized for learning
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 1000)
+    config.setFloat("plasticity.stdp.learning_rate", 0.005)
+    config.setFloat("neuromod.dopamine.scale", 1.0)
+    config.setFloat("neuromod.curiosity.scale", 1.0)
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=6, visionHeight=6)
+    world.setAgentStart(5.0, 5.0)
+    agent.initialize(world)
+    
+    # Enable all learning mechanisms
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Record initial state
+    initial_spikes = brain.getTotalSpikeCount()
+    initial_neurons = brain.getTotalNeuronCount()
+    
+    print(f"Initial state: {initial_spikes} spikes, {initial_neurons} neurons")
+    
+    # Run learning simulation
+    learning_curve = []
+    for episode in range(10):
+        world.reset()
+        agent.reset()
+        
+        episode_spikes = 0
+        for step in range(100):
+            world.update(0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process and learn
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            
+            # Act and learn from results
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Get reward (simplified)
+            reward = 1.0 if np.random.random() < 0.3 else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            episode_spikes += brain.getTotalSpikeCount() - initial_spikes
+        
+        # Record learning metrics
+        learning_curve.append({
+            'episode': episode,
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_rate': brain.getAverageFiringRate(),
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'prediction_error': agent.getPredictionError()
+        }n        
+        print(f"Episode {episode}: {brain.getTotalSpikeCount()} spikes, "
+              f"curiosity={agent.getCuriosityLevel():.3f}, "
+              f"novelty={agent.getNoveltyLevel():.3f}")
+    
+    # Analyze learning results
+    final_spikes = brain.getTotalSpikeCount() - initial_spikes
+    spike_increase = final_spikes > 0
+    
+    print(f"\nLearning Results:")
+    print(f"Total spike increase: {final_spikes}")
+    print(f"Spike increase achieved: {spike_increase}")
+    print(f"Average curiosity level: {np.mean([x['curiosity'] for x in learning_curve]):.3f}")
+    print(f"Average novelty level: {np.mean([x['novelty'] for x in learning_curve]):.3f}")
+    
+    # Check if learning occurred
+    learning_occurred = (
+        spike_increase or 
+        np.mean([x['curiosity'] for x in learning_curve]) > 0.1 or
+        np.mean([x['novelty'] for x in learning_curve]) > 0.1
+    )
+    
+    return {
+        'learning_occurred': learning_occurred,
+        'learning_curve': learning_curve,
+        'final_spike_increase': final_spikes,
+        'average_curiosity': np.mean([x['curiosity'] for x in learning_curve]),
+        'average_novelty': np.mean([x['novelty'] for x in learning_curve])
+    }
+
+if __name__ == "__main__":
+    learning_results = learning_example()
+    
+    if learning_results['learning_occurred']:
+        print("\n✓ Learning successfully demonstrated!")
+    else:
+        print("\n⚠ Limited learning observed - may need more episodes or different configuration")
+```
+
+### Template 4: Performance Benchmark
+
+```python
+"""
+Performance Benchmark Example
+
+This example benchmarks NLM performance with different configurations:
+- Measures simulation speed
+- Tests memory efficiency
+- Compares different parameter sets
+- Identifies performance bottlenecks
+"""
+
+import pynlm
+import time
+import statistics
+from typing import Dict, List
+
+def benchmark_performance(configurations: List[Dict], steps: int = 100):
+    """Benchmark NLM performance with different configurations."""
+    print(f"Benchmarking NLM performance with {len(configurations)} configurations for {steps} steps")
+    
+    results = []
+    
+    for i, config_dict in enumerate(configurations):
+        print(f"\nConfiguration {i+1}: {config_dict.get('name', 'unnamed')}")
+        
+        # Create configuration
+        config = pynlm.createDefaultConfig()
+        for key, value in config_dict.items():
+            if key != 'name' and isinstance(value, int):
+                config.setInt(key, value)
+            elif key != 'name' and isinstance(value, float):
+                config.setFloat(key, value)
+            elif key != 'name' and isinstance(value, bool):
+                config.setBool(key, value)
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run benchmark
+        times = []
+        for step in range(steps):
+            step_start = time.time()
+            brain.step(step)
+            step_time = time.time() - step_start
+            times.append(step_time)
+        
+        # Calculate statistics
+        avg_time = statistics.mean(times)
+        min_time = min(times)
+        max_time = max(times)
+        std_time = statistics.stdev(times) if len(times) > 1 else 0.0
+        
+        # Performance metrics
+        steps_per_second = steps / sum(times)
+        neurons_per_ms = config_dict.get('brain.neuron_count', 0) / (sum(times) * 1000)
+        
+        result = {
+            'name': config_dict.get('name', f'config_{i+1}'),
+            'neuron_count': config_dict.get('brain.neuron_count', 0),
+            'connection_probability': config_dict.get('brain.connection_probability', 0.0),
+            'learning_rate': config_dict.get('plasticity.stdp.learning_rate', 0.0),
+            'avg_step_time': avg_time,
+            'min_step_time': min_time,
+            'max_step_time': max_time,
+            'std_step_time': std_time,
+            'steps_per_second': steps_per_second,
+            'neurons_per_ms': neurons_per_ms,
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_rate': brain.getAverageFiringRate()
+        }
+        
+        print(f"  Neurons: {result['neuron_count']}")
+        print(f"  Steps/sec: {result['steps_per_second']:.1f}")
+        print(f"  Avg step time: {result['avg_step_time']*1000:.2f} ms")
+        print(f"  Total spikes: {result['total_spikes']}")
+        
+        results.append(result)
+    
+    return results
+
+def print_benchmark_summary(results: List[Dict]):
+    """Print benchmark summary."""
+    if not results:
+        return
+    
+    print(f"\n{'Benchmark Summary':^60}")
+    print("=" * 60)
+    print(f"{'Configuration':<20} {'Neurons':<10} {'Steps/sec':<12} {'Avg Time (ms)':<15} {'Total Spikes':<12}")
+    print("-" * 60)
+    
+    for result in results:
+        print(f"{result['name']:<20} {result['neuron_count']:<10} "
+              f"{result['steps_per_second']:<12.1f} {result['avg_step_time']*1000:<15.2f} {result['total_spikes']:<12}")
+    
+    # Find best performer
+    fastest = max(results, key=lambda x: x['steps_per_second'])
+    most_neurons = max(results, key=lambda x: x['neuron_count'])
+    
+    print(f"\nBest Performance:")
+    print(f"  Fastest: {fastest['name']} ({fastest['steps_per_second']:.1f} steps/sec)")
+    print(f"  Most neurons: {most_neurons['name']} ({most_neurons['neuron_count']} neurons)")
+
+if __name__ == "__main__":
+    # Define configurations to benchmark
+    configurations = [
+        {
+            'name': 'Small_Brain',
+            'brain.neuron_count': 500,
+            'brain.connection_probability': 0.05,
+            'plasticity.stdp.learning_rate': 0.001
+        },
+        {
+            'name': 'Medium_Brain',
+            'brain.neuron_count': 1000,
+            'brain.connection_probability': 0.1,
+            'plasticity.stdp.learning_rate': 0.005
+        },
+        {
+            'name': 'Large_Brain',
+            'brain.neuron_count': 2000,
+            'brain.connection_probability': 0.15,
+            'plasticity.stdp.learning_rate': 0.01
+        },
+        {
+            'name': 'High_Plasticity',
+            'brain.neuron_count': 1000,
+            'brain.connection_probability': 0.2,
+            'plasticity.stdp.learning_rate': 0.02
+        }
+    ]
+    
+    # Run benchmark
+    benchmark_results = benchmark_performance(configurations, steps=200)
+    
+    # Print summary
+    print_benchmark_summary(benchmark_results)
+```
+
+## Example Usage
+
+### Basic Examples (Easy to Understand)
+
+These examples are perfect for beginners and demonstrate fundamental NLM concepts:
+
+1. **`BasicBrainSimulation.py`** - Core neural simulation
+2. **`SimpleWorld.py`** - Basic environment interaction
+3. **`BrainStats.py`** - Understanding brain statistics
+
+### Learning Examples (Learning Mechanisms)
+
+These examples demonstrate NLM's learning capabilities:
+
+1. **`LearningBrain.py`** - Plasticity and learning
+2. **`RewardLearning.py`** - Reward-modulated learning
+3. **`Development.py`** - Developmental changes over time
+
+### Advanced Examples (Complex Scenarios)
+
+These examples demonstrate advanced NLM features:
+
+1. **`AgentWorldExample.py`** - Complete agent simulation
+2. **`PerformanceBenchmarks.py`** - Performance optimization
+3. **`ParameterSweep.py`** - Experiment design
+
+### Research Examples (Scientific Research)
+
+These examples are designed for scientific research:
+
+1. **`ResearchExperiments.py`** - Research frameworks
+2. **`AblationStudies.py`** - Component analysis
+3. **`ValidationTests.py`** - Testing and validation
+
+---
+
+## Example Files
+
+### 1. BasicBrainSimulation.py
+
+```python
+"""
+Basic Neural Network Simulation
+
+Demonstrates core NLM simulation with basic brain configuration.
+"""
+
+import pynlm
+
+def main():
+    print("Running Basic Brain Simulation")
+    
+    # Create and configure brain
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 500)
+    config.setFloat("plasticity.stdp.learning_rate", 0.001)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(50):
+        brain.step(step)
+    
+    # Display results
+    print(f"Simulation completed:")
+    print(f"  Neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"  Average firing rate: {brain.getAverageFiringRate():.3f}")
+    print(f"  Development stage: {brain.getDevelopmentalStage()}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### 2. AgentWorldExample.py
+
+```python
+"""
+Complete Agent-Environment Simulation
+
+Demonstrates a complete NLM agent simulation with world interaction.
+"""
+
+import pynlm
+
+def main():
+    print("Running Agent-World Example")
+    
+    # Setup world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # Setup brain
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 1000)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Setup agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable learning
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    # Run simulation
+    for step in range(100):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 20 == 0:
+            print(f"Step {step}:")
+            print(f"  Position: ({agent.getBrain().getRegion(1).getNeurons()[0].x}, {agent.getBrain().getRegion(1).getNeurons()[0].y})")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Firing rate: {brain.getAverageFiringRate():.3f}")
+    
+    print(f"\nSimulation completed successfully!")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### 3. LearningBrain.py
+
+```python
+"""
+Learning and Plasticity Demonstration
+
+Demonstrates NLM learning through STDP and reward modulation.
+"""
+
+import pynlm
+import statistics
+
+def main():
+    print("Running Learning Brain Example")
+    
+    # Create learning configuration
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 500)
+    config.setFloat("plasticity.stdp.learning_rate", 0.01)
+    config.setFloat("neuromod.dopamine.scale", 1.0)
+    config.setFloat("neuromod.curiosity.scale", 1.0)
+    
+    # Create brain and agent
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=6, visionHeight=6)
+    agent.initialize(world)
+    
+    # Enable learning
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # Track learning progress
+    learning_metrics = {
+        'spikes': [],
+        'curiosity': [],
+        'novelty': [],
+        'prediction_error': []
+    }
+    
+    # Run learning simulation
+    for episode in range(5):
+        world.reset()
+        agent.reset()
+        
+        for step in range(50):
+            world.update(0.1)
+            
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            
+            brain.step(step)
+            
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Simple reward
+            reward = 1.0 if step % 10 == 0 else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            agent.updateDevelopment(0.1)
+        
+        # Record metrics
+        learning_metrics['spikes'].append(brain.getTotalSpikeCount())
+        learning_metrics['curiosity'].append(agent.getCuriosityLevel())
+        learning_metrics['novelty'].append(agent.getNoveltyLevel())
+        learning_metrics['prediction_error'].append(agent.getPredictionError())
+        
+        print(f"Episode {episode}: "
+              f"Spikes={brain.getTotalSpikeCount()}, "
+              f"Curiosity={agent.getCuriosityLevel():.3f}, "
+              f"Novelty={agent.getNoveltyLevel():.3f}")
+    
+    # Analyze results
+    print(f"\nLearning Analysis:")
+    print(f"Average spike count: {statistics.mean(learning_metrics['spikes']):.1f}")
+    print(f"Average curiosity: {statistics.mean(learning_metrics['curiosity']):.3f}")
+    print(f"Average novelty: {statistics.mean(learning_metrics['novelty']):.3f}")
+    print(f"Average prediction error: {statistics.mean(learning_metrics['prediction_error']):.3f}")
+    
+    # Check if learning occurred
+    spike_increase = learning_metrics['spikes'][-1] > learning_metrics['spikes'][0]
+    curiosity_increase = learning_metrics['curiosity'][-1] > learning_metrics['curiosity'][0]
+    
+    learning_occurred = spike_increase or curiosity_increase
+    print(f"Learning occurred: {learning_occurred}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### 4. PerformanceBenchmarks.py
+
+```python
+"""
+Performance Benchmark Example
+
+Benchmarks NLM performance with different configurations.
+"""
+
+import pynlm
+import time
+import statistics
+
+def benchmark_configuration(name, config_dict, steps=100):
+    """Benchmark a single configuration."""
+    print(f"Benchmarking {name}...")
+    
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    for key, value in config_dict.items():
+        if isinstance(value, int):
+            config.setInt(key, value)
+        elif isinstance(value, float):
+            config.setFloat(key, value)
+        elif isinstance(value, bool):
+            config.setBool(key, value)
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run benchmark
+    times = []
+    for step in range(steps):
+        step_start = time.time()
+        brain.step(step)
+        times.append(time.time() - step_start)
+    
+    # Calculate metrics
+    avg_time = statistics.mean(times)
+    steps_per_second = steps / sum(times)
+    
+    return {
+        'name': name,
+        'avg_step_time': avg_time,
+        'steps_per_second': steps_per_second,
+        'total_spikes': brain.getTotalSpikeCount(),
+        'firing_rate': brain.getAverageFiringRate()
+    }
+
+def main():
+    print("Running Performance Benchmarks")
+    
+    # Define configurations to benchmark
+    configurations = [
+        {'name': 'Small', 'brain.neuron_count': 200, 'brain.connection_probability': 0.05},
+        {'name': 'Medium', 'brain.neuron_count': 1000, 'brain.connection_probability': 0.1},
+        {'name': 'Large', 'brain.neuron_count': 2000, 'brain.connection_probability': 0.15}
+    ]
+    
+    # Run benchmarks
+    results = []
+    for config_dict in configurations:
+        result = benchmark_configuration(config_dict['name'], config_dict)
+        results.append(result)
+        print(f"  {result['name']}: {result['steps_per_second']:.1f} steps/sec, "
+              f"avg {result['avg_step_time']*1000:.2f} ms/step, "
+              f"{result['total_spikes']} spikes")
+    
+    # Print summary
+    print(f"\nBenchmark Summary:")
+    fastest = max(results, key=lambda x: x['steps_per_second'])
+    most_spikes = max(results, key=lambda x: x['total_spikes'])
+    
+    print(f"Fastest: {fastest['name']} ({fastest['steps_per_second']:.1f} steps/sec)")
+    print(f"Most spikes: {most_spikes['name']} ({most_spikes['total_spikes']} spikes)")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Example Usage Guide
+
+### Running Examples
+
+#### Command Line
+
+```bash
+# Change to examples directory
+cd examples
+
+# Run a specific example
+python BasicBrainSimulation.py
+python AgentWorldExample.py
+python LearningBrain.py
+
+# Run all examples
+python run_all_examples.py
+```
+
+#### With Arguments
+
+Some examples accept command line arguments:
+
+```bash
+# Run with custom parameters
+python examples/BasicBrainSimulation.py --neurons 2000 --steps 500
+python examples/AgentWorldExample.py --width 30 --height 30
+```
+
+### Importing Examples
+
+#### Programmatic Usage
+
+```python
+import examples.BasicBrainSimulation
+examples.BasicBrainSimulation.main()
+
+# Or import specific functions
+from examples.BasicBrainSimulation import simple_simulation
+results = simple_simulation(neuron_count=1000, steps=100)
+```
+
+#### As Module
+
+```python
+# In your own Python code
+import pynlm
+
+# Import example templates
+from examples import template_simulator
+from examples import learning_framework
+
+# Use templates to create custom simulations
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+results = template_simulator(brain, steps=500)
+```
+
+### Example Integration
+
+#### Integration with Your Project
+
+```python
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from examples import LearningBrain
+from examples import PerformanceBenchmarks
+
+# Create custom experiment configuration
+config = pynlm.createDefaultConfig()
+config.setInt("brain.neuron_count", 1500)
+config.setFloat("neuromod.curiosity.scale", 1.5)
+
+# Run learning experiment
+results = LearningBrain.learning_example(config)
+
+# Run performance benchmark
+benchmark_results = PerformanceBenchmarks.benchmark_configuration(
+    "MyExperiment", config, steps=200
+)
+```
+
+#### Example-Based Testing
+
+```python
+import unittest
+import pynlm
+from examples import BasicBrainSimulation
+
+class TestNLMExamples(unittest.TestCase):
+    def test_basic_simulation(self):
+        # Test basic simulation
+        results = BasicBrainSimulation.simple_simulation(steps=10)
+        self.assertIn('total_spikes', results)
+        self.assertIn('firing_rate', results)
+    
+    def test_learning_simulation(self):
+        # Test learning simulation
+        results = BasicBrainSimulation.learning_example(steps=10)
+        self.assertIn('learning_occurred', results)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### Example Customization
+
+#### Modifying Example Templates
+
+```python
+# Customize example templates for your needs
+
+def custom_simulation_example():
+    """Customize example for your research."""
+    config = pynlm.createDefaultConfig()
+    
+    # Custom configuration
+    config.setInt("brain.neuron_count", 3000)
+    config.setFloat("plasticity.stdp.learning_rate", 0.02)
+    config.setFloat("neuromod.curiosity.scale", 2.0)
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Custom simulation logic
+    for step in range(1000):
+        brain.step(step)
+        
+        # Custom learning or analysis
+        if step % 100 == 0:
+            print(f"Step {step}: Firing rate = {brain.getAverageFiringRate():.3f}")
+    
+    return {
+        'final_firing_rate': brain.getAverageFiringRate(),
+        'total_spikes': brain.getTotalSpikeCount(),
+        'development_stage': brain.getDevelopmentalStage()
+    }
+```
+
+#### Creating Custom Examples
+
+```python
+# Create your own example directory
+examples/MyResearch/
+├── basic_simulation.py
+├── learning_analysis.py
+├── performance_tests.py
+└── validation_tests.py
+
+# Then use them in your project
+from examples.MyResearch import basic_simulation
+from examples.MyResearch import learning_analysis
+```
+
+---
+
+## Example Best Practices
+
+### Code Quality
+
+1. **Add Comments**: Always add comments explaining what your code does
+2. **Error Handling**: Include proper error handling for robustness
+3. **Documentation**: Add docstrings and README files
+4. **Testing**: Include unit tests for critical functionality
+5. **Performance**: Optimize for performance where needed
+
+### Code Structure
+
+1. **Modular Design**: Break examples into logical components
+2. **Reusable Functions**: Create reusable functions for common operations
+3. **Configuration Management**: Use configuration files for parameters
+4. **Logging**: Include logging for debugging and monitoring
+5. **Results Analysis**: Include analysis of results
+
+### Documentation
+
+1. **README Files**: Include README files for each example directory
+2. **Example Descriptions**: Document what each example demonstrates
+3. **Usage Instructions**: Provide clear usage instructions
+4. **Expected Output**: Document expected console output
+5. **Configuration Examples**: Show configuration file examples
+
+### Testing
+
+1. **Unit Tests**: Test individual functions and components
+2. **Integration Tests**: Test complete simulation workflows
+3. **Performance Tests**: Measure performance and identify bottlenecks
+4. **Regression Tests**: Ensure changes don't break existing functionality
+5. **Documentation Tests**: Verify that examples are up-to-date
+
+---
+
+## Example Troubleshooting
+
+### Common Issues
+
+1. **Import Errors**: Make sure examples are in the Python path
+2. **Configuration Errors**: Check configuration parameters
+3. **Simulation Errors**: Verify brain initialization and simulation steps
+4. **Performance Issues**: Optimize configuration parameters
+5. **Memory Issues**: Monitor memory usage in long simulations
+
+### Troubleshooting Guide
+
+```python
+# Troubleshooting helper
+
+def troubleshoot_simulation_error(error, brain=None, world=None):
+    """Troubleshoot simulation errors."""
+    if "not initialized" in str(error):
+        print("Error: Brain not initialized")
+        if brain:
+            print("Solution: Call brain.initialize()")
+    
+    elif "neuron_count" in str(error):
+        print("Error: Invalid neuron count")
+        if brain:
+            print(f"Solution: Current neuron count: {brain.getTotalNeuronCount()}")
+    
+    elif "step" in str(error):
+        print("Error: Simulation step failed")
+        if brain:
+            print("Solution: Check brain state and configuration")
+    
+    elif world and world.getSimulationTime() > 1000:
+        print("Warning: Long simulation time may cause performance issues")
+    
+    return "Troubleshooting complete"
+```
+
+### Debugging Examples
+
+```python
+# Debug example with logging
+
+def debug_example():
+    """Debug example with enhanced logging."""
+    import logging
+    
+    # Setup logging
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    try:
+        # Run example
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        logging.debug("Brain initialized successfully")
+        
+        for step in range(10):
+            logging.debug(f"Processing step {step}")
+            brain.step(step)
+            logging.debug(f"Step {step} completed")
+        
+        logging.info("Simulation completed successfully")
+        
+    except Exception as e:
+        logging.error(f"Simulation failed: {e}")
+        # Add debugging information
+        if 'brain' in locals():
+            logging.debug(f"Brain state: {brain.getTotalNeuronCount()} neurons")
+```
+
+---
+
+## Example Repository Structure
+
+```
+/examples/
+├── README.md                    # Examples directory overview
+├── run_all_examples.py          # Script to run all examples
+├── __init__.py                  # Make directory a Python package
+├── BasicBrainSimulation.py       # Basic brain simulation example
+├── AgentWorldExample.py          # Complete agent simulation example
+├── LearningBrain.py              # Learning and plasticity example
+├── PerformanceBenchmarks.py      # Performance benchmark example
+├── ConfigExamples.py             # Configuration examples
+├── AdvancedBrainDesign.py         # Advanced brain design example
+├── ResearchExperiments.py        # Research experiment examples
+└── templates/                    # Example templates and frameworks
+    ├── simple_simulation.py
+    ├── learning_framework.py
+    ├── performance_test.py
+    └── validation_test.py
+```
+
+---
+
+## Example Contributors Guide
+
+### Adding New Examples
+
+1. **Create Example File**: Create a new example file in the examples directory
+2. **Add to Index**: Update the examples index or README
+3. **Test Example**: Ensure the example runs correctly
+4. **Document Usage**: Add documentation for the example
+5. **Share Results**: Include example results or expected output
+
+### Improving Existing Examples
+
+1. **Bug Fixes**: Fix any bugs or issues
+2. **Enhance Documentation**: Add more documentation and comments
+3. **Performance Improvements**: Optimize for performance
+4. **New Features**: Add new features or capabilities
+5. **Testing**: Add unit tests and integration tests
+
+### Example Quality Checklist
+
+- [ ] Example runs without errors
+- [ ] Documentation is clear and comprehensive
+- [ ] Code follows project conventions
+- [ ] Includes examples of configuration usage
+- [ ] Has error handling and debugging information
+- [ ] Includes performance considerations
+- [ ] Has unit tests or validation scripts
+- [ ] Provides clear output and results analysis
+- [ ] Is compatible with different Python versions
+- [ ] Includes troubleshooting information
+
+---
+
+This examples directory provides a comprehensive set of examples for using the NLM framework. Each example demonstrates different aspects of the framework and can be used as a starting point for your own research and development work. The examples are designed to be educational, practical, and extensible.
+
+The examples directory serves as a valuable resource for both beginners learning about NLM and experienced researchers developing complex neural simulations. All examples are fully documented and can be easily customized for specific research needs.

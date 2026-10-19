@@ -1,0 +1,1611 @@
+# NLM Performance and Debugging Utilities
+
+This directory contains advanced performance monitoring and debugging utilities for the NLM (Neural Learning Machine) framework. These utilities provide comprehensive tools for:
+
+1. **Performance Monitoring**: Track and analyze simulation performance
+2. **Memory Management**: Monitor and optimize memory usage
+3. **Debugging**: Debug simulations and identify issues
+4. **Profiling**: Profile simulation performance and identify bottlenecks
+5. **Validation**: Validate configurations and simulation results
+6. **Optimization**: Provide recommendations for performance optimization
+
+## Utility Overview
+
+The performance and debugging utilities are organized into categories:
+
+### Core Utilities
+- `performance_monitor.py`: Performance monitoring and analysis
+- `memory_manager.py`: Memory management and leak detection
+- `debugger.py`: Debugging and troubleshooting tools
+- `profiler.py`: Performance profiling tools
+- `validator.py`: Configuration and result validation
+- `optimizer.py`: Performance optimization recommendations
+
+### Advanced Utilities
+- `bottleneck_detector.py`: Bottleneck detection and analysis
+- `trace_analyzer.py`: Execution trace analysis
+- `resource_monitor.py`: System resource monitoring
+- `checkpoint_analyzer.py`: Checkpoint analysis and validation
+- `performance_benchmarker.py`: Comprehensive performance benchmarking
+
+## Installation and Setup
+
+### System Installation
+
+```bash
+# Install performance and debugging utilities
+sudo apt install nlm-utils-performance  # (if available via package manager)
+
+# Or install from source
+pip install -e .[performance,debugging]
+
+# Make utilities available
+export PATH="$PATH:/usr/local/bin"
+```
+
+### Development Setup
+
+```bash
+# Clone the repository
+cd /workspace/app
+
+# Install performance dependencies
+pip install -r requirements-performance.txt
+pip install -r requirements-debugging.txt
+
+# Install utilities
+pip install -e .[performance,debugging]
+
+# Set up environment
+export PYTHONPATH="$PYTHONPATH:$(pwd)/performance"
+export NLM_PERFORMANCE_HOME="$(pwd)/performance"
+```
+
+## Core Utilities
+
+### 1. Performance Monitor
+
+**Purpose**: Monitor and analyze NLM simulation performance over time.
+
+**Features**:
+- Real-time performance monitoring
+- Performance metrics tracking
+- Historical performance analysis
+- Bottleneck identification
+- Performance trend analysis
+
+**Usage**:
+
+```python
+from nlm.performance import PerformanceMonitor
+
+# Create performance monitor
+monitor = PerformanceMonitor()
+
+# Start monitoring
+monitor.start_monitoring()
+
+# Run simulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(1000):
+    brain.step(step)
+
+# Stop monitoring
+performance_data = monitor.stop_monitoring()
+
+# Analyze results
+analysis = monitor.analyze_performance(performance_data)
+print(f"Average steps per second: {analysis['steps_per_second']:.1f}")
+print(f"Memory usage: {analysis['memory_usage_mb']:.1f} MB")
+print(f"Bottlenecks detected: {analysis['bottlenecks']}")
+```
+
+**Class Methods**:
+
+```python
+class PerformanceMonitor:
+    def __init__(self, sampling_interval=0.1):
+        """Initialize performance monitor."""
+    
+    def start_monitoring(self):
+        """Start performance monitoring."""
+    
+    def stop_monitoring(self):
+        """Stop monitoring and return performance data."""
+    
+    def get_performance_stats(self) -> dict:
+        """Get current performance statistics."""
+    
+    def analyze_performance(self, performance_data) -> dict:
+        """Analyze performance data and identify issues."""
+    
+    def predict_performance(self, steps: int) -> dict:
+        """Predict performance for future simulations."""
+```
+
+### 2. Memory Manager
+
+**Purpose**: Monitor and manage memory usage in NLM simulations.
+
+**Features**:
+- Memory usage tracking
+- Memory leak detection
+- Memory optimization recommendations
+- Memory pool management
+- Garbage collection monitoring
+
+**Usage**:
+
+```python
+from nlm.performance import MemoryManager
+
+# Create memory manager
+memory_manager = MemoryManager()
+
+# Start memory monitoring
+memory_manager.start_monitoring()
+
+# Run simulation with memory tracking
+for step in range(1000):
+    brain.step(step)
+
+# Stop monitoring
+memory_stats = memory_manager.stop_monitoring()
+
+# Analyze memory usage
+analysis = memory_manager.analyze_memory_usage(memory_stats)
+print(f"Peak memory usage: {analysis['peak_memory_mb']:.1f} MB")
+print(f"Memory leaks detected: {analysis['memory_leaks']}")
+print(f"Optimization opportunities: {analysis['optimization_opportunities']}")
+```
+
+**Class Methods**:
+
+```python
+class MemoryManager:
+    def __init__(self, sampling_interval=0.5):
+        """Initialize memory manager."""
+    
+    def start_monitoring(self):
+        """Start memory monitoring."""
+    
+    def stop_monitoring(self):
+        """Stop monitoring and return memory stats."""
+    
+    def get_memory_usage(self) -> dict:
+        """Get current memory usage statistics."""
+    
+    def detect_memory_leaks(self) -> list:
+        """Detect memory leaks in memory usage."""
+    
+    def analyze_memory_usage(self, memory_stats) -> dict:
+        """Analyze memory usage patterns."""
+    
+    def recommend_memory_optimization(self) -> list:
+        """Recommend memory optimization strategies."""
+```
+
+### 3. Debugger
+
+**Purpose**: Debug NLM simulations and identify issues.
+
+**Features**:
+- Detailed logging and tracing
+- Error detection and reporting
+- State inspection and analysis
+- Step-by-step debugging
+- Exception handling and recovery
+
+**Usage**:
+
+```python
+from nlm.performance import Debugger
+
+# Create debugger
+debugger = Debugger(debug_level="detailed", log_file="debug.log")
+
+# Start debugging
+debugger.start_debugging()
+
+# Run simulation with debugging
+for step in range(100):
+    try:
+        brain.step(step)
+        debugger.log_step(step, brain.get_total_spike_count())
+    except Exception as e:
+        debugger.handle_exception(e, step)
+
+# Stop debugging
+debug_info = debugger.stop_debugging()
+
+# Analyze debugging results
+analysis = debugger.analyze_debugging(debug_info)
+print(f"Debug issues detected: {analysis['issues']}")
+print(f"Performance bottlenecks: {analysis['bottlenecks']}")
+```
+
+**Class Methods**:
+
+```python
+class Debugger:
+    def __init__(self, debug_level="info", log_file=None):
+        """Initialize debugger."""
+    
+    def start_debugging(self):
+        """Start debugging session."""
+    
+    def stop_debugging(self):
+        """Stop debugging and return debug info."""
+    
+    def log_step(self, step: int, spike_count: int):
+        """Log simulation step information."""
+    
+    def handle_exception(self, exception: Exception, step: int):
+        """Handle exceptions during simulation."""
+    
+    def inspect_state(self) -> dict:
+        """Inspect current simulation state."""
+    
+    def analyze_debugging(self, debug_info) -> dict:
+        """Analyze debugging results."""
+```
+
+### 4. Profiler
+
+**Purpose**: Profile NLM simulation performance and identify bottlenecks.
+
+**Features**:
+- CPU profiling
+- Memory profiling
+- I/O profiling
+- Network profiling
+- Function-level profiling
+
+**Usage**:
+
+```python
+from nlm.performance import Profiler
+
+# Create profiler
+profiler = Profiler(profile_type="comprehensive", output_file="profile_results.json")
+
+# Start profiling
+profiler.start_profiling()
+
+# Run simulation
+for step in range(500):
+    brain.step(step)
+
+# Stop profiling
+profile_results = profiler.stop_profiling()
+
+# Analyze profiling results
+analysis = profiler.analyze_profiling(profile_results)
+print(f"CPU time: {analysis['cpu_time']:.2f} seconds")
+print(f"Memory usage: {analysis['memory_usage_mb']:.1f} MB")
+print(f"Bottlenecks: {analysis['bottlenecks']}")
+print(f"Optimization opportunities: {analysis['optimization_opportunities']}")
+```
+
+**Class Methods**:
+
+```python
+class Profiler:
+    def __init__(self, profile_type="comprehensive", output_file=None):
+        """Initialize profiler."""
+    
+    def start_profiling(self):
+        """Start profiling."""
+    
+    def stop_profiling(self):
+        """Stop profiling and return results."""
+    
+    def get_profile_stats(self) -> dict:
+        """Get profiling statistics."""
+    
+    def analyze_profiling(self, profile_results) -> dict:
+        """Analyze profiling results."""
+    
+    def generate_profile_report(self, profile_results) -> str:
+        """Generate human-readable profile report."""
+```
+
+### 5. Validator
+
+**Purpose**: Validate NLM configurations and simulation results.
+
+**Features**:
+- Configuration validation
+- Result validation
+- Consistency checking
+- Quality assurance
+- Error detection and reporting
+
+**Usage**:
+
+```python
+from nlm.performance import Validator
+
+# Create validator
+validator = Validator(validation_level="comprehensive")
+
+# Validate configuration
+config_validation = validator.validate_config("config.json")
+if config_validation.is_valid:
+    print("Configuration is valid")
+else:
+    print(f"Configuration errors: {config_validation.errors}")
+
+# Validate simulation results
+results_validation = validator.validate_results("results.json")
+print(f"Result validity: {results_validation.is_valid}")
+print(f"Number of issues: {len(results_validation.issues)}")
+
+# Validate consistency
+consistency_check = validator.validate_consistency("results.json", "baseline.json")
+print(f"Consistency: {consistency_check.is_consistent}")
+```
+
+**Class Methods**:
+
+```python
+class Validator:
+    def __init__(self, validation_level="standard"):
+        """Initialize validator."""
+    
+    def validate_config(self, config_file: str) -> dict:
+        """Validate configuration file."""
+    
+    def validate_results(self, results_file: str) -> dict:
+        """Validate simulation results."""
+    
+    def validate_consistency(self, current_file: str, baseline_file: str) -> dict:
+        """Validate consistency between results."""
+    
+    def validate_quality(self, results_file: str) -> dict:
+        """Validate quality of simulation results."""
+    
+    def get_validation_report(self, validation_results) -> str:
+        """Generate validation report."""
+```
+
+### 6. Optimizer
+
+**Purpose**: Provide performance optimization recommendations for NLM simulations.
+
+**Features**:
+- Performance analysis
+- Optimization recommendations
+- Configuration optimization
+- Memory optimization
+- CPU optimization
+
+**Usage**:
+
+```python
+from nlm.performance import Optimizer
+
+# Create optimizer
+optimizer = Optimizer(optimization_type="comprehensive")
+
+# Analyze current configuration
+config = pynlm.createDefaultConfig()
+optimization_analysis = optimizer.analyze_configuration(config)
+
+# Get optimization recommendations
+recommendations = optimizer.get_optimization_recommendations(optimization_analysis)
+for rec in recommendations:
+    print(f"Recommendation: {rec['description']}")
+    print(f"  Impact: {rec['impact']}")
+    print(f"  Effort: {rec['effort']}")
+
+# Apply optimizations
+optimized_config = optimizer.apply_optimizations(config, recommendations[:3])
+
+# Validate optimized configuration
+validation = validator.validate_config(optimized_config)
+```
+
+**Class Methods**:
+
+```python
+class Optimizer:
+    def __init__(self, optimization_type="comprehensive"):
+        """Initialize optimizer."""
+    
+    def analyze_configuration(self, config: dict) -> dict:
+        """Analyze configuration for optimization opportunities."""
+    
+    def get_optimization_recommendations(self, analysis: dict) -> list:
+        """Get optimization recommendations."""
+    
+    def apply_optimizations(self, config: dict, recommendations: list) -> dict:
+        """Apply optimization recommendations to configuration."""
+    
+    def analyze_performance(self, performance_data: dict) -> dict:
+        """Analyze performance for optimization opportunities."""
+    
+    def get_performance_recommendations(self, analysis: dict) -> list:
+        """Get performance optimization recommendations."""
+```
+
+## Advanced Utilities
+
+### 1. Bottleneck Detector
+
+**Purpose**: Detect and analyze performance bottlenecks in NLM simulations.
+
+**Features**:
+- Bottleneck detection
+- Bottleneck analysis
+- Bottleneck resolution recommendations
+- Performance profiling
+- Resource usage analysis
+
+**Usage**:
+
+```python
+from nlm.performance import BottleneckDetector
+
+# Create bottleneck detector
+detector = BottleneckDetector(detection_method="statistical")
+
+# Analyze simulation performance
+performance_data = {
+    'step_times': [0.001, 0.002, 0.003, ...],
+    'memory_usage': [100, 120, 150, ...],
+    'cpu_usage': [0.5, 0.7, 0.8, ...]
+}
+
+# Detect bottlenecks
+bottlenecks = detector.detect_bottlenecks(performance_data)
+
+# Analyze bottlenecks
+for bottleneck in bottlenecks:
+    print(f"Bottleneck: {bottleneck['type']}")
+    print(f"  Severity: {bottleneck['severity']}")
+    print(f"  Location: {bottleneck['location']}")
+    print(f"  Impact: {bottleneck['impact']}")
+
+# Get resolution recommendations
+recommendations = detector.get_resolution_recommendations(bottlenecks)
+```
+
+### 2. Trace Analyzer
+
+**Purpose**: Analyze execution traces for NLM simulations.
+
+**Features**:
+- Trace collection
+- Trace analysis
+- Trace visualization
+- Performance bottleneck identification
+- Resource usage analysis
+
+**Usage**:
+
+```python
+from nlm.performance import TraceAnalyzer
+
+# Create trace analyzer
+analyzer = TraceAnalyzer(trace_format="ptdwarf", analysis_type="performance")
+
+# Start trace collection
+trace_collector = analyzer.start_trace_collection()
+
+# Run simulation with tracing
+for step in range(200):
+    brain.step(step)
+
+# Stop trace collection
+trace_data = analyzer.stop_trace_collection()
+
+# Analyze trace
+analysis = analyzer.analyze_trace(trace_data)
+print(f"Trace duration: {analysis['duration']:.2f} seconds")
+print(f"Trace samples: {analysis['trace_samples']}")
+print(f"Performance bottlenecks: {analysis['bottlenecks']}")
+```
+
+### 3. Resource Monitor
+
+**Purpose**: Monitor system resources during NLM simulations.
+
+**Features**:
+- CPU monitoring
+- Memory monitoring
+- I/O monitoring
+- Network monitoring
+- System resource tracking
+
+**Usage**:
+
+```python
+from nlm.performance import ResourceMonitor
+
+# Create resource monitor
+monitor = ResourceMonitor(monitoring_interval=0.1)
+
+# Start resource monitoring
+monitor.start_monitoring()
+
+# Run simulation with resource monitoring
+for step in range(500):
+    brain.step(step)
+
+# Stop monitoring
+resource_stats = monitor.stop_monitoring()
+
+# Analyze resource usage
+analysis = monitor.analyze_resource_usage(resource_stats)
+print(f"Peak CPU usage: {analysis['peak_cpu_percent']:.1f}%")
+print(f"Peak memory usage: {analysis['peak_memory_mb']:.1f} MB")
+print(f"I/O operations: {analysis['io_operations']}")
+```
+
+### 4. Checkpoint Analyzer
+
+**Purpose**: Analyze and validate NLM simulation checkpoints.
+
+**Features**:
+- Checkpoint validation
+- Checkpoint analysis
+- Checkpoint consistency checking
+- Checkpoint recovery analysis
+- Checkpoint performance analysis
+
+**Usage**:
+
+```python
+from nlm.performance import CheckpointAnalyzer
+
+# Create checkpoint analyzer
+analyzer = CheckpointAnalyzer(analysis_type="comprehensive")
+
+# Analyze checkpoint
+checkpoint_data = {
+    'checkpoint_id': 1,
+    'step': 100,
+    'timestamp': 1.0,
+    'neuron_count': 1000,
+    'memory_usage': 500,
+    'performance_metrics': {...}
+}
+
+# Validate checkpoint
+validation = analyzer.validate_checkpoint(checkpoint_data)
+if validation.is_valid:
+    print("Checkpoint is valid")
+else:
+    print(f"Checkpoint validation errors: {validation.errors}")
+
+# Analyze checkpoint
+analysis = analyzer.analyze_checkpoint(checkpoint_data)
+print(f"Checkpoint age: {analysis['checkpoint_age']:.2f} seconds")
+print(f"Checkpoint size: {analysis['checkpoint_size']:.1f} MB")
+print(f"Checkpoint integrity: {analysis['checkpoint_integrity']}")
+```
+
+### 5. Performance Benchmarker
+
+**Purpose**: Comprehensive performance benchmarking for NLM simulations.
+
+**Features**:
+- Comprehensive benchmarking
+- Comparative analysis
+- Performance regression detection
+- Performance optimization validation
+- Benchmarking report generation
+
+**Usage**:
+
+```python
+from nlm.performance import PerformanceBenchmarker
+
+# Create performance benchmarker
+benchmarker = PerformanceBenchmarker(
+    benchmark_type="comprehensive",
+    repetitions=5,
+    warmup_steps=50
+)
+
+# Run benchmark
+benchmark_results = benchmarker.run_benchmark(
+    config_file="config.json",
+    steps=1000
+)
+
+# Analyze benchmark results
+analysis = benchmarker.analyze_benchmark_results(benchmark_results)
+print(f"Average performance: {analysis['average_performance']:.2f} steps/sec")
+print(f"Performance variation: {analysis['performance_variation']:.2f}%")
+print(f"Performance regression detected: {analysis['regression_detected']}")
+print(f"Performance optimization opportunities: {analysis['optimization_opportunities']}")
+```
+
+## Integration with NLM Tools
+
+### Integration with Command Line Tools
+
+The performance and debugging utilities integrate with the NLM command line tools:
+
+```bash
+# Run simulation with performance monitoring
+nlm-run --config config.json --steps 500 --benchmark
+
+# Run simulation with memory monitoring
+nlm-run --config config.json --steps 500 --memory-monitoring
+
+# Run simulation with debugging
+nlm-run --config config.json --steps 500 --debug-mode
+
+# Run simulation with validation
+nlm-run --config config.json --steps 500 --validate
+
+# Run simulation with optimization
+nlm-run --config config.json --steps 500 --optimize
+```
+
+### Python API Integration
+
+```python
+import pynlm
+from nlm.performance import PerformanceMonitor, MemoryManager, Profiler
+
+# Create performance monitoring suite
+performance_suite = PerformanceMonitor()
+memory_suite = MemoryManager()
+profiler_suite = Profiler()
+
+# Start monitoring
+performance_suite.start_monitoring()
+memory_suite.start_monitoring()
+profiler_suite.start_profiling()
+
+# Run simulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(1000):
+    brain.step(step)
+
+# Stop monitoring
+perf_data = performance_suite.stop_monitoring()
+mem_data = memory_suite.stop_monitoring()
+prof_data = profiler_suite.stop_profiling()
+
+# Analyze results
+perf_analysis = performance_suite.analyze_performance(perf_data)
+mem_analysis = memory_suite.analyze_memory_usage(mem_data)
+prof_analysis = profiler_suite.analyze_profiling(prof_data)
+
+# Generate optimization report
+optimizer = Optimizer()
+optimization_recommendations = optimizer.get_optimization_recommendations({
+    **perf_analysis,
+    **mem_analysis,
+    **prof_analysis
+})
+```
+
+## Configuration
+
+### Performance Monitoring Configuration
+
+```ini
+[performance_monitor]
+sampling_interval = 0.1
+enable_cpu_profiling = true
+enable_memory_profiling = true
+enable_ioprofile = true
+max_samples = 10000
+
+[memory_manager]
+sampling_interval = 0.5
+detection_threshold_mb = 100.0
+memory_leak_detection = true
+memory_optimization = true
+
+[debugger]
+debug_level = "detailed"
+log_file = "debug.log"
+enable_step_logging = true
+enable_exception_logging = true
+
+[profiler]
+profile_type = "comprehensive"
+output_file = "profile_results.json"
+function_level_profiling = true
+
+[validator]
+validation_level = "comprehensive"
+strict_validation = false
+enable_consistency_checking = true
+enable_quality_assurance = true
+
+[optimizer]
+optimization_type = "comprehensive"
+auto_optimization = false
+optimization_threshold = 0.8
+```
+
+### Environment Variables
+
+```bash
+export NLM_PERFORMANCE_MONITORING=true
+export NLM_MEMORY_MONITORING=true
+export NLM_DEBUGGING_ENABLED=true
+export NLM_PROFILING_ENABLED=true
+export NLM_VALIDATION_ENABLED=true
+export NLM_OPTIMIZATION_ENABLED=true
+export NLM_PERFORMANCE_SAMPLE_INTERVAL=0.1
+export NLM_MEMORY_SAMPLE_INTERVAL=0.5
+export NLM_LOG_LEVEL=debug
+export NLM_OUTPUT_FORMAT=json
+```
+
+## Usage Examples
+
+### Example 1: Performance Monitoring
+
+```python
+from nlm.performance import PerformanceMonitor
+
+# Create performance monitor with custom settings
+monitor = PerformanceMonitor(sampling_interval=0.05)
+
+# Start performance monitoring
+monitor.start_monitoring()
+
+# Run simulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(500):
+    brain.step(step)
+
+# Stop monitoring and analyze
+performance_data = monitor.stop_monitoring()
+analysis = monitor.analyze_performance(performance_data)
+
+print("Performance Analysis Results:")
+print(f"Average steps per second: {analysis['steps_per_second']:.1f}")
+print(f"Peak memory usage: {analysis['peak_memory_mb']:.1f} MB")
+print(f"Performance bottlenecks: {analysis['bottlenecks']}")
+print(f"Optimization opportunities: {analysis['optimization_opportunities']}")
+```
+
+### Example 2: Memory Management
+
+```python
+from nlm.performance import MemoryManager
+
+# Create memory manager
+memory_manager = MemoryManager(sampling_interval=0.2)
+
+# Start memory monitoring
+memory_manager.start_monitoring()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+
+# Stop monitoring and analyze
+memory_stats = memory_manager.stop_monitoring()
+analysis = memory_manager.analyze_memory_usage(memory_stats)
+
+print("Memory Analysis Results:")
+print(f"Peak memory usage: {analysis['peak_memory_mb']:.1f} MB")
+print(f"Memory leaks detected: {analysis['memory_leaks']}")
+print(f"Memory optimization opportunities: {analysis['optimization_opportunities']}")
+print(f"Memory efficiency: {analysis['memory_efficiency']:.2%}")
+```
+
+### Example 3: Debugging
+
+```python
+from nlm.performance import Debugger
+
+# Create debugger with detailed logging
+debugger = Debugger(debug_level="detailed", log_file="simulation_debug.log")
+
+# Start debugging
+debugger.start_debugging()
+
+# Run simulation with debugging
+for step in range(100):
+    try:
+        brain.step(step)
+        debugger.log_step(step, brain.getTotalSpikeCount())
+        
+        # Simulate some potential issues
+        if step % 50 == 0:
+            # Simulate performance issue
+            import time
+            time.sleep(0.01)
+        
+        # Simulate memory issue
+        if step % 75 == 0:
+            # Access large data
+            large_data = list(range(1000000))
+            debugger.log_memory_usage(step, len(large_data) * 8)  # bytes
+            del large_data
+            
+    except Exception as e:
+        debugger.handle_exception(e, step)
+
+# Stop debugging
+debug_info = debugger.stop_debugging()
+
+# Analyze debugging results
+analysis = debugger.analyze_debugging(debug_info)
+
+print("Debugging Analysis Results:")
+print(f"Debug issues detected: {analysis['issues']}")
+print(f"Performance bottlenecks: {analysis['bottlenecks']}")
+print(f"Memory issues: {analysis['memory_issues']}")
+print(f"Error occurrences: {analysis['error_occurrences']}")
+```
+
+### Example 4: Profiling
+
+```python
+from nlm.performance import Profiler
+
+# Create profiler for comprehensive profiling
+profiler = Profiler(profile_type="comprehensive", output_file="simulation_profile.json")
+
+# Start profiling
+profiler.start_profiling()
+
+# Run simulation with profiling
+for step in range(300):
+    brain.step(step)
+
+# Stop profiling
+profile_results = profiler.stop_profiling()
+
+# Analyze profiling results
+analysis = profiler.analyze_profiling(profile_results)
+
+print("Profiling Analysis Results:")
+print(f"CPU time: {analysis['cpu_time']:.2f} seconds")
+print(f"Memory usage: {analysis['memory_usage_mb']:.1f} MB")
+print(f"I/O operations: {analysis['io_operations']}")
+print(f"Bottlenecks: {analysis['bottlenecks']}")
+print(f"Optimization opportunities: {analysis['optimization_opportunities']}")
+
+# Generate profile report
+report = profiler.generate_profile_report(profile_results)
+print("\nProfile Report:")
+print(report)
+```
+
+### Example 5: Validation
+
+```python
+from nlm.performance import Validator
+
+# Create validator
+validator = Validator(validation_level="comprehensive")
+
+# Validate configuration
+config_validation = validator.validate_config("config.json")
+print("Configuration Validation:")
+print(f"Is valid: {config_validation.is_valid}")
+if config_validation.is_valid:
+    print(f"Validation score: {config_validation.score:.2%}")
+else:
+    print(f"Validation errors: {config_validation.errors}")
+    print(f"Warning count: {config_validation.warning_count}")
+
+# Validate simulation results
+results_validation = validator.validate_results("results.json")
+print("\nResults Validation:")
+print(f"Is valid: {results_validation.is_valid}")
+print(f"Number of issues: {len(results_validation.issues)}")
+for i, issue in enumerate(results_validation.issues):
+    print(f"  Issue {i+1}: {issue['type']} - {issue['message']}")
+
+# Validate consistency
+consistency_check = validator.validate_consistency("current_results.json", "baseline_results.json")
+print("\nConsistency Check:")
+print(f"Is consistent: {consistency_check.is_consistent}")
+print(f"Consistency score: {consistency_check.score:.2%}")
+```
+
+### Example 6: Optimization
+
+```python
+from nlm.performance import Optimizer
+
+# Create optimizer
+optimizer = Optimizer(optimization_type="comprehensive")
+
+# Analyze current configuration
+config = pynlm.createDefaultConfig()
+optimization_analysis = optimizer.analyze_configuration(config)
+
+# Get optimization recommendations
+recommendations = optimizer.get_optimization_recommendations(optimization_analysis)
+
+print("Optimization Recommendations:")
+for i, rec in enumerate(recommendations):
+    print(f"\nRecommendation {i+1}:")
+    print(f"  Description: {rec['description']}")
+    print(f"  Impact: {rec['impact']:.2%}")
+    print(f"  Effort: {rec['effort']:.2%}")
+    print(f"  Priority: {rec['priority']}")
+    print(f"  Implementation: {rec['implementation']}")
+
+# Apply top recommendations
+optimized_config = optimizer.apply_optimizations(config, recommendations[:3])
+
+# Validate optimized configuration
+optimized_validation = validator.validate_config(optimized_config)
+print(f"\nOptimized Configuration Validation:")
+print(f"Is valid: {optimized_validation.is_valid}")
+print(f"Improvement: {optimized_validation.score:.2%}")
+```
+
+## Performance Monitoring Integration
+
+### Integration with NLM Command Line Tools
+
+```bash
+# Run simulation with comprehensive performance monitoring
+nlm-run --config config.json --steps 500 --performance-monitoring --memory-monitoring --debug-mode
+
+# Run simulation with optimization
+nlm-run --config config.json --steps 500 --performance-monitoring --optimization
+
+# Run simulation with profiling
+nlm-run --config config.json --steps 500 --profiling --profile-type comprehensive
+
+# Run simulation with validation
+nlm-run --config config.json --steps 500 --validation --validate-type comprehensive
+```
+
+### Python Integration with Performance Monitoring
+
+```python
+import pynlm
+from nlm.performance import PerformanceMonitor, MemoryManager, Debugger, Profiler
+
+# Create comprehensive performance monitoring suite
+performance_suite = PerformanceMonitor(sampling_interval=0.05)
+memory_suite = MemoryManager(sampling_interval=0.2)
+debugger_suite = Debugger(debug_level="detailed")
+profiler_suite = Profiler(profile_type="comprehensive")
+
+# Start all monitoring
+performance_suite.start_monitoring()
+memory_suite.start_monitoring()
+debugger_suite.start_debugging()
+profiler_suite.start_profiling()
+
+# Run simulation with comprehensive monitoring
+for step in range(1000):
+    try:
+        brain.step(step)
+        
+        # Log performance metrics
+        performance_suite.log_performance(step)
+        
+        # Log memory metrics
+        memory_suite.log_memory(step)
+        
+        # Log debug information
+        debugger_suite.log_step(step, brain.getTotalSpikeCount())
+        
+    except Exception as e:
+        debugger_suite.handle_exception(e, step)
+
+# Stop all monitoring
+perf_data = performance_suite.stop_monitoring()
+mem_data = memory_suite.stop_monitoring()
+debug_data = debugger_suite.stop_debugging()
+prof_data = profiler_suite.stop_profiling()
+
+# Analyze all monitoring data
+perf_analysis = performance_suite.analyze_performance(perf_data)
+mem_analysis = memory_suite.analyze_memory_usage(mem_data)
+debug_analysis = debugger_suite.analyze_debugging(debug_data)
+prof_analysis = profiler_suite.analyze_profiling(prof_data)
+
+# Generate comprehensive optimization report
+optimizer = Optimizer()
+comprehensive_analysis = {
+    **perf_analysis,
+    **mem_analysis,
+    **debug_analysis,
+    **prof_analysis
+}
+
+optimization_recommendations = optimizer.get_optimization_recommendations(comprehensive_analysis)
+
+print("Comprehensive Performance Analysis:")
+print(f"Performance: {perf_analysis['steps_per_second']:.1f} steps/sec")
+print(f"Memory: {mem_analysis['peak_memory_mb']:.1f} MB")
+print(f"Debug issues: {debug_analysis['issues']}")
+print(f"Optimization recommendations: {len(optimization_recommendations)}")
+```
+
+## Advanced Usage
+
+### Custom Performance Monitoring
+
+```python
+from nlm.performance import BasePerformanceMonitor
+
+class CustomPerformanceMonitor(BasePerformanceMonitor):
+    def __init__(self, custom_metrics):
+        super().__init__()
+        self.custom_metrics = custom_metrics
+    
+    def collect_custom_metrics(self, step):
+        """Collect custom performance metrics."""
+        metrics = {}
+        
+        for metric_name, metric_func in self.custom_metrics.items():
+            try:
+                metrics[metric_name] = metric_func(step)
+            except Exception as e:
+                metrics[metric_name] = f"Error: {e}"
+        
+        return metrics
+    
+    def analyze_custom_performance(self, performance_data):
+        """Analyze custom performance metrics."""
+        analysis = {}
+        
+        for metric_name, values in performance_data.items():
+            if isinstance(values, list) and len(values) > 0:
+                analysis[metric_name] = {
+                    'mean': sum(values) / len(values),
+                    'min': min(values),
+                    'max': max(values),
+                    'std': (sum((x - sum(values)/len(values))**2 for x in values) / len(values))**0.5,
+                    'trend': self.calculate_trend(values)
+                }
+        
+        return analysis
+    
+    def calculate_trend(self, values):
+        """Calculate trend for a series of values."""
+        if len(values) < 2:
+            return "stable"
+        
+        x = list(range(len(values)))
+        y = values
+        
+        # Simple linear regression
+        n = len(x)
+        sum_x = sum(x)
+        sum_y = sum(y)
+        sum_xy = sum(x[i] * y[i] for i in range(n))
+        sum_x2 = sum(x[i] ** 2 for i in range(n))
+        
+        slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x ** 2)
+        
+        if abs(slope) < 0.01:
+            return "stable"
+        elif slope > 0.01:
+            return "increasing"
+        else:
+            return "decreasing"
+
+# Use custom performance monitor
+custom_metrics = {
+    'cpu_usage': lambda step: brain.get_average_firing_rate() * 0.01,
+    'memory_usage': lambda step: brain.get_total_neuron_count() * 0.1,
+    'spike_frequency': lambda step: brain.get_total_spike_count() / (step + 1)
+}
+
+custom_monitor = CustomPerformanceMonitor(custom_metrics)
+```
+
+### Performance Alerting
+
+```python
+from nlm.performance import PerformanceAlerting
+
+# Create performance alerting system
+alerting = PerformanceAlerting()
+
+# Add performance alerts
+alerting.add_alert(
+    name="high_cpu_usage",
+    condition=lambda metrics: metrics.get('cpu_usage', 0) > 0.8,
+    message="CPU usage exceeded 80%"
+)
+
+alerting.add_alert(
+    name="memory_leak",
+    condition=lambda metrics: metrics.get('memory_growth', 0) > 100,
+    message="Memory leak detected - memory growth > 100MB"
+)
+
+alerting.add_alert(
+    name="performance_degradation",
+    condition=lambda metrics: metrics.get('performance_trend', '') == 'decreasing',
+    message="Performance trend shows degradation"
+)
+
+# Monitor performance with alerting
+for step in range(1000):
+    brain.step(step)
+    
+    # Get current metrics
+    metrics = get_current_metrics(step)
+    
+    # Check for alerts
+    alerts = alerting.check_alerts(metrics)
+    
+    if alerts:
+        for alert in alerts:
+            print(f"ALERT: {alert['name']} - {alert['message']}")
+```
+
+### Performance Reporting
+
+```python
+from nlm.performance import PerformanceReporter
+
+# Create performance reporter
+reporter = PerformanceReporter(
+    report_type="comprehensive",
+    output_format="json",
+    output_file="performance_report.json"
+)
+
+# Generate performance report
+performance_data = {
+    'step_times': [0.001, 0.002, 0.003, ...],
+    'memory_usage': [100, 120, 150, ...],
+    'cpu_usage': [0.5, 0.7, 0.8, ...],
+    'spike_counts': [50, 60, 70, ...],
+    'firing_rates': [0.5, 0.6, 0.7, ...]
+}
+
+# Generate report
+report = reporter.generate_report(performance_data)
+
+# Export report
+reporter.export_report(report, "performance_report.txt")
+
+# Send report via email (example)
+reporter.send_report_by_email(report, "admin@example.com")
+```
+
+## Utility Functions
+
+### Performance Monitoring Functions
+
+```python
+# Function to create performance monitor
+def create_performance_monitor(sampling_interval=0.1):
+    """Create performance monitor with specified settings."""
+    return PerformanceMonitor(sampling_interval)
+
+# Function to analyze performance data
+def analyze_performance(performance_data):
+    """Analyze performance data and return analysis."""
+    monitor = PerformanceMonitor()
+    return monitor.analyze_performance(performance_data)
+
+# Function to optimize configuration
+def optimize_configuration(config, analysis):
+    """Optimize configuration based on performance analysis."""
+    optimizer = Optimizer()
+    return optimizer.apply_optimizations(config, analysis['optimization_recommendations'])
+```
+
+### Memory Management Functions
+
+```python
+def create_memory_manager(sampling_interval=0.5):
+    """Create memory manager with specified settings."""
+    return MemoryManager(sampling_interval)
+
+def analyze_memory_usage(memory_data):
+    """Analyze memory usage and return analysis."""
+    manager = MemoryManager()
+    return manager.analyze_memory_usage(memory_data)
+
+def detect_memory_leaks(memory_data):
+    """Detect memory leaks in memory data."""
+    manager = MemoryManager()
+    return manager.detect_memory_leaks(memory_data)
+```
+
+### Debugging Functions
+
+```python
+def create_debugger(debug_level="info", log_file=None):
+    """Create debugger with specified settings."""
+    return Debugger(debug_level, log_file)
+
+def analyze_debugging(debug_data):
+    """Analyze debugging data and return analysis."""
+    debugger = Debugger()
+    return debugger.analyze_debugging(debug_data)
+
+def handle_simulation_error(error, step, debugger):
+    """Handle simulation error using debugger."""
+    debugger.handle_exception(error, step)
+```
+
+### Profiling Functions
+
+```python
+def create_profiler(profile_type="comprehensive", output_file=None):
+    """Create profiler with specified settings."""
+    return Profiler(profile_type, output_file)
+
+def analyze_profiling(profile_data):
+    """Analyze profiling data and return analysis."""
+    profiler = Profiler()
+    return profiler.analyze_profiling(profile_data)
+
+def generate_profile_report(profile_data):
+    """Generate profile report from profiling data."""
+    profiler = Profiler()
+    return profiler.generate_profile_report(profile_data)
+```
+
+### Validation Functions
+
+```python
+def create_validator(validation_level="standard"):
+    """Create validator with specified settings."""
+    return Validator(validation_level)
+
+def analyze_performance_validation(validation_data):
+    """Analyze performance validation data."""
+    validator = Validator()
+    return validator.analyze_performance_validation(validation_data)
+
+def validate_configuration(config, validator):
+    """Validate configuration using validator."""
+    return validator.validate_config(config)
+```
+
+### Optimization Functions
+
+```python
+def create_optimizer(optimization_type="comprehensive"):
+    """Create optimizer with specified settings."""
+    return Optimizer(optimization_type)
+
+def analyze_optimization_opportunities(config):
+    """Analyze configuration for optimization opportunities."""
+    optimizer = Optimizer()
+    return optimizer.analyze_configuration(config)
+
+def apply_optimizations(config, recommendations):
+    """Apply optimization recommendations to configuration."""
+    optimizer = Optimizer()
+    return optimizer.apply_optimizations(config, recommendations)
+```
+
+## Installation and Setup
+
+### System Installation
+
+```bash
+# Install performance and debugging utilities
+sudo apt install nlm-performance-tools  # (if available)
+
+# Or install from source
+pip install -e .[performance,debugging]
+
+# Make utilities executable
+chmod +x bin/performance-tools
+```
+
+### Development Setup
+
+```bash
+# Clone the repository
+cd /workspace/app
+
+# Install performance dependencies
+pip install -r requirements-performance.txt
+pip install -r requirements-debugging.txt
+
+# Install utilities
+pip install -e .[performance,debugging]
+
+# Set up environment
+export PYTHONPATH="$PYTHONPATH:$(pwd)/performance"
+export NLM_PERFORMANCE_HOME="$(pwd)/performance"
+```
+
+### Configuration
+
+```bash
+# Set up configuration directory
+mkdir -p ~/.config/nlm/performance
+
+# Create performance configuration
+cat > ~/.config/nlm/performance/config.ini << EOF
+[performance_monitor]
+sampling_interval = 0.1
+enable_cpu_profiling = true
+enable_memory_profiling = true
+
+[memory_manager]
+sampling_interval = 0.5
+detection_threshold_mb = 100.0
+
+[debugger]
+debug_level = "detailed"
+log_file = "debug.log"
+
+[profiler]
+profile_type = "comprehensive"
+
+[validator]
+validation_level = "comprehensive"
+
+[optimizer]
+optimization_type = "comprehensive"
+EOF
+
+# Set environment variables
+export NLM_PERFORMANCE_CONFIG="~/.config/nlm/performance/config.ini"
+```
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+# Run simulation with performance monitoring
+nlm-run --config config.json --steps 500 --performance-monitoring
+
+# Run simulation with memory management
+nlm-run --config config.json --steps 500 --memory-monitoring
+
+# Run simulation with debugging
+nlm-run --config config.json --steps 500 --debug-mode
+
+# Run simulation with profiling
+nlm-run --config config.json --steps 500 --profiling
+
+# Run simulation with validation
+nlm-run --config config.json --steps 500 --validation
+
+# Run simulation with optimization
+nlm-run --config config.json --steps 500 --optimization
+```
+
+### Python Usage
+
+```python
+import pynlm
+from nlm.performance import (
+    PerformanceMonitor, MemoryManager, Debugger, Profiler,
+    Validator, Optimizer, BottleneckDetector, ResourceMonitor
+)
+
+# Initialize performance monitoring
+monitor = PerformanceMonitor()
+memory = MemoryManager()
+debugger = Debugger()
+profiler = Profiler()
+
+# Start monitoring
+monitor.start_monitoring()
+memory.start_monitoring()
+debugger.start_debugging()
+profiler.start_profiling()
+
+# Run simulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(1000):
+    brain.step(step)
+
+# Stop monitoring
+performance_data = monitor.stop_monitoring()
+memory_data = memory.stop_monitoring()
+debug_data = debugger.stop_debugging()
+profile_data = profiler.stop_profiling()
+
+# Analyze results
+perf_analysis = monitor.analyze_performance(performance_data)
+mem_analysis = memory.analyze_memory_usage(memory_data)
+debug_analysis = debugger.analyze_debugging(debug_data)
+prof_analysis = profiler.analyze_profiling(profile_data)
+
+# Generate optimization recommendations
+optimizer = Optimizer()
+optimization_recommendations = optimizer.get_optimization_recommendations({
+    **perf_analysis,
+    **mem_analysis,
+    **debug_analysis,
+    **prof_analysis
+})
+
+print("Performance Analysis Complete")
+print(f"Performance: {perf_analysis['steps_per_second']:.1f} steps/sec")
+print(f"Memory: {mem_analysis['peak_memory_mb']:.1f} MB")
+print(f"Optimization opportunities: {len(optimization_recommendations)}")
+```
+
+### Command Line Integration
+
+```bash
+# Run comprehensive performance monitoring
+nlm-run --config config.json --steps 500 \
+  --performance-monitoring --memory-monitoring \
+  --debug-mode --profiling --validation --optimization
+
+# Run specific performance analysis
+nlm-bench --config config.json --steps 300 --metric time --output benchmark.json
+
+# Run memory analysis
+nlm-memory-analysis --config config.json --steps 500 --output memory_analysis.json
+
+# Run bottleneck detection
+nlm-bottleneck-detection --config config.json --steps 200 --output bottleneck_report.json
+
+# Run resource monitoring
+nlm-resource-monitoring --config config.json --steps 500 --output resource_stats.json
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Performance Monitoring Not Working**
+```bash
+# Check if performance monitoring is enabled
+export NLM_PERFORMANCE_MONITORING=true
+
+# Verify installation
+python -c "from nlm.performance import PerformanceMonitor; print('Performance Monitor available')"
+
+# Check configuration
+cat ~/.config/nlm/performance/config.ini
+```
+
+2. **Memory Management Issues**
+```bash
+# Check memory monitoring configuration
+export NLM_MEMORY_MONITORING=true
+
+# Verify memory manager
+python -c "from nlm.performance import MemoryManager; print('Memory Manager available')"
+
+# Check for memory leaks
+nlm-memory-analysis --config config.json --steps 100 --detect-leaks
+```
+
+3. **Debugging Problems**
+```bash
+# Enable debugging
+export NLM_DEBUGGING_ENABLED=true
+
+# Check debugger configuration
+python -c "from nlm.performance import Debugger; print('Debugger available')"
+
+# Run simulation with debugging
+nlm-run --config config.json --steps 100 --debug-mode
+```
+
+4. **Profiling Issues**
+```bash
+# Enable profiling
+export NLM_PROFILING_ENABLED=true
+
+# Check profiler configuration
+python -c "from nlm.performance import Profiler; print('Profiler available')"
+
+# Run simulation with profiling
+nlm-run --config config.json --steps 100 --profiling
+```
+
+5. **Validation Problems**
+```bash
+# Enable validation
+export NLM_VALIDATION_ENABLED=true
+
+# Check validator configuration
+python -c "from nlm.performance import Validator; print('Validator available')"
+
+# Run simulation with validation
+nlm-run --config config.json --steps 100 --validation
+```
+
+### Debugging Performance Issues
+
+```python
+# Debug performance issues
+
+def debug_performance_issues():
+    """Debug common performance issues."""
+    
+    # Check for performance bottlenecks
+    bottleneck_detector = BottleneckDetector()
+    bottlenecks = bottleneck_detector.detect_bottlenecks(performance_data)
+    
+    # Analyze resource usage
+    resource_monitor = ResourceMonitor()
+    resource_stats = resource_monitor.analyze_resource_usage(resource_data)
+    
+    # Check for memory leaks
+    memory_manager = MemoryManager()
+    memory_leaks = memory_manager.detect_memory_leaks(memory_data)
+    
+    # Analyze performance trends
+    trend_analyzer = PerformanceTrendAnalyzer()
+    trends = trend_analyzer.analyze_trends(performance_data)
+    
+    return {
+        'bottlenecks': bottlenecks,
+        'resource_stats': resource_stats,
+        'memory_leaks': memory_leaks,
+        'trends': trends
+    }
+```
+
+### Performance Optimization
+
+```python
+# Optimize performance based on analysis
+def optimize_performance(config, analysis):
+    """Optimize configuration based on performance analysis."""
+    
+    optimizer = Optimizer()
+    
+    # Get optimization recommendations
+    recommendations = optimizer.get_optimization_recommendations(analysis)
+    
+    # Apply top recommendations
+    optimized_config = optimizer.apply_optimizations(
+        config, recommendations[:3]
+    )
+    
+    # Validate optimized configuration
+    validator = Validator()
+    validation = validator.validate_config(optimized_config)
+    
+    if validation.is_valid:
+        return optimized_config, validation
+    else:
+        raise Exception(f"Optimized configuration is invalid: {validation.errors}")
+```
+
+## Conclusion
+
+The NLM performance and debugging utilities provide comprehensive tools for monitoring, analyzing, and optimizing NLM simulations. These utilities include:
+
+1. **Performance Monitoring**: Track and analyze simulation performance
+2. **Memory Management**: Monitor and optimize memory usage
+3. **Debugging**: Debug simulations and identify issues
+4. **Profiling**: Profile simulation performance and identify bottlenecks
+5. **Validation**: Validate configurations and simulation results
+6. **Optimization**: Provide performance optimization recommendations
+
+The utilities integrate seamlessly with NLM command line tools and provide both command line and Python API interfaces. They are designed to be easily extensible, allowing users to create custom monitoring and analysis tools for specific research needs.
+
+These utilities significantly enhance the usability and performance of the NLM framework, making it easier for researchers to:
+
+- Monitor simulation performance in real-time
+- Identify and resolve performance bottlenecks
+- Optimize memory usage
+- Debug simulation issues
+- Validate simulation results
+- Optimize configurations for specific use cases
+
+The comprehensive performance and debugging tools ensure that NLM simulations are efficient, reliable, and optimized for the best possible performance.
