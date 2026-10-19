@@ -121,11 +121,29 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable - Phase 6 Integration Demo
 add_executable(nlm
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 2 demo (backward compatibility)
+add_executable(nlm_phase2
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_phase2 PUBLIC nlm_core)
+
+# Phase 6 integration demo
+add_executable(nlm
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 2 demo (original basic neural computation demonstration)
+add_executable(nlm_phase2
+    src/main.cpp
+)
+target_link_libraries(nlm_phase2 PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -144,8 +162,6 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+install(TARGETS nlm nlm_phase2 nlm_phase3_demo nlm_phase4_demo
     RUNTIME DESTINATION bin
 )
