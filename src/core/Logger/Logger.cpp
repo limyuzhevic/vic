@@ -184,6 +184,7 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+    // This method is kept for API compatibility but doesn't override the static one
 }
 
 // LogStream implementation

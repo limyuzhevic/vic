@@ -245,7 +245,10 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
+    if (neuronCount == 0) return;
+    
+    // For each pre-synaptic neuron, create connections to post-synaptic neurons
+    // Use probabilistic connection based on connection probability
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();
@@ -253,13 +256,39 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
         // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
+        // Calculate number of potential post-synaptic neurons
+        size_t potentialPostCount = neuronCount - 1;  // Exclude self
+        if (potentialPostCount == 0) continue;
+        
+        // Expected number of connections for this pre-synaptic neuron
+        float expectedConnections = potentialPostCount * connectionProbability;
+        
+        // Determine how many connections to make (Poisson distribution approximation)
+        size_t targetConnections = std::max<size_t>(0, std::round(expectedConnections));
+        
+        // Select targetConnections post-synaptic neurons without replacement
+        // Use reservoir sampling or Fisher-Yates shuffle for efficiency
+        std::vector<size_t> postIndices;
+        postIndices.reserve(neuronCount);
+        
+        // Build list of all possible post-synaptic neuron indices (excluding self)
+        postIndices.resize(neuronCount);
+        for (size_t k = 0; k < neuronCount; ++k) {
+            postIndices[k] = k;
+        }
+        
+        // Shuffle using Fisher-Yates (partial shuffle for efficiency)
+        for (size_t k = 0; k < targetConnections && k < neuronCount; ++k) {
+            size_t j = k + rng.uniformInt(0, neuronCount - k);
+            std::swap(postIndices[k], postIndices[j]);
+        }
+        
+        // Create connections to selected post-synaptic neurons
+        for (size_t k = 0; k < targetConnections && k < neuronCount; ++k) {
+            size_t j = postIndices[k];
+            if (j == i) continue;  // Skip self (shouldn't happen due to shuffle)
             
             Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
             
             // Determine synapse type based on pre-synaptic neuron type
             SynapseType synType;
@@ -282,6 +311,18 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                 synType = SynapseType::Excitatory;
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
             }
+            
+            // Add synapse
+            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+            
+            // Initialize random properties
+            auto* synapse = getSynapse(synId);
+            if (synapse) {
+                synapse->enablePlasticity(true, true, false);
+                synapse->initializeRandom(rng);
+            }
+        }
+    }
             
             // Add synapse
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);

@@ -59,9 +59,7 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
     pImpl->neurons.push_back(neuron);
-    if (pImpl->size < pImpl->neurons.size()) {
-        pImpl->size = pImpl->neurons.size();
-    }
+    pImpl->size = pImpl->neurons.size();
 }
 
 const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {

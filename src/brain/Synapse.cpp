@@ -228,6 +228,9 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    // Re-initialize short-term plasticity state
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
