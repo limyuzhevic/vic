@@ -6,17 +6,31 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+# Advanced features option
+option(ENABLE_ADVANCED_FEATURES "Enable advanced configuration and features" ON)
+option(ENABLE_MEMORY_POOLS "Enable memory pool optimization" ON)
+option(ENABLE_SIMD_VECTORIZATION "Enable SIMD vectorization" ON)
+option(ENABLE_PARALLEL_PROCESSING "Enable parallel processing" OFF)
+option(ENABLE_CHECKPOINTING "Enable checkpointing" ON)
+option(ENABLE_REPLAY "Enable memory replay" OFF)
+option(ENABLE_DEVELOPMENT "Enable developmental processes" ON)
+option(ENABLE_PREDICTION "Enable prediction systems" ON)
+option(ENABLE_MEMORY_INTEGRATION "Enable memory integration" OFF)
+option(ENABLE_COGNITION_INTEGRATION "Enable cognition integration" OFF)
+option(ENABLE_PERFORMANCE_MONITORING "Enable performance monitoring" ON)
+option(ENABLE_ADVANCED_LOGGING "Enable advanced logging" OFF)
+option(ENABLE_METALEARNING "Enable meta-learning" OFF)
+option(ENABLE_TRANSFER_LEARNING "Enable transfer learning" OFF)
+option(ENABLE_CURRICULUM_LEARNING "Enable curriculum learning" OFF)
+option(ENABLE_PLUGIN_SYSTEM "Enable plugin system" ON)
+option(ENABLE_EXPERIMENTAL_FEATURES "Enable experimental features" OFF)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -121,6 +135,14 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 experiments (performance optimized)
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase5Demo.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -139,13 +161,55 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 5 demo executable (performance optimized)
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase5)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core)
+
+# Advanced features library
+if(ENABLE_ADVANCED_FEATURES)
+    add_library(nlm_advanced STATIC
+        src/agent/AdvancedFeatures.hpp
+        src/agent/AgentBrainConfig.hpp
+    )
+    target_include_directories(nlm_advanced PUBLIC src)
+    target_link_libraries(nlm_advanced PUBLIC nlm_core nlm_agent)
+    
+    # Link advanced features to executables
+    target_link_libraries(nlm PUBLIC nlm_advanced)
+    target_link_libraries(nlm_phase3_demo PUBLIC nlm_advanced)
+    target_link_libraries(nlm_phase4_demo PUBLIC nlm_advanced)
+    target_link_libraries(nlm_phase5_demo PUBLIC nlm_advanced)
+    target_link_libraries(nlm_phase6_demo PUBLIC nlm_advanced)
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Documentation generation
+if(BUILD_DOCUMENTATION)
+    find_package(Doxygen REQUIRED)
+    set(DOXYGEN_INPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/docs)
+    
+    doxygen_add_docs(docs
+        ${DOXYGEN_INPUT_DIR}/README.md
+        ${DOXYGEN_INPUT_DIR}/src
+        COMMENT "Generating API documentation"
+    )
+endif()
