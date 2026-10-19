@@ -86,7 +86,23 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Save the actual value based on its type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -140,6 +156,119 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+// Advanced methods for configuration management
+bool Config::validate() const {
+    std::vector<std::string> errors;
+    bool isValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        try {
+            // Check for required keys based on common patterns
+            if (entry.key.find("brain.") == 0) {
+                if (entry.key == "brain.neuron_count") {
+                    auto value = get<int64_t>(entry.key);
+                    if (value && *value <= 0) {
+                        errors.push_back("brain.neuron_count must be positive");
+                        isValid = false;
+                    }
+                } else if (entry.key == "brain.synapse_density") {
+                    auto value = get<double>(entry.key);
+                    if (value && (*value < 0.0 || *value > 1.0)) {
+                        errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+                        isValid = false;
+                    }
+                }
+            } else if (entry.key.find("plasticity.") == 0) {
+                if (entry.key == "plasticity.stdp.enable") {
+                    auto value = get<bool>(entry.key);
+                    if (!value) {
+                        errors.push_back("plasticity.stdp.enable must be specified");
+                        isValid = false;
+                    }
+                }
+            } else if (entry.key.find("neuromod.") == 0) {
+                if (entry.key == "neuromod.dopamine.scale") {
+                    auto value = get<double>(entry.key);
+                    if (value && *value < 0.0) {
+                        errors.push_back("neuromod.dopamine.scale must be non-negative");
+                        isValid = false;
+                    }
+                }
+            }
+            
+        } catch (const std::bad_variant_access&) {
+            errors.push_back("Invalid type for configuration key: " + entry.key);
+            isValid = false;
+        }
+    }
+    
+    // Store validation errors in a member variable if needed
+    return isValid;
+}
+
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    bool isValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        try {
+            // Check for required keys based on common patterns
+            if (entry.key.find("brain.") == 0) {
+                if (entry.key == "brain.neuron_count") {
+                    auto value = get<int64_t>(entry.key);
+                    if (value && *value <= 0) {
+                        errors.push_back("brain.neuron_count must be positive");
+                        isValid = false;
+                    }
+                } else if (entry.key == "brain.synapse_density") {
+                    auto value = get<double>(entry.key);
+                    if (value && (*value < 0.0 || *value > 1.0)) {
+                        errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+                        isValid = false;
+                    }
+                }
+            } else if (entry.key.find("plasticity.") == 0) {
+                if (entry.key == "plasticity.stdp.enable") {
+                    auto value = get<bool>(entry.key);
+                    if (!value) {
+                        errors.push_back("plasticity.stdp.enable must be specified");
+                        isValid = false;
+                    }
+                }
+            } else if (entry.key.find("neuromod.") == 0) {
+                if (entry.key == "neuromod.dopamine.scale") {
+                    auto value = get<double>(entry.key);
+                    if (value && *value < 0.0) {
+                        errors.push_back("neuromod.dopamine.scale must be non-negative");
+                        isValid = false;
+                    }
+                }
+            }
+            
+        } catch (const std::bad_variant_access&) {
+            errors.push_back("Invalid type for configuration key: " + entry.key);
+            isValid = false;
+        }
+    }
+    
+    return errors;
+}
+
+void Config::merge(const Config& other) {
+    for (const auto& entry : other.pImpl->entries) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key = entry.key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            pImpl->entries.push_back(entry);
+        } else {
+            // Override with value from other config
+            it->value = entry.value;
+            it->source = entry.source;
+        }
+    }
 }
 
 bool Config::has(const std::string& key) const {

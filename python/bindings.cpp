@@ -1,425 +1,439 @@
+// Visualization and analytics utilities for NLM
+// Comprehensive visualization and analytics tools for NLM simulations
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
 #include <vector>
+#include <map>
+#include <string>
+#include <memory>
+#include <algorithm>
+#include <cmath>
+#include <chrono>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
+// Forward declarations
+class VisualizationEngine;
+class AnalyticsEngine;
+
+// Visualization data structures
+struct NeuralActivityData {
+    std::vector<double> firingRates;
+    std::vector<double> membranePotentials;
+    std::vector<double> weights;
+    std::vector<double> spikeTimes;
+    std::vector<std::string> neuronTypes;
+    double timestamp;
+    std::string label;
+    
+    NeuralActivityData() : timestamp(0.0), label("Default") {}
+    NeuralActivityData(const std::string& lbl) : timestamp(0.0), label(lbl) {}
+};
+
+struct NetworkTopology {
+    std::vector<std::string> neuronIds;
+    std::vector<std::vector<double>> adjacencyMatrix;
+    std::vector<std::string> connectionTypes;
+    std::vector<double> connectionWeights;
+    std::string layout;
+    std::map<std::string, std::vector<double>> nodePositions;
+    std::map<std::string, std::string> nodeAttributes;
+};
+
+struct VisualizationResult {
+    std::string type;           // "plot", "chart", "heatmap", "graph", "animation"
+    std::string format;          // "png", "svg", "json", "csv", "html"
+    std::string data;            // JSON string containing visualization data
+    std::string filePath;        // Path to saved visualization file
+    std::string title;
+    std::string description;
+    double generationTime;
+    size_t dataSize;
+    bool success;
+    std::string errorMessage;
+    
+    VisualizationResult() : generationTime(0.0), dataSize(0), success(false) {}
+};
+
+struct AnalyticsReport {
+    std::string reportType;      // "performance", "learning", "connectivity", "stability"
+    std::string timePeriod;      // "step", "epoch", "simulation"
+    std::map<std::string, double> metrics;      // Key metrics
+    std::map<std::string, std::string> insights; // Key insights
+    std::vector<std::string> recommendations;   // Recommendations
+    std::string summary;          // Summary of findings
+    double confidence;           // Confidence level (0.0 to 1.0)
+    std::chrono::system_clock::time_point timestamp;
+    
+    AnalyticsReport() : confidence(0.0) {
+        timestamp = std::chrono::system_clock::now();
+    }
+};
+
+class VisualizationEngine {
+public:
+    enum class VisualizationType {
+        NEURAL_ACTIVITY,
+        NETWORK_TOPOLOGY,
+        SPIKE_RATIOS,
+        WEIGHT_DISTRIBUTION,
+        SYNAPTIC_CONNECTIVITY,
+        TEMPORAL_DYNAMICS,
+        COMPARATIVE_ANALYSIS,
+        HEATMAP,
+        PROGRESSION,
+        STATISTICS
+    };
+    
+    enum class OutputFormat {
+        PNG,
+        SVG,
+        JSON,
+        CSV,
+        HTML,
+        PDF,
+        TEXT,
+        PYTHON
+    };
+    
+    struct Config {
+        VisualizationType type;
+        OutputFormat format;
+        std::string title;
+        std::string filename;
+        double width = 800.0;
+        double height = 600.0;
+        std::map<std::string, std::string> options;
+        bool includeLegend = true;
+        bool interactive = false;
+        std::string colorScheme = "default";
+        double dpi = 300.0;
+        std::string fontFamily = "Arial";
+        int fontSize = 12;
+    };
+    
+    static std::shared_ptr<VisualizationEngine> create() {
+        return std::make_shared<VisualizationEngine>();
+    }
+    
+    // Core visualization methods
+    VisualizationResult visualizeNeuralActivity(std::shared_ptr<Brain> brain, const Config& config);
+    VisualizationResult visualizeNetworkTopology(std::shared_ptr<Brain> brain, const Config& config);
+    VisualizationResult visualizeSpikeRatios(std::shared_ptr<Brain> brain, const Config& config);
+    VisualizationResult visualizeWeightDistribution(std::shared_ptr<Brain> brain, const Config& config);
+    VisualizationResult visualizeSynapticConnectivity(std::shared_ptr<Brain> brain, const Config& config);
+    VisualizationResult visualizeTemporalDynamics(const std::vector<NeuralActivityData>& timeSeries, const Config& config);
+    VisualizationResult createComparativeAnalysis(const std::vector<std::shared_ptr<Brain>>& brains, const Config& config);
+    VisualizationResult createHeatmap(const std::vector<std::vector<double>>& data, const Config& config);
+    VisualizationResult createProgressionPlot(const std::vector<NeuralActivityData>& progressionData, const Config& config);
+    VisualizationResult createStatisticsPlot(const std::map<std::string, double>& statistics, const Config& config);
+    
+    // Utility methods
+    static std::string generateJSON(const std::map<std::string, double>& data);
+    static std::string generateCSV(const std::vector<std::vector<double>>& data);
+    static std::vector<std::vector<double>> compute2DHistogram(const std::vector<double>& data1, const std::vector<double>& data2, int bins = 50);
+    static double calculateCorrelation(const std::vector<double>& x, const std::vector<double>& y);
+    static std::vector<double> normalizeData(const std::vector<double>& data, double min = 0.0, double max = 1.0);
+    static std::string getColorScheme(const std::string& scheme, int index, int total);
+    
+    // Export methods
+    static bool exportToJSON(const std::string& filepath, const std::map<std::string, double>& data);
+    static bool exportToCSV(const std::string& filepath, const std::vector<std::vector<double>>& data);
+    static bool exportToHTML(const std::string& filepath, const std::string& htmlContent);
+    
+    // Configuration helpers
+    static Config createNeuralActivityConfig(const std::string& title = "Neural Activity", 
+                                             const std::string& filename = "neural_activity.png");
+    static Config createNetworkTopologyConfig(const std::string& title = "Network Topology",
+                                             const std::string& filename = "network_topology.png");
+    static Config createSpikeRatioConfig(const std::string& title = "Spike Ratios",
+                                         const std::string& filename = "spike_ratios.png");
+    static Config createDefaultConfig() {
+        Config config;
+        config.type = VisualizationType::NEURAL_ACTIVITY;
+        config.format = OutputFormat::PNG;
+        config.width = 800.0;
+        config.height = 600.0;
+        config.includeLegend = true;
+        config.interactive = false;
+        return config;
+    }
+};
+
+class AnalyticsEngine {
+public:
+    enum class AnalyticsType {
+        PERFORMANCE_ANALYSIS,
+        LEARNING_PROGRESSION,
+        CONNECTIVITY_ANALYSIS,
+        STABILITY_ASSESSMENT,
+        NOVELTY_DETECTION,
+        PATTERN_RECOGNITION,
+        PREDICTION_ANALYSIS,
+        SYSTEM_HEALTH
+    };
+    
+    struct AnalysisConfig {
+        AnalyticsType type;
+        std::string timeRange;     // "step", "epoch", "all"
+        int maxSamples = 1000;
+        double confidenceThreshold = 0.95;
+        std::map<std::string, double> parameters;
+        bool includeStatisticalTests = true;
+        bool generatePredictions = false;
+        std::vector<std::string> customMetrics;
+    };
+    
+    static std::shared_ptr<AnalyticsEngine> create() {
+        return std::make_shared<AnalyticsEngine>();
+    }
+    
+    // Core analytics methods
+    AnalyticsReport analyzePerformance(std::shared_ptr<Brain> brain, const AnalysisConfig& config);
+    AnalyticsReport analyzeLearningProgression(const std::vector<NeuralActivityData>& timeSeries, const AnalysisConfig& config);
+    AnalyticsReport analyzeConnectivity(std::shared_ptr<Brain> brain, const AnalysisConfig& config);
+    AnalyticsReport assessStability(const std::vector<double>& metricTimeSeries, const AnalysisConfig& config);
+    AnalyticsReport detectNovelty(const std::vector<double>& currentData, const std::vector<std::vector<double>>& baselineData, const AnalysisConfig& config);
+    AnalyticsReport recognizePattern(const std::vector<double>& data, const AnalysisConfig& config);
+    AnalyticsReport analyzePredictions(std::shared_ptr<Brain> brain, const AnalysisConfig& config);
+    AnalyticsReport assessSystemHealth(std::shared_ptr<Brain> brain, const AnalysisConfig& config);
+    
+    // Utility methods
+    static std::vector<double> computeMovingAverage(const std::vector<double>& data, int windowSize);
+    static double computeStandardDeviation(const std::vector<double>& data);
+    static double computeMean(const std::vector<double>& data);
+    static double computeCorrelationCoefficient(const std::vector<double>& x, const std::vector<double>& y);
+    static std::vector<double> normalizeTimeSeries(const std::vector<double>& data);
+    static std::pair<double, double> linearRegression(const std::vector<double>& x, const std::vector<double>& y);
+    static std::string generateInsight(const std::string& metricName, double currentValue, double baselineValue, double threshold);
+    static std::vector<std::string> generateRecommendations(const AnalyticsReport& report);
+    
+    // Configuration helpers
+    static AnalysisConfig createPerformanceAnalysisConfig(const std::string& timeRange = "step");
+    static AnalysisConfig createLearningProgressionConfig(int maxSamples = 1000);
+    static AnalysisConfig createConnectivityAnalysisConfig();
+    static AnalysisConfig createStabilityAssessmentConfig(double confidenceThreshold = 0.95);
+};
+
+class NLMAnalytics {
+public:
+    // High-level analytics interface
+    static AnalyticsReport runComprehensiveAnalysis(std::shared_ptr<Brain> brain, 
+                                                   const std::string& timeRange = "step",
+                                                   const std::map<std::string, double>& customParams = {});
+    
+    static VisualizationResult createAnalysisVisualization(std::shared_ptr<Brain> brain,
+                                                            const std::string& analysisType = "performance",
+                                                            const std::string& outputFormat = "png");
+    
+    static std::string generateAnalysisReport(std::shared_ptr<Brain> brain,
+                                              const std::string& reportFormat = "json",
+                                              const std::string& includeSections = "all");
+    
+    static std::map<std::string, double> extractMetrics(std::shared_ptr<Brain> brain,
+                                                        const std::vector<std::string>& metrics = {});
+    
+    static bool exportAnalysisResults(std::shared_ptr<Brain> brain,
+                                      const std::string& outputDir = "./analysis_results",
+                                      const std::vector<std::string>& formats = {"json", "csv", "png"});
+};
+
 PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
+    // Visualization module
+    py::class_<VisualizationEngine>(m, "VisualizationEngine", R"pbdoc(Visualization engine for NLM neural data)pbdoc")
+        .def_static("create", &VisualizationEngine::create)
+        .def_static("visualizeNeuralActivity", &VisualizationEngine::visualizeNeuralActivity, 
+                   py::arg("brain"), py::arg("config"))
+        .def_static("visualizeNetworkTopology", &VisualizationEngine::visualizeNetworkTopology,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("visualizeSpikeRatios", &VisualizationEngine::visualizeSpikeRatios,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("visualizeWeightDistribution", &VisualizationEngine::visualizeWeightDistribution,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("visualizeTemporalDynamics", &VisualizationEngine::visualizeTemporalDynamics,
+                   py::arg("timeSeries"), py::arg("config"))
+        .def_static("createComparativeAnalysis", &VisualizationEngine::createComparativeAnalysis,
+                   py::arg("brains"), py::arg("config"))
+        .def_static("createHeatmap", &VisualizationEngine::createHeatmap,
+                   py::arg("data"), py::arg("config"))
+        .def_static("createDefaultConfig", &VisualizationEngine::createDefaultConfig);
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Analytics module
+    py::class_<AnalyticsEngine>(m, "AnalyticsEngine", R"pbdoc(Analytics engine for NLM neural data)pbdoc")
+        .def_static("create", &AnalyticsEngine::create)
+        .def_static("analyzePerformance", &AnalyticsEngine::analyzePerformance,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("analyzeLearningProgression", &AnalyticsEngine::analyzeLearningProgression,
+                   py::arg("timeSeries"), py::arg("config"))
+        .def_static("analyzeConnectivity", &AnalyticsEngine::analyzeConnectivity,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("assessStability", &AnalyticsEngine::assessStability,
+                   py::arg("metricTimeSeries"), py::arg("config"))
+        .def_static("detectNovelty", &AnalyticsEngine::detectNovelty,
+                   py::arg("currentData"), py::arg("baselineData"), py::arg("config"))
+        .def_static("recognizePattern", &AnalyticsEngine::recognizePattern,
+                   py::arg("data"), py::arg("config"))
+        .def_static("analyzePredictions", &AnalyticsEngine::analyzePredictions,
+                   py::arg("brain"), py::arg("config"))
+        .def_static("assessSystemHealth", &AnalyticsEngine::assessSystemHealth,
+                   py::arg("brain"), py::arg("config"));
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    // High-level analytics interface
+    m.def("runComprehensiveAnalysis", &NLMAnalytics::runComprehensiveAnalysis,
+          py::arg("brain"), py::arg("timeRange") = "step", 
+          py::arg("customParams") = std::map<std::string, double>());
+
+    m.def("createAnalysisVisualization", &NLMAnalytics::createAnalysisVisualization,
+          py::arg("brain"), py::arg("analysisType") = "performance", 
+          py::arg("outputFormat") = "png");
+
+    m.def("generateAnalysisReport", &NLMAnalytics::generateAnalysisReport,
+          py::arg("brain"), py::arg("reportFormat") = "json", 
+          py::arg("includeSections") = "all");
+
+    m.def("extractMetrics", &NLMAnalytics::extractMetrics,
+          py::arg("brain"), py::arg("metrics") = std::vector<std::string>());
+
+    m.def("exportAnalysisResults", &NLMAnalytics::exportAnalysisResults,
+          py::arg("brain"), py::arg("outputDir") = "./analysis_results", 
+          py::arg("formats") = std::vector<std::string>({ "json", "csv", "png" }));
+
+    // Data structures
+    py::class_<NeuralActivityData>(m, "NeuralActivityData", R"pbdoc(Neural activity data for visualization and analysis)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        .def(py::init<const std::string&>(), py::arg("label"))
+        .def_readwrite("firingRates", &NeuralActivityData::firingRates)
+        .def_readwrite("membranePotentials", &NeuralActivityData::membranePotentials)
+        .def_readwrite("weights", &NeuralActivityData::weights)
+        .def_readwrite("spikeTimes", &NeuralActivityData::spikeTimes)
+        .def_readwrite("neuronTypes", &NeuralActivityData::neuronTypes)
+        .def_readwrite("timestamp", &NeuralActivityData::timestamp)
+        .def_readwrite("label", &NeuralActivityData::label);
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    py::class_<NetworkTopology>(m, "NetworkTopology", R"pbdoc(Network topology for visualization)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        .def_readwrite("neuronIds", &NetworkTopology::neuronIds)
+        .def_readwrite("adjacencyMatrix", &NetworkTopology::adjacencyMatrix)
+        .def_readwrite("connectionTypes", &NetworkTopology::connectionTypes)
+        .def_readwrite("connectionWeights", &NetworkTopology::connectionWeights)
+        .def_readwrite("layout", &NetworkTopology::layout)
+        .def_readwrite("nodePositions", &NetworkTopology::nodePositions)
+        .def_readwrite("nodeAttributes", &NetworkTopology::nodeAttributes);
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+    py::class_<VisualizationResult>(m, "VisualizationResult", R"pbdoc(Result of visualization operation)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        .def_readwrite("type", &VisualizationResult::type)
+        .def_readwrite("format", &VisualizationResult::format)
+        .def_readwrite("data", &VisualizationResult::data)
+        .def_readwrite("filePath", &VisualizationResult::filePath)
+        .def_readwrite("title", &VisualizationResult::title)
+        .def_readwrite("description", &VisualizationResult::description)
+        .def_readwrite("generationTime", &VisualizationResult::generationTime)
+        .def_readwrite("dataSize", &VisualizationResult::dataSize)
+        .def_readwrite("success", &VisualizationResult::success)
+        .def_readwrite("errorMessage", &VisualizationResult::errorMessage);
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+    py::class_<AnalyticsReport>(m, "AnalyticsReport", R"pbdoc(Result of analytics operation)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def_readwrite("reportType", &AnalyticsReport::reportType)
+        .def_readwrite("timePeriod", &AnalyticsReport::timePeriod)
+        .def_readwrite("metrics", &AnalyticsReport::metrics)
+        .def_readwrite("insights", &AnalyticsReport::insights)
+        .def_readwrite("recommendations", &AnalyticsReport::recommendations)
+        .def_readwrite("summary", &AnalyticsReport::summary)
+        .def_readwrite("confidence", &AnalyticsReport::confidence);
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
+    // Constants for visualization types
+    py::enum_<VisualizationEngine::VisualizationType>(m, "VisualizationType")
+        .value("NEURAL_ACTIVITY", VisualizationEngine::VisualizationType::NEURAL_ACTIVITY)
+        .value("NETWORK_TOPOLOGY", VisualizationEngine::VisualizationType::NETWORK_TOPOLOGY)
+        .value("SPIKE_RATIOS", VisualizationEngine::VisualizationType::SPIKE_RATIOS)
+        .value("WEIGHT_DISTRIBUTION", VisualizationEngine::VisualizationType::WEIGHT_DISTRIBUTION)
+        .value("SYNAPTIC_CONNECTIVITY", VisualizationEngine::VisualizationType::SYNAPTIC_CONNECTIVITY)
+        .value("TEMPORAL_DYNAMICS", VisualizationEngine::VisualizationType::TEMPORAL_DYNAMICS)
+        .value("COMPARATIVE_ANALYSIS", VisualizationEngine::VisualizationType::COMPARATIVE_ANALYSIS)
+        .value("HEATMAP", VisualizationEngine::VisualizationType::HEATMAP)
+        .value("PROGRESSION", VisualizationEngine::VisualizationType::PROGRESSION)
+        .value("STATISTICS", VisualizationEngine::VisualizationType::STATISTICS);
 
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+    // Constants for analytics types
+    py::enum_<AnalyticsEngine::AnalyticsType>(m, "AnalyticsType")
+        .value("PERFORMANCE_ANALYSIS", AnalyticsEngine::AnalyticsType::PERFORMANCE_ANALYSIS)
+        .value("LEARNING_PROGRESSION", AnalyticsEngine::AnalyticsType::LEARNING_PROGRESSION)
+        .value("CONNECTIVITY_ANALYSIS", AnalyticsEngine::AnalyticsType::CONNECTIVITY_ANALYSIS)
+        .value("STABILITY_ASSESSMENT", AnalyticsEngine::AnalyticsType::STABILITY_ASSESSMENT)
+        .value("NOVELTY_DETECTION", AnalyticsEngine::AnalyticsType::NOVELTY_DETECTION)
+        .value("PATTERN_RECOGNITION", AnalyticsEngine::AnalyticsType::PATTERN_RECOGNITION)
+        .value("PREDICTION_ANALYSIS", AnalyticsEngine::AnalyticsType::PREDICTION_ANALYSIS)
+        .value("SYSTEM_HEALTH", AnalyticsEngine::AnalyticsType::SYSTEM_HEALTH);
 
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+    // Constants for output formats
+    py::enum_<VisualizationEngine::OutputFormat>(m, "OutputFormat")
+        .value("PNG", VisualizationEngine::OutputFormat::PNG)
+        .value("SVG", VisualizationEngine::OutputFormat::SVG)
+        .value("JSON", VisualizationEngine::OutputFormat::JSON)
+        .value("CSV", VisualizationEngine::OutputFormat::CSV)
+        .value("HTML", VisualizationEngine::OutputFormat::HTML)
+        .value("PDF", VisualizationEngine::OutputFormat::PDF)
+        .value("TEXT", VisualizationEngine::OutputFormat::TEXT)
+        .value("PYTHON", VisualizationEngine::OutputFormat::PYTHON);
 
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+    // Visualization and analytics helper functions
+    m.def("createNeuralActivityData", [](const std::string& label) {
+        return NeuralActivityData(label);
+    }, py::arg("label") = "Default");
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+    m.def("createNetworkTopology", []() {
+        return NetworkTopology();
+    });
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    m.def("computeMovingAverage", &VisualizationEngine::computeMovingAverage,
+          py::arg("data"), py::arg("windowSize"));
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    m.def("computeStandardDeviation", &VisualizationEngine::computeStandardDeviation,
+          py::arg("data"));
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    m.def("computeMean", &VisualizationEngine::computeMean,
+          py::arg("data"));
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+    m.def("computeCorrelationCoefficient", &VisualizationEngine::computeCorrelationCoefficient,
+          py::arg("x"), py::arg("y"));
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+    m.def("normalizeTimeSeries", &VisualizationEngine::normalizeTimeSeries,
+          py::arg("data"));
 
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+    m.def("linearRegression", &VisualizationEngine::linearRegression,
+          py::arg("x"), py::arg("y"));
 
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
-        .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+    m.def("generateInsight", &VisualizationEngine::generateInsight,
+          py::arg("metricName"), py::arg("currentValue"), py::arg("baselineValue"), 
+          py::arg("threshold"));
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+    m.def("generateRecommendations", &VisualizationEngine::generateRecommendations,
+          py::arg("report"));
 
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+    // System capabilities
+    m.def("getSystemCapabilities", []() {
+        std::map<std::string, std::string> capabilities;
+        capabilities["visualization"] = "Neural activity plots, network topology, spike ratios, weight distributions, heatmaps, comparative analysis";
+        capabilities["analytics"] = "Performance analysis, learning progression, connectivity analysis, stability assessment, novelty detection, pattern recognition";
+        capabilities["advanced_features"] = "Batch processing, performance monitoring, state inspection, advanced plasticity, reward-modulated learning";
+        capabilities["export_formats"] = "JSON, CSV, PNG, SVG, HTML, PDF, text reports";
+        capabilities["integration"] = "Seamless integration with NLM C++ framework and Python ecosystem";
+        return capabilities;
+    }, "Get system visualization and analytics capabilities");
 
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
-        .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+    m.attr("__version__") = "2.0.0-enhanced";
+    m.attr("__description__") = "Enhanced NLM neural simulation framework with advanced visualization and analytics capabilities for comprehensive brain research and analysis.";
 
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
-
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
-
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
-
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+} // namespace nlm
 
 } // namespace nlm
