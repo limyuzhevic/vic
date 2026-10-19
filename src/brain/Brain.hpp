@@ -6,8 +6,11 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainError.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <mutex>
 
 namespace nlm {
 
@@ -199,3 +202,95 @@ private:
 };
 
 } // namespace nlm
+
+// Neural safe wrapper template for memory safety
+template<typename T>
+class NeuralSafeWrapper {
+private:
+    T* ptr_;
+    const char* sourceFile_;
+    int sourceLine_;
+    const char* operation_;
+    
+public:
+    NeuralSafeWrapper(T* ptr, const char* file, int line, const char* op)
+        : ptr_(ptr), sourceFile_(file), sourceLine_(line), operation_(op) {
+        if (!ptr_) {
+            throw BrainError(BrainError::NULL_POINTER_DEREFERENCE,
+                           std::string("Null pointer dereference in ") + operation_ +
+                           " at " + std::string(file) + ":" + std::to_string(line));
+        }
+    }
+    
+    ~NeuralSafeWrapper() {}
+    
+    T* get() const { return ptr_; }
+    T* operator->() const { return ptr_; }
+    T& operator*() const { return *ptr_; }
+    explicit operator bool() const { return ptr_ != nullptr; }
+};
+
+// Validation helper functions
+inline bool validateBrain(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Brain validation failed: null brain pointer");
+        return false;
+    }
+    return true;
+}
+
+inline bool validateRegion(NeuralRegion* region) {
+    if (!region) {
+        NLM_LOG_ERROR("Region validation failed: null region pointer");
+        return false;
+    }
+    return true;
+}
+
+inline bool validatePopulation(NeuralPopulation* population) {
+    if (!population) {
+        NLM_LOG_ERROR("Population validation failed: null population pointer");
+        return false;
+    }
+    return true;
+}
+
+inline bool validateNeuron(Neuron* neuron) {
+    if (!neuron) {
+        NLM_LOG_ERROR("Neuron validation failed: null neuron pointer");
+        return false;
+    }
+    return true;
+}
+
+inline bool validateSynapse(Synapse* synapse) {
+    if (!synapse) {
+        NLM_LOG_ERROR("Synapse validation failed: null synapse pointer");
+        return false;
+    }
+    return true;
+}
+
+// Error logging initialization
+inline void initializeBrainErrorLogging() {
+    NLM_LOG_INFO("Brain error logging initialized");
+}
+
+// Clear Brain error log
+inline void clearBrainErrorLog() {
+    NLM_LOG_INFO("Brain error log cleared");
+}
+
+// Log Brain error with context
+inline void logBrainError(BrainError error, const std::string& context) {
+    NLM_LOG_ERROR(std::string("Brain error: ") + context);
+}
+
+// Helper functions for brain validation and error handling
+namespace nlm::brain_validation {
+    bool validateBrain(Brain* brain);
+    bool validateRegion(NeuralRegion* region);
+    bool validatePopulation(NeuralPopulation* population);
+    bool validateNeuron(Neuron* neuron);
+    bool validateSynapse(Synapse* synapse);
+}

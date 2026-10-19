@@ -21,6 +21,16 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Brain (improved with comprehensive error handling and memory management)
+add_library(nlm_brain_improved STATIC
+    src/brain/BrainImproved.cpp
+)
+target_include_directories(nlm_brain_improved PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_brain_improved PUBLIC nlm_core)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -29,11 +39,12 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
+    # Note: Original Brain.cpp is kept for backward compatibility
     src/brain/Brain.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
@@ -65,6 +76,7 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/AttentionalSelection.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
