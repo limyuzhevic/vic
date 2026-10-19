@@ -99,6 +99,9 @@ public:
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
 
+    // Set maximum number of episodes
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
+
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
 

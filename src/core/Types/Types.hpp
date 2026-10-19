@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -33,6 +34,19 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    constexpr SynapseId& operator++() {
+        ++value;
+        return *this;
+    }
+    
+    // Postfix increment
+    constexpr SynapseId operator++(int) {
+        SynapseId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Region identifier
@@ -47,6 +61,19 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    constexpr RegionId& operator++() {
+        ++value;
+        return *this;
+    }
+    
+    // Postfix increment
+    constexpr RegionId operator++(int) {
+        RegionId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Population identifier
@@ -61,6 +88,19 @@ struct PopulationId {
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Prefix increment
+    constexpr PopulationId& operator++() {
+        ++value;
+        return *this;
+    }
+    
+    // Postfix increment
+    constexpr PopulationId operator++(int) {
+        PopulationId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Simulation step counter
@@ -190,3 +230,12 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Custom hash for NeuronId in global namespace for std::unordered_map
+namespace std {
+    template<> struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+}

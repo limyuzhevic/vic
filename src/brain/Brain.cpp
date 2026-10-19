@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -48,7 +49,7 @@ struct Brain::Impl {
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<nlm::Novelty> novelty;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -128,7 +129,7 @@ struct Brain::Impl {
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        novelty = std::make_unique<nlm::Novelty>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1061,9 +1062,9 @@ Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
+    nlm::Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();

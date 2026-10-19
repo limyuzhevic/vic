@@ -66,6 +66,7 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Core Library
 ```bash
 mkdir build
 cd build
@@ -73,46 +74,253 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Bindings
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON=ON
+make pynlm_bindings
+```
+
+The Python bindings will be built as `pynlm.so` in the `build/python/` directory.
+
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2: Basic Neural Computation Demo
+```bash
+./nlm
+```
+
+### Phase 3: Learning Environment Demo
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4: Social Learning Demo
+```bash
+./nlm_phase4_demo
+```
+
+### Phase 5: Performance Optimized Demo
+```bash
+./nlm_phase5_demo
+```
+
+### Phase 6: Final Integration Test
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Phase 6: Integrated Experiment
+```bash
+./nlm_phase6_integrated
+```
+
+## Python Usage Examples
+
+### Basic Brain Simulation
+```python
+from pynlm import createBrain, createSimpleWorld, createDefaultConfig
+
+# Create a brain with configuration
+config = createDefaultConfig()
+brain = createBrain(config)
+
+# Initialize brain
+brain.initialize()
+
+# Create a simple world
+world = createSimpleWorld()
+world.configure(100, 100, 20, 20)
+world.setAgentStart(50, 50)
+
+# Run a simple simulation
+for step in range(100):
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process sensory input through brain
+    # (In practice, use AgentBrain for this)
+    
+    # Update world
+    world.update(0.001)
+
+brain.logStatus()
+```
+
+### Advanced Usage with Performance Monitoring
+```python
+from pynlm import (
+    createBrain, createDefaultConfig, createSimpleWorld,
+    createPerformanceMonitor, SimulationHelper
+)
+
+# Create brain and monitor
+config = createOptimizedConfig({
+    "NLM_RANDOM_SEED": "12345",
+    "NLM_NEURON_COUNT": "1000"
+})
+
+brain = createBrain(config)
+monitor = createPerformanceMonitor()
+brain.initialize()
+
+# Create simulation helper
+helper = brain.createSimulationHelper()
+
+# Run episode and collect statistics
+inputs = [createSimpleVisionInput()] * 50
+stats = helper.runAndCollectStats(50, inputs)
+print(f"Simulation stats: {stats}")
+
+# Get performance metrics
+print(f"Average time per step: {monitor.getAverageTimePerStep()} ms")
+print(f"Total steps: {monitor.getStepCount()}")
+
+# Validate configuration
+errors = validateConfig(config)
+if errors:
+    print(f"Configuration errors: {errors}")
+else:
+    print("Configuration is valid!")
+```
+
+### NumPy Integration
+```python
+import numpy as np
+from pynlm import createSimpleVisionInput
+
+# Create vision input and convert to NumPy
+vision = createSimpleVisionInput(64, 64, 3)
+numpy_array = vision.to_numpy()
+
+print(f"Vision array shape: {numpy_array.shape}")
+print(f"Vision array dtype: {numpy_array.dtype}")
+
+# Create new vision from NumPy array
+vision2 = createSimpleVisionInput()
+vision2.setData(numpy_array)
+```
+
+### Error Handling
+```python
+from pynlm import createBrain, createDefaultConfig, NLMError, check, safeExecute
+
+try:
+    config = createDefaultConfig()
+    brain = createBrain(config)
+    
+    # Validate configuration
+    check(config.has("neuron_count"), "Configuration must have neuron_count")
+    
+    # Safely execute operations
+    safeExecute(lambda: brain.initialize(), "Brain initialization failed")
+    
+    brain.logStatus()
+    
+except NLMError as e:
+    print(f"NLM Error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Documentation and Help
+```python
+from pynlm import show_docs
+
+# Display comprehensive documentation
+docs = show_docs()
+print(docs)
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── Python Bindings:
+│   ├── python/              # Python bindings directory
+│   │   ├── bindings.cpp     # Enhanced C++ bindings
+│   │   └── CMakeLists.txt   # Python build system
+│   └── examples/            # Example scripts (future)
+│
+├── C++ Core Library:
+│   ├── src/               # Source directory
+│   │   ├── core/          # Core utilities
+│   │   ├── brain/         # Neural components
+│   │   ├── memory/        # Memory systems
+│   │   ├── cognition/     # Cognitive mechanisms
+│   │   ├── sensory/       # Sensory processing
+│   │   ├── motor/         # Motor system
+│   │   ├── prediction/    # Prediction systems
+│   │   ├── neuromodulation/# Neuromodulators
+│   │   ├── development/   # Developmental system
+│   │   ├── plasticity/    # Plasticity rules
+│   │   ├── world/         # Environment interface
+│   │   └── experiments/   # Experiment framework
+│   └── main.cpp          # Main executable
+│
+├── Tests:
+│   ├── tests/            # Test directory
+│   │   ├── test_*.cpp     # Unit tests
+│   │   └── test_*.py      # Python bindings tests
+│
+├── Documentation:
+│   ├── README.md         # Main documentation
+│   ├── HOW_TO_USE.md     # Usage guide
+│   └── easy_usage.md     # Quick start guide
+│
+└── Config:
+    └── configs/          # Configuration files
 ```
+
+## Features
+
+### Enhanced Python Bindings
+
+#### Core Classes
+- **Brain**: Central neural simulation with performance monitoring
+- **Config**: Configuration management with validation
+- **AgentBrain**: Agent-brain interface for world interaction
+- **SimpleWorld**: 2D world simulation with physics
+- **Vision/Audio**: Sensory input with NumPy integration
+- **Action**: Motor action representation
+- **SensoryPercept**: Sensory perception data
+
+#### New Features
+- **Performance Monitoring**: Built-in timing and memory tracking
+- **Simulation Helpers**: Advanced simulation control utilities
+- **Error Handling**: Comprehensive exception handling
+- **Memory Management**: Efficient memory conversion utilities
+- **Configuration Validation**: Configuration validation and optimization
+- **NumPy Integration**: Seamless NumPy array support
+- **Debugging Tools**: Network visualization and debug utilities
+
+#### Advanced APIs
+- **Optimized Configuration**: Environment-based configuration
+- **Memory Snapshots**: Neural state backup and comparison
+- **Safe Execution**: Wrapper functions with error handling
+- **Documentation Help**: Comprehensive documentation access
+
+### C++ Code Quality Improvements
+
+#### Performance Optimizations
+- **Optimized Build Flags**: -O3 -march=native -ffast-math
+- **Memory Pooling**: Efficient memory allocation
+- **SIMD Vectorization**: Parallel processing capabilities
+- **Cache Optimization**: Improved data locality
+
+#### Code Structure
+- **Modular Design**: Well-separated concerns
+- **Type Safety**: Strong typing with validation
+- **Error Handling**: Comprehensive error management
+- **Documentation**: Doxygen-style comments
+- **Memory Safety**: Smart pointer usage throughout
+
+#### Validation and Safety
+- **Configuration Validation**: Input range checking
+- **Memory Bounds**: Bounds checking in critical sections
+- **Exception Safety**: Strong exception guarantee where needed
+- **Thread Safety**: Thread-safe data structures where appropriate
 
 ## Phase Summary
 
@@ -228,3 +436,7 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Acknowledgments
+
+This project builds on decades of research in computational neuroscience, artificial intelligence, and neural systems. Special thanks to the open-source community for contributing tools and libraries used in this project.

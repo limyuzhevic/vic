@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -70,7 +71,7 @@ public:
     void reset();
     
     // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
+    void initializeRandomConnectivity(RandomGenerator& rng, 
                                       float connectionProbability,
                                       float meanWeight,
                                       float weightVariance);

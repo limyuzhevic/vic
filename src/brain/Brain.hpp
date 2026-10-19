@@ -26,7 +26,7 @@ class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
-class Novelty;
+class nlm::Novelty;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
@@ -179,7 +179,7 @@ public:
     Curiosity* getCuriosity();
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    nlm::Novelty* getNovelty();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
