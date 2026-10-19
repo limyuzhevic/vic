@@ -73,6 +73,92 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
+## The 3 Things You Need to Know
+
+1. **Brain** - The virtual brain that thinks
+2. **World** - The environment the brain lives in
+3. **Agent** - The bridge connecting brain to world
+
+---
+
+## Quick Start (C++ CLI Version)
+
+For the C++ command-line interface version (new enhanced version), here are some basic examples:
+
+### Simple Brain Test (Demo Mode)
+
+```bash
+# Run basic connectivity, plasticity, and STDP tests
+./nlm
+
+# Or specify demo mode explicitly
+./nlm --mode demo
+```
+
+### Learning Experiment
+
+```bash
+# Run plasticity learning experiment with custom settings
+./nlm --mode learning --iterations 1000 --pattern random --verbose
+
+# With output to file
+./nlm --mode learning --output learning_results.txt --iterations 500
+```
+
+### Performance Benchmark
+
+```bash
+# Run performance benchmarks
+./nlm --mode benchmark
+
+# Custom benchmark with specific iterations
+./nlm --mode benchmark --iterations 20
+
+# With verbose output
+./nlm --mode benchmark --verbose --output benchmark_results.json
+```
+
+### Curiosity-Driven Exploration
+
+```bash
+# Run exploration mode
+./nlm --mode explore --duration 60  # 60 second exploration
+
+# With pattern-based exploration
+./nlm --mode explore --pattern sinusoidal --verbose
+```
+
+### Parameter Comparison
+
+```bash
+# Compare different parameter sets
+./nlm --mode compare
+
+# With custom output
+./nlm --mode compare --output comparison_results.txt
+```
+
+### Help and Usage
+
+```bash
+# Show all available modes and their descriptions
+./nlm --help-modes
+
+# Show all command-line options
+./nlm --help-options
+
+# Show complete usage with examples
+./nlm --help-usage
+
+# Validate configuration file
+./nlm --validate --config myconfig.cfg
+
+# List available configuration files
+./nlm --list-configs
+```
+
+---
+
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -271,6 +357,20 @@ print("Agent simulation complete!")
 
 ---
 
+## Quick Reference for C++ CLI
+
+| What you want | Command |
+|--------------|---------|
+| Run demo tests | `./nlm` or `./nlm --mode demo` |
+| Run learning experiment | `./nlm --mode learning --iterations 1000` |
+| Run benchmark | `./nlm --mode benchmark --iterations 10` |
+| Run exploration | `./nlm --mode explore --duration 60` |
+| Compare parameters | `./nlm --mode compare` |
+| Get help | `./nlm --help-modes` or `./nlm --help-options` |
+| Validate config | `./nlm --validate --config myconfig.cfg` |
+
+---
+
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
@@ -295,3 +395,16 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+## New Enhanced CLI Features
+
+The enhanced C++ CLI version now includes:
+
+- **Multiple execution modes**: demo, learning, benchmark, explore, compare
+- **Comprehensive help system** with detailed descriptions
+- **Configuration validation** and error checking
+- **Batch processing** for automated testing
+- **Output logging** to files
+- **Advanced options** for power users
+- **Progress tracking** and timing information
+- **Parameter sensitivity analysis** capabilities

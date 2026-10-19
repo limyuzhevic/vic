@@ -70,34 +70,494 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 4: Using the Enhanced C++ Command-Line Interface
 
-### From Source (Recommended for Development)
+NLM now includes an enhanced command-line interface with multiple execution modes, comprehensive help system, and advanced configuration options. This makes it easier to use NLM for different purposes (research, education, performance testing, etc.) without needing to write custom code.
+
+### New Modes Available
+
+The enhanced CLI provides several execution modes:
+
+- **demo** (default): Phase 6 integration test with connectivity, plasticity, and STDP verification
+- **learning**: Plasticity learning experiment with detailed metrics
+- **benchmark**: Performance testing with detailed timing measurements
+- **explore**: Curiosity-driven exploration with adaptive input patterns
+- **compare**: Parameter comparison and sensitivity analysis
+- **test**: Basic functionality tests
+
+### Getting Started with the Enhanced CLI
 
 ```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+# Basic usage - runs demo mode
+./nlm
 
-# Build and install
-pip install .
+# Specify mode explicitly
+./nlm --mode learning
 
-# Or install in development mode
-pip install -e .
+# Get comprehensive help
+./nlm --help-modes          # Show mode descriptions
+./nlm --help-options        # Show option details
+./nlm --help-usage          # Show complete usage
+./nlm --version             # Print version information
 ```
 
-### Using pyproject.toml (Modern Python Packaging)
+### Complete Usage Examples
+
+#### 1. Running Different Modes
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
+# Run demo mode (comprehensive integration test)
+./nlm --mode demo
 
-# Build only (without installing)
-pip install build
-python -m build
+# Run learning experiment with custom settings
+./nlm --mode learning --iterations 1000 --pattern random --verbose
 
-# Install specific build from wheel
-pip install dist/*.whl
+# Run performance benchmark
+./nlm --mode benchmark --iterations 20
+
+# Run exploration mode with time limit
+./nlm --mode explore --duration 120
+
+# Compare different parameter sets
+./nlm --mode compare
 ```
+
+#### 2. Configuration and Output Options
+
+```bash
+# Load specific configuration file
+./nlm --config myconfig.cfg
+
+# Save results to file
+./nlm --output results.json
+
+# Validate configuration before running
+./nlm --validate --config production.cfg
+
+# List available configuration files
+./nlm --list-configs
+```
+
+#### 3. Advanced Options
+
+```bash
+# Enable debug mode with maximum logging
+./nlm --debug --verbose
+
+# Quiet mode - only show errors and final results
+./nlm --quiet
+
+# Batch mode for automated testing
+./nlm --batch --iterations 100
+
+# Custom input patterns
+./nlm --mode explore --pattern sinusoidal
+./nlm --mode learning --pattern correlated
+```
+
+#### 4. Working with Patterns
+
+The enhanced CLI supports different input patterns for experiments:
+
+```bash
+# Random pattern (default for learning)
+./nlm --mode learning --pattern random
+
+# Sinusoidal pattern (smooth input variations)
+./nlm --mode explore --pattern sinusoidal
+
+# Correlated pattern (pre/post firing)
+./nlm --mode learning --pattern correlated
+
+# Pulse pattern (sharp input bursts)
+./nlm --mode explore --pattern pulse
+
+# Custom pattern from file
+./nlm --mode learning --pattern custom_input.txt
+```
+
+#### 5. Output Formats and Destinations
+
+```bash
+# Output to console (default)
+./nlm --output stdout
+
+# Output to text file
+./nlm --output results.txt
+
+# Output to JSON file for programmatic analysis
+./nlm --output results.json
+
+# Append to existing log file
+./nlm --output experiment.log --mode benchmark
+```
+
+#### 6. Configuration Validation
+
+The enhanced CLI includes robust configuration validation:
+
+```bash
+# Validate configuration file
+./nlm --validate --config myconfig.cfg
+
+# Check if all required parameters are present
+./nlm --validate
+
+# List all available configuration options
+./nlm --config-options
+```
+
+### Mode Descriptions
+
+#### Demo Mode (Phase 6 Integration Test)
+
+```bash
+./nlm --mode demo
+```
+
+**What it does:** Runs comprehensive integration tests verifying that all NLM systems work together:
+
+- **Basic connectivity:** Tests that spikes propagate through the neural network
+- **Plasticity learning:** Demonstrates measurable synaptic changes through experience
+- **STDP verification:** Confirms spike-timing dependent plasticity works correctly
+
+**Best for:** Initial setup verification, educational demonstrations, quality assurance
+
+#### Learning Mode (Plasticity Experiment)
+
+```bash
+./nlm --mode learning --iterations 1000 --pattern random
+```
+
+**What it does:** Focuses on measurable synaptic changes through repeated experience with configurable input patterns.
+
+**Key features:**
+- Records initial and final brain states
+- Tracks weight changes over time
+- Supports different input patterns (random, sinusoidal, correlated, pulse)
+- Provides detailed learning metrics
+
+**Best for:** Research experiments, parameter tuning, studying learning dynamics
+
+#### Benchmark Mode (Performance Testing)
+
+```bash
+./nlm --mode benchmark --iterations 10
+```
+
+**What it does:** Measures and reports performance characteristics for different network sizes and configurations.
+
+**Key features:**
+- Runs multiple benchmark configurations
+- Measures execution time, spike rates, memory usage
+- Compares against baseline performance
+- Outputs formatted results tables
+
+**Best for:** Performance optimization, capacity planning, system monitoring
+
+#### Explore Mode (Curiosity-Driven Exploration)
+
+```bash
+./nlm --mode explore --duration 60 --pattern sinusoidal
+```
+
+**What it does:** Open-ended exploration with adaptive input based on brain state and curiosity levels.
+
+**Key features:**
+- Random stimulus application
+- Tracks discovery patterns
+- Adapts to network activity
+- Records emergent behaviors
+
+**Best for:** Behavioral research, curiosity studies, discovery experiments
+
+#### Compare Mode (Parameter Sensitivity Analysis)
+
+```bash
+./nlm --mode compare
+```
+
+**What it does:** Runs the same experiment with different parameter sets to identify optimal configurations.
+
+**Key features:**
+- Tests multiple parameter combinations
+- Compares results across configurations
+- Identifies optimal parameter ranges
+- Reports variance analysis
+
+**Best for:** Parameter optimization, sensitivity analysis, experimental design
+
+### Configuration Files
+
+The enhanced CLI supports multiple configuration file formats:
+
+#### Standard Format (configs/*.cfg)
+
+```
+# configs/myexperiment.cfg
+neuron_count = 2000
+region_count = 3
+connection_probability = 0.05
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+```
+
+#### Command Line Override
+
+```bash
+# Load config file and override specific values
+./nlm --config config/base.cfg --neuron_count=5000 --connection_probability=0.1
+```
+
+### Script Automation
+
+The enhanced CLI supports batch processing for automated workflows:
+
+#### Simple Batch Script
+
+```bash
+#!/bin/bash
+
+# Run multiple experiments in batch mode
+for pattern in random sinusoidal correlated pulse; do
+    echo "Running experiment with pattern: $pattern"
+    ./nlm --mode learning --pattern $pattern --output $pattern"_results.txt"
+done
+```
+
+#### Parameter Sweeps
+
+```bash
+#!/bin/bash
+
+# Sweep through different parameter values
+for neurons in 500 1000 2000; do
+    for connections in 0.05 0.1 0.15; do
+        ./nlm --mode learning \
+            --neuron_count $neurons \
+            --connection_probability $connections \
+            --output "n${neurons}_c${connections}.txt"
+    done
+done
+```
+
+#### Parallel Execution
+
+```bash
+#!/bin/bash
+
+# Run multiple experiments in parallel
+for i in {1..5}; do
+    ./nlm --mode learning --iterations 500 --output "run$i.txt" &
+done
+
+wait  # Wait for all background jobs to complete
+```
+
+### File Output Formats
+
+The enhanced CLI supports multiple output formats:
+
+#### Text Format (default for console)
+
+```
+=== DEMON STRATION MODE ===
+Mode: demo
+Duration: 2.34s
+Success: true
+
+Results:
+- Basic connectivity: PASSED
+- Plasticity learning: PASSED
+- STDP verification: PASSED
+```
+
+#### JSON Format
+
+```json
+{
+  "mode": "learning",
+  "duration": 12.5,
+  "success": true,
+  "metrics": {
+    "learning_progress": 0.342,
+    "total_spikes": 15678,
+    "synapse_changes": 234
+  },
+  "output": "Learning experiment completed successfully."
+}
+```
+
+### Advanced Features
+
+#### Log File Support
+
+```bash
+# Log to file in addition to console
+./nlm --log-file nlm_debug.log --debug
+
+# Separate log file for different modes
+./nlm --mode benchmark --log-file benchmark.log
+./nlm --mode learning --log-file learning.log
+```
+
+#### Custom Help and Documentation
+
+```bash
+# Show context-specific help
+./nlm --mode learning --help
+./nlm --mode benchmark --help
+
+# Display version and build information
+./nlm --version
+```
+
+### Troubleshooting
+
+#### Common Issues and Solutions
+
+**"Command not found: nlm"**
+```bash
+# First time building
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+```
+
+**"Unknown option: --myoption"**
+```bash
+# Check available options
+./nlm --help-options
+
+# Or get usage information
+./nlm --help-usage
+```
+
+**"Configuration file not found"**
+```bash
+# Check available configuration files
+./nlm --list-configs
+
+# Or use default configuration
+./nlm --mode learning
+```
+
+**"Permission denied"**
+```bash
+# Check file permissions
+chmod +x nlm
+chmod 644 configs/*.cfg
+```
+
+### Integration with Existing Workflows
+
+The enhanced CLI is fully compatible with existing NLM workflows:
+
+#### Using with Python Scripts
+
+```bash
+#!/usr/bin/env python3
+import subprocess
+import json
+import sys
+
+# Run NLM from Python
+result = subprocess.run([
+    './nlm', '--mode', 'learning', '--iterations', '1000'
+], capture_output=True, text=True)
+
+if result.returncode == 0:
+    print("NLM completed successfully")
+    print(result.stdout)
+else:
+    print("NLM failed:")
+    print(result.stderr)
+    sys.exit(1)
+```
+
+#### Post-Processing Results
+
+```bash
+#!/bin/bash
+
+# Run experiment and parse results
+./nlm --mode benchmark --output raw_results.txt
+
+# Extract specific metrics
+python3 parse_benchmark_results.py raw_results.txt > summary.txt
+
+# Generate plots
+python3 plot_performance.py raw_results.txt performance_plot.png
+```
+
+### Next Steps
+
+After getting familiar with the enhanced CLI:
+
+1. **Read `easy_usage.md`** - Quick start guide with examples
+2. **Read `docs/ARCHITECTURE.md`** - System architecture overview
+3. **Read `docs/PHASE6_FINAL_AUDIT.md`** - Phase 6 integration details
+4. **Experiment with different modes** - Find the right setup for your needs
+5. **Create custom configuration files** - Optimize for your specific use case
+6. **Set up automated workflows** - Batch processing for research
+
+---
+
+## Part 5: Extending the CLI
+
+The enhanced CLI provides hooks for extending functionality:
+
+### Custom Modes
+
+To add a custom mode, modify `src/main.cpp`:
+
+```cpp
+// Add to CommandLineArgs
+std::string customMode = "";
+
+// Add to parseArguments()
+if (arg.find("--custom-mode=") == 0) {
+    args.customMode = arg.substr(18);
+}
+
+// Add to main() processing
+if (args.mode == "custom") {
+    runCustomMode(brain, args);
+}
+```
+
+### Plugin Architecture
+
+The enhanced CLI can be extended with plugins:
+
+```cpp
+// Example plugin interface
+class ModePlugin {
+public:
+    virtual ~ModePlugin() = default;
+    virtual std::string getName() const = 0;
+    virtual void run(std::shared_ptr<Brain> brain, const CommandLineArgs& args) = 0;
+};
+```
+
+### Configuration Schema
+
+Define configuration schema for validation:
+
+```cpp
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "double", "bool", "string"
+    std::string defaultValue;
+    std::string description;
+    bool required;
+};
+```
+
+The enhanced CLI represents a significant improvement over the original basic interface, providing comprehensive functionality for diverse use cases while maintaining backward compatibility. It supports scientific research, educational purposes, performance optimization, and automated testing scenarios with robust configuration management and output flexibility.
 
 ### Verifying Installation
 
