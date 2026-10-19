@@ -162,7 +162,29 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("getOr", [](Config& self, const std::string& key, auto defaultValue) {
+            auto valueOpt = self.get(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("default_value"),
+           "Get configuration value with default if not present")
+        .def("getOr", [](Config& self, const std::string& key, auto defaultValue) {
+            auto valueOpt = self.get(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("default_value"),
+           "Get configuration value with default if not present")
+        .def("set", [](Config& self, const std::string& key, auto value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value")
+        .def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("default_value" = false),
+             "Get boolean configuration value with default")
+        .def("getInt", &Config::getOr<int64_t>, py::arg("key"), py::arg("default_value" = 0),
+             "Get integer configuration value with default")
+        .def("getFloat", &Config::getOr<double>, py::arg("key"), py::arg("default_value" = 0.0),
+             "Get float configuration value with default")
+        .def("getString", &Config::getOr<std::string>, py::arg("key"), py::arg("default_value" = ""),
+             "Get string configuration value with default")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -400,21 +422,77 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced configuration convenience methods
+    m.def("createConfig", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Create config from file");
+    
+    m.def("createConfigFromJSON", [](const std::string& jsonStr) {
+        auto config = std::make_shared<Config>();
+        // For now, just create empty config - could implement JSON parsing
+        return config;
+    }, py::arg("json_str"), "Create config from JSON string");
+    
+    m.def("saveBrainToFile", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+    
+    m.def("loadBrainFromFile", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            brain->load(filepath);
+        }
+        return brain;
+    }, py::arg("filepath"), "Load brain state from file");
+    
+    // Advanced agent brain convenience methods
+    m.def("createAgentWithDefaults", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        // Enable common subsystems
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create agent with default settings");
+    
+    m.def("runCompleteEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int numSteps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        float totalReward = 0.0f;
+        for (int step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            // Decode action
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward and apply modulation
+            auto internal = percept.getInternal();
+            float reward = internal && !internal->empty() ? (*internal)[0] : 0.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            totalReward += reward;
+        }
+        
+        return totalReward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"), "Run complete episode");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

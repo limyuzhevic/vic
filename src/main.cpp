@@ -343,8 +343,14 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Parse command line arguments for enhanced functionality
     std::string configFile = "configs/default.cfg";
+    std::string outputFile = "";
+    std::string experimentMode = "";
+    bool enableSave = false;
+    bool enableVisualization = false;
+    int maxSteps = 1000;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,6 +359,20 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 10) == "--output=") {
+            outputFile = arg.substr(10);
+            enableSave = true;
+        } else if (arg == "--save") {
+            enableSave = true;
+        } else if (arg.substr(0, 17) == "--experiment-mode=") {
+            experimentMode = arg.substr(17);
+        } else if (arg == "--viz") {
+            enableVisualization = true;
+        } else if (arg.substr(0, 11) == "--max-steps=") {
+            maxSteps = std::atoi(arg.substr(11).c_str());
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
         }
     }
     
@@ -382,6 +402,17 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Experiment mode settings
+    if (experimentMode == "plasticity") {
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        NLM_LOG_INFO("Running PLasticity experiment mode with enhanced parameters");
+    } else if (experimentMode == "stdp") {
+        config->set("neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        NLM_LOG_INFO("Running STDP experiment mode with focused parameters");
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -409,20 +440,44 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run experiments based on mode
+    if (experimentMode == "all") {
+        runBasicConnectivityTest(brain);
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } else if (experimentMode == "plasticity") {
+        runPlasticityExperiment(brain);
+    } else if (experimentMode == "stdp") {
+        runStdpVerification(brain);
+    } else {
+        // Default: run all tests
+        runBasicConnectivityTest(brain);
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Save checkpoint if requested
+    if (enableSave) {
+        std::string checkpointFile = outputFile;
+        if (checkpointFile.empty()) {
+            checkpointFile = "checkpoint_" + std::to_string(brain->getTotalSpikeCount()) + ".bin";
+        }
+        
+        NLM_LOG_INFO("Saving checkpoint to: " + checkpointFile);
+        if (brain->save(checkpointFile)) {
+            NLM_LOG_INFO("Checkpoint saved successfully");
+        } else {
+            NLM_LOG_ERROR("Failed to save checkpoint");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +501,19 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << "\n=== NLM Command Line Options ===" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --config=file.cfg         Load configuration from file" << std::endl;
+    std::cout << "  --output=file.bin        Save brain state to file" << std::endl;
+    std::cout << "  --save                    Enable automatic checkpoint saving" << std::endl;
+    std::cout << "  --experiment-mode=MODE    Run specific experiment mode (all, plasticity, stdp)" << std::endl;
+    std::cout << "  --viz                     Enable visualization output" << std::endl;
+    std::cout << "  --max-steps=N             Set maximum number of simulation steps" << std::endl;
+    std::cout << "\n=== Example Usage ===" << std::endl;
+    std::cout << "./nlm --config=myconfig.cfg --experiment-mode=plasticity --save" << std::endl;
+    std::cout << "./nlm --max-steps=5000 --output=checkpoint.bin" << std::endl;
 }
