@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Action.hpp"
+#include "../performance/NLMPerformanceProfiler.hpp"
 #include <memory>
 #include <vector>
 

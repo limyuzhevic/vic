@@ -6,6 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/NLMPerformanceProfiler.hpp"
+#include "../performance/ProfilerConfigManager.hpp"
 #include <memory>
 #include <string>
 

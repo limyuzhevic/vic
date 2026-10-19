@@ -7,6 +7,8 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+#include "core/ErrorHandling.hpp"
+
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -18,6 +20,8 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "performance/NLMPerformanceProfiler.hpp"
+#include "performance/ProfilerConfigManager.hpp"
 
 #include <iostream>
 #include <memory>
@@ -27,6 +31,99 @@
 #include <numeric>
 
 using namespace nlm;
+
+void runWithProfiling() {
+    std::cout << "\n=== NLM Performance Profiling ===" << std::endl;
+    
+    // Initialize profiler with performance configuration
+    nlm::profiling::initializeProfiler("configs/performance.cfg");
+    
+    // Get configuration
+    const auto& config = nlm::profiling::getProfilerConfig();
+    
+    std::cout << "Profiler Configuration:" << std::endl;
+    std::cout << "  Enabled: " << (config.enabled ? "Yes" : "No") << std::endl;
+    std::cout << "  Output File: " << config.outputFile << std::endl;
+    std::cout << "  Sample Interval: " << config.sampleIntervalMs << "ms" << std::endl;
+    std::cout << "  Report Interval: " << config.reportIntervalSeconds << "s" << std::endl;
+    std::cout << "  Memory Threshold: " << config.memoryThresholdMB << "MB" << std::endl;
+    std::cout << "  CPU Threshold: " << config.cpuThresholdPercent << "%" << std::endl;
+    std::cout << "  Operation Threshold: " << config.operationThresholdNs << "ns" << std::endl;
+    std::cout << "  Profile Brain: " << (config.profileBrain ? "Yes" : "No") << std::endl;
+    std::cout << "  Profile Motor: " << (config.profileMotor ? "Yes" : "No") << std::endl;
+    std::cout << "  Profile Sensor: " << (config.profileSensor ? "Yes" : "No") << std::endl;
+    std::cout << "  Thread Local Profiling: " << (config.threadLocalProfiling ? "Yes" : "No") << std::endl;
+    std::cout << "  Detect Bottlenecks: " << (config.detectBottlenecks ? "Yes" : "No") << std::endl;
+    
+    // Start global profiling
+    nlm::profiling::startProfiler();
+    
+    // Record brain operation start
+    nlm::profiling::recordBrainOperation("experiment_start");
+    
+    // Run learning experiment with profiling
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Learning Experiment with Performance Profiling ===");
+    
+    LearningExperiment experiment(std::make_shared<Brain>(config->getOr<int64_t>("random_seed", 42)), 
+                                   config->getOr<int64_t>("random_seed", 42));
+    
+    experiment.recordInitialState();
+    
+    for (SimulationStep step = 0; step < 1000; ++step) {
+        PROFILE_SCOPE("plasticity_step", "brain")
+        
+        for (size_t i = 0; i < 20 && i < experiment.brain->getTotalNeuronCount() / 4; ++i) {
+            PROFILE_SCOPE("inject_current", "brain")
+            experiment.brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        }
+        
+        PROFILE_SCOPE("brain_step", "brain")
+        experiment.brain->step(step, step * 0.001);
+    }
+    
+    experiment.recordFinalState();
+    experiment.computeStatistics();
+    
+    // Record brain operation end
+    nlm::profiling::recordBrainOperation("experiment_end");
+    
+    // Stop profiler
+    nlm::profiling::stopProfiler();
+    
+    // Generate reports
+    nlm::profiling::generateProfilerReport("performance_profile.json");
+    nlm::profiling::generateProfilerReport("performance_profile.txt", 
+                                           nlm::profiling::ProfileReporter::OutputFormat::TEXT);
+    nlm::profiling::generateProfilerReport("performance_profile.csv", 
+                                           nlm::profiling::ProfileReporter::OutputFormat::CSV);
+    
+    std::cout << "\n=== Performance Profiling Complete ===" << std::endl;
+    std::cout << "Reports generated:" << std::endl;
+    std::cout << "  - " << config.outputFile << std::endl;
+    std::cout << "  - performance_profile.txt" << std::endl;
+    std::cout << "  - performance_profile.csv" << std::endl;
+    
+    // Get system statistics
+    auto stats = nlm::profiling::GlobalProfiler::instance().getSystemStats();
+    std::cout << "\nSystem Performance Summary:" << std::endl;
+    std::cout << "  - Average operation duration: " << stats.avgOperationDuration << " ns" << std::endl;
+    std::cout << "  - Max operation duration: " << stats.maxOperationDuration << " ns" << std::endl;
+    std::cout << "  - Min operation duration: " << stats.minOperationDuration << " ns" << std::endl;
+    std::cout << "  - Total operations: " << stats.totalOperations << std::endl;
+    
+    // Check for bottlenecks
+    nlm::profiling::GlobalProfiler::instance().checkForBottlenecks();
+    
+    // Display alerts if any
+    const auto& alerts = nlm::profiling::GlobalProfiler::instance().getProfiler().getAlertSystem().getAlerts();
+    if (!alerts.empty()) {
+        std::cout << "\nPerformance Alerts:" << std::endl;
+        for (const auto& alert : alerts) {
+            std::cout << "  - " << alert.name << ": " << alert.message << " (" << alert.severity << ")" << std::endl;
+        }
+    }
+}
 
 void printBanner() {
     std::cout << R"(
@@ -322,6 +419,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Initialize NLM error handling system
+    NLM::initializeErrorHandling();
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

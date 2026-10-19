@@ -44,6 +44,7 @@
     #define NLM_USE_SPARE_CONNECTIVITY 1
     #define NLM_USE_MULTITHREADING 1
     #define NLM_USE_SIMD 1
+    #define NLM_USE_PROFILING 1
 #else
     #define NLM_USE_MEMORY_POOL 0
     #define NLM_USE_SOA 0
@@ -51,6 +52,13 @@
     #define NLM_USE_SPARE_CONNECTIVITY 0
     #define NLM_USE_MULTITHREADING 0
     #define NLM_USE_SIMD 0
+    #define NLM_USE_PROFILING 0
+#endif
+
+// Profiling configuration
+#ifdef NLM_PROFILING_ENABLED
+    #include "NLMPerformanceProfiler.hpp"
+    #include "ProfilerConfig.hpp"
 #endif
 
 // SIMD configuration

@@ -6,16 +6,21 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find required packages
+find_package(yaml-cpp REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(Threads REQUIRED)
+
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 # Source directory
@@ -92,6 +97,13 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(nlm_core PUBLIC yaml-cpp nlohmann_json::nlohmann_json)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -121,23 +133,57 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Performance profiling library (optional)
+add_library(nlm_performance STATIC
+    src/performance/NLMPerformanceProfiler.cpp
+)
+target_include_directories(nlm_performance PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_performance PUBLIC Threads::Threads)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_performance)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance)
+
+# Advanced CLI executable for power users
+add_executable(nlm_cli
+    src/cli/nlm-cli.cpp
+    src/config/AdvancedConfigManager.cpp
+    src/performance/AdvancedPerformanceMonitor.cpp
+    src/debug/AdvancedDebugger.cpp
+    src/batch/BatchProcessor.cpp
+    src/data/DataManager.cpp
+    src/scripting/ScriptEngine.cpp
+    src/help/ExtendedHelpSystem.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_performance)
+target_include_directories(nlm_cli PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cli>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/config>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/debug>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/batch>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/data>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/scripting>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/help>
+)
 
 # Testing
 enable_testing()

@@ -1,12 +1,22 @@
 #include "Logger.hpp"
+#include "EnhancedLogger.hpp"
+#include "ErrorHandling.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <thread>
+#include <filesystem>
 
 namespace nlm {
 
+// Forward declaration
+namespace enhanced {
+    class Logger;
+}
+
+// Original ConsoleLogger implementation
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
@@ -71,12 +81,46 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    try {
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            auto error = Errors::ioError(ErrorCode::FILE_ACCESS_DENIED, filepath, 
+                                         "Failed to open log file for writing");
+            error->getContext().function = "setOutputFile";
+            error->getContext().file = __FILE__;
+            error->getContext().line = __LINE__;
+            error->getContext().module = "Logger";
+            nlm::getGlobalErrorManager().recordError(error);
+            std::cerr << "[ERROR] Failed to open log file: " << filepath << std::endl;
+        }
+    } catch (const std::exception& e) {
+        auto error = Errors::systemError("setOutputFile", e.what());
+        error->getContext().function = "setOutputFile";
+        error->getContext().file = __FILE__;
+        error->getContext().line = __LINE__;
+        error->getContext().module = "Logger";
+        nlm::getGlobalErrorManager().recordError(error);
+        std::cerr << "[ERROR] Exception in setOutputFile: " << e.what() << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+        }
+    } catch (const std::exception& e) {
+        auto error = Errors::systemError("closeOutputFile", e.what());
+        error->getContext().function = "closeOutputFile";
+        error->getContext().file = __FILE__;
+        error->getContext().line = __LINE__;
+        error->getContext().module = "Logger";
+        nlm::getGlobalErrorManager().recordError(error);
+        std::cerr << "[ERROR] Exception in closeOutputFile: " << e.what() << std::endl;
     }
 }
 
@@ -102,15 +146,36 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// Logger implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Backward compatibility with enhanced logger
+    std::shared_ptr<enhanced::Logger> enhancedLogger;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    // Try to get the enhanced global logger for backward compatibility
+    try {
+        enhancedLogger = std::make_shared<enhanced::Logger>();
+    } catch (...) {
+        // If enhanced logger fails to initialize, continue with basic logger
+    }
+}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    try {
+        flush();
+    } catch (const std::exception& e) {
+        auto error = Errors::systemError("~Logger", e.what());
+        error->getContext().function = "~Logger";
+        error->getContext().file = __FILE__;
+        error->getContext().line = __LINE__;
+        error->getContext().module = "Logger";
+        nlm::getGlobalErrorManager().recordError(error);
+    }
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
@@ -127,42 +192,62 @@ void Logger::setLevel(LogLevel level) {
     for (auto& logger : pImpl->loggers) {
         logger->setLevel(level);
     }
-}
-
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    // Also update enhanced logger if available
+    if (pImpl->enhancedLogger) {
+        pImpl->enhancedLogger->setLevel(static_cast<enhanced::LogLevel>(level));
     }
 }
 
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
+void Logger::log(LogLevel level, const std::string& message,
+                 const std::string& file, int line,
+                 const std::string& function) {
+    // Convert to enhanced LogEntry
+    enhanced::LogEntry enhancedEntry;
+    enhancedEntry.level = static_cast<enhanced::LogLevel>(level);
+    enhancedEntry.message = message;
+    enhancedEntry.file = file;
+    enhancedEntry.line = line;
+    enhancedEntry.function = function;
+    enhancedEntry.timestamp = std::chrono::system_clock::now();
+    
+    // Migrate to enhanced format
+    LogEntry migratedEntry = migrateEntry(message, level, file, line, function);
+    
+    // Send to basic loggers
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (auto& logger : pImpl->loggers) {
+        logger->log(migratedEntry);
+    }
+    
+    // Also send to enhanced logger if available
+    if (pImpl->enhancedLogger) {
+        pImpl->enhancedLogger->log(enhancedEntry);
+    }
+}
+
+void Logger::debug(const std::string& message, const std::string& file,
+                   int line, const std::string& function) {
     log(LogLevel::Debug, message, file, line, function);
 }
 
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
+void Logger::info(const std::string& message, const std::string& file,
+                  int line, const std::string& function) {
     log(LogLevel::Info, message, file, line, function);
 }
 
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
+void Logger::warning(const std::string& message, const std::string& file,
+                     int line, const std::string& function) {
     log(LogLevel::Warning, message, file, line, function);
 }
 
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
+void Logger::error(const std::string& message, const std::string& file,
+                   int line, const std::string& function) {
     log(LogLevel::Error, message, file, line, function);
 }
 
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
+void Logger::critical(const std::string& message, const std::string& file,
+                      int line, const std::string& function) {
     log(LogLevel::Critical, message, file, line, function);
 }
 
@@ -184,6 +269,32 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+}
+
+// Enhanced Logger factory methods
+std::unique_ptr<Logger> Logger::createEnhancedLogger() {
+    return std::make_unique<enhanced::Logger>();
+}
+
+// Migration helper
+LogEntry Logger::migrateEntry(const std::string& message, LogLevel level,
+                              const std::string& file, int line,
+                              const std::string& function) {
+    LogEntry entry;
+    entry.level = level;
+    entry.message = message;
+    entry.file = file;
+    entry.line = line;
+    entry.function = function;
+    entry.timestamp = std::chrono::system_clock::now();
+    
+    // Add additional fields for enhanced compatibility
+    entry.module = "unknown";
+    entry.category = "system";
+    entry.processId = getpid();
+    entry.threadId = std::this_thread::get_id();
+    
+    return entry;
 }
 
 // LogStream implementation

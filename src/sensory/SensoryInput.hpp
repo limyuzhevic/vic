@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include "../performance/NLMPerformanceProfiler.hpp"
+#include "../performance/ProfilerConfigManager.hpp"
 
 namespace nlm {
 

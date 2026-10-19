@@ -142,16 +142,97 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+py::enum_<ConfigType>(m, "ConfigType", R"pbdoc(Configuration type enumeration)pbdoc")
+        .value("INTEGER", ConfigType::INTEGER)
+        .value("DOUBLE", ConfigType::DOUBLE)
+        .value("STRING", ConfigType::STRING)
+        .value("BOOLEAN", ConfigType::BOOLEAN)
+        .value("INTEGER_ARRAY", ConfigType::INTEGER_ARRAY)
+        .value("DOUBLE_ARRAY", ConfigType::DOUBLE_ARRAY)
+        .value("STRING_ARRAY", ConfigType::STRING_ARRAY)
+        .value("OBJECT", ConfigType::OBJECT)
+        .export_values();
+
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
+    // ValidationResult struct
+    py::class_<ValidationResult>(m, "ValidationResult", R"pbdoc(Validation result with errors and warnings)pbdoc")
+        .def(py::init<>())
+        .def_readonly("valid", &ValidationResult::valid)
+        .def_readonly("errors", &ValidationResult::errors)
+        .def_readonly("warnings", &ValidationResult::warnings)
+        .def("hasErrors", &ValidationResult::hasErrors)
+        .def("hasWarnings", &ValidationResult::hasWarnings)
+        .def("getErrors", &ValidationResult::getErrors)
+        .def("getWarnings", &ValidationResult::getWarnings);
+
+    // ConfigSchema struct
+    py::class_<ConfigSchema>(m, "ConfigSchema", R"pbdoc(Configuration schema definition)pbdoc")
+        .def(py::init<>())
+        .def(py::init<const std::string&, ConfigType, const std::string&, const std::string&, bool>(),
+             py::arg("name"), py::arg("type"), py::arg("description") = "", py::arg("defaultValue") = "", py::arg("required") = false)
+        .def_readwrite("name", &ConfigSchema::name)
+        .def_readwrite("type", &ConfigSchema::type)
+        .def_readwrite("description", &ConfigSchema::description)
+        .def_readwrite("defaultValue", &ConfigSchema::defaultValue)
+        .def_readwrite("validators", &ConfigSchema::validators)
+        .def_readwrite("required", &ConfigSchema::required)
+        .def_readwrite("nestedSchema", &ConfigSchema::nestedSchema)
+        .def("isValidType", &ConfigSchema::isValidType, py::arg("value"))
+        .def("getTypeName", &ConfigSchema::getTypeName)
+        .def("getTypeName", [](const ConfigSchema& schema) { return schema.getTypeName(); });
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath, bool validate = true) {
+            return self.loadFromFile(filepath, validate);
+        }, py::arg("filepath"), py::arg("validate") = true,
+             "Load configuration from a JSON/YAML/file")
+        .def("loadFromJSON", [](Config& self, const std::string& filepath, bool validate = true) {
+            return self.loadFromJSON(filepath, validate);
+        }, py::arg("filepath"), py::arg("validate") = true,
              "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+        .def("loadFromYAML", [](Config& self, const std::string& filepath, bool validate = true) {
+            return self.loadFromYAML(filepath, validate);
+        }, py::arg("filepath"), py::arg("validate") = true,
+             "Load configuration from a YAML file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv, bool validate = true) {
+            return self.loadFromArgs(argc, argv, validate);
+        }, py::arg("argc"), py::arg("argv"), py::arg("validate") = true,
+             "Load configuration from command line arguments")
+        .def("loadFromJSON", [](Config& self, const std::string& jsonString, bool validate = true) {
+            return self.loadFromJSON(jsonString, validate);
+        }, py::arg("jsonString"), py::arg("validate") = true,
+             "Load configuration from a JSON string")
+        .def("loadFromYAML", [](Config& self, const std::string& yamlString, bool validate = true) {
+            return self.loadFromYAML(yamlString, validate);
+        }, py::arg("yamlString"), py::arg("validate") = true,
+             "Load configuration from a YAML string")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("toJSON", &Config::toJSON,
+             "Get configuration as JSON string")
+        .def("toYAML", &Config::toYAML,
+             "Get configuration as YAML string")
+        .def("validateAgainstSchema", [](Config& self, const std::vector<ConfigSchema>& schema) {
+            return self.validateAgainstSchema(schema);
+        }, py::arg("schema"),
+             "Validate configuration against schema")
+        .def("setSchema", &Config::setSchema, py::arg("schema"),
+             "Set configuration schema")
+        .def("addSchema", &Config::addSchema, py::arg("schema"),
+             "Add a schema to the configuration")
+        .def("clearSchema", &Config::clearSchema,
+             "Clear configuration schema")
+        .def("getSchemaHelp", &Config::getSchemaHelp,
+             "Get help text for configuration schema")
+        .def("getSchema", &Config::getSchema,
+             "Get the configuration schema")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,9 +241,33 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("getLastError", &Config::getLastError,
+             "Get the last error message")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
