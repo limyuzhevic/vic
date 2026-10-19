@@ -1,8 +1,3 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
-
 namespace nlm {
 
 struct Neuron::Impl {
@@ -189,18 +184,33 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
-    bool fired = false;
-    
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
+    // Handle refractory period (early return for efficiency)
+    if (handleRefractoryPeriod()) {
         return false;
     }
+    
+    return integrateLIF(currentTime, dt);
+}
+
+bool Neuron::handleRefractoryPeriod() {
+    if (pImpl->state.refractoryRemaining <= 0) {
+        return false;
+    }
+    
+    --pImpl->state.refractoryRemaining;
+    // During refractory period, clear synaptic input but don't integrate
+    pImpl->synapticInput = 0.0f;
+    
+    if (pImpl->state.refractoryRemaining == 0) {
+        pImpl->state.firingState = FiringState::Resting;
+    }
+    
+    return true;
+}
+    
+// LIF integration: Core neuron dynamics computation
+bool Neuron::integrateLIF(Timestamp currentTime, TimestepDuration dt) {
+    bool fired = false;
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C

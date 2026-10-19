@@ -74,6 +74,10 @@ public:
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
+    // Internal helper function to update short-term plasticity
+    // Extracts complex calculations to improve code organization
+    void updateShortTermPlasticity(Timestamp currentTime);
+    
     // Reset to initial state
     void reset();
     
@@ -84,5 +88,3 @@ private:
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm

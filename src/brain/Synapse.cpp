@@ -1,9 +1,22 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 
 namespace nlm {
+
+namespace {
+    constexpr const char* ERROR_NEGATIVE_WEIGHT = "Negative synaptic weight: ";
+    constexpr const char* ERROR_EXCESSIVE_WEIGHT = "Excessive synaptic weight: ";
+    constexpr const char* ERROR_INVALID_DELAY = "Invalid synaptic delay: ";
+}
+
+namespace {
+    constexpr const char* ERROR_NEGATIVE_WEIGHT = "Negative synaptic weight: ";
+    constexpr const char* ERROR_EXCESSIVE_WEIGHT = "Excessive synaptic weight: ";
+    constexpr const char* ERROR_INVALID_DELAY = "Invalid synaptic delay: ";
+}
 
 struct Synapse::Impl {
     SynapseId id;
@@ -89,12 +102,13 @@ NeuronId Synapse::getDestinationNeuron() const {
     return pImpl->destinationNeuron;
 }
 
-SynapticWeight Synapse::getWeight() const {
-    return pImpl->weight;
-}
-
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    if (std::abs(weight) > Impl::MAX_WEIGHT) {
+        NLM_LOG_ERROR(std::string(ERROR_EXCESSIVE_WEIGHT) + std::to_string(weight));
+        pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    } else {
+        pImpl->weight = weight;
+    }
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
@@ -103,16 +117,13 @@ void Synapse::addToWeight(SynapticWeight delta) {
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
-Delay Synapse::getDelay() const {
-    return pImpl->delay;
-}
-
 void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
-}
-
-SynapseType Synapse::getType() const {
-    return pImpl->type;
+    if (delay <= 0) {
+        NLM_LOG_ERROR(std::string(ERROR_INVALID_DELAY) + std::to_string(delay));
+        pImpl->delay = 1;  // Reset to default
+    } else {
+        pImpl->delay = delay;
+    }
 }
 
 void Synapse::setType(SynapseType type) {
@@ -199,6 +210,18 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
+    // Update short-term plasticity state
+    updateShortTermPlasticity(currentTime);
+    
+    // Decay eligibility trace for reward-modulated learning
+    decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Clamp weight bounds
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+}
+
+// Extract short-term plasticity calculations to helper method
+void Synapse::updateShortTermPlasticity(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
@@ -214,12 +237,6 @@ void Synapse::step(Timestamp currentTime) {
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
