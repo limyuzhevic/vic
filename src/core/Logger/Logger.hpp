@@ -88,11 +88,18 @@ public:
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
     
+    // Enhanced logging with error context
+    void logWithContext(LogLevel level, const std::string& message,
+                       const std::string& file = "", int line = 0,
+                       const std::string& function = "",
+                       const std::string& context = "",
+                       const std::string& errorCode = "");
+    
     // Convenience methods
     void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "", const std::string& errorCode = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
     // Check if level is enabled

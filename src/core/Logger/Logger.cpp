@@ -158,8 +158,12 @@ void Logger::warning(const std::string& message, const std::string& file, int li
     log(LogLevel::Warning, message, file, line, function);
 }
 
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
+void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function, const std::string& errorCode) {
+    std::string enhancedMessage = message;
+    if (!errorCode.empty()) {
+        enhancedMessage += " [Error: " + errorCode + "]";
+    }
+    log(LogLevel::Error, enhancedMessage, file, line, function);
 }
 
 void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
