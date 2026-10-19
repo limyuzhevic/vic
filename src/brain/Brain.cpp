@@ -32,6 +32,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -75,6 +77,10 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Planning state
+    ActionType lastPlannedAction;
+    SimulationStep lastPlanningStep;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +98,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastPlannedAction(ActionType::None)
+        , lastPlanningStep(0)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -112,6 +120,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -511,8 +521,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make prediction about next sensory state
+        // This uses the brain's internal predictive coding mechanism
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create current sensory input from active sensory neurons
+            std::vector<float> currentSensory;
+            for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), 100ul); ++i) {
+                const auto& state = pImpl->sensoryNeurons[i]->getState();
+                currentSensory.push_back(state.membranePotential);
+            }
+            
+            if (!currentSensory.empty()) {
+                // Create a temporary SensoryInput for prediction
+                auto currentInput = std::make_unique<InternalSignals>();
+                currentInput->setData(currentSensory);
+                
+                // Generate prediction about next state
+                auto predictedState = pImpl->predictionSystem->predictNextState(*currentInput);
+                
+                // Store prediction in working memory for planning
+                if (pImpl->workingMemory && predictedState) {
+                    const auto& predData = predictedState->getData();
+                    if (!predData.empty()) {
+                        // Store prediction as a memory item
+                        pImpl->workingMemory->storeToNeuron(
+                            currentStep,  // Use step as neuron ID
+                            predData[0]  // Use first prediction value
+                        );
+                    }
+                }
+                
+                // In a real implementation, this would:
+                // 1. Compare prediction with expected outcome
+                // 2. Generate prediction error signal
+                // 3. Update synaptic weights based on prediction error
+                // 4. Use prediction to guide action selection
+                
+                // For now, we'll update prediction error history
+                const auto& predData = predictedState->getData();
+                float avgPredicted = 0.0f;
+                for (float val : predData) avgPredicted += val;
+                if (!predData.empty()) avgPredicted /= predData.size();
+                
+                pImpl->predictionSystem->updatePredictions(*currentInput, *predictedState);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +581,86 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Encode current sensory state and neural patterns
+        std::vector<float> sensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 100; ++i) {  // Limit to first 100 sensory neurons
+            const auto& state = pImpl->sensoryNeurons[i]->getState();
+            sensoryState.push_back(state.membranePotential);
+        }
+        
+        // Create simple feature vector from current state
+        std::vector<float> features;
+        if (!sensoryState.empty()) {
+            float avgSensory = 0.0f;
+            for (float val : sensoryState) avgSensory += val;
+            avgSensory /= sensoryState.size();
+            features.push_back(avgSensory);
+            
+            // Add variance as a feature
+            float variance = 0.0f;
+            for (float val : sensoryState) variance += (val - avgSensory) * (val - avgSensory);
+            variance /= sensoryState.size();
+            features.push_back(std::sqrt(variance));
+        }
+        
+        // Present experience to concept formation system
+        if (!features.empty()) {
+            float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            pImpl->conceptFormation->presentExperience(sensoryState, features, currentReward, currentStep);
+        }
+    }
+    
+    // ========== STEP 10.5: Apply neural planning ==========
+    if (pImpl->planner) {
+        // Generate action plan based on current working memory state and goals
+        std::vector<NeuronId> workingMemoryNeurons;
+        if (pImpl->workingMemory) {
+            workingMemoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Get current motor intentions from motor neuron activity
+        std::vector<NeuronId> motorNeurons;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring() || 
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                motorNeurons.push_back(neuron->getId());
+            }
+        }
+        
+        // Create current state vector for planning
+        std::vector<float> currentState;
+        currentState.reserve(workingMemoryNeurons.size() + motorNeurons.size());
+        for (NeuronId id : workingMemoryNeurons) {
+            currentState.push_back(static_cast<float>(id));
+        }
+        for (NeuronId id : motorNeurons) {
+            currentState.push_back(-static_cast<float>(id));  // Negative to distinguish from working memory
+        }
+        
+        // If we have a current goal, use it, otherwise plan for general reward
+        float targetReward = pImpl->curiosity ? pImpl->curiosity->getTargetReward() : 0.5f;
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Apply planned action to motor system
+        if (plannedAction != ActionType::None) {
+            // Create motor command from planned action
+            std::unique_ptr<Action> action = std::make_unique<Action>(plannedAction);
+            action->setType(plannedAction);
+            action->confidence = pImpl->planner->getPlanningConfidence();
+            action->timestamp = currentTime;
+            action->neuronSourceId = !motorNeurons.empty() ? motorNeurons[0] : 0;
+            
+            // Store planned action in working memory for execution
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(static_cast<NeuronId>(plannedAction), action->confidence);
+            }
+            
+            // In a real implementation, this would trigger the motor system
+            // For now, we'll just store the action in the brain state
+            pImpl->lastPlannedAction = plannedAction;
+            pImpl->lastPlanningStep = currentStep;
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -578,8 +709,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Enhanced memory consolidation with neuromodulation integration
+        // Consolidation now considers dopamine levels for reward-based learning
+        // and prediction errors for surprise-based learning
+        
+        // Get current dopamine level (reward prediction error signal)
+        float dopamineLevel = 0.0f;
+        if (pImpl->dopamine) {
+            dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        
+        // Get current prediction error if available
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Calculate adaptive relevance threshold based on neuromodulation
+        // High dopamine promotes consolidation of high-reward memories
+        // High prediction error promotes consolidation of surprising memories
+        float baseThreshold = 0.3f;
+        float dopamineBoost = dopamineLevel * 0.4f;  // Up to 0.4 boost
+        float predictionErrorBoost = std::min(predictionError, 1.0f) * 0.3f;  // Up to 0.3 boost
+        
+        float adaptiveThreshold = baseThreshold + dopamineBoost + predictionErrorBoost;
+        adaptiveThreshold = std::clamp(adaptiveThreshold, 0.1f, 0.9f);
+        
+        // Log consolidation status for debugging
+        if (pImpl->dopamine) {
+            NLM_LOG_INFO("Memory consolidation: dopamine=" + std::to_string(dopamineLevel) + 
+                        ", prediction_error=" + std::to_string(predictionError) +
+                        ", threshold=" + std::to_string(adaptiveThreshold));
+        }
+        
+        // Perform consolidation with adaptive threshold
+        pImpl->episodicMemory->consolidate(adaptiveThreshold);
+        
+        // Dopamine-dependent synaptic consolidation
+        // High dopamine levels should strengthen the neural connections
+        // that were active during the consolidated memories
+        if (dopamineLevel > 0.5f && pImpl->dopamine) {
+            // Strong dopamine signal promotes synaptic consolidation
+            // This would involve LTP-like processes in the episodic memory neurons
+            for (const auto& epNeuron : pImpl->episodeNeurons) {
+                // In a full implementation, this would apply dopamine-dependent
+                // plasticity to strengthen the memory trace
+                // For now, we'll just log the consolidation
+                if (pImpl->dopamine->getPlasticityFactor() > 1.0f) {
+                    NLM_LOG_INFO("Strong dopamine consolidation for episode neuron " + 
+                                std::to_string(epNeuron.index()));
+                }
+            }
+        }
+        
+        // Prediction error-dependent learning
+        // High prediction error should trigger reconsolidation of relevant memories
+        if (predictionError > 0.5f && pImpl->predictionSystem) {
+            NLM_LOG_INFO("High prediction error (" + std::to_string(predictionError) + ") triggering reconsolidation");
+            // In a full implementation, this would trigger reconsolidation of memories
+            // that predicted incorrectly, helping to update the internal model
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -1015,6 +1204,18 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// ========== SEMANTIC MEMORY ACCESSOR ==========
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// ========== PROCEDURAL MEMORY ACCESSOR ==========
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -144,6 +146,12 @@ public:
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();

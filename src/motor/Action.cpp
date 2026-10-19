@@ -2,12 +2,12 @@
 
 namespace nlm {
 
-Action::Action() : type_(ActionType::Wait) {}
+Action::Action() : type_(ActionType::Wait), confidence(0.0f), neuronSourceId(0), timestamp(0) {}
 
-Action::Action(ActionType type) : type_(type) {}
+Action::Action(ActionType type) : type_(type), confidence(0.0f), neuronSourceId(0), timestamp(0) {}
 
 Action::Action(ActionType type, const std::vector<float>& params) 
-    : type_(type), parameters_(params) {}
+    : type_(type), parameters_(params), confidence(0.0f), neuronSourceId(0), timestamp(0) {}
 
 Action::~Action() = default;
 
@@ -53,7 +53,11 @@ std::string Action::getName() const {
 }
 
 std::unique_ptr<Action> Action::clone() const {
-    return std::make_unique<Action>(type_, parameters_);
+    auto cloned = std::make_unique<Action>(type_, parameters_);
+    cloned->confidence = confidence;
+    cloned->neuronSourceId = neuronSourceId;
+    cloned->timestamp = timestamp;
+    return cloned;
 }
 
 } // namespace nlm

@@ -48,6 +48,11 @@ public:
     // Clone
     std::unique_ptr<Action> clone() const;
     
+    // Additional fields for brain integration
+    float confidence;  // Planning confidence
+    NeuronId neuronSourceId;  // Which neuron initiated this action
+    SimulationStep timestamp;  // When action was planned/issued
+    
 private:
     ActionType type_;
     std::vector<float> parameters_;

@@ -219,11 +219,85 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    // Enhanced memory consolidation with multiple criteria
+    // Consolidation removes weak memories and reinforces strong ones
+    // Based on reward (dopamine), recency, prediction error, and stability
+    
+    if (episodes_.empty()) return;
+    
+    // Calculate average reward in the system (proxy for overall dopamine level)
+    float avgReward = 0.0f;
+    for (const auto& ep : episodes_) {
+        avgReward += ep.reward;
+    }
+    avgReward /= episodes_.size();
+    
+    // Phase 1: Filter episodes by relevance threshold
+    std::vector<EpisodicMemoryItem> relevantEpisodes;
+    for (const auto& ep : episodes_) {
+        // Calculate relevance score based on multiple factors
+        float recencyFactor = 1.0f / (ep.age + 1);  // More recent = higher relevance
+        float rewardFactor = ep.reward;           // Higher reward = higher relevance
+        
+        // Prediction error factor (if we have prediction error system)
+        // In a full implementation, this would use prediction error from the prediction system
+        float predictionErrorFactor = std::min(1.0f, ep.age * 0.1f);  // Older episodes may have more prediction error
+        
+        float relevanceScore = recencyFactor * 0.3f + rewardFactor * 0.5f + predictionErrorFactor * 0.2f;
+        
+        if (relevanceScore >= relevanceThreshold) {
+            relevantEpisodes.push_back(ep);
+        }
+    }
+    
+    // Phase 2: Handle consolidation based on overall reward/dopamine level
+    if (avgReward > 0.5f) {
+        // High dopamine (reward) promotes consolidation of high-relevance memories
+        // Keep only the most relevant episodes
+        std::sort(relevantEpisodes.begin(), relevantEpisodes.end(),
+            [](const EpisodicMemoryItem& a, const EpisodicMemoryItem& b) {
+                return a.reward > b.reward;  // Sort by reward
+            });
+        
+        // Keep top 80% of episodes when reward is high
+        size_t keepCount = std::max(size_t(1), static_cast<size_t>(relevantEpisodes.size() * 0.8f));
+        std::vector<EpisodicMemoryItem> consolidatedEpisodes(relevantEpisodes.begin(), 
+                                                           relevantEpisodes.begin() + keepCount);
+        episodes_ = consolidatedEpisodes;
+    } else {
+        // Low dopamine (punishment) promotes memory extinction
+        // Keep only very high-relevance memories
+        std::vector<EpisodicMemoryItem> consolidatedEpisodes;
+        for (const auto& ep : relevantEpisodes) {
+            float relevanceScore = 1.0f / (ep.age + 1) * 0.3f + ep.reward * 0.5f;
+            if (relevanceScore >= relevanceThreshold * 1.5f) {  // Stricter threshold
+                consolidatedEpisodes.push_back(ep);
+            }
+        }
+        
+        // Ensure we keep at least one episode for learning
+        if (consolidatedEpisodes.empty() && !relevantEpisodes.empty()) {
+            consolidatedEpisodes.push_back(relevantEpisodes[0]);
+        }
+        
+        episodes_ = consolidatedEpisodes;
+    }
+    
+    // Phase 3: Update episode ages for remaining episodes
+    for (auto& ep : episodes_) {
+        ep.age++;
+    }
+    
+    // Phase 4: Update neural pattern for consolidated episodes
+    // In a full implementation, this would update episode neurons
+    // based on consolidation success/failure
+    if (brain_ && !episodes_.empty()) {
+        // Consolidate neural patterns
+        pImpl->episodeNeurons.clear();
+        for (size_t i = 0; i < episodes_.size(); ++i) {
+            NeuronId epNeuron(i + 20000);
+            pImpl->episodeNeurons.push_back(epNeuron);
+        }
     }
 }
 

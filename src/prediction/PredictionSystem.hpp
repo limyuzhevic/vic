@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Forward declaration
+class RandomGenerator;
+
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
@@ -33,6 +36,9 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Set random generator (for testing)
+    void setRandomGenerator(RandomGenerator* rng) { pImpl->rng = rng; }
     
 private:
     struct Impl;
