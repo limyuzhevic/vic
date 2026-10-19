@@ -50,12 +50,130 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
-void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
     pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || 
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::setFiringState(FiringState state) {
+    pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
+}
+
+void Neuron::decrementRefractory() {
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+    }
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
+}
+
+void Neuron::setRestingPotential(MembranePotential potential) {
+    pImpl->state.restingPotential = potential;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+void Neuron::setResetPotential(MembranePotential potential) {
+    pImpl->state.resetPotential = potential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+bool Neuron::checkThreshold() const {
+    return pImpl->state.membranePotential >= pImpl->state.threshold;
+}
+
+float Neuron::getLastSpikeTime() const {
+    return pImpl->state.lastSpikeTime;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -260,7 +378,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Use default timestep (1ms) for backward compatibility
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }
