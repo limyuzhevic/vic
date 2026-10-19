@@ -154,12 +154,94 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("__contains__", &Config::has, py::arg("key"),
+             "Check if a configuration key exists (Python 'in' operator)")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getAllKeys", &Config::getAllKeys,
+             "Get all configuration keys including nested ones")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Pythonic __getitem__ and __setitem__
+        .def("__getitem__", [](Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (!value.has_value()) {
+                throw py::key_error("Key not found: " + key);
+            }
+            return value.value();
+        }, py::arg("key"),
+             "Get a configuration value by key (Python '[]' operator)")
+        .def("__setitem__", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value by key (Python '[]' operator)")
+        .def("__setitem__", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value by key (Python '[]' operator)")
+        .def("__setitem__", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value by key (Python '[]' operator)")
+        .def("__setitem__", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value by key (Python '[]' operator)")
+        // Enhanced get methods with Pythonic signatures
+        .def("get", [](Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+             "Get a configuration value as string (returns None if not found)")
+        .def("get", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a configuration value or default (Pythonic)")
+        .def("get", [](Config& self, const std::string& dotNotationPath) {
+            return self.get<std::string>(dotNotationPath);
+        }, py::arg("dotNotationPath"),
+             "Get a nested configuration value by dot notation")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a configuration value or default")
+        .def("getOr", [](Config& self, const std::string& dotNotationPath, const std::string& defaultValue) {
+            return self.getOr<std::string>(dotNotationPath, defaultValue);
+        }, py::arg("dotNotationPath"), py::arg("defaultValue"),
+             "Get a nested configuration value or default")
+        // Validation and schema support
+        .def("validate", &Config::validate,
+             "Validate the configuration against its schema")
+        .def("addValidator", &Config::addValidator, py::arg("key"), py::arg("validator"),
+             "Add a custom validator function for a key")
+        .def("addSchemaEntry", &Config::addSchemaEntry, py::arg("entry"),
+             "Add a schema entry for validation")
+        .def("hasSchema", &Config::hasSchema,
+             "Check if the configuration has a schema")
+        .def("validateSchema", &Config::validateSchema,
+             "Validate the configuration against its schema")
+        // Default value system
+        .def("setDefault", [](Config& self, const std::string& key, const std::string& value) {
+            self.setDefault(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a default value for a key")
+        .def("setDefault", [](Config& self, const std::string& dotNotationPath, const std::string& value) {
+            self.setDefault(dotNotationPath, value);
+        }, py::arg("dotNotationPath"), py::arg("value"),
+             "Set a default value for a nested key")
+        // Config merging
+        .def("merge", &Config::merge, py::arg("other"), py::arg("source") = ConfigSource::Runtime,
+             "Merge another configuration into this one")
+        // Context manager support
+        .def("__enter__", [](Config& self) {
+            return self;
+        })
+        .def("__exit__", [](Config&, const py::args&) {
+            // Cleanup code here if needed
+            return false; // Don't suppress exceptions
+        })
+        // Pythonic representation
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

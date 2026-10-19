@@ -1,102 +1,85 @@
 cmake_minimum_required(VERSION 3.16)
-project(pynlm_bindings LANGUAGES CXX)
+project(nlm_enhanced VERSION 2.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+# Find Python and pybind11
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Include directories
+include_directories(${PYTHON_INCLUDE_DIRS})
+include_directories(${pybind11_INCLUDE_DIRS})
+include_directories(../src)
 
-find_package(Python REQUIRED COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG REQUIRED)
-
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
-
-set(NLM_CORE_SOURCES
-    ${NLM_SOURCE_DIR}/core/Types/Types.cpp
-    ${NLM_SOURCE_DIR}/core/Config/Config.cpp
-    ${NLM_SOURCE_DIR}/core/Random/Random.cpp
-    ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
-    ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
-    ${NLM_SOURCE_DIR}/brain/Neuron.cpp
-    ${NLM_SOURCE_DIR}/brain/Synapse.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
-    ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
-    ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
-    ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
-    ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
-    ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
-    ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
-    ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
-    ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
-    ${NLM_SOURCE_DIR}/development/Pruning.cpp
-    ${NLM_SOURCE_DIR}/development/Maturation.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
-    ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
-    ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
-    ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
-    ${NLM_SOURCE_DIR}/sensory/Vision.cpp
-    ${NLM_SOURCE_DIR}/sensory/Audio.cpp
-    ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
-    ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
-    ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
-    ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
-    ${NLM_SOURCE_DIR}/environment/Environment.cpp
-    ${NLM_SOURCE_DIR}/environment/Observation.cpp
-    ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
-    ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
-    ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
-    ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+# Enhanced bindings source files
+set(ENHANCED_BINDINGS_SRC
+    enhanced_bindings.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+# Basic bindings source files (for reference)
+set(BASIC_BINDINGS_SRC
+    bindings.cpp
 )
 
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+# Create enhanced module
+pybind11_add_module(nlm_enhanced ${ENHANCED_BINDINGS_SRC})
+
+# Link against pybind11 and Python
+target_link_libraries(nlm_enhanced PRIVATE pybind11::module)
+
+# Set module properties
+set_target_properties(nlm_enhanced PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "nlm_enhanced"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
 )
 
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
-    $<INSTALL_INTERFACE:include>
-)
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+# Install target
+install(TARGETS nlm_enhanced
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+# Create build directory if it doesn't exist
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+# Print build information
+message(STATUS "Building NLM Enhanced Python bindings")
+message(STATUS "Python executable: ${Python_EXECUTABLE}")
+message(STATUS "Python include directories: ${PYTHON_INCLUDE_DIRS}")
+message(STATUS "pybind11 include directories: ${pybind11_INCLUDE_DIRS}")
+message(STATUS "Enhanced bindings source: ${ENHANCED_BINDINGS_SRC}")
+message(STATUS "Enhanced bindings target: nlm_enhanced")
 
-pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
-endif()
-
-install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+# Add custom targets for easy building
+add_custom_target(build_enhanced
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlm_enhanced
+    COMMENT "Building NLM Enhanced Python bindings"
+    VERBATIM
 )
+
+add_custom_target(install_enhanced
+    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix .
+    COMMENT "Installing NLM Enhanced Python bindings"
+    VERBATIM
+)
+
+# Print build instructions
+message(STATUS "Build instructions:")
+message(STATUS "  mkdir build")
+message(STATUS "  cd build")
+message(STATUS "  cmake ..")
+message(STATUS "  make -j4")
+message(STATUS "")
+message(STATUS "After building, you can install the module:")
+message(STATUS "  make install_enhanced")
+message(STATUS "")
+message(STATUS "The enhanced module will be available as:")
+message(STATUS "  Python: from nlm_enhanced import *")
+message(STATUS "  Module file: build/nlm_enhanced${PYTHON_MODULE_EXTENSION}")

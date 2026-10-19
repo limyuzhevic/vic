@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find nlohmann/json
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
+# Find yaml-cpp
+find_package(yaml-cpp REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -91,6 +97,8 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
