@@ -133,9 +133,8 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Update neuron for one simulation step with real integrate-and-fire dynamics
+    bool step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset to initial state
     void reset();
@@ -143,9 +142,20 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Development effects on neuron properties
+    void applyDevelopmentEffect(float plasticityRate);
+    
+    // Metabolic constraints and energy consumption
+    float getMetabolicCost() const;
+    void updateMetabolicState();
+    
+    // Competition effects from nearby neurons
+    void applyCompetitionEffects(const std::vector<Neuron*>& neighbors);
+    
+    // Plasticity integration
+    void applyPlasticity(Synapse* synapse, const std::vector<Timestamp>& preSpikeHistory,
+                        const std::vector<Timestamp>& postSpikeHistory, TimestepDuration dt);
+    
 private:
     struct Impl;
     Impl* pImpl;
-};
-
-} // namespace nlm
