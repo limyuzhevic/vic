@@ -20,46 +20,70 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
 
-### Phase 6 Integration Achievements
+### Current Phase 2 Implementation
 
-#### Memory Systems
+Phase 2 demonstrates:
+- Real neural dynamics with biologically plausible LIF neurons
+- Event-driven computation with spike propagation and delays
+- Activity-dependent synaptic plasticity through STDP and Hebbian learning
+- Structural changes through synaptogenesis and pruning
+- Learning experiments showing measurable synaptic changes
+
+### Phase 6 Vision
+
+Phase 6 represents the next major milestone: integrating all existing Phase 1-5 systems into a coherent artificial brain. Phase 6 will:
+- Connect memory systems to neural processing
+- Integrate neuromodulation with plasticity and dynamics
+- Incorporate prediction systems into the brain loop
+- Implement developmental modulation of learning
+- Enable checkpoint save/load and memory replay
+- Create a complete brain-world-agent loop
+
+### Planned Phase 6 Integration Achievements
+
+Phase 6 will deliver:
+#### Memory Systems (Connected)
 - Working memory with persistent activity and competition
 - Episodic memory with experience encoding and replay
 - Associative memory with Hebbian pattern associations
 - All memory systems connected to neural processing
 
-#### Neuromodulation Integration
+#### Neuromodulation Integration (Connected)
 - Dopamine affects neural excitability and plasticity
 - Curiosity drives exploration behavior
 - Novelty detection integrated with sensory processing
 - All neuromodulators connected to plasticity rules
 
-#### Prediction System
+#### Prediction System (Connected)
 - Prediction system integrated into brain loop
 - Prediction error signals affect learning
 - Confidence tracking implemented
 
-#### Cognition Systems
+#### Cognition Systems (Connected)
 - Neural planner with action sequence evaluation
 - Concept formation from experience patterns
 - Attention with competitive selection dynamics
 - All cognition systems connected to perception and action
 
-#### Development Integration
+#### Development Integration (Connected)
 - Developmental stages affect plasticity rates
 - Structural plasticity modulated by age
 - Neural excitability changes with development
 
-#### Persistence
+#### Persistence (Working)
 - Checkpoint save/load implemented
 - Brain state serialization working
 - Can resume from saved checkpoints
 
-#### Replay and Consolidation
+#### Replay and Consolidation (Working)
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
@@ -75,12 +99,33 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Build
+
 ```bash
-./nlm_phase6_demo
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Phase 2 Demo (Current Implementation)
+
+```bash
+./nlm
+```
+
+This runs a comprehensive Phase 2 neural computation demonstration showing:
+- Real LIF neuron dynamics
+- Event-driven spike propagation with synaptic delays  
+- STDP and Hebbian plasticity
+- Structural plasticity (synaptogenesis/pruning)
+- Learning experiments with measurable synaptic changes
+
+### Phase 6 Demo (Planned)
+
+A Phase 6 integration demo will be available once the complete artificial brain systems are integrated. This will demonstrate all systems working together in a coherent brain loop.
+
+## Project Structure
 
 ## Project Structure
 
@@ -152,15 +197,14 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (In Progress - Final Integration)
+Phase 6 represents the next major milestone: integrating all existing Phase 1-5 systems into a coherent artificial brain. Phase 6 will:
+- Connect memory systems to neural processing
+- Integrate neuromodulation with plasticity and dynamics
+- Incorporate prediction systems into the brain loop
+- Implement developmental modulation of learning
+- Enable checkpoint save/load and memory replay
+- Create a complete brain-world-agent loop
 
 ## Scientific Limitations
 
