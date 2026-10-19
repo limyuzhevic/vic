@@ -36,7 +36,22 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
+    // Add component if specified
+    if (!entry.component.empty()) {
+        oss << " [" << entry.component << "]";
+    }
+    
+    // Add operation if specified
+    if (!entry.operation.empty()) {
+        oss << " (" << entry.operation << ")";
+    }
+    
     oss << " " << entry.message;
+    
+    // Add file/line info for debugging
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " [" << entry.file << ":" << entry.line << "]";
+    }
     
     std::string output = oss.str();
     
@@ -130,7 +145,8 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                const std::string& file, int line, const std::string& function,
+                const std::string& operation, const std::string& component) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -140,6 +156,8 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.operation = operation;
+    entry.component = component;
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
@@ -186,12 +204,22 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // In practice, we just use getGlobal() which is already static
 }
 
-// LogStream implementation
+// Enhanced LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+}
+
+// Enhanced LogStream with context support
+LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function,
+                     const std::string& operation, const std::string& component)
+    : level_(level), file_(file), line_(line), function_(function),
+      operation_(operation), component_(component) {}
+
+LogStream::~LogStream() {
+    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_, operation_, component_);
 }
 
 } // namespace nlm

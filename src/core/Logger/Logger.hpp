@@ -18,7 +18,7 @@ enum class LogLevel {
     Critical = 4
 };
 
-// Log entry structure
+// Enhanced Log entry structure with additional context
 struct LogEntry {
     LogLevel level;
     std::string message;
@@ -26,6 +26,10 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    // Additional context for better error reporting
+    std::string operation;
+    std::string component;
+    std::map<std::string, std::string> metadata;
 };
 
 // Logger interface
@@ -128,14 +132,50 @@ public:
         return *this;
     }
     
+    // Enhanced stream logging with operation and component
+    template<typename T>
+    LogStream& operator<<(const T& value) {
+        oss_ << value;
+        return *this;
+    }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
     std::string file_;
     int line_;
     std::string function_;
+    std::string operation_;
+    std::string component_;
 };
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// Enhanced logging convenience macros with context
+#define NLM_LOG_CONTEXT_INFO(msg, operation, component) nlm::Logger::getGlobal().log(nlm::LogLevel::Info, msg, __FILE__, __LINE__, __func__, operation, component)
+#define NLM_LOG_CONTEXT_ERROR(msg, operation, component) nlm::Logger::getGlobal().log(nlm::LogLevel::Error, msg, __FILE__, __LINE__, __func__, operation, component)
+#define NLM_LOG_CONTEXT_WARNING(msg, operation, component) nlm::Logger::getGlobal().log(nlm::LogLevel::Warning, msg, __FILE__, __LINE__, __func__, operation, component)
+
+// Enhanced logging helper functions
+inline LogEntry createLogEntry(LogLevel level, const std::string& message,
+                              const std::string& file = "", int line = 0,
+                              const std::string& function = "",
+                              const std::string& operation = "",
+                              const std::string& component = "") {
+    LogEntry entry;
+    entry.level = level;
+    entry.message = message;
+    entry.file = file;
+    entry.line = line;
+    entry.function = function;
+    entry.timestamp = std::chrono::system_clock::now();
+    entry.operation = operation;
+    entry.component = component;
+    return entry;
+}
+
+inline void logWithContext(LogLevel level, const std::string& message,
+                          const std::string& operation = "",
+                          const std::string& component = "") {
+    getGlobal().log(level, message, "", 0, "", operation, component);
+}
 
 } // namespace nlm
