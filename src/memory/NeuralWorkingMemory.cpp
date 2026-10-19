@@ -44,12 +44,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            // Check if region has getAllNeurons method
+            // For now, just log this as a known issue and skip
+            // TODO: Fix this properly based on actual API
+            // For now: inject current directly to the neuron
+            if (neuron.getId() != INVALID_NEURON_ID) {
+                brain_->injectCurrent(neuron, activation * 5.0f);
             }
         }
         

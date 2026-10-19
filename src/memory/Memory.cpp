@@ -13,16 +13,27 @@ struct WorkingMemory::Impl {
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 
-WorkingMemory::~WorkingMemory() = default;
+WorkingMemory::~WorkingMemory() {
+    delete pImpl;
+}
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Implement real storage with capacity limits
+    
+    // Input validation
+    if (value < -1000.0f || value > 1000.0f) {
+        return;  // Reject extreme values
+    }
+    
+    // Find existing entry
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    
+    // Add new entry if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
     }
@@ -59,6 +70,10 @@ size_t WorkingMemory::getCurrentSize() const {
 }
 
 void WorkingMemory::decay(float decayRate) {
+    if (decayRate <= 0.0f || decayRate >= 1.0f) {
+        return;  // Invalid decay rate
+    }
+    
     for (auto& item : pImpl->items) {
         item.second *= (1.0f - decayRate);
     }
@@ -74,9 +89,22 @@ struct EpisodicMemory::Impl {
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
 
-EpisodicMemory::~EpisodicMemory() = default;
+EpisodicMemory::~EpisodicMemory() {
+    delete pImpl;
+}
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    if (episode.neurons.empty()) {
+        return;  // Don't store empty episodes
+    }
+    
+    // Check for duplicate episode timestamp
+    for (const auto& existing : pImpl->episodes) {
+        if (existing.timestamp == episode.timestamp) {
+            return;  // Don't store duplicate
+        }
+    }
+    
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
         pImpl->episodes.erase(pImpl->episodes.begin());
     }
@@ -96,6 +124,8 @@ size_t EpisodicMemory::getEpisodeCount() const {
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
+    if (count == 0) return result;
+    
     size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
     for (size_t i = start; i < pImpl->episodes.size(); ++i) {
         result.push_back(pImpl->episodes[i]);
@@ -108,7 +138,35 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Implement real consolidation - move relevant episodes to long-term storage
+    // For now, just clean up low-relevance episodes
+    if (relevanceThreshold < 0.0f || relevanceThreshold > 1.0f) {
+        return;  // Invalid threshold
+    }
+    
+    std::vector<EpisodicMemoryItem> relevantEpisodes;
+    for (const auto& episode : pImpl->episodes) {
+        // Simple relevance calculation based on number of neurons and activation values
+        if (!episode.neurons.empty() && !episode.values.empty()) {
+            float avgActivation = 0.0f;
+            for (float val : episode.values) {
+                avgActivation += std::abs(val);
+            }
+            avgActivation /= episode.values.size();
+            
+            if (avgActivation >= relevanceThreshold) {
+                relevantEpisodes.push_back(episode);
+            }
+        }
+    }
+    
+    // Keep only the most recent relevant episodes
+    if (relevantEpisodes.size() > pImpl->maxEpisodes) {
+        relevantEpisodes.erase(relevantEpisodes.begin(), 
+                              relevantEpisodes.begin() + (relevantEpisodes.size() - pImpl->maxEpisodes));
+    }
+    
+    pImpl->episodes = std::move(relevantEpisodes);
 }
 
 // Semantic Memory Implementation
@@ -118,9 +176,20 @@ struct SemanticMemory::Impl {
 
 SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
 
-SemanticMemory::~SemanticMemory() = default;
+SemanticMemory::~SemanticMemory() {
+    delete pImpl;
+}
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
+    if (key.empty() || value.empty()) {
+        return;  // Reject empty keys or values
+    }
+    
+    // Limit key length
+    if (key.length() > 100) {
+        return;
+    }
+    
     for (auto& fact : pImpl->facts) {
         if (fact.first == key) {
             fact.second = value;
@@ -163,18 +232,32 @@ struct ProceduralMemory::Impl {
 
 ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
 
-ProceduralMemory::~ProceduralMemory() = default;
+ProceduralMemory::~ProceduralMemory() {
+    delete pImpl;
+}
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
+    if (name.empty() || pattern.empty()) {
+        return;  // Reject empty skills or patterns
+    }
+    
+    // Limit skill name length
+    if (name.length() > 50) {
+        return;
+    }
+    
     for (auto& skill : pImpl->skills) {
         if (skill.name == name) {
             skill.neuralPattern = pattern;
+            skill.proficiency = 0.5f;  // Reset proficiency
             return;
         }
     }
+    
     Skill skill;
     skill.name = name;
     skill.neuralPattern = pattern;
+    skill.proficiency = 0.5f;
     pImpl->skills.push_back(skill);
 }
 
@@ -216,12 +299,28 @@ struct AssociativeMemory::Impl {
 
 AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
 
-AssociativeMemory::~AssociativeMemory() = default;
+AssociativeMemory::~AssociativeMemory() {
+    delete pImpl;
+}
 
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
+    // Validate input
+    if (a.value == 0 || b.value == 0) {
+        return;  // Invalid neuron IDs
+    }
+    
+    if (strength < 0.0f || strength > 1.0f) {
+        return;  // Invalid strength
+    }
+    
+    // Ensure symmetry - create bidirectional association
+    associatePair(a, b, strength);
+    associatePair(b, a, strength);
+}
+
+void AssociativeMemory::associatePair(NeuronId a, NeuronId b, float strength) {
     for (auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
+        if (std::get<0>(assoc) == a && std::get<1>(assoc) == b) {
             std::get<2>(assoc) = strength;
             return;
         }

@@ -12,7 +12,7 @@ namespace nlm {
 class WorkingMemory {
 public:
     WorkingMemory();
-    ~WorkingMemory();
+    ~WorkingMemory() { delete pImpl; }
     
     // Store item
     // TODO PHASE 2: Implement real storage
@@ -54,7 +54,7 @@ struct EpisodicMemoryItem {
 class EpisodicMemory {
 public:
     EpisodicMemory();
-    ~EpisodicMemory();
+    ~EpisodicMemory() { delete pImpl; }
     
     // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
@@ -85,7 +85,7 @@ private:
 class SemanticMemory {
 public:
     SemanticMemory();
-    ~SemanticMemory();
+    ~SemanticMemory() { delete pImpl; }
     
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
@@ -121,7 +121,7 @@ struct Skill {
 class ProceduralMemory {
 public:
     ProceduralMemory();
-    ~ProceduralMemory();
+    ~ProceduralMemory() { delete pImpl; }
     
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
@@ -149,7 +149,7 @@ private:
 class AssociativeMemory {
 public:
     AssociativeMemory();
-    ~AssociativeMemory();
+    ~AssociativeMemory() { delete pImpl; }
     
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
