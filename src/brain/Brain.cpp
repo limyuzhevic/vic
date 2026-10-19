@@ -50,6 +50,11 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // ========== PHASE 2 COMPLETE NEUROMODULATION ==========
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -100,11 +105,23 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize core performance systems
         spikeSystem = std::make_unique<SpikeSystem>();
+        
+        // Initialize plasticity systems
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // Initialize performance optimizations
+        // Event-driven spike processing with ring buffer
+        spikeSystem->setEventQueue(std::make_unique<SpikeRingBuffer>());
+        
+        // Time-bucketed delayed spike processing
+        spikeSystem->setDelayedQueue(std::make_unique<DelayedSpikeQueue>());
+        
+        // Configure spike system for event-driven processing
+        spikeSystem->configureForEventDrivenProcessing();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
@@ -112,6 +129,11 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize memory systems with brain pointer
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -121,6 +143,11 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Initialize cognition systems with brain pointer
+        if (planner) planner->initialize(this);
+        if (conceptFormation) conceptFormation->initialize(this);
+        if (attention) attention->initialize(this);
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
@@ -129,6 +156,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize complete neuromodulation systems (Phase 2)
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -417,6 +449,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+    }
+    
+    // Update serotonin (mood, impulsivity, and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+    }
+    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -528,13 +575,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        // Present current experience to concept formation system
+        // Create neural activity pattern from current brain state
+        std::vector<float> activityPattern;
+        std::vector<float> features;
+        
+        // Extract neural activity pattern from firing neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Only include neurons that are firing or highly active
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activityPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Extract sensory features from current state
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                features.push_back(neuron->getMembranePotential());
+            }
+        }
+        
+        // If we have enough data, present to concept formation
+        if (!activityPattern.empty()) {
+            float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            pImpl->conceptFormation->presentExperience(activityPattern, features, currentReward, currentStep);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -546,7 +617,84 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 13: Sleep/rest cycle with enhanced consolidation ==========
+    // Determine if brain should enter sleep/rest mode
+    // Sleep occurs when no significant events for extended period
+    bool shouldRest = false;
+    
+    if (pImpl->totalSpikesThisStep == 0 && 
+        pImpl->stepsSinceLastEpisode > 50) {  // No activity for 50 steps
+        shouldRest = true;
+    }
+    
+    // Track time in sleep mode for adaptive consolidation
+    static int sleepCounter = 0;
+    
+    // If entering rest mode, activate sleep
+    if (shouldRest && !isResting) {
+        isResting = true;
+        sleepCounter = 0;
+        NLM_LOG_INFO("Brain entering sleep/rest mode for memory consolidation");
+    }
+    // If active mode, deactivate sleep
+    else if (!shouldRest && isResting) {
+        isResting = false;
+        NLM_LOG_INFO("Brain exiting sleep/rest mode after %d cycles", sleepCounter);
+    }
+    
+    // If in sleep mode, enhance memory processing
+    if (isResting) {
+        sleepCounter++;
+        
+        // During sleep, progressively increase consolidation effectiveness
+        // Longer sleep = more consolidation
+        float sleepMultiplier = std::min(1.5f, 0.1f * sleepCounter);  // Cap at 150%
+        
+        pImpl->stepsSinceLastEpisode++;
+        
+        if (pImpl->stepsSinceLastEpisode >= 20) {  // Store episode every 20 steps during sleep
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            if (pImpl->episodicMemory) {
+                // During sleep, consolidate memories more aggressively based on sleep duration
+                float enhancedConsolidation = 0.8f * sleepMultiplier;
+                enhancedConsolidation = std::clamp(enhancedConsolidation, 0.5f, 0.95f);
+                
+                pImpl->episodicMemory->consolidate(enhancedConsolidation);
+                
+                // Sleep replay: systematically review all important episodes with increasing depth
+                // Early sleep: quick review of recent episodes
+                // Late sleep: deep processing of important, stable episodes
+                size_t replayDepth = std::min(3 + sleepCounter / 10, 10u);  // Gradual increase in replay depth
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(replayDepth);
+                
+                for (const auto* episode : episodesToReplay) {
+                    // During later sleep stages, prioritize episodes with higher importance and stability
+                    if (sleepCounter > 5 && episode->importance > 0.3f && episode->stability > 0.6f) {
+                        // Deep replay of well-established memories
+                        pImpl->episodicMemory->replayEpisode(episode);
+                    } else if (sleepCounter <= 5) {
+                        // Early sleep: replay recent episodes for initial consolidation
+                        pImpl->episodicMemory->replayEpisode(episode);
+                    }
+                }
+            }
+        }
+        
+        // Sleep phase: synaptic downscaling and pruning
+        if (pImpl->structuralPlasticity) {
+            // During sleep, perform targeted pruning based on sleep duration
+            // Longer sleep = more aggressive pruning
+            float pruningRate = 0.00001f + 0.000005f * sleepMultiplier;
+            pImpl->structuralPlasticity->setPruningRate(pruningRate);
+            pImpl->structuralPlasticity->update(this, *pImpl->rng);
+            
+            // Restore normal pruning after sleep processing
+            pImpl->structuralPlasticity->setPruningRate(0.00001f);
+        }
+    }
+    
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,10 +724,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        float consolidationStrength = 0.3f;
+        
+        // Enhance consolidation during sleep
+        if (isResting) {
+            consolidationStrength *= 2.5f;  // 150% consolidation during sleep
+        }
+        
+        pImpl->episodicMemory->consolidate(consolidationStrength);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -690,9 +845,44 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner to plan multi-step actions based on predictions
+    if (!pImpl->planner) {
+        return std::make_unique<Action>(ActionType::Wait);
+    }
     
+    // Convert current brain state to action planning context
+    std::vector<float> currentState;
+    
+    // Get sensory state from sensory neurons
+    for (auto* neuron : pImpl->sensoryNeurons) {
+        currentState.push_back(neuron->getMembranePotential());
+    }
+    
+    // Add working memory content to planning context
+    if (pImpl->workingMemory) {
+        auto workingMemoryContent = pImpl->workingMemory->getCurrentState();
+        currentState.insert(currentState.end(), 
+                           workingMemoryContent.begin(), 
+                           workingMemoryContent.end());
+    }
+    
+    // Add current goals if set
+    if (pImpl->planner->getCurrentGoal().size() > 0) {
+        currentState.insert(currentState.end(),
+                           pImpl->planner->getCurrentGoal().begin(),
+                           pImpl->planner->getCurrentGoal().end());
+    }
+    
+    // Use NeuralPlanner to select best action
+    ActionType plannedAction = pImpl->planner->planAction(currentState);
+    
+    // If planner suggests an action, use it
+    if (plannedAction != ActionType::Wait) {
+        auto action = std::make_unique<Action>(plannedAction);
+        return action;
+    }
+    
+    // Fallback to simple motor neuron activity if planner didn't select action
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -705,7 +895,7 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Return a simple action based on motor activity
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
@@ -757,6 +947,17 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    
+    // Reset complete neuromodulation systems (Phase 2)
+    if (pImpl->acetylcholine) pImpl->acetylcholine->reset();
+    if (pImpl->norepinephrine) pImpl->norepinephrine->reset();
+    if (pImpl->serotonin) pImpl->serotonin->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

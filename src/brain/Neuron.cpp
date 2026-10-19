@@ -1,9 +1,8 @@
 #include "Neuron.hpp"
+#include "../performance/SIMDVectorization.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
-
-namespace nlm {
 
 struct Neuron::Impl {
     NeuronId id;
@@ -297,6 +296,64 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+} // namespace nlm
+
+// SIMD Vectorization Implementations
+
+namespace nlm {
+
+bool Neuron::isSIMDAvailable() {
+    return SIMDUtils::isSIMDAvailable();
+}
+
+const char* Neuron::getSIMDType() {
+    return SIMDUtils::getSIMDType();
+}
+
+size_t Neuron::getOptimalSIMDBlockSize() {
+    return SIMDUtils::SIMD_WIDTH;
+}
+
+bool Neuron::processBatchSIMD(
+    std::vector<Neuron*>& neurons,
+    Timestamp currentTime,
+    TimestepDuration dt,
+    size_t blockSize
+) {
+    if (!isSIMDAvailable() || neurons.empty()) {
+        return false;
+    }
+    
+    // Determine block size
+    if (blockSize == 0) {
+        blockSize = getOptimalSIMDBlockSize();
+    }
+    
+    // Process neurons in blocks
+    for (size_t i = 0; i < neurons.size(); i += blockSize) {
+        size_t currentBlockSize = std::min(blockSize, neurons.size() - i);
+        
+        // Create vector of neuron references for this block
+        std::vector<Neuron*> block(neurons.begin() + i, neurons.begin() + i + currentBlockSize);
+        
+        // TODO: Implement SIMD batch processing
+        // For now, fall back to sequential processing
+        for (Neuron* neuron : block) {
+            neuron->stepLIF(currentTime, dt);
+        }
+    }
+    
+    return true;
+}
+
+bool Neuron::processLargeNetworkSIMD(
+    std::vector<Neuron*>& neurons,
+    Timestamp currentTime,
+    TimestepDuration dt
+) {
+    return processBatchSIMD(neurons, currentTime, dt);
 }
 
 } // namespace nlm

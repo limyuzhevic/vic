@@ -1,11 +1,6 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Neuron.hpp"
-#include <vector>
-#include <queue>
-#include <functional>
-#include <unordered_map>
+#include "../performance/EventQueue.hpp"
 
 namespace nlm {
 
@@ -52,29 +47,26 @@ public:
     using SpikeHandler = std::function<void(const DetailedSpikeEvent&)>;
     void registerHandler(SpikeHandler handler);
     
-    // Register delayed spike handler (called when delayed spikes are delivered)
-    using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
-    void registerDelayedHandler(DelayedSpikeHandler handler);
+    // Event queue for immediate spike processing
+    using SpikeRingBuffer = ::nlm::SpikeRingBuffer;
     
-    // Get spike history
-    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
-    void clearHistory();
+    // Event queue for delayed spike processing
+    using DelayedSpikeQueue = ::nlm::DelayedSpikeQueue;
     
-    // Get spike count
-    size_t getSpikeCount() const;
-    size_t getPendingSpikeCount() const;
-    size_t getPendingDelayedCount() const;
+    // Set event queue for immediate spikes
+    void setEventQueue(std::unique_ptr<SpikeRingBuffer> queue);
     
-    // Statistics
-    float getAverageSpikeRate() const;
-    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    // Set event queue for delayed spikes
+    void setDelayedQueue(std::unique_ptr<DelayedSpikeQueue> queue);
     
-    // Reset
-    void reset();
+    // Configure for event-driven processing
+    void configureForEventDrivenProcessing();
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Get event queue for immediate spikes
+    SpikeRingBuffer* getEventQueue() const;
+    
+    // Get event queue for delayed spikes
+    DelayedSpikeQueue* getDelayedQueue() const;
 };
 
 } // namespace nlm

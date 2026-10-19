@@ -137,11 +137,28 @@ public:
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
-    // Reset to initial state
-    void reset();
+    // High-performance LIF step with explicit timestep
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // SIMD vectorization support
+    static bool isSIMDAvailable();
+    static const char* getSIMDType();
+    static size_t getOptimalSIMDBlockSize();
+    
+    // Batch SIMD processing for multiple neurons
+    static bool processBatchSIMD(
+        std::vector<Neuron*>& neurons,
+        Timestamp currentTime,
+        TimestepDuration dt,
+        size_t blockSize = 0
+    );
+    
+    // Large network SIMD processing
+    static bool processLargeNetworkSIMD(
+        std::vector<Neuron*>& neurons,
+        Timestamp currentTime,
+        TimestepDuration dt
+    );
     
 private:
     struct Impl;
