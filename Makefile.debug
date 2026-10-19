@@ -1,0 +1,65 @@
+# This file provides build configuration for the new Debugger module
+# It ensures the debugger is properly included in the build process
+
+# Set to 1 to enable the Debugger module
+NLM_ENABLE_DEBUGGER ?= 1
+
+# Compiler flags for debugging
+CXXFLAGS += -DNLM_DEBUGGER_ENABLED
+
+# Include paths for debugger module
+INCLUDES += -Isrc/debug
+
+# Source files for debugger module
+ifeq ($(NLM_ENABLE_DEBUGGER),1)
+    NLM_SOURCES += src/debug/Debugger.cpp
+    NLM_HEADERS += src/debug/Debugger.hpp
+endif
+
+# Link dependencies
+NLM_LIBRARIES += pthread
+
+# Debug build configuration
+ifdef NDEBUG
+    CXXFLAGS += -g -O0 -DDEBUG
+else
+    CXXFLAGS += -O2 -DNDEBUG
+endif
+
+# Additional performance flags
+CXXFLAGS += -DNLM_USE_EVENT_QUEUE -DNLM_USE_SPARSE_CONNECTIVITY
+
+# Python bindings configuration
+PYBIND11_INCLUDE_DIR ?= /usr/include/python3.11
+CXXFLAGS += -I$(PYBIND11_INCLUDE_DIR)
+
+# Installation directories
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+LIBDIR ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include
+
+install: debug-install
+
+install: install-sources install-binaries install-libraries
+
+debug-install:
+	@echo "Installing NLM debugger..."
+	@if [ -d "src/debug" ]; then \
+		echo "Debug module present - installation will include debugger tools"; \
+	fi
+
+# Test targets
+include tests/Makefile
+
+# Phased build support
+build-phase:
+	@echo "Building NLM Phase $(PHASE)"
+	@$(MAKE) NLM_ENABLE_DEBUGGER=1
+
+# Clean targets
+clean:
+	rm -f *.o *.a *.so
+	rm -rf build
+
+.PHONY: install debug-install build-phase clean

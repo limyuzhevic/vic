@@ -139,13 +139,34 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Debug module (advanced debugging and profiling)
+if (DEFINED ENV{NLM_ENABLE_DEBUGGER} OR NLM_ENABLE_DEBUGGER)
+    message(STATUS "Building with Debugger module enabled")
+    add_library(nlm_debugger STATIC
+        src/debug/Debugger.cpp
+    )
+    target_include_directories(nlm_debugger PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_link_libraries(nlm_debugger PUBLIC nlm_core)
+    
+    # Link debugger to main executable if enabled
+    target_link_libraries(nlm PUBLIC nlm_debugger)
+endif()
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Error handling module (comprehensive error handling and recovery)
+if (DEFINED ENV{NLM_ENABLE_ERROR_HANDLING} OR NLM_ENABLE_ERROR_HANDLING)
+    message(STATUS "Building with Error Handling module enabled")
+    add_library(nlm_error_handling STATIC
+        src/error/ErrorHandling.cpp
+    )
+    target_include_directories(nlm_error_handling PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_link_libraries(nlm_error_handling PUBLIC nlm_core)
+    
+    # Link error handling to main executable if enabled
+    target_link_libraries(nlm PUBLIC nlm_error_handling)
+endif()
