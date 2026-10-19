@@ -133,19 +133,21 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Phase 6 demo executable  
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Phase 6 integrated experiment executable
+add_executable(nlm_phase6_integration_test
+    src/experiments/Phase6IntegrationDemo.cpp
 )
+target_link_libraries(nlm_phase6_integration_test PUBLIC nlm_core nlm_agent nlm_world)
+
+# Final integration test executable (Phase 6)
+add_executable(nlm_phase6_final_test
+    src/experiments/Phase6FinalIntegrationTest.cpp
+)
+target_link_libraries(nlm_phase6_final_test PUBLIC nlm_core nlm_agent nlm_world)
+

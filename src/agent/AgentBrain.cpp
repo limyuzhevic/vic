@@ -85,7 +85,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_ || !percept.getBrain()) {
+        NLM_LOG_ERROR("Invalid percept or brain pointer in processSensoryInput");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -126,8 +129,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
+        // Ensure previousVision_ is sized correctly
+        previousVision_.resize(vision.size(), 0.0f);
+        
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        for (size_t i = 0; i < vision.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
@@ -140,12 +146,17 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+    } else {
+        // Reset novelty if no vision input
+        noveltyLevel_ = 0.0f;
     }
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    } else {
+        curiosityLevel_ = 0.0f;
     }
 }
 
@@ -250,9 +261,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Get STDP system for plasticity modulation
+    auto* stdp = brain_->getSTDP();
+    if (!stdp) {
+        NLM_LOG_ERROR("STDP system not available for reward modulation");
+        return;
+    }
+    
     // Apply to all synapses with eligibility traces
+    size_t modifiedSynapses = 0;
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -262,8 +283,13 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
+                modifiedSynapses++;
             }
         }
+    }
+    
+    if (modifiedSynapses > 0) {
+        NLM_LOG_DEBUG("Reward modulation applied to " + std::to_string(modifiedSynapses) + " synapses");
     }
     
     // Modulate plasticity based on dopamine
@@ -272,15 +298,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
+    stdp->setLTPWeight(0.01f * plasticityFactor);
+    stdp->setLTDWeight(0.012f * plasticityFactor);
+    
+    NLM_LOG_DEBUG("Plasticity factor modulated to " + std::to_string(plasticityFactor));
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
+    
+    if (timestep < 0.0) {
+        NLM_LOG_ERROR("Negative timestep in updateDevelopment: " + std::to_string(timestep));
+        return;
+    }
     
     developmentalAge_ += timestep;
     
@@ -309,6 +339,9 @@ void AgentBrain::updateDevelopment(double timestep) {
             float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
+            
+            NLM_LOG_DEBUG("Development update: synaptogenesis rate = " + std::to_string(synRate) +
+                         ", pruning rate = " + std::to_string(pruneRate));
         }
     }
 }
