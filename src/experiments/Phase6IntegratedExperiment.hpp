@@ -96,43 +96,93 @@ struct Phase6Config {
         , checkpointPath("./checkpoint_test.bin") {}
 };
 
+struct Phase6BenchmarkResult {
+    // Performance metrics
+    double totalWallClockTime;
+    double simulationTime;
+    double checkpointTime;
+    double loadTime;
+    
+    // Computational metrics
+    size_t totalSpikesGenerated;
+    size_t totalSynapticChanges;
+    size_t totalMemoryOperations;
+    size_t totalNeuromodulationOperations;
+    
+    // Memory usage
+    size_t peakMemoryUsage;
+    
+    // Throughput metrics
+    double stepsPerSecond;
+    double spikesPerSecond;
+    double synapticChangesPerSecond;
+    
+    Phase6BenchmarkResult()
+        : totalWallClockTime(0.0)
+        , simulationTime(0.0)
+        , checkpointTime(0.0)
+        , loadTime(0.0)
+        , totalSpikesGenerated(0)
+        , totalSynapticChanges(0)
+        , totalMemoryOperations(0)
+        , totalNeuromodulationOperations(0)
+        , peakMemoryUsage(0)
+        , stepsPerSecond(0.0)
+        , spikesPerSecond(0.0)
+        , synapticChangesPerSecond(0.0) {}
+};
+
 /**
- * Phase 6 integrated experiment runner
+ * Configuration for Phase 6 benchmarking
  */
-class Phase6IntegratedExperiment {
+struct Phase6BenchmarkConfig {
+    uint64_t maxSteps;
+    size_t neuronCount;
+    size_t regionCount;
+    float connectionProbability;
+    bool enableCheckpointing;
+    bool enableReplay;
+    bool enableDevelopment;
+    std::string checkpointPath;
+    
+    Phase6BenchmarkConfig()
+        : maxSteps(10000)
+        , neuronCount(1000)
+        , regionCount(1)
+        , connectionProbability(0.1f)
+        , enableCheckpointing(true)
+        , enableReplay(true)
+        , enableDevelopment(true)
+        , checkpointPath("./checkpoint_bench.bin") {}
+};
+
+/**
+ * Phase 6 benchmark runner
+ */
+class Phase6BenchmarkRunner {
 public:
-    Phase6IntegratedExperiment();
-    ~Phase6IntegratedExperiment();
+    Phase6BenchmarkRunner();
+    ~Phase6BenchmarkRunner();
     
     /**
-     * Run the complete integration test
+     * Run performance benchmarks
      */
-    Phase6IntegrationResult run(const Phase6Config& config);
+    Phase6BenchmarkResult runBenchmarks(const Phase6BenchmarkConfig& config);
     
     /**
-     * Run a simple integration verification
+     * Run benchmark with multiple configurations
      */
-    bool verifyIntegration();
+    std::vector<Phase6BenchmarkResult> runBenchmarkSuite(const std::vector<Phase6BenchmarkConfig>& configs);
     
     /**
-     * Test memory integration
+     * Print benchmark results
      */
-    bool testMemoryIntegration();
+    void printBenchmarkResults(const Phase6BenchmarkResult& result, const std::string& description);
     
     /**
-     * Test neuromodulation integration
+     * Print benchmark suite results
      */
-    bool testNeuromodulationIntegration();
-    
-    /**
-     * Test checkpoint save/load
-     */
-    bool testCheckpointing();
-    
-    /**
-     * Test replay system
-     */
-    bool testReplay();
+    void printBenchmarkSuiteResults(const std::vector<Phase6BenchmarkResult>& results);
 };
 
 } // namespace nlm
