@@ -353,6 +353,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Add version attribute to the module
+    m.attr("__version__") = "0.1.0";
+    m.attr("__version_info__") = py::make_tuple(0, 1, 0);
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,22 +404,73 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    // Enhanced createBrain method with convenience overloads
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+    
+    // Convenience method for creating brain with default config
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+    
+    // Batch brain operations for efficiency
+    m.def("batchInjectCurrent", [](std::shared_ptr<Brain> brain, const std::vector<std::pair<NeuronId, MembranePotential>>& currents) {
+        for (const auto& [neuron, current] : currents) {
+            brain->injectCurrent(neuron, current);
+        }
+    }, py::arg("brain"), py::arg("currents"), "Inject current into multiple neurons efficiently");
+    
+    // Performance monitoring helpers
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getFiringNeuronCount(),
+            brain->getAverageFiringRate(),
+            brain->getExcitationInhibitionRatio()
+        );
+    }, py::arg("brain"), "Get comprehensive brain statistics as tuple");
 
+    // Performance monitoring tools
+    m.def("getPerformanceStats", [](std::shared_ptr<Brain> brain) {
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getTotalNeuronCount(),
+            brain->getAverageFiringRate(),
+            brain->getTotalSynapseCount(),
+            brain->getPendingSpikeEventCount()
+        );
+    }, py::arg("brain"), "Get performance statistics for monitoring brain efficiency");
+
+    // Advanced debugging tools
+    m.def("dumpBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"), "Save brain state to file for debugging");
+
+    // Batch operations for large-scale simulations
+    m.def("batchStep", [](std::shared_ptr<Brain> brain, std::vector<size_t> steps) {
+        for (size_t step : steps) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("steps"), "Perform multiple simulation steps efficiently");
+
+    // Add version attribute to the module
+    m.attr("__version__") = "0.1.0";
+    m.attr("__version_info__") = py::make_tuple(0, 1, 0);
+
+    // SimpleWorld factory
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // AgentBrain factory
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
