@@ -28,6 +28,22 @@ SimpleWorld::SimpleWorld()
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    // Configurable parameters
+    , moveSpeed_(3.0f)
+    , turnSpeed_(2.0f)
+    , actionCooldown_(0.1f)
+    , movementStep_(0.1f)
+    , backwardMovementFactor_(0.5f)
+    , movementCost_(0.01f)
+    , wallCollisionCost_(0.05f)
+    , backwardMovementCost_(0.02f)
+    , turnCost_(0.005f)
+    , hazardDamage_(0.2f)
+    , interactRange_(1.0f)
+    , hazardDetectionRange_(1.5f)
+    , touchDetectionRange_(0.3f)
+    , visionMinIntensity_(0.4f)
+    , sensoryNoveltyDecay_(0.99f)
 {
     agent_.reset();
 }
@@ -118,11 +134,14 @@ uint64_t SimpleWorld::nextRandom() {
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
     ActionResult result;
-    const float moveSpeed = 3.0f;
-    const float turnSpeed = 2.0f;
+    
+    // Validate input parameters
+    if (std::isnan(currentTime) || std::isinf(currentTime)) {
+        return ActionResult(0.0f, false, "invalid_time");
+    }
     
     // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    if (currentTime - agent_.lastActionTime < actionCooldown_) {
         return ActionResult(0.0f, false, "too soon");
     }
     
@@ -130,56 +149,56 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     
     switch (cmd) {
         case MotorCommand::MoveForward: {
-            float dx = std::cos(agent_.orientation) * moveSpeed;
-            float dy = std::sin(agent_.orientation) * moveSpeed;
+            float dx = std::cos(agent_.orientation) * moveSpeed_;
+            float dy = std::sin(agent_.orientation) * moveSpeed_;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * movementStep_;
+            float newY = agent_.y + dy * movementStep_;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = -movementCost_;  // Small cost for movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = -wallCollisionCost_;  // Cost for hitting wall
                 result.success = false;
             }
             break;
         }
         
         case MotorCommand::MoveBackward: {
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
+            float dx = -std::cos(agent_.orientation) * moveSpeed_ * backwardMovementFactor_;
+            float dy = -std::sin(agent_.orientation) * moveSpeed_ * backwardMovementFactor_;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * movementStep_;
+            float newY = agent_.y + dy * movementStep_;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = -backwardMovementCost_;
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -wallCollisionCost_;
                 result.success = false;
             }
             break;
         }
         
         case MotorCommand::TurnLeft:
-            agent_.angularVelocity = -turnSpeed;
+            agent_.angularVelocity = -turnSpeed_;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -turnCost_;
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
-            agent_.angularVelocity = turnSpeed;
+            agent_.angularVelocity = turnSpeed_;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -turnCost_;
             result.success = true;
             break;
             
@@ -218,8 +237,13 @@ ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
+    result.message = "no_object";
     
-    // Check for objects in interaction range
+    // Validate agent state
+    if (std::isnan(agent_.x) || std::isnan(agent_.y)) {
+        return ActionResult(0.0f, false, "invalid_agent_position");
+    }
+    
     const float interactRange = 1.0f;
     
     for (auto& obj : objects_) {
@@ -228,6 +252,9 @@ ActionResult SimpleWorld::interact() {
         float dx = obj.x - agent_.x;
         float dy = obj.y - agent_.y;
         float dist = std::sqrt(dx * dx + dy * dy);
+        
+        // Avoid division by zero
+        if (dist < 0.001f) continue;
         
         if (dist < interactRange + obj.radius) {
             obj.active = false;  // Consume the object
@@ -238,7 +265,7 @@ ActionResult SimpleWorld::interact() {
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                agent_.health -= hazardDamage_;
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
@@ -247,10 +274,6 @@ ActionResult SimpleWorld::interact() {
             // Only interact with one object at a time
             break;
         }
-    }
-    
-    if (!result.success) {
-        result.message = "no_object";
     }
     
     return result;
@@ -302,28 +325,24 @@ void SimpleWorld::generateVision() {
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     
-    const int rayCount = 16;
-    const float fov = M_PI / 2.0f;  // 90 degree FOV
-    const float maxRange = 8.0f;
+    std::vector<float> vision(visionRayCount_, 1.0f);  // Default: far/empty
     
-    std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
-    
-    for (int i = 0; i < rayCount; ++i) {
+    for (int i = 0; i < visionRayCount_; ++i) {
         // Angle for this ray
-        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        float angle = agent_.orientation - M_PI / 4.0f + (M_PI / 2.0f * i / (visionRayCount_ - 1));
         
         // Cast ray
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < maxRange) {
+        while (t < visionMaxRange_) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
             // Check wall collision
             if (!isValidPosition(px, py)) {
-                vision[i] = t / maxRange;
+                vision[i] = t / visionMaxRange_;
                 break;
             }
             
@@ -333,16 +352,16 @@ void SimpleWorld::generateVision() {
                 // Encode object type as intensity pattern
                 // Resource = bright, Hazard = dark, different distances
                 if (obj->type == WorldObjectType::Resource) {
-                    vision[i] = (maxRange - t) / maxRange * 0.8f;  // Bright
+                    vision[i] = (visionMaxRange_ - t) / visionMaxRange_ * visionMinIntensity_;  // Bright
                 } else if (obj->type == WorldObjectType::Hazard) {
-                    vision[i] = (maxRange - t) / maxRange * 0.3f;  // Dark
+                    vision[i] = (visionMaxRange_ - t) / visionMaxRange_ * (visionMinIntensity_ * 0.5f);  // Dark
                 } else {
                     vision[i] = 0.5f;
                 }
                 break;
             }
             
-            t += 0.1f;
+            t += visionRayStep_;
         }
     }
     
@@ -350,22 +369,22 @@ void SimpleWorld::generateVision() {
     sensory_.setTimestamp(simTime_);
     
     // Generate touch sensors (proximity to obstacles in 8 directions)
-    std::vector<float> touch(8, 0.0f);
-    for (int i = 0; i < 8; ++i) {
-        float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
+    std::vector<float> touch(touchRayCount_, 0.0f);
+    for (int i = 0; i < touchRayCount_; ++i) {
+        float angle = agent_.orientation + 2.0f * M_PI * i / touchRayCount_;
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < 1.5f) {
+        while (t < hazardDetectionRange_) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
             if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
+                touch[i] = 1.0f - t / hazardDetectionRange_;  // Closer = stronger signal
                 break;
             }
-            t += 0.1f;
+            t += touchDetectionStep_;
         }
     }
     sensory_.setTouch(touch);
@@ -383,9 +402,9 @@ void SimpleWorld::generateVision() {
     proprioception[0] = agent_.x / width_;     // Normalized X
     proprioception[1] = agent_.y / height_;    // Normalized Y
     proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
+    proprioception[3] = std::abs(agent_.velocityX) / internalSignalWeight_;  // Speed X
+    proprioception[4] = std::abs(agent_.velocityY) / internalSignalWeight_;  // Speed Y
+    proprioception[5] = std::abs(agent_.angularVelocity) / turnSpeed_;  // Turn rate
     sensory_.setProprioception(proprioception);
     
     // No audio for now

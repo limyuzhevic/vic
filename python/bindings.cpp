@@ -5,7 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cmath>
 
+#include "../src/core/Logger/Logger.hpp"
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"

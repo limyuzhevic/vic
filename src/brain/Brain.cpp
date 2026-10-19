@@ -325,6 +325,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Brain::step: Invalid internal state - spike system not initialized");
+        return;
+    }
+
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
@@ -589,6 +594,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Check for valid internal state
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::receiveSensoryInput: Invalid internal state");
+        return;
+    }
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -607,16 +618,23 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        if (pImpl->sensoryNeurons[i]) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        }
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        if (pImpl->workingMemory && normalizedValue > 0.5f && pImpl->sensoryNeurons[i]) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::injectCurrent: Invalid internal state");
+        return;
+    }
+    
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
@@ -629,11 +647,18 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::injectCurrentToNeurons: Invalid internal state");
+        return;
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                    if (neuron) {
+                        neuron->injectCurrent(current);
+                    }
                 }
             }
         }

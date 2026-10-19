@@ -274,6 +274,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
+    // Validate brain and region
+    if (!brain || !region) {
+        NLM_LOG_ERROR("STDP test: Invalid brain or region");
+        return;
+    }
+    
+    // Validate brain and region
+    if (!brain || !region) {
+        NLM_LOG_ERROR("STDP test: Invalid brain or region");
+        return;
+    }
+    
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;

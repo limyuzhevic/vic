@@ -69,6 +69,25 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configurable parameters
+    void setVisionScaleFactor(float factor) { visionScaleFactor_ = factor; }
+    void setTouchScaleFactor(float factor) { touchScaleFactor_ = factor; }
+    void setInternalSignalScaleFactor(float factor) { internalSignalScaleFactor_ = factor; }
+    void setProprioceptionScaleFactor(float factor) { proprioceptionScaleFactor_ = factor; }
+    void setNoveltyMultiplier(float multiplier) { noveltyMultiplier_ = multiplier; }
+    void setPredictionErrorMultiplier(float multiplier) { predictionErrorMultiplier_ = multiplier; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExploreChanceMultiplier(float multiplier) { exploreChanceMultiplier_ = multiplier; }
+    
+    float getVisionScaleFactor() const { return visionScaleFactor_; }
+    float getTouchScaleFactor() const { return touchScaleFactor_; }
+    float getInternalSignalScaleFactor() const { return internalSignalScaleFactor_; }
+    float getProprioceptionScaleFactor() const { return proprioceptionScaleFactor_; }
+    float getNoveltyMultiplier() const { return noveltyMultiplier_; }
+    float getPredictionErrorMultiplier() const { return predictionErrorMultiplier_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExploreChanceMultiplier() const { return exploreChanceMultiplier_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +131,16 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configurable parameters
+    float visionScaleFactor_;
+    float touchScaleFactor_;
+    float internalSignalScaleFactor_;
+    float proprioceptionScaleFactor_;
+    float noveltyMultiplier_;
+    float predictionErrorMultiplier_;
+    float curiosityThreshold_;
+    float exploreChanceMultiplier_;
 };
 
 } // namespace nlm
