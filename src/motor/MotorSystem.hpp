@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Motor system: converts neural activity to actions
-// PLACEHOLDER - Phase 2 will implement real action selection
+// PLACEHOLDER - Phase 6 will implement real action selection
 
 class MotorSystem {
 public:

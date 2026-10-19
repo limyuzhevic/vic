@@ -23,6 +23,8 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Initialize neuron implementation data
+    // Set default type to internal and clear other identifiers
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
@@ -203,17 +205,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Mathematical model: dV/dt = (V_rest - V)/tau + I/C
+    // Where:
+    //   V = membrane potential (mV)
+    //   V_rest = resting potential (mV)
+    //   tau = membrane time constant (ms)
+    //   I = total synaptic current (nA)
+    //   C = membrane capacitance (nF)
+    // Discrete approximation: V_new = V + dt * 1000 * ((V_rest - V)/tau + I/C)
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::TIME_CONSTANT;  // ms - Typical time constant for cortical neurons
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF - Membrane capacitance
     
     // Synaptic input contributes to membrane potential change
+    // I/C converts current to voltage change (nA/nF = mV)
     float synapticContribution = pImpl->synapticInput / C;
     
     // Leak contribution
@@ -231,70 +240,94 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Spike detection and reset
+    // If membrane potential exceeds threshold, neuron fires
+    // Reset voltage to prevent immediate re-firing
+    // Enter refractory period to prevent unrealistic firing rates
+    // Update adaptation variable for spike-frequency adaptation
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity and history
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to post-spike value
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period to prevent immediate re-firing
+        // Prevents unrealistic firing rates and allows ion channel recovery
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Update adaptation variable for spike-frequency adaptation
+        // Higher firing rates increase adaptation, reducing excitability over time
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron did not spike, update state
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
+    // Clear synaptic input for next simulation step
+    // Input has been integrated into membrane potential
     pImpl->synapticInput = 0.0f;
     
     return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Default LIF step implementation with standard biophysical parameters
+    // Uses biologically plausible values: resting potential -70mV, threshold -55mV
+    // Refractory period of 5ms ensures realistic firing rates (max ~200Hz)
+    // Time constant 20ms determines membrane charging dynamics
+    TimestepDuration dt = 0.001;  // 1ms timestep matches typical neural simulations
     stepLIF(currentTime, dt);
 }
 
 void Neuron::reset() {
+    // Reset neuron to its initial quiescent state
+    // All state variables are reset to default values
+    // Membrane potential set to resting state
+    // Refractory period cleared
+    // Spike history cleared for plasticity computation
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
+    // Realistic neuron parameter initialization based on biological constraints
+    // Neural parameters exhibit natural variability across neuron populations
+    
+    // Membrane potential typically starts near resting with small perturbation
+    // Represents initial ion channel state before any input
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
+    // Spike threshold typically -55mV with physiological variation
+    // Sets input required to initiate action potential
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Resting potential typically -70mV
+    // Resting potential varies across neuron types (L2/3 pyramidal: -70mV, fast-spiking: -60mV, etc.)
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
+    // Reset potential typically close to resting but can be higher
+    // Determines post-spike hyperpolarization level
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
+    // Refractory period varies by neuron type (PV+ interneurons: 2-5ms, pyramidal: 5-10ms)
+    // Prevents unrealistic firing rates and allows sodium channel recovery
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
-    // Initial state
+    // Initial firing state: either resting or active
+    // Determines initial excitability before any inputs
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
+    // Clear any residual synaptic input from previous steps
+    // Ensures clean state for new initialization
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }

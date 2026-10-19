@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Synapse pruning: removal of weak or unused synapses
-// PLACEHOLDER - Phase 2 will implement real pruning
+// PLACEHOLDER - Phase 6 will implement real pruning
 
 class Pruning {
 public:

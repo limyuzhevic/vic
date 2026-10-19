@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// PLACEHOLDER - Phase 6 will have real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();

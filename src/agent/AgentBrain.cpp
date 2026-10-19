@@ -20,6 +20,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize agent brain by connecting NLM neural system to the world
+    // This is the crucial interface layer between neural processing and behavior
+    // Distributes motor and sensory neurons across functional groups for action selection
+    // Implements population coding for motor commands (forward, backward, turn, interact, wait)
+    // Separates sensory modalities for different input streams (vision, touch, internal, proprioception)
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -29,6 +35,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
+                        // Each group contains multiple neurons for robust control
+                        // Population coding allows smooth transitions between actions
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
@@ -44,7 +52,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Distribute sensory neurons across modalities
+                        // Vision: 256 neurons (16x16 grid)
+                        // Touch: 8 neurons for collision detection
+                        // Internal: 4 neurons for homeostatic signals
+                        // Proprioception: 6 neurons for body position
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
@@ -64,6 +76,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Initialize agent for interaction with the simulated world
+    // Setup sensory input buffer for visual perception
+    // Reset developmental state and plasticity modifiers
+    // Log initialization for debugging and monitoring
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;

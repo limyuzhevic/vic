@@ -61,7 +61,7 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+// Initialize brain with configuration
     bool initialize();
     
     // Main simulation step
@@ -192,8 +192,34 @@ public:
     
     // Logging
     void logStatus() const;
-    
+
 private:
+    // Brain initialization helper methods
+    bool initialize();
+    void validateInitializationConfig();
+    void createRegions();
+    void createNeurons();
+    void collectIONeurons(NeuralRegion* region, PopulationId sensoryPopId, PopulationId motorPopId);
+    void initializeConnectivity();
+    void initializeMemorySystems();
+    void initializeCognitionSystems();
+    void initializeNeuromodulationSystems();
+    void configureSpikeSystem();
+    void configureCheckpointManager();
+    void logInitializationSummary();
+    void rollbackInitialization(const struct InitializationState& initState);
+    
+    struct InitializationState {
+        bool regionsCreated = false;
+        bool neuronsCreated = false;
+        bool connectivityInitialized = false;
+        bool memorySystemsInitialized = false;
+        bool cognitionSystemsInitialized = false;
+        bool neuromodulationInitialized = false;
+        bool spikeSystemConfigured = false;
+        bool checkpointManagerConfigured = false;
+    };
+    
     struct Impl;
     Impl* pImpl;
 };

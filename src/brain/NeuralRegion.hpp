@@ -10,7 +10,7 @@
 namespace nlm {
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
+// PLACEHOLDER - Phase 6 will implement region-level dynamics
 
 class NeuralRegion {
 public:

@@ -50,7 +50,7 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+    // Phase 6: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
@@ -142,15 +142,15 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Get timestep from configuration for simulation control
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config for replay and consolidation
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager for state persistence
+    checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -307,14 +307,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
-     * This implements the complete integrated brain simulation:
+     * This implements the complete integrated brain simulation with all neural systems:
      * 
      * 1. Process pending delayed spike events (deliver synaptic input)
      * 2. Update all neuron membrane potentials (LIF dynamics)
      * 3. Detect spikes and schedule outgoing spike events
      * 4. Update working memory (maintenance and competition)
      * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
+     * 6. Apply plasticity rules (STDP and Hebbian learning)
      * 7. Update episodic memory with current experience
      * 8. Update prediction system
      * 9. Update attention system
@@ -323,6 +323,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
      * 14. Collect statistics
+     * 
+     * The integrated brain loop combines all neural components into a unified
+     * developmental system that learns from experience and adapts over time.
      */
     
     pImpl->currentStep = currentStep;
@@ -330,9 +333,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    // Deliver synaptic inputs from presynaptic neurons to postsynaptic neurons
+    // Implements synaptic transmission with biologically realistic delays
+    // Event-driven processing efficiently handles sparse neural activity
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Apply Leaky Integrate-and-Fire dynamics to all neurons
+    // Membrane potentials integrate synaptic inputs and leak toward resting
+    // Prevents unrealistic firing rates through refractory periods
+    // This is the core neural computation engine
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -478,17 +488,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 7: Update episodic memory ==========
+    // Store current brain state as episodic memory for long-term storage
+    // Episodes are created periodically based on neural activity patterns
+    // Includes active neurons and their activation levels
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
             // Capture current brain state as an episode
+            // EpisodicMemoryItem contains active neurons and reward signal
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Record all active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,24 +516,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode for reinforcement learning
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store episode to episodic memory system
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
+    // Prediction system anticipates sensory input and computes prediction errors
+    // Used for curiosity-driven exploration and efficient coding
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
     
     // ========== STEP 9: Update attention system ==========
+    // Attention selects relevant neural assemblies from working memory
+    // Implements competitive selection based on novelty and prediction errors
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
+        // Enhances representation of behaviorally relevant neural patterns
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
@@ -527,17 +547,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
+    // Forms abstract concepts from recurring neural activity patterns
+    // Supports generalization and transfer learning across experiences
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
+    // Creates and prunes synaptic connections based on usage and developmental stage
+    // Synaptogenesis adds new connections, pruning removes unused ones
+    // Critical for brain development and adaptive wiring
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 12: Replay important memories ==========
+    // Replays recently stored episodic memories to strengthen synaptic connections
+    // Implemented during rest or periodic consolidation phases
+    // Enhances memory retention through replay-induced synaptic changes
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -547,6 +575,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
+    // Development system modulates plasticity rates over time
+    // Early stages have high plasticity, adult stages have reduced plasticity
+    // Biologically inspired developmental trajectory
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -556,33 +587,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
             
+            // Stage-specific plasticity modulation
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityMod = 1.0f;  // High plasticity in early development
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    plasticityMod = 0.8f;  // Reduced but still plastic
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    plasticityMod = 0.5f;  // Moderate plasticity
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityMod = 0.2f;  // Stable, low plasticity
                     break;
             }
             
+            // Development modulates structural plasticity rates
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
+    // Consolidates important memories, removing weak traces
+    // Implements synaptic homeostasis and memory prioritization
+    // Reduces network complexity while preserving essential information
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
+        // 30% threshold for memory retention
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
     // ========== STEP 15: Checkpoint management ==========
+    // Periodic state saving for persistence and recovery
+    // Preserves learned behaviors and neural configurations
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }

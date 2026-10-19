@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// PLACEHOLDER - Phase 6 will implement real STDP
 
 class STDP : public PlasticityRule {
 public:
@@ -36,7 +36,7 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// PLACEHOLDER - Phase 6: Reward-modulated STDP for reinforcement learning
 class RewardModulatedSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
@@ -48,7 +48,7 @@ public:
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
+// PLACEHOLDER - Phase 6: Triplet STDP for complex temporal dependencies
 class TripletSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,

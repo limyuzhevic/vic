@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Neural maturation: development of adult-level properties
-// PLACEHOLDER - Phase 2 will implement real maturation
+// PLACEHOLDER - Phase 6 will implement real maturation
 
 class Maturation {
 public:

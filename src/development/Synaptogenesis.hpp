@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Synaptogenesis: formation of new synapses
-// PLACEHOLDER - Phase 2 will implement real synapse formation
+// PLACEHOLDER - Phase 6 will implement real synapse formation
 
 class Synaptogenesis {
 public:

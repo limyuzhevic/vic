@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Real Neural Computation Tests
 
 #include <iostream>
 #include <cassert>
@@ -38,7 +38,7 @@ namespace test_brain {
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "=== NLM Phase 6 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
