@@ -46,6 +46,66 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "\nNLM Phase 2: Real Neural Computation Demo" << std::endl;
+    std::cout << "===========================================" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "\n=== NLM Phase 2 Command Line Interface ===\n" << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl << std::endl;
+    
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --help                    Display this help message" << std::endl;
+    std::cout << "  --version                 Display version information" << std::endl;
+    std::cout << "  --config=<file>           Load configuration from file" << std::endl << std::endl;
+    
+    std::cout << "Simulation Configuration:" << std::endl;
+    std::cout << "  --neurons=<n>             Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --timestep=<t>            Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --steps=<n>              Run simulation for N steps" << std::endl;
+    std::cout << "  --region_count=<n>        Set number of neural regions (default: 1)" << std::endl;
+    std::cout << "  --connection_prob=<p>    Set synaptic connection probability (default: 0.15)" << std::endl << std::endl;
+    
+    std::cout << "Plasticity Options:" << std::endl;
+    std::cout << "  --enable_hebbian          Enable Hebbian plasticity rule" << std::endl;
+    std::cout << "  --enable_structural       Enable structural plasticity (growth/pruning)" << std::endl;
+    std::cout << "  --enable_stdp             Enable Spike-Timing-Dependent Plasticity" << std::endl;
+    std::cout << "  --stdp_ltp=<w>            Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd=<w>            Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau=<t>            Set STDP time constant (default: 20.0)" << std::endl << std::endl;
+    
+    std::cout << "Neuromodulation Options:" << std::endl;
+    std::cout << "  --enable_curiosity        Enable curiosity-driven exploration" << std::endl;
+    std::cout << "  --enable_development      Enable developmental stages" << std::endl;
+    std::cout << "  --enable_reward           Enable reward-based learning" << std::endl;
+    std::cout << "  --enable_novelty          Enable novelty detection" << std::endl;
+    std::cout << "  --enable_prediction       Enable prediction systems" << std::endl;
+    std::cout << "  --enable_cognition        Enable cognitive functions (planning, attention)" << std::endl << std::endl;
+    
+    std::cout << "Memory Systems:" << std::endl;
+    std::cout << "  --enable_working_memory   Enable working memory" << std::endl;
+    std::cout << "  --enable_episodic_memory  Enable episodic memory" << std::endl;
+    std::cout << "  --enable_associative      Enable associative memory" << std::endl;
+    std::cout << "  --enable_procedural       Enable procedural memory" << std::endl << std::endl;
+    
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --verbose                 Enable verbose logging" << std::endl;
+    std::cout << "  --benchmark               Run performance benchmark" << std::endl;
+    std::cout << "  --experiment=<name>       Run specific experiment (development, curiosity, memory, prediction)" << std::endl;
+    std::cout << "  --save=<file>             Save brain state to file" << std::endl;
+    std::cout << "  --load=<file>             Load brain state from file" << std::endl;
+    std::cout << "  --checkpoint=<steps>      Create checkpoint every N steps" << std::endl;
+    std::cout << "  --random_seed=<seed>      Set random seed for reproducibility" << std::endl;
+    std::cout << "  --enable_all              Enable all systems" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "Build: Phase 2 with full integration" << std::endl;
+    std::cout << "License: MIT" << std::endl;
+    std::cout << "Author: NLM Research Project" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

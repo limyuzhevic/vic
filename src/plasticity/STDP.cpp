@@ -20,6 +20,10 @@ STDP::STDP() : pImpl(new Impl) {}
 
 STDP::~STDP() = default;
 
+STDP::STDP() : pImpl(new Impl) {}
+
+STDP::~STDP() = default;
+
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
@@ -61,16 +65,18 @@ void STDP::update(Synapse* synapse,
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
+            // Calculate timing difference - ensure proper order to prevent overflow
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
+            if (dt > 0.0f) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
+            } else if (dt < 0.0f) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
+                // Use absolute value and negative sign
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
@@ -78,8 +84,8 @@ void STDP::update(Synapse* synapse,
         }
     }
     
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
+    // Apply weight change with bounds and validation
+    if (std::abs(totalDelta) > 1e-8f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;

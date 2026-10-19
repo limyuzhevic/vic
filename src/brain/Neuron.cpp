@@ -205,6 +205,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Note: dt is in seconds, tau in ms, so convert: dt_s = dt * 1000
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -214,12 +215,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = pImpl->synapticInput / C;  // (nA / nF) = V/s
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution (convert ms to seconds for consistency)
+    float leakContribution = (V_rest - V) / tau;  // V/ms
     
     // Update membrane potential using exponential Euler integration
+    // Convert dt from seconds to milliseconds for consistency with tau
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)

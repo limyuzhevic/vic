@@ -40,13 +40,19 @@ uint64_t RandomGenerator::getSeed() const {
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        throw std::invalid_argument("RandomGenerator::uniformInt: min must be <= max (min=" + 
+                                   std::to_string(min) + ", max=" + std::to_string(max) + ")");
     }
     if (min == max) {
         return min;
     }
-    std::uniform_int_distribution<uint32_t> dist(min, max);
-    return dist(pImpl->gen);
+    try {
+        std::uniform_int_distribution<uint32_t> dist(min, max);
+        return dist(pImpl->gen);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("RandomGenerator::uniformInt: failed to generate random number - " + 
+                               std::string(e.what()));
+    }
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {

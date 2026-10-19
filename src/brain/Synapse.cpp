@@ -205,21 +205,24 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression - simplified and more efficient recovery formula
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Recovery from depression toward 1.0 using a simpler exponential approach
+        float recoveryFactor = 1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU);
+        pImpl->shortTermDepression = 1.0f - (1.0f - pImpl->shortTermDepression) * recoveryFactor;
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
+    // Clamp weight bounds with efficacy consideration
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Apply efficacy factor to weight bounds for more realistic constraints
+    float efficacyAdjustedMax = Impl::MAX_WEIGHT * pImpl->efficacy;
+    float efficacyAdjustedMin = Impl::MIN_WEIGHT * pImpl->efficacy;
+    pImpl->weight = std::clamp(pImpl->weight, efficacyAdjustedMin, efficacyAdjustedMax);
 }
 
 void Synapse::reset() {

@@ -65,6 +65,10 @@ TimestepDuration SimulationClock::getTimestep() const {
 }
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
+    if (dt <= 0.0) {
+        throw std::invalid_argument("SimulationClock::setTimestep: timestep must be positive (got " + 
+                                   std::to_string(dt) + ")");
+    }
     pImpl->timestep = dt;
 }
 

@@ -56,8 +56,16 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true; // No command line arguments
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        if (arg.empty()) {
+            continue;
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,14 +73,22 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Validate key and value
+                if (!key.empty()) {
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Validate key and value
+            if (!key.empty()) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -84,9 +100,29 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File (version 1.0)" << "\n";
+    file << "# Generated on " << "PLACEHOLDER_TIMESTAMP" << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (source: " << static_cast<int>(entry.source) << ")\n";
+        
+        // Visit the variant value and write it appropriately
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << std::scientific << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -94,8 +130,17 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    
+    std::string sanitizedKey = trim(key);
+    if (sanitizedKey.empty()) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&sanitizedKey](const ConfigEntry& e) { return e.key == sanitizedKey; });
     
     if (it == pImpl->entries.end()) {
         return std::nullopt;
@@ -115,14 +160,25 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key before processing
+    if (key.empty()) {
+        return; // Silently ignore invalid keys
+    }
+    
+    // Sanitize key: remove leading/trailing whitespace
+    std::string sanitizedKey = trim(key);
+    if (sanitizedKey.empty()) {
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&sanitizedKey](const ConfigEntry& e) { return e.key == sanitizedKey; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(sanitizedKey, value, source);
     }
 }
 
