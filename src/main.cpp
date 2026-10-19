@@ -24,7 +24,6 @@
 #include <string>
 #include <vector>
 #include <iomanip>
-#include <numeric>
 
 using namespace nlm;
 

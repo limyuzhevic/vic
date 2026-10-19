@@ -106,20 +106,22 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    return uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(1));
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
     }
+    // Use the uint64_t version for large ranges
     return uniformInt(0, n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
+    // Use the uint32_t version for small ranges (0-255 fits in uint32_t)
     for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+        bytes[i] = static_cast<uint8_t>(uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(255)));
     }
 }
 

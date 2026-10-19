@@ -18,6 +18,10 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find Python and pybind11
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(pybind11 REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -55,11 +59,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -74,11 +74,10 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
-    src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -90,6 +89,25 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+)
+
+# Python bindings
+add_library(pynlm MODULE
+    python/bindings.cpp
+)
+
+target_link_libraries(pynlm PRIVATE pybind11::module nlm_core)
+target_include_directories(pynlm PRIVATE python)
+
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
@@ -119,7 +137,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
