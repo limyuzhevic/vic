@@ -23,6 +23,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
+    // Validate configuration
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: neuronCount must be > 0");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (config.maxSteps == 0) {
+        NLM_LOG_ERROR("Invalid configuration: maxSteps must be > 0");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     // Create configuration
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", config.neuronCount);
@@ -259,6 +271,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
+    // Check if memory systems are available
     if (!wm || !em) {
         NLM_LOG_ERROR("Memory systems not available");
         return false;
@@ -300,6 +313,7 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
     
+    // Check if neuromodulation systems are available
     if (!dopamine || !curiosity || !novelty) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
@@ -393,10 +407,13 @@ bool Phase6IntegratedExperiment::testReplay() {
         if (!episodes.empty()) {
             NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
             return true;
+        } else {
+            NLM_LOG_WARNING("Episodes available but retrieval failed");
         }
+    } else {
+        NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
     }
     
-    NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
     return true;
 }
 
