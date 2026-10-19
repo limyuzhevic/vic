@@ -245,6 +245,57 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // Batch operations helper for neurons
+    m.def("batchSetNeuronParameters", [](std::shared_ptr<Brain> brain, std::vector<NeuronId> neuronIds,
+                                         std::optional<double> membranePotential,
+                                         std::optional<double> threshold,
+                                         std::optional<double> type,
+                                         std::optional<int> refractoryPeriod) {
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (!spikeSystem) return;
+        
+        for (const auto& id : neuronIds) {
+            if (auto* neuron = spikeSystem->getNeuron(id)) {
+                if (membranePotential.has_value()) {
+                    neuron->setMembranePotential(*membranePotential);
+                }
+                if (threshold.has_value()) {
+                    neuron->setThreshold(*threshold);
+                }
+                if (type.has_value()) {
+                    neuron->setType(static_cast<NeuronType>(type.value()));
+                }
+                if (refractoryPeriod.has_value()) {
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(refractoryPeriod.value()));
+                }
+            }
+        }
+    }, py::arg("brain"), py::arg("neuronIds"), 
+       py::arg("membranePotential") = std::nullopt,
+       py::arg("threshold") = std::nullopt,
+       py::arg("type") = std::nullopt,
+       py::arg("refractoryPeriod") = std::nullopt,
+       "Batch update parameters for multiple neurons");
+
+    m.def("batchGetNeuronStates", [](std::shared_ptr<Brain> brain, std::vector<NeuronId> neuronIds) {
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (!spikeSystem) return std::map<uint64_t, std::string>();
+        
+        std::map<uint64_t, std::string> stateMap;
+        for (const auto& id : neuronIds) {
+            if (auto* neuron = spikeSystem->getNeuron(id)) {
+                std::ostringstream oss;
+                oss << "V=" << neuron->getMembranePotential()
+                    << ", T=" << neuron->getThreshold()
+                    << ", State=" << static_cast<int>(neuron->getState().firingState)
+                    << ", Firing=" << neuron->isFiring();
+                stateMap[id.value] = oss.str();
+            }
+        }
+        return stateMap;
+    }, py::arg("brain"), py::arg("neuronIds"),
+       "Get states for multiple neurons as a map");
+
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -404,22 +455,170 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced API features for power users
+    
+    // Configuration management
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set useful defaults for Phase 6 operations
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        
+        // Phase 6 integration settings
+        config->set("working_memory_size", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        config->set("enable_prediction", true, ConfigSource::Default);
+        config->set("enable_cognition", true, ConfigSource::Default);
+        
+        // Performance settings
+        config->set("enable_simd", true, ConfigSource::Default);
+        config->set("enable_parallel", true, ConfigSource::Default);
+        config->set("memory_pool_size", static_cast<int64_t>(10000), ConfigSource::Default);
+        
+        return config;
+    }, "Create advanced configuration with Phase 6 defaults");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Environment factory functions
+    m.def("createWorldWithFeatures", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);  // Standard size for agent navigation
+        return world;
+    }, "Create world with standard configuration for agent training");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createAgentWithFeatures", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable all advanced features for optimal performance
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       "Create agent brain with all advanced features enabled");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Visualization helpers
+    m.def("createVisualizationPipeline", []() {
+        py::dict pipeline;
+        pipeline["vision"] = true;
+        pipeline["memory"] = true;
+        pipeline["neuromodulation"] = true;
+        pipeline["cognition"] = true;
+        return pipeline;
+    }, "Create visualization pipeline configuration for monitoring brain activity");
+
+    // Experiment management helpers
+    m.def("createExperimentConfig", []() {
+        py::dict config;
+        config["name"] = "NLM_Phase6_Experiment";
+        config["version"] = "6.0";
+        config["author"] = "NLM_Research";
+        config["description"] = "Phase 6 Integration Experiment";
+        config["output_dir"] = "./experiments";
+        config["checkpoint_interval"] = 100;
+        config["metrics"] = py::dict()
+            .def("__setitem__", [](py::dict& d, const std::string& key, double value) { d[key] = value; })
+            .def("__getitem__", [](py::dict& d, const std::string& key) { return d[key]; });
+        return config;
+    }, "Create experiment configuration dictionary");
+
+    // Performance monitoring
+    m.def("getBrainPerformanceStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        
+        // Basic stats
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["active_regions"] = brain->getRegionCount();
+        
+        // Calculate derived metrics
+        double firingRate = brain->getTotalNeuronCount() > 0 ? 
+            static_cast<double>(brain->getFiringNeuronCount()) / brain->getTotalNeuronCount() : 0.0;
+        stats["firing_rate_percent"] = firingRate * 100.0;
+        
+        // Plasticity activity
+        auto* stdp = brain->getSTDP();
+        if (stdp) {
+            stats["stdp_active"] = stdp->isEnabled();
+        }
+        
+        auto* hebbian = brain->getHebbian();
+        if (hebbian) {
+            stats["hebbian_active"] = hebbian->isEnabled();
+        }
+        
+        return stats;
+    }, py::arg("brain"),
+       "Get comprehensive performance statistics from brain");
+
+    // Memory profiling
+    m.def("profileBrainMemory", [](std::shared_ptr<Brain> brain) {
+        py::dict profile;
+        
+        // Estimate memory usage
+        size_t neuronMemory = brain->getTotalNeuronCount() * sizeof(NeuronState);
+        size_t synapseMemory = brain->getTotalSynapseCount() * sizeof(Synapse);
+        
+        profile["neurons"] = static_cast<double>(neuronMemory) / 1024.0;  // KB
+        profile["synapses"] = static_cast<double>(synapseMemory) / 1024.0;  // KB
+        profile["estimated_mb"] = (neuronMemory + synapseMemory) / (1024.0 * 1024.0);
+        
+        return profile;
+    }, py::arg("brain"),
+       "Profile memory usage of brain components");
+
+    // Batch learning operations
+    m.def("batchApplyLearning", [](std::shared_ptr<Brain> brain, std::vector<NeuronType> targetTypes,
+                                   double strength, int steps) {
+        for (int step = 0; step < steps; ++step) {
+            for (const auto& type : targetTypes) {
+                brain->injectCurrentToNeurons(type, strength);
+            }
+            brain->step(step, step * 0.001);
+        }
+    }, py::arg("brain"), py::arg("targetTypes"), py::arg("strength"), py::arg("steps"),
+       "Apply learning to neurons of specified types over multiple steps");
+
+    // Configuration validation and comparison
+    m.def("validateBrainConfig", [](std::shared_ptr<Config> config) {
+        py::dict results;
+        results["valid"] = config->has("random_seed") && 
+                          config->has("neuron_count") && 
+                          config->has("region_count");
+        
+        if (results["valid"]) {
+            results["neuron_count"] = config->getOr<int64_t>("neuron_count", 0);
+            results["region_count"] = config->getOr<int64_t>("region_count", 0);
+            
+            double timestep = config->getOr<double>("simulation_timestep", 0.001);
+            results["timestep_ok"] = timestep > 0.0 && timestep < 1.0;
+        }
+        
+        return results;
+    }, py::arg("config"),
+       "Validate configuration and return validation results");
+
+    // Experiment serialization helpers
+    m.def("exportBrainForExperiment", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        brain->save(filepath);
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+       "Export brain state for experiment recording");
+
+    m.def("importBrainForExperiment", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->load(filepath);
+        return brain;
+    }, py::arg("filepath"),
+       "Import brain state from experiment recording");
 
 } // namespace nlm
