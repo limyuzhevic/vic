@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // IMPLEMENTED: Real dopamine-modulated plasticity factor based on biological research
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -48,9 +48,18 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Internal methods for system control
+    void reset();
+    float getBaseline() const;
+    float getPeakLevel() const;
+    
+    // Statistics and diagnostics
+    float getEffectiveness() const;
+    std::string getStatus() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

@@ -64,33 +64,41 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Get configuration summary
+    std::string summary() const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Configuration analysis
+    bool validate() const;
+    std::vector<std::string> getIssues() const;
     
-    // Set values
+    // File I/O with JSON support
+    bool loadFromFile(const std::string& filepath);
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Command line argument parsing
+    bool loadFromArgs(int argc, char** argv);
+    
+    // Configuration management
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Configuration retrieval
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Configuration information
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
-    
-    // Get all keys
     std::vector<std::string> getKeys() const;
-    
-    // Clear all
     void clear();
     
-    // Get configuration summary
+    // Configuration summary
     std::string summary() const;
     
 private:
