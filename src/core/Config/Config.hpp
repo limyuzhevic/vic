@@ -11,18 +11,6 @@ namespace nlm {
 // Forward declarations
 class Config;
 
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
 // Configuration source
 enum class ConfigSource {
     Default,
@@ -93,6 +81,14 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ========== ADVANCED CONFIGURATION ==========
+    
+    // Advanced configuration operations
+    void merge(const Config& other, bool overwrite = true);
+    bool validate(std::string& errors, std::string& warnings) const;
+    void optimize();
+    std::unique_ptr<Config> createAdvancedConfig(const std::string& presetName = "advanced") const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +97,17 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Configuration value types
+using ConfigValue = std::variant<
+    int,
+    int64_t,
+    double,
+    bool,
+    std::string,
+    std::vector<int>,
+    std::vector<double>,
+    std::vector<std::string>
+];
 
 } // namespace nlm

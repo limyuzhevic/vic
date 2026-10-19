@@ -193,6 +193,24 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ADVANCED BRAIN OPERATIONS ==========
+    
+    // Advanced operations
+    void setParameters(const std::vector<std::pair<std::string, ConfigValue>>& parameters);
+    bool saveState(const std::string& filepath, bool compress = true, CompressionLevel level = CompressionLevel::Balanced) const;
+    bool loadState(const std::string& filepath, bool validate = true, bool repair = false);
+    void optimize(int iterations = 100, float targetSNR = 20.0f);
+    bool prune(float threshold, bool structural = false, size_t minSynapses = 1);
+    std::unique_ptr<Brain> duplicate(const std::vector<std::string>& excludePaths = {}) const;
+    
+    // Analysis tools
+    std::map<std::string, float> analyzeConnectivity() const;
+    std::vector<std::string> getEmergentBehaviors(float threshold = 0.5f) const;
+    
+    // Performance and debugging
+    bool benchmark(int duration = 1000, bool detailed = false) const;
+    bool validateState(bool thorough = false) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

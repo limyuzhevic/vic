@@ -58,6 +58,21 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== ADVANCED AGENT FEATURES ==========
+    
+    // Advanced agent operations
+    void setLearningRate(float rate);
+    void enableReplay(bool enable, size_t bufferSize = 1000);
+    std::map<std::string, float> getPerformanceStats() const;
+    std::string analyzeBehavior(size_t window = 100) const;
+    std::vector<MotorCommand> planAction(size_t depth = 5) const;
+    
+    // Analysis tools
+    std::vector<MotorCommand> getDecisionTrail(size_t count = 100) const;
+    
+    // Performance and debugging
+    bool traceExecution(std::vector<MotorCommand>& trail, size_t steps = 1000) const;
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }

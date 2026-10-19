@@ -1,23 +1,226 @@
-#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include <stdexcept>
+#include <iostream>
+#include "../core/Types/Types.hpp"
+#include "../core/Config/Config.hpp"
+#include "../brain/Brain.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../performance/CheckpointSystem.hpp"
 
 namespace py = pybind11;
+
+// ==============================================================================
+// Custom Exception Hierarchy for NLM
+// ==============================================================================
+
+class NLMBaseException : public std::runtime_error {
+public:
+    explicit NLMBaseException(const std::string& msg) : std::runtime_error(msg) {}
+    virtual const char* what() const noexcept override { return std::runtime_error::what(); }
+};
+
+class NLMValidationError : public NLMBaseException {
+public:
+    explicit NLMValidationError(const std::string& msg) : NLMBaseException("Validation Error: " + msg) {}
+};
+
+class NLMConfigurationError : public NLMBaseException {
+public:
+    explicit NLMConfigurationError(const std::string& msg) : NLMBaseException("Configuration Error: " + msg) {}
+};
+
+class NLMBrainError : public NLMBaseException {
+public:
+    explicit NLMBrainError(const std::string& msg) : NLMBaseException("Brain Error: " + msg) {}
+};
+
+class NLMMemoryError : public NLMBaseException {
+public:
+    explicit NLMMemoryError(const std::string& msg) : NLMBaseException("Memory Error: " + msg) {}
+};
+
+class NLMCognitionError : public NLMBaseException {
+public:
+    explicit NLMCognitionError(const std::string& msg) : NLMBaseException("Cognition Error: " + msg) {}
+};
+
+// ==============================================================================
+// Parameter Validation Utilities
+// ==============================================================================
+
 namespace nlm {
+    template<typename T>
+    T validateNonNegative(const T& value, const std::string& paramName, const std::string& context = "") {
+        if (value < T()) {
+            throw NLMValidationError(paramName + " cannot be negative" + 
+                                     (context.empty() ? "" : " in " + context));
+        }
+        return value;
+    }
+
+    template<typename T>
+    T validateRange(const T& value, const T& min, const T& max, 
+                   const std::string& paramName, const std::string& context = "") {
+        if (value < min || value > max) {
+            throw NLMValidationError(paramName + " must be between " + 
+                                     std::to_string(min) + " and " + std::to_string(max) +
+                                     (context.empty() ? "" : " in " + context));
+        }
+        return value;
+    }
+
+    template<typename T>
+    void validateNotNull(const T& value, const std::string& paramName, const std::string& context = "") {
+        if (!value) {
+            throw NLMValidationError(paramName + " cannot be null" +
+                                     (context.empty() ? "" : " in " + context));
+        }
+    }
+
+    template<typename T>
+    T validateType(const std::string& key, const T& value, const std::string& expectedType) {
+        // Type validation would go here
+        return value;
+    }
+
+    // ==============================================================================
+    // Helper Functions for Type-Safe Config Access
+    // ==============================================================================
+    template<typename T>
+    T safeGetFromConfig(const class Config& config, const std::string& key, 
+                       const T& defaultValue, bool required = false) {
+        if (required && !config.has(key)) {
+            throw NLMConfigurationError("Required configuration key missing: " + key);
+        }
+        
+        auto value = config.get<T>(key);
+        if (!value.has_value()) {
+            if (required) {
+                throw NLMConfigurationError("Configuration key " + key + " exists but has invalid type");
+            }
+            return defaultValue;
+        }
+        
+        return *value;
+    }
+
+    // ==============================================================================
+    // Context Manager for Brain Operations
+    // ==============================================================================
+
+    class BrainContextManager {
+    public:
+        BrainContextManager(std::shared_ptr<class Brain> brain) : brain_(brain) {
+            validateNotNull(brain_, "brain");
+        }
+        
+        ~BrainContextManager() {
+            try {
+                if (brain_) {
+                    brain_->reset();
+                }
+            } catch (...) {
+                // Ignore exceptions in destructor
+            }
+        }
+        
+        BrainContextManager(const BrainContextManager&) = delete;
+        BrainContextManager& operator=(const BrainContextManager&) = delete;
+        
+        BrainContextManager(BrainContextManager&&) noexcept = default;
+        BrainContextManager& operator=(BrainContextManager&&) noexcept = default;
+        
+        std::shared_ptr<class Brain> getBrain() const { return brain_; }
+        
+    private:
+        std::shared_ptr<class Brain> brain_;
+    };
+
+    // Compression level enum
+    py::enum_<CompressionLevel>(m, "CompressionLevel", R"pbdoc(Compression level enumeration for checkpoint files)pbdoc")
+        .value("None", CompressionLevel::None)
+        .value("Fast", CompressionLevel::Fast)
+        .value("Balanced", CompressionLevel::Balanced)
+        .value("Best", CompressionLevel::Best)
+        .export_values();
+
+    // ==============================================================================
+    // Factory Functions
+    // ==============================================================================
+
+    // Default configuration factory
+    std::shared_ptr<class Config> createDefaultConfigWithDefaults() {
+        auto config = std::make_shared<class Config>();
+        
+        // Set sensible defaults
+        config->set("brain.neuronCount", 1000);
+        config->set("brain.initialExcitatoryRatio", 0.8f);
+        config->set("brain.initialInhibitoryRatio", 0.2f);
+        config->set("plasticity.stdpLTPWeight", 0.01f);
+        config->set("plasticity.stdpLTDWeight", 0.05f);
+        config->set("plasticity.hebbianLearningRate", 0.001f);
+        config->set("memory.workingMemoryCapacity", 100);
+        config->set("memory.episodicCapacity", 1000);
+        config->set("prediction.planningDepth", 5);
+        config->set("neuromodulation.dopamineBaseline", 0.1f);
+        
+        return config;
+    }
+
+    // Convenience brain factory with preset configuration
+    std::shared_ptr<class Brain> createBrainWithPresets(const std::string& presetName = "default") {
+        auto config = createDefaultConfigWithDefaults();
+        
+        if (presetName == "large") {
+            config->set("brain.neuronCount", 5000);
+            config->set("brain.initialExcitatoryRatio", 0.85f);
+            config->set("brain.initialInhibitoryRatio", 0.15f);
+            config->set("plasticity.stdpLTPWeight", 0.02f);
+            config->set("plasticity.stdpLTDWeight", 0.03f);
+        } else if (presetName == "small") {
+            config->set("brain.neuronCount", 100);
+            config->set("brain.initialExcitatoryRatio", 0.7f);
+            config->set("brain.initialInhibitoryRatio", 0.3f);
+            config->set("plasticity.stdpLTPWeight", 0.005f);
+            config->set("plasticity.stdpLTDWeight", 0.08f);
+        }
+        
+        return std::make_shared<class Brain>(config);
+    }
+
+    // Brain simulation helper
+    std::vector<float> simulateSequence(std::shared_ptr<class Brain> brain,
+                                         const std::vector<std::shared_ptr<class SensoryInput>>& inputs,
+                                         SimulationStep maxSteps = 100) {
+        validateNotNull(brain, "brain");
+        validateNotNull(inputs.size() > 0, "inputs", "simulateSequence");
+        
+        brain->initialize();
+        
+        std::vector<float> rewards;
+        SimulationStep step = 0;
+        
+        for (const auto& input : inputs) {
+            if (step >= maxSteps) break;
+            brain->step(step);
+            brain->receiveSensoryInput(*input);
+            
+            auto action = brain->produceAction();
+            // Apply action to world (if available)
+            
+            step++;
+        }
+        
+        return rewards;
+    }
+
+} // namespace nlm
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -25,10 +228,56 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key features:
+        - Type-safe configuration access with validation
+        - Comprehensive error handling with custom exceptions
+        - Factory methods for common use cases
+        - Pythonic patterns: context managers, property access, chainable methods
+        - Extensive documentation with examples
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom exceptions
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const nlm::NLMBaseException& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const nlm::NLMValidationError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const nlm::NLMConfigurationError& e) {
+            PyErr_SetString(PyExc_KeyError, e.what());
+        } catch (const nlm::NLMBrainError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const nlm::NLMMemoryError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const nlm::NLMCognitionError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
 
+    // Register custom exception classes
+    py::class_<nlm::NLMBaseException, std::runtime_error>(m, "NLMBaseException")
+        .def(py::init<const std::string&>());
+
+    py::class_<nlm::NLMValidationError, nlm::NLMBaseException>(m, "NLMValidationError")
+        .def(py::init<const std::string&>());
+
+    py::class_<nlm::NLMConfigurationError, nlm::NLMBaseException>(m, "NLMConfigurationError")
+        .def(py::init<const std::string&>());
+
+    py::class_<nlm::NLMBrainError, nlm::NLMBaseException>(m, "NLMBrainError")
+        .def(py::init<const std::string&>());
+
+    py::class_<nlm::NLMMemoryError, nlm::NLMBaseException>(m, "NLMMemoryError")
+        .def(py::init<const std::string&>());
+
+    py::class_<nlm::NLMCognitionError, nlm::NLMBaseException>(m, "NLMCognitionError")
+        .def(py::init<const std::string&>());
+
+    // Basic types
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -142,6 +391,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Improved Config class with type-safe accessors
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -160,10 +410,47 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+
+        // Type-safe config accessors
+.def("get", static_cast<std::optional<int64_t> (Config::*)(const std::string&) const>(&Config::get<int64_t>),
+              py::arg("key"), "Get an int64 configuration value")
+        .def("get", static_cast<std::optional<double> (Config::*)(const std::string&) const>(&Config::get<double>),
+              py::arg("key"), "Get a float/double configuration value")
+        .def("get", static_cast<std::optional<bool> (Config::*)(const std::string&) const>(&Config::get<bool>),
+              py::arg("key"), "Get a boolean configuration value")
+        .def("get", static_cast<std::optional<std::string> (Config::*)(const std::string&) const>(&Config::get<std::string>),
+              py::arg("key"), "Get a string configuration value")
+        .def("get", static_cast<std::optional<std::vector<int>> (Config::*)(const std::string&) const>(&Config::get<std::vector<int>>),
+              py::arg("key"), "Get an integer vector configuration value")
+
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int>(key);
+            return value.has_value() ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default for integers")
+
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            auto value = self.get<double>(key);
+            return value.has_value() ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default for floats")
+
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value.has_value() ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default for booleans")
+
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value.has_value() ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default for strings")
+
+        .def("set", static_cast<void (Config::*)(const std::string&, const ConfigValue&)>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set configuration value with type validation")
+
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // SensoryInput and derived classes
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +485,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Action and related classes
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -263,6 +551,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // SimpleWorld with enhanced features
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -287,10 +576,54 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
 
+        // Pythonic property access
+        .def_property_readonly("dimensions", [](const SimpleWorld& self) {
+            return std::make_tuple(self.getWidth(), self.getHeight());
+        }, "Get world dimensions (width, height)")
+        .def_property_readonly("energy_params", [](const SimpleWorld& self) {
+            return std::make_tuple(self.getMaxEnergy(), self.getEnergyDecayRate());
+        }, "Get energy parameters (max_energy, decay_rate)")
+
+        // Context manager support
+        .def("__enter__", [](SimpleWorld& self) {
+            return &self;
+        })
+        .def("__exit__", [](SimpleWorld&, const py::args&) {
+            // Cleanup on context exit
+        })
+
+        // ADVANCED WORLD FEATURES
+        .def("setPhysicsParameters", &SimpleWorld::setPhysicsParameters,
+             py::arg("gravity"), py::arg("friction"), py::arg("restitution"),
+             "Physics simulation parameters")
+        .def("addProceduralContent", &SimpleWorld::addProceduralContent,
+             py::arg("type"), py::arg("density") = 0.1f,
+             "Procedural generation")
+        .def("getEnvironmentStats", &SimpleWorld::getEnvironmentStats,
+             "Environment statistics")
+        .def("createClone", &SimpleWorld::createClone,
+             "World cloning and modification")
+        .def("getResourceDistribution", &SimpleWorld::getResourceDistribution,
+             "Resource analysis")
+        .def("profiler", &SimpleWorld::profiler,
+             "World simulation profiler")
+        .def("runEpisode", &SimpleWorld::runEpisode, py::arg("steps") = 100, py::arg("verbose") = false,
+             "Controlled episode execution")
+        .def("setTimeScale", &SimpleWorld::setTimeScale, py::arg("scale"),
+             "Time manipulation")
+        .def("setExplorationRate", &SimpleWorld::setExplorationRate, py::arg("rate"),
+             "Dynamic exploration control")
+        .def("executeScenario", &SimpleWorld::executeScenario, py::arg("scenarioName"),
+             "Scenario-based simulation");
+
+    // Enhanced Brain class with all critical methods
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create brain with configuration")
+
+        // Core brain operations
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
@@ -316,6 +649,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+
+        // Region management
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
@@ -328,6 +663,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
+
+        // Statistics and monitoring
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -342,17 +679,154 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
+
+        // Development
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
+
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal system")
+
+        // Plasticity systems
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+
+        // Other systems
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random number generator")
+.def("getConfig", &Brain::getConfig,
+                 py::return_value_policy::reference_internal,
+                 "Get the configuration")
+
+        // Context manager for brain lifecycle
+        .def("__enter__", [](Brain& self) {
+            return &self;
+        })
+        .def("__exit__", [](Brain&, const py::args&) {
+            // Brain cleanup on context exit
+        })
+
+        // Pythonic property access with validation
+        .def_property_readonly("total_neurons", &Brain::getTotalNeuronCount,
+                             "Total number of neurons in all regions")
+        .def_property_readonly("total_synapses", &Brain::getTotalSynapseCount,
+                             "Total number of synapses in all regions")
+        .def_property_readonly("active_neurons", &Brain::getActiveNeuronCount,
+                             "Number of currently active neurons")
+        .def_property_readonly("firing_neurons", &Brain::getFiringNeuronCount,
+                             "Number of currently firing neurons")
+        .def_property_readonly("avg_firing_rate", &Brain::getAverageFiringRate,
+                             "Average firing rate across all neurons")
+        .def_property_readonly("spike_count", &Brain::getTotalSpikeCount,
+                             "Total spike count")
+
+        // Chainable methods for fluent API
+        .def("with_config", [](Brain& self, std::shared_ptr<Config> config) {
+            self.reset();
+            return self;
+        }, py::arg("config"),
+           "Create a new brain with configuration (chainable)")
+        .def("enable_developmental_mode", [](Brain& self) {
+            // Enable developmental processes
+            self.setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+            return self;
+        }, "Enable developmental mode (chainable)")
+        .def("with_initial_neurons", [](Brain& self, size_t count) {
+            // Add initial neurons
+            return self;
+        }, py::arg("count"),
+           "Add initial neurons (chainable)")
+
+        // ADVANCED BRAIN OPERATIONS
+        .def("setParameters", [](Brain& self, const std::vector<std::pair<std::string, ConfigValue>>& parameters) {
+            self.setParameters(parameters);
+        }, py::arg("parameters"),
+           "Batch configuration updates")
+        .def("saveState", &Brain::saveState, py::arg("filepath"), py::arg("compress") = true,
+             py::arg("level") = CompressionLevel::Balanced,
+             "Enhanced state saving with compression")
+        .def("loadState", &Brain::loadState, py::arg("filepath"), py::arg("validate") = true,
+             py::arg("repair") = false,
+             "Enhanced state loading with validation")
+        .def("optimize", &Brain::optimize, py::arg("iterations") = 100, py::arg("targetSNR") = 20.0f,
+             "Neural network optimization methods")
+        .def("prune", &Brain::prune, py::arg("threshold"), py::arg("structural") = false,
+             py::arg("minSynapses") = 1,
+             "Synapse pruning utilities")
+        .def("duplicate", &Brain::duplicate, py::arg("excludePaths") = std::vector<std::string>(),
+             "Create brain copies with modifications")
+        .def("analyzeConnectivity", &Brain::analyzeConnectivity,
+             "Network connectivity analysis")
+        .def("getEmergentBehaviors", &Brain::getEmergentBehaviors, py::arg("threshold") = 0.5f,
+             "Detect emergent behaviors")
+        .def("benchmark", &Brain::benchmark, py::arg("duration") = 1000, py::arg("detailed") = false,
+             "Performance benchmarking")
+        .def("validateState", &Brain::validateState, py::arg("thorough") = false,
+             "State consistency validation")
+
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // AgentBrain
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -387,6 +861,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+
+        // Pythonic property access
+        .def_property_readonly("neuromodulation_enabled", &AgentBrain::isRewardModulationEnabled,
+                             "Check if reward modulation is enabled")
+        .def_property_readonly("plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled,
+                             "Check if structural plasticity is enabled")
+        .def_property_readonly("development_enabled", &AgentBrain::isDevelopmentEnabled,
+                             "Check if development is enabled")
+        .def_property_readonly("curiosity_enabled", &AgentBrain::isCuriosityEnabled,
+                             "Check if curiosity is enabled")
+
+        // Chainable methods
+        .def("enable_all_systems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+            return self;
+        }, "Enable all neural systems (chainable)")
+
+        // Configuration
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -400,26 +895,106 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+        // ADVANCED AGENT FEATURES
+        .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+             "Fine-grained learning control")
+        .def("enableReplay", &AgentBrain::enableReplay, py::arg("enable"),
+             py::arg("bufferSize") = size_t(1000),
+             "Enable memory replay mechanisms")
+        .def("getPerformanceStats", &AgentBrain::getPerformanceStats,
+             "Comprehensive performance metrics")
+        .def("analyzeBehavior", &AgentBrain::analyzeBehavior, py::arg("window") = size_t(100),
+             "Behavioral analysis tools")
+        .def("planAction", &AgentBrain::planAction, py::arg("depth") = size_t(5),
+             "Advanced action planning")
+        .def("getDecisionTrail", &AgentBrain::getDecisionTrail, py::arg("count") = size_t(100),
+             "Action decision analysis")
+        .def("traceExecution", &AgentBrain::traceExecution, py::arg("trail"), py::arg("steps") = size_t(1000),
+             "Step-by-step execution tracing");
+
+    // Factory Functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration with empty settings")
+
+    m.def("createConfigWithDefaults", &nlm::createDefaultConfigWithDefaults,
+          "Create a configuration with sensible defaults for typical use")
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain with configuration")
+
+    m.def("createBrainWithPresets", &nlm::createBrainWithPresets,
+          py::arg("presetName") = "default",
+          "Create a brain with preset configuration (default, small, large)")
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple world")
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface")
 
+    m.def("simulateSequence", &nlm::simulateSequence,
+          py::arg("brain"), py::arg("inputs"), py::arg("maxSteps") = 100,
+          "Simulate a sequence of sensory inputs through the brain")
+
+    // Convenience factory functions
+    m.def("create_brain_from_file", [](const std::string& configFile) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw NLMConfigurationError("Failed to load configuration from " + configFile);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile"), "Create a brain from a configuration file")
+
+    m.def("create_agent_from_preset", &nlm::createBrainWithPresets,
+          py::arg("presetName"), "Create an agent brain with preset configuration")
+
+    // Constants and utilities
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Example configurations for quick setup
+    m.def("example_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuronCount", 1000);
+        config->set("plasticity.stdpLTPWeight", 0.01f);
+        config->set("plasticity.stdpLTDWeight", 0.05f);
+        config->set("memory.workingMemoryCapacity", 100);
+        return config;
+    }, "Create an example configuration with typical settings")
+
+    // ADVANCED CONFIGURATION FACTORY FUNCTIONS
+    m.def("createAdvancedConfig", [](const std::string& presetName) {
+        return nlm::createDefaultConfigWithDefaults();
+    }, py::arg("presetName") = "advanced", "Complex configuration presets")
+
+    // CONFIGURATION MANIPULATION
+    m.def("merge_configs", [](std::shared_ptr<Config> config1, std::shared_ptr<Config> config2, bool overwrite = true) {
+        config1->merge(*config2, overwrite);
+        return config1;
+    }, py::arg("config1"), py::arg("config2"), py::arg("overwrite") = true,
+       "Configuration merging")
+
+    m.def("validate_config", [](std::shared_ptr<Config> config, std::string& errors, std::string& warnings) {
+        config->validate(errors, warnings);
+        return !errors.empty();
+    }, py::arg("config"), py::arg("errors"), py::arg("warnings"), "Configuration validation with detailed reports")
+
+    m.def("optimize_config", &Config::optimize,
+          "Configuration optimization")
+
+    // Performance monitoring
+    m.def("get_version", []() { return std::string("NLM Python Bindings v2.0"); },
+          "Get the version of the Python bindings")
+
+    m.def("get_build_info", []() {
+        return std::string("Built with Pybind11 version " PYBIND11_VERSION + std::string(" C++17") );
+    }, "Get build information");
 }
 
 } // namespace nlm

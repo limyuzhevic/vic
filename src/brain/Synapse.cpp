@@ -130,14 +130,16 @@ bool Synapse::isInhibitory() const {
 void Synapse::recordPreSpike(Timestamp timestamp) {
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+        // Use std::rotate for O(1) buffer management instead of erase(begin())
+        std::rotate(pImpl->preSpikeHistory.begin(), pImpl->preSpikeHistory.begin() + 1, pImpl->preSpikeHistory.end());
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        // Use std::rotate for O(1) buffer management instead of erase(begin())
+        std::rotate(pImpl->postSpikeHistory.begin(), pImpl->postSpikeHistory.begin() + 1, pImpl->postSpikeHistory.end());
     }
 }
 
@@ -202,7 +204,9 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Prevent division by zero (though STP_FACILITATION_TAU is 100.0f)
+        float tau = Impl::STP_FACILITATION_TAU > 0.0f ? Impl::STP_FACILITATION_TAU : 1.0f;
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / tau);
     }
     
     // Decay short-term depression

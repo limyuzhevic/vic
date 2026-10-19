@@ -1,533 +1,985 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# Test Setup and Teardown Documentation
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+This document provides comprehensive information about test setup, configuration, execution, and teardown procedures for the NLM C++ and Python bindings. It covers everything from basic test execution to advanced testing scenarios and best practices.
 
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+## Table of Contents
 
----
+1. [Test Environment Setup](#test-environment-setup)
+2. [Test Configuration](#test-configuration)
+3. [C++ Test Setup](#cpp-test-setup)
+4. [Python Test Setup](#python-test-setup)
+5. [Test Execution Procedures](#test-execution-procedures)
+6. [Test Teardown and Cleanup](#test-teardown-and-cleanup)
+7. [Advanced Testing Features](#advanced-testing-features)
+8. [Troubleshooting and Common Issues](#troubleshooting-and-common-issues)
+9. [Performance Considerations](#performance-considerations)
+10. [Continuous Integration Setup](#continuous-integration-setup)
 
-## Part 1: Building the C++ Project from Source
+## Test Environment Setup
 
 ### Prerequisites
 
-- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
-- **CMake**: Version 3.16 or higher
-- **Python**: 3.8+ (for Python bindings)
-- **pybind11**: Version 2.11.0+ (for Python bindings)
-
-### Build Steps
-
+#### C++ Development Environment
 ```bash
-# Navigate to the project directory
-cd /path/to/nlm
+# Required packages
+- GCC 10+ or Clang 12+ or MSVC 2019+
+- CMake 3.16 or higher
+- Python 3.8+ (for Python bindings)
+- pybind11 2.11.0+ (for Python bindings)
 
-# Create a build directory
-mkdir -p build
-cd build
-
-# Configure with CMake (Release build for best performance)
-cmake .. -DCMAKE_BUILD_TYPE=Release
-
-# Build all targets
-make -j$(nproc)
-
-# Run tests (if built)
-ctest --output-on-failure
+# Optional but recommended
+- Python development headers
+- NumPy (for Python tests)
+- PyTest framework
+- gtest/gmock (if using alternative testing framework)
 ```
 
-### Build Outputs
-
-After successful compilation, you will have:
-
-| Target | Type | Description |
-|--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
-
-### Build Options
-
+#### Python Development Environment
 ```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+# Install Python test dependencies
+pip install pytest numpy scipy
+pip install pybind11 scikit-build-core
 
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
-
-# Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
-```
-
----
-
-## Part 2: Installing the Python Library
-
-### From Source (Recommended for Development)
-
-```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
-
-# Build and install
-pip install .
-
-# Or install in development mode
+# For development with editable installs
 pip install -e .
 ```
 
-### Using pyproject.toml (Modern Python Packaging)
+### Directory Structure
 
+```
+/workspace/app/
+├── src/                    # C++ source code
+├── tests/                 # Test files
+│   ├── test_*.cpp         # C++ unit tests
+│   ├── test_*.py          # Python tests
+│   └── CMakeLists.txt     # Test build configuration
+├── examples/              # Example scripts
+│   ├── simple_brain.py
+│   ├── agent_world.py
+│   ├── advanced_config.py
+│   ├── plasticity_experiment.py
+│   ├── neuromodulation_study.py
+│   ├── memory_system_test.py
+│   ├── performance_benchmark.py
+│   └── debugging_tools.py
+├── python/               # Python bindings
+│   └── bindings.cpp       # C++/Python interface
+├── CMakeLists.txt        # Main build configuration
+├── pyproject.toml       # Python build configuration
+└── docs/                # Documentation
+    ├── ARCHITECTURE.md
+    ├── SCIENCE.md
+    ├── ROADMAP.md
+    ├── EXPERIMENTS.md
+    ├── LIMITATIONS.md
+    └── PHASE6_FINAL_AUDIT.md
+```
+
+### Build Directory Configuration
+
+#### Standard Build with Tests
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
+# Create build directory
+mkdir -p build
+cd build
 
-# Build only (without installing)
-pip install build
-python -m build
+# Configure with tests enabled
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 
-# Install specific build from wheel
-pip install dist/*.whl
+# Build with tests
+make -j$(nproc)
+
+# Verify test targets
+ls -la | grep nlm_test
 ```
 
-### Verifying Installation
+#### Development Build
+```bash
+# For development with hot-reloading
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 
-```python
-import pynlm
-
-# Check version
-print(pynlm.__version__)
-
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+# Build only test targets
+make test_types
+make test_brain
+make test_stdp
 ```
 
----
+### Environment Variables
 
-## Part 3: Using the Python Library
+| Variable | Description | Default | Example |
+|----------|-------------|---------|-------------|
+| `NLM_TEST_PATH` | Path to test directory | `./tests` | `/workspace/app/tests` |
+| `NLM_PYTHON_PATH` | Path to Python bindings | `./python` | `/workspace/app/python` |
+| `NLM_BUILD_TYPE` | Build configuration | `Release` | `Debug`, `Release`, `RelWithDebInfo` |
+| `NLM_ENABLE_COVERAGE` | Enable code coverage | `OFF` | `ON` |
+| `NLM_TEST_TIMEOUT` | Test timeout in seconds | `300` | `600` |
 
-### Basic Usage
+## Test Configuration
 
-#### Creating a Brain
+### C++ Test Configuration
 
-```python
-import pynlm
+#### Test Categories
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+The C++ test suite is organized into logical categories:
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+1. **Core Functionality Tests** (`test_types.cpp`, `test_config.cpp`, `test_random.cpp`, `test_clock.cpp`)
+   - Type system validation
+   - Configuration management
+   - Random number generation
+   - Simulation timing
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
+2. **Neural Component Tests** (`test_neuron.cpp`, `test_synapse.cpp`, `test_stdp.cpp`)
+   - LIF neuron dynamics
+   - Synaptic transmission
+   - Spike-timing dependent plasticity
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
-```
+3. **System Integration Tests** (`test_brain.cpp`, `test_comprehensive.cpp`)
+   - Complete brain simulation
+   - Memory management
+   - Thread safety
+   - Plasticity mechanisms
 
-#### Running a Simulation
+#### Test Configuration Options
 
-```python
-import pynlm
+```cmake
+# In tests/CMakeLists.txt
+option(BUILD_TESTS "Build test targets" ON)
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Test compilation flags
+add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
-
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../python
 )
 
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
+# Test framework configuration
+enable_testing()
+add_test(NAME nlm_test COMMAND nlm_test)
 ```
 
-### Complete Agent Example
+### Python Test Configuration
+
+#### pytest Configuration
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--cov=pynlm",
+    "--cov-report=html",
+    "--cov-report=term-missing"
+]
+
+[tool.coverage.run]
+source = ["python/"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == __main__:",
+    "raise AssertionError",
+    "raise NotImplementedError"
+]
+```
+
+#### Test Fixtures
 
 ```python
+# conftest.py
+import pytest
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
+@pytest.fixture
+def default_config():
+    """Fixture for default configuration"""
     config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
+    config.set("brain.neuronCount", 100)
+    return config
+
+@pytest.fixture
+def default_brain(default_config):
+    """Fixture for default brain"""
+    brain = pynlm.createBrain(default_config)
+    brain.initialize()
+    return brain
+
+@pytest.fixture
+def test_setup():
+    """Fixture for complete test setup"""
+    config = pynlm.createDefaultConfig()
     brain = pynlm.createBrain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
     agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
     world = pynlm.createSimpleWorld()
     world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
     world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    return {
+        'config': config,
+        'brain': brain,
+        'agent': agent,
+        'world': world
+    }
+```
+
+## C++ Test Setup
+
+### Test Compilation
+
+#### Prerequisites
+```bash
+# Ensure all source files are present
+ls src/{brain,synaptic,plasticity,neuromodulation,memory,cognition,development,sensory,motor,prediction,environment,experiments,dynamics,agent,visualization,world}/**/*.hpp
+```
+
+#### Build Commands
+```bash
+# Full build with tests
+cd build
+make nlm_test
+
+# Build specific test targets
+make test_types
+make test_brain
+make test_stdp
+
+# Build with custom options
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DNLM_ENABLE_TESTS=ON
+make -j4 nlm_test
+```
+
+#### Test Dependencies
+```cmake
+# Link libraries for test targets
+target_link_libraries(nlm_test
+    PRIVATE
+    nlm_core
+    nlm_agent
+    nlm_world
+)
+
+target_compile_features(nlm_test PRIVATE cxx_std_20)
+```
+
+### Test Execution
+
+#### Running C++ Tests
+```bash
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test categories
+./nlm_test  # Runs all C++ tests
+./nlm_test --filter="testBrain"  # Filter by test name
+```
+
+#### Test Output Analysis
+```bash
+# Verbose test output
+ctest -V
+
+# XML output for integration
+ctest -T Test -T "Tests" -o test-results.xml
+
+# Custom output format
+./nlm_test --verbose
+```
+
+## Python Test Setup
+
+### Installation Requirements
+
+#### System Dependencies
+```bash
+# Install Python and pip
+# On Ubuntu/Debian:
+apt-get update
+apt-get install python3 python3-pip python3-dev
+
+# On macOS:
+brew install python3
+
+# On Windows (using WSL or Git Bash):
+# Already covered by base requirements
+```
+
+#### Python Package Dependencies
+```bash
+# Install from requirements.txt
+pip install -r requirements.txt
+
+# Or install directly
+pip install pytest numpy scipy pybind11 scikit-build-core
+
+# For development with editable installs
+pip install -e .
+```
+
+### Test Environment Setup
+
+#### Virtual Environment Setup
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On Unix
+# Or
+venv\Scripts\activate      # On Windows
+
+# Install dependencies in virtual environment
+pip install -r requirements.txt
+pip install -e .
+```
+
+#### Docker Environment
+```dockerfile
+# Dockerfile for testing
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    cmake \
+    git
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip3 install -r requirements.txt
+RUN pip3 install -e .
+
+CMD ["python3", "-m", "pytest", "tests/"]
+```
+
+### Python Test Execution
+
+#### Running Python Tests
+```bash
+# Run all Python tests
+python3 -m pytest tests/ -v
+
+# Run with coverage
+python3 -m pytest tests/ --cov=pynlm --cov-report=html
+
+# Run specific test files
+python3 -m pytest tests/test_python_bindings.py
+python3 -m pytest tests/test_cpython_integration.py
+
+# Run with custom configuration
+python3 -m pytest tests/ -k "test_brain" --tb=short
+```
+
+#### Test Command Line Options
+```bash
+# Run tests with specific options
+python3 -m pytest tests/ \
+    --verbose \
+    --tb=short \
+    --timeout=300 \
+    --ignore=tests/test_benchmark.py
+
+# Run tests in parallel
+python3 -m pytest tests/ -n auto
+
+# Run tests with xdist for distributed testing
+python3 -m pytest tests/ --dist=loadscope
+```
+
+## Test Execution Procedures
+
+### C++ Test Execution Procedures
+
+#### Step-by-Step Execution
+
+1. **Build Preparation**
+```bash
+# Create build directory
+mkdir -p build
+cd build
+
+# Configure with tests
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+# Build tests
+make nlm_test
+```
+
+2. **Test Execution**
+```bash
+# Run comprehensive test suite
+./nlm_test
+
+# Or run with ctest
+ctest --output-on-failure
+```
+
+3. **Output Analysis**
+```bash
+# Check test results
+cat test_results.txt
+
+# Generate test report
+./nlm_test > test_output.txt 2>&1
+```
+
+4. **Validation**
+```bash
+# Verify expected output files
+ls -la *.xml *.json *.txt
+
+# Check for failures
+grep -i "FAILED\|ERROR" test_output.txt
+```
+
+#### C++ Test Categories
+
+1. **Core Functionality Tests**
+   - Test types, configurations, and basic operations
+   - Run: `./nlm_test` or `ctest --filter="test_types"`
+
+2. **Neural Dynamics Tests**
+   - Test neuron and synapse behavior
+   - Run: `./nlm_test` or `ctest --filter="test_neuron"`
+
+3. **Plasticity Tests**
+   - Test STDP and Hebbian mechanisms
+   - Run: `./nlm_test` or `ctest --filter="test_stdp"`
+
+4. **System Integration Tests**
+   - Test complete brain functionality
+   - Run: `./nlm_test` or `ctest --filter="test_brain"`
+
+5. **Comprehensive Tests**
+   - Test all critical areas
+   - Run: `./nlm_test` or `ctest --filter="test_comprehensive"`
+
+### Python Test Execution Procedures
+
+#### Step-by-Step Execution
+
+1. **Environment Setup**
+```bash
+# Ensure Python environment is set up
+python3 --version
+pip --version
+
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
+```
+
+2. **Test Execution**
+```bash
+# Run all Python tests
+python3 -m pytest tests/ -v
+
+# Run integration tests
+python3 tests/test_python_bindings.py
+python3 tests/test_cpython_integration.py
+```
+
+3. **Output Analysis**
+```bash
+# Check test results
+python3 -m pytest tests/ --tb=short
+
+# Generate coverage report
+python3 -m pytest tests/ --cov=pynlm --cov-report=html
+```
+
+#### Python Test Categories
+
+1. **Exception Hierarchy Tests**
+   - Test custom exception classes
+   - Run: `python3 tests/test_python_bindings.py` (within exception tests)
+
+2. **Parameter Validation Tests**
+   - Test configuration validation
+   - Run: `python3 tests/test_python_bindings.py` (within parameter tests)
+
+3. **Context Manager Tests**
+   - Test resource cleanup
+   - Run: `python3 tests/test_python_bindings.py` (within context tests)
+
+4. **Factory Function Tests**
+   - Test convenience factory methods
+   - Run: `python3 tests/test_python_bindings.py` (within factory tests)
+
+5. **Advanced Feature Tests**
+   - Test power user features
+   - Run: `python3 tests/test_python_bindings.py` (within advanced tests)
+
+6. **Interoperability Tests**
+   - Test C++/Python integration
+   - Run: `python3 tests/test_cpython_integration.py`
+
+## Test Teardown and Cleanup
+
+### C++ Test Teardown
+
+#### Cleanup Procedures
+```bash
+# Clean build artifacts
+cd build
+make clean
+rm -rf *.o *.so *.a *.dylib
+
+# Clean test results
+rm -f test_results.txt
+rm -f *.xml *.json
+rm -f ctest-testDetails-*.xml
+```
+
+#### Resource Management
+```cpp
+// In test implementations
+#include <memory>
+
+// Use smart pointers for resource management
+auto config = std::make_shared<Config>();
+auto brain = std::make_shared<Brain>(config);
+
+// Use RAII for test resources
+class TestFixture {
+public:
+    TestFixture() {
+        // Setup
+        brain_ = std::make_shared<Brain>(config_);
+        brain_->initialize();
+    }
     
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
+    ~TestFixture() {
+        // Cleanup
+        brain_.reset();
+    }
+    
+private:
+    std::shared_ptr<Config> config_;
+    std::shared_ptr<Brain> brain_;
+};
 ```
 
-### Key Classes and Methods
+### Python Test Teardown
 
-#### Brain Class
-
+#### Context Manager Cleanup
 ```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Using context managers for test cleanup
+class TestEnvironment:
+    def __enter__(self):
+        # Setup
+        self.config = pynlm.createDefaultConfig()
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup
+        if hasattr(self.brain, 'reset'):
+            self.brain.reset()
+        # Clear references
+        self.brain = None
+        self.config = None
 ```
 
-#### Config Class
-
+#### Temporary File Cleanup
 ```python
-# Create
-config = pynlm.createDefaultConfig()
+import tempfile
+import os
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+# Use temporary files for test output
+with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+    test_file = f.name
+    # Write test output
 
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+# Clean up after use
+os.unlink(test_file)
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Or use temporary directory
+with tempfile.TemporaryDirectory() as temp_dir:
+    # Write test files
+    test_path = os.path.join(temp_dir, 'test_output.txt')
+    with open(test_path, 'w') as f:
+        f.write('test results')
+    
+    # Directory automatically cleaned up
 ```
 
-#### AgentBrain Class
+## Advanced Testing Features
 
+### C++ Advanced Testing Features
+
+#### Mock Objects and Stubs
+```cpp
+// Create mock objects for testing
+class MockNeuron {
+public:
+    virtual float getMembranePotential() const { return -70.0f; }
+    virtual void setMembranePotential(float v) {}
+    virtual bool isFiring() const { return false; }
+};
+
+// Test with mock objects
+void testWithMockNeuron() {
+    MockNeuron mock;
+    assert(mock.getMembranePotential() == -70.0f);
+    mock.setMembranePotential(-65.0f);
+    assert(!mock.isFiring());
+}
+```
+
+#### Test Parameters and Fixtures
+```cpp
+// Parameterized tests
+class NeuronTest : public ::testing::TestWithParamInterface<float> {
+protected:
+    void SetUp() override {
+        neuron_ = std::make_unique<Neuron>();
+        test_value_ = GetParam();
+    }
+    
+    void TestBody() override {
+        neuron_->setMembranePotential(test_value_);
+        EXPECT_EQ(neuron_->getMembranePotential(), test_value_);
+    }
+    
+private:
+    std::unique_ptr<Neuron> neuron_;
+    float test_value_;
+};
+
+// Register parameterized tests
+INSTANTIATE_TEST_SUITE_P(NeuronTest,
+    ::testing::Values(-80.0f, -70.0f, -60.0f, -50.0f));
+```
+
+### Python Advanced Testing Features
+
+#### Pytest Advanced Features
 ```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Test class with multiple fixtures
+@pytest.mark.parametrize("neuron_type", ["excitatory", "inhibitory"])
+@pytest.mark.parametrize("threshold", [-50.0, -55.0, -60.0])
+class TestNeuronBehavior:
+    def test_creation(self, neuron_type, threshold):
+        # Test neuron creation with different parameters
+        pass
+    
+    def test_activation(self, default_brain):
+        # Test with default brain fixture
+        pass
+    
+    @pytest.mark.skip(reason="Feature not yet implemented")
+    def test_advanced_feature(self):
+        pass
 ```
 
-#### SimpleWorld Class
-
+#### Custom Test Markers
 ```python
-# Creation
-world = pynlm.createSimpleWorld()
+# Custom test markers for categorization
+pytest.mark.unit = pytest.mark.skip(reason="Integration test required")
+pytest.mark.integration = pytest.mark.skip(reason="Unit test only")
+pytest.mark.performance = pytest.mark.skip(reason="Performance test")
+pytest.mark.memory = pytest.mark.skip(reason="Memory intensive test")
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+# Use markers in tests
+@pytest.mark.unit
+def test_basic_functionality():
+    pass
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+@pytest.mark.integration  
+def test_complete_workflow():
+    pass
 ```
 
-### Enumerations
+## Troubleshooting and Common Issues
 
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
+### Common Issues and Solutions
 
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
-```
-
----
-
-## Part 4: Configuration Options
-
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
-```
-
-### Environment Interaction
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
-
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
-```
-
----
-
-## Troubleshooting
-
-### Build Issues
-
-**CMake cannot find Python:**
+#### C++ Compilation Errors
 ```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+# Issue: Cannot find header files
+# Solution: Ensure source directory is correct
+mkdir -p build
+cd build
+cmake .. -I../src
+
+# Issue: Missing pybind11
+# Solution: Install pybind11
+pip install pybind11
+
+# Issue: Compiler version mismatch
+# Solution: Use supported compiler
+gcc --version  # Check version
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
+#### Python Import Errors
 ```bash
-pip install --force-reinstall .
+# Issue: Cannot import pynlm
+# Solution: Build Python bindings first
+python3 -m pip install -e .
+
+# Issue: Missing dependencies
+# Solution: Install requirements
+pip install -r requirements.txt
+
+# Issue: Virtual environment not activated
+# Solution: Activate virtual environment
+source venv/bin/activate
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+#### Test Failures
+```bash
+# Issue: Tests failing without clear error
+# Solution: Run tests with verbose output
+python3 -m pytest tests/ -v
 
----
+# Issue: Memory issues in tests
+# Solution: Limit memory usage
+python3 -m pytest tests/ --max-memory=1024
 
-## Further Reading
+# Issue: Slow test execution
+# Solution: Use parallel execution
+python3 -m pytest tests/ -n auto
+```
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+### Diagnostic Commands
+
+#### Test Environment Diagnosis
+```bash
+# Check build configuration
+cat build/CMakeCache.txt | grep NLM
+
+# Check test targets
+make help | grep test
+
+# Check Python environment
+python3 -c "import sys; print(sys.path)"
+python3 -c "import pynlm; print(pynlm.__version__)"
+```
+
+#### Test Output Diagnosis
+```bash
+# Analyze test output
+python3 -m pytest tests/ --tb=long
+
+# Generate detailed report
+python3 -m pytest tests/ --json-report --json-report-file=report.json
+
+# Check for specific test failures
+python3 -m pytest tests/ -v --lf
+```
+
+## Performance Considerations
+
+### Test Performance Optimization
+
+#### C++ Performance Optimization
+```bash
+# Optimize build for tests
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNDEBUG=ON -O3
+
+# Parallel build
+make -j$(nproc)
+
+# Use ccache for faster builds
+ccache -M 20G
+cmake .. -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+```
+
+#### Python Performance Optimization
+```bash
+# Use PyPy for faster Python execution
+pypy3 -m pytest tests/
+
+# Optimize test collection
+python3 -m pytest tests/ --collect-only
+
+# Cache test results
+python3 -m pytest tests/ --cache-clear
+```
+
+### Resource Management
+
+#### Memory Management
+```cpp
+// Use memory pools in tests
+class TestMemoryPool {
+public:
+    TestMemoryPool() {
+        // Allocate memory pool
+        pool_ = std::make_unique<MemoryPool<float>>(1024);
+    }
+    
+    ~TestMemoryPool() {
+        // Cleanup memory pool
+        pool_.reset();
+    }
+    
+private:
+    std::unique_ptr<MemoryPool<float>> pool_;
+};
+```
+
+#### File Handle Management
+```python
+import os
+import tempfile
+
+# Use context managers for file handling
+with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+    file_path = f.name
+    # Write to file
+
+# Ensure file is closed and cleaned up
+try:
+    with open(file_path, 'r') as f:
+        content = f.read()
+finally:
+    os.unlink(file_path)  # Clean up
+```
+
+## Continuous Integration Setup
+
+### GitHub Actions Workflow
+
+```yaml
+# .github/workflows/test.yml
+name: NLM Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-cpp:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ python3 python3-pip
+    
+    - name: Build tests
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j4
+    
+    - name: Run C++ tests
+      run: |
+        cd build
+        ctest --output-on-failure
+  
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.8'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install -e .
+    
+    - name: Run Python tests
+      run: |
+        python3 -m pytest tests/ -v
+```
+
+### GitLab CI/CD Pipeline
+
+```yaml
+# .gitlab-ci.yml
+test_cpp:
+  stage: test
+  script:
+    - mkdir build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Release
+    - make -j4
+    - ctest --output-on-failure
+  only:
+    - merge_requests
+    - main
+
+test_python:
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - pip install -e .
+    - python3 -m pytest tests/ -v
+  only:
+    - merge_requests
+    - main
+```
+
+### Local CI Setup
+
+#### GitHub CLI
+```bash
+# Create GitHub Actions workflow locally
+gitHub workflows create
+
+# Run local CI checks
+gitHub ci check
+```
+
+#### GitLab Runner
+```bash
+# Register local GitLab runner
+sudo gitlab-runner register
+
+# Run CI pipeline locally
+sudo gitlab-runner run --docker-image alpine:latest
+```
+
+## Conclusion
+
+This comprehensive test setup and teardown documentation provides complete guidance for setting up, running, and maintaining the NLM testing ecosystem. The documentation covers:
+
+1. **Test Environment Setup**: Prerequisites, directory structure, and configuration
+2. **Test Configuration**: Both C++ and Python test configuration options
+3. **Test Execution Procedures**: Step-by-step instructions for running tests
+4. **Test Teardown and Cleanup**: Proper resource management and cleanup procedures
+5. **Advanced Testing Features**: Mock objects, parameterized tests, custom markers
+6. **Troubleshooting and Common Issues**: Common problems and their solutions
+7. **Performance Considerations**: Optimization techniques and resource management
+8. **Continuous Integration Setup**: CI/CD pipeline configurations
+
+The testing ecosystem is designed to be robust, maintainable, and scalable, supporting both local development and CI/CD workflows. All tests are organized by functionality and can be run individually or as part of the complete test suite.
+
+**Key Features:**
+- Comprehensive test coverage for all NLM functionality
+- Strong support for both C++ and Python testing
+- Advanced testing features and best practices
+- Robust troubleshooting and error handling
+- Performance-optimized test execution
+- Full CI/CD integration support
+
+This documentation ensures that developers can efficiently set up, run, and maintain the NLM testing infrastructure throughout the development lifecycle.

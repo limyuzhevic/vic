@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# NLM Python Development Setup Script
+
+# Exit on error
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Print colored output
+print_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Main function
+main() {
+    echo "NLM Python Development Environment Setup"
+    echo "======================================"
+    echo
+
+    # Check if we have the python directory
+    if [ ! -d "python" ]; then
+        print_error "Python directory not found. This should be run from the NLM root directory."
+        exit 1
+    fi
+
+    cd python
+
+    print_info "Setting up Python development environment..."
+
+    # Check Python version
+    python3 --version
+
+    if ! command -v pip3 &> /dev/null; then
+        print_error "pip3 not found. Please install pip3 first."
+        exit 1
+    fi
+
+    # Upgrade pip and setuptools
+    print_info "Upgrading Python package manager..."
+    pip3 install --upgrade pip setuptools wheel
+
+    # Create and activate virtual environment
+    if [ ! -d "venv" ]; then
+        print_info "Creating Python virtual environment..."
+        python3 -m venv venv
+    fi
+
+    # Activate virtual environment
+    source venv/bin/activate
+
+    # Install the package in development mode
+    print_info "Installing pynlm package in development mode..."
+    pip3 install -e .
+
+    # Install development dependencies
+    print_info "Installing development dependencies..."
+    pip3 install -e .[dev]
+
+    # Install pre-commit hooks
+    print_info "Setting up pre-commit hooks..."
+    pip3 install pre-commit
+    pre-commit install
+
+    # Create development configuration files
+    print_info "Creating Python-specific configuration..."
+
+    # Create .env file for Python development
+    cat > .env << 'EOF'
+# NLM Python Development Environment
+
+# Debug and logging
+PYNLB_DEBUG=true
+PYNLB_LOG_LEVEL=DEBUG
+PYNLB_CACHE_DIR=./.python_cache
+
+# Testing
+PYTEST_VERBOSE=1
+PYTEST_COVERAGE=1
+PYTEST_BENCHMARK=1
+
+# Development
+DEV_MODE=true
+AUTO_FORMAT=true
+TYPE_CHECKING=true
+
+# Path configuration
+PYTHONPATH=./pynlm:$PYTHONPATH
+
+# Optional dependencies
+USE_NUMPY=true
+USE_NUMBA=false
+EOF
+
+    # Create development directory structure
+    mkdir -p benchmarks
+    mkdir -p test_results
+    mkdir -p profile_results
+
+    print_info "Python development environment setup completed."
+    echo
+    echo "Next steps:"
+    echo "1. Activate the environment: source venv/bin/activate"
+    echo "2. Run tests: pytest tests/ -v --benchmark"
+    echo "3. Run type checking: mypy pynlm/"
+    echo "4. Run linting: ruff check pynlm/ && black --check pynlm/"
+    echo "5. For more help, see BUILD.md"
+}
+
+# Run main function
+main "$@"

@@ -199,17 +199,156 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm
+
+// ==============================================================================
+// ADVANCED CONFIGURATION (NLM Phase 8)
+// ==============================================================================
+
+// Configuration merger
+void Config::merge(const Config& other, bool overwrite) {
+    NLM_LOG_INFO("Merging configurations: overwrite=" + std::string(overwrite ? "true" : "false"));
+    
+    for (const auto& entry : other.pImpl->entries) {
+        if (overwrite || !has(entry.key)) {
+            set(entry.key, entry.value, entry.source);
+            NLM_LOG_INFO("  Merged key: " + entry.key);
+        }
+    }
+}
+
+bool Config::validate(std::string& errors, std::string& warnings) const {
+    NLM_LOG_INFO("Validating configuration");
+    
+    errors.clear();
+    warnings.clear();
+    
+    bool isValid = true;
+    
+    // Basic validation rules
+    for (const auto& entry : pImpl->entries) {
+        const std::string& key = entry.key;
+        
+        // Check for empty keys
+        if (key.empty()) {
+            errors += "Empty configuration key found\n";
+            isValid = false;
+        }
+        
+        // Validate specific key patterns
+        if (key.find("brain.") == 0) {
+            // Brain-related validation
+            if (key == "brain.neuronCount" || key == "brain.regionCount") {
+                auto value = get<size_t>(key);
+                if (value && *value == 0) {
+                    warnings += "Zero " + key + " may cause issues\n";
+                } else if (value && *value > 100000) {
+                    errors += key + " too large (max 100000)\n";
+                    isValid = false;
+                }
+            }
+        }
+        
+        else if (key.find("plasticity.") == 0) {
+            // Plasticity validation
+            if (key == "plasticity.stdpLTPWeight" || key == "plasticity.stdpLTDWeight") {
+                auto value = get<double>(key);
+                if (value && (*value < 0.0 || *value > 1.0)) {
+                    warnings += key + " outside [0.0, 1.0] range\n";
+                }
+            }
+        }
+        
+        else if (key.find("memory.") == 0) {
+            // Memory validation
+            if (key == "memory.workingMemoryCapacity" || key == "memory.episodicCapacity") {
+                auto value = get<size_t>(key);
+                if (value && *value > 10000) {
+                    warnings += key + " very large (consider reducing)\n";
+                }
+            }
+        }
+    }
+    
+    if (isValid && warnings.empty()) {
+        NLM_LOG_INFO("Configuration validation passed");
+    }
+    
+    return isValid;
+}
+
+void Config::optimize() {
+    NLM_LOG_INFO("Optimizing configuration");
+    
+    // Optimization logic
+    // 1. Remove redundant entries
+    std::vector<ConfigEntry> toKeep;
+    std::vector<std::string> seenKeys;
+    
+    for (auto it = pImpl->entries.rbegin(); it != pImpl->entries.rend(); ++it) {
+        const auto& entry = *it;
+        if (std::find(seenKeys.begin(), seenKeys.end(), entry.key) == seenKeys.end()) {
+            seenKeys.push_back(entry.key);
+            toKeep.push_back(entry);
+        }
+    }
+    
+    // Reverse back to original order
+    std::reverse(toKeep.begin(), toKeep.end());
+    pImpl->entries = toKeep;
+    
+    NLM_LOG_INFO("Configuration optimized: " + std::to_string(pImpl->entries.size()) + " entries");
+}
+
+std::unique_ptr<Config> Config::createAdvancedConfig(const std::string& presetName) const {
+    NLM_LOG_INFO("Creating advanced configuration: " + presetName);
+    
+    auto advancedConfig = std::make_unique<Config>();
+    
+    // Add common advanced settings
+    advancedConfig->set("brain.neuronCount", 5000);
+    advancedConfig->set("brain.regionCount", 3);
+    advancedConfig->set("brain.connectionProbability", 0.15f);
+    
+    // Memory settings
+    advancedConfig->set("memory.workingMemoryCapacity", 500);
+    advancedConfig->set("memory.episodicCapacity", 5000);
+    advancedConfig->set("memory.associativeCapacity", 2000);
+    
+    // Plasticity settings
+    advancedConfig->set("plasticity.stdpLTPWeight", 0.02f);
+    advancedConfig->set("plasticity.stdpLTDWeight", 0.03f);
+    advancedConfig->set("plasticity.hebbianLearningRate", 0.002f);
+    
+    // Prediction settings
+    advancedConfig->set("prediction.planningDepth", 8);
+    advancedConfig->set("prediction.predictionHorizon", 20);
+    
+    // Neuromodulation settings
+    advancedConfig->set("neuromodulation.dopamineBaseline", 0.15f);
+    advancedConfig->set("neuromodulation.curiosityScale", 1.2f);
+    advancedConfig->set("neuromodulation.noveltyThreshold", 0.3f);
+    
+    // Development settings
+    advancedConfig->set("development.criticalPeriodDuration", 300.0f);
+    advancedConfig->set("development.synaptogenesisRate", 0.0005f);
+    advancedConfig->set("development.pruningRate", 0.00002f);
+    
+    // Performance settings
+    advancedConfig->set("performance.simulationTimestep", 0.002);
+    advancedConfig->set("performance.checkpointInterval", 10000);
+    advancedConfig->set("performance.maxMemoryUsage", 512 * 1024 * 1024); // 512MB
+    
+    // Reproducibility
+    advancedConfig->set("random.seed", 12345);
+    advancedConfig->set("random.algorithm", "mt19937");
+    
+    NLM_LOG_INFO("Advanced configuration created: " + presetName);
+    return advancedConfig;
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}

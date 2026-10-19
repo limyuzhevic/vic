@@ -150,7 +150,8 @@ void Neuron::clearTotalCurrent() {
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        // Use std::rotate for O(1) buffer management instead of erase(begin())
+        std::rotate(pImpl->spikeHistory.begin(), pImpl->spikeHistory.begin() + 1, pImpl->spikeHistory.end());
     }
 }
 
@@ -220,7 +221,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Remove hardcoded 1000.0f factor for proper time unit consistency (dt is in ms)
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {

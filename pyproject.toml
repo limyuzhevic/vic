@@ -1,57 +1,32 @@
-[build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+# Add these lines to pyproject.toml after the project section
 
-[project]
-name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
-readme = "README.md"
-license = {text = "MIT"}
-requires-python = ">=3.8"
-authors = [
-    {name = "NLM Authors"}
-]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-
-dependencies = []
-
+# Additional visualization and monitoring subpackage
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "numpy>=1.20",
+viz = [
+    "matplotlib>=3.5.0",
+    "plotly>=5.10.0",
+    "dash>=2.6.0",
+    "flask>=2.0.0",
+    "websockets>=10.0.0",
+    "jinja2>=3.0.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
-Repository = "https://github.com/nlm-project/nlm.git"
-
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+performance = [
+    "psutil>=5.8.0",
+    "memory-profiler>=0.5.0",
+    "cProfile-VProf>=1.0.0",
+    "pyinstrument>=4.0.0",
+    "py-spy>=0.3.14",
 ]
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+# Export comprehensive list of visualization and monitoring features
+[project.scripts]
+pynlm = "pynlm.cli:main"
+pynlm-benchmark = "pynlm.benchmark:main"
+
+# New visualization and monitoring scripts
+pynlm-viz = "pynlm_viz.cli:main"
+pynlm-monitor = "pynlm_viz.monitor:main"
+pynlm-dashboard = "pynlm_viz.dashboard:main"
+pynlm-export = "pynlm_viz.export:main"

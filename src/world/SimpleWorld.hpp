@@ -83,6 +83,26 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // ========== ADVANCED WORLD FEATURES ==========
+    
+    // Advanced world operations
+    void setPhysicsParameters(float gravity, float friction, float restitution);
+    void addProceduralContent(const std::string& type, float density = 0.1f);
+    std::map<std::string, float> getEnvironmentStats() const;
+    std::unique_ptr<SimpleWorld> createClone() const;
+    
+    // Analysis tools
+    std::map<std::string, std::vector<float>> getResourceDistribution() const;
+    
+    // Performance and debugging
+    bool profiler(double& totalTime, double& cpuTime, double& wallTime) const;
+    
+    // Simulation control
+    bool runEpisode(int steps = 100, bool verbose = false);
+    void setTimeScale(float scale);
+    void setExplorationRate(float rate);
+    void executeScenario(const std::string& scenarioName);
+    
 private:
     // Generate vision from current view
     void generateVision();
