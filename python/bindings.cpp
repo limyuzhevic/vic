@@ -1,10 +1,5 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
+    // Add missing includes at the top of the file
+    #include <limits>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -412,9 +407,19 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Validate INVALID_*_ID values at module initialization
+    if (INVALID_NEURON_ID.value >= std::numeric_limits<uint64_t>::max()) {
+        throw std::runtime_error("INVALID_NEURON_ID value is invalid");
+    }
+    if (INVALID_SYNAPSE_ID.value >= std::numeric_limits<uint64_t>::max()) {
+        throw std::runtime_error("INVALID_SYNAPSE_ID value is invalid");
+    }
+    if (INVALID_REGION_ID.value >= std::numeric_limits<uint64_t>::max()) {
+        throw std::runtime_error("INVALID_REGION_ID value is invalid");
+    }
+    if (INVALID_POPULATION_ID.value >= std::numeric_limits<uint64_t>::max()) {
+        throw std::runtime_error("INVALID_POPULATION_ID value is invalid");
+    }
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
