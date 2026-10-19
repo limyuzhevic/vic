@@ -65,8 +65,13 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // ========== PERFORMANCE OPTIMIZATION ==========
+    NeuronLookupCache neuronCache;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
+    
+    // Motor neurons for output selection
     std::vector<Neuron*> motorNeurons;
     
     // Integration state
@@ -88,10 +93,12 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , neuronCache()  // Initialize neuron lookup cache for performance
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -174,6 +181,8 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+// Update Brain.hpp to use std::unique_ptr<Impl> instead of Impl* for proper resource management
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -201,22 +210,19 @@ bool Brain::initialize() {
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
+            // Use neuron cache to get neurons by type for O(1) access
+            const auto& sensoryNeurons = pImpl->neuronCache.getNeuronsByType(NeuronType::Sensory);
+            const auto& motorNeurons = pImpl->neuronCache.getNeuronsByType(NeuronType::Motor);
+            
+            pImpl->sensoryNeurons.assign(sensoryNeurons.begin(), sensoryNeurons.end());
+            pImpl->motorNeurons.assign(motorNeurons.begin(), motorNeurons.end());
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
+            NLM_LOG_INFO("Region " + std::to_string(i + 1) + ": " + 
+                        std::to_string(pImpl->sensoryNeurons.size()) + " sensory neurons, " +
+                        std::to_string(pImpl->motorNeurons.size()) + " motor neurons");
         }
     }
     
@@ -268,20 +274,15 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // Use neuron lookup cache for O(1) access instead of O(n) search
+        Neuron* neuron = pImpl->neuronCache.getNeuron(event.destination_neuron);
+        if (neuron) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -289,6 +290,9 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Update neuron lookup cache after regions are created and populated
+    pImpl->neuronCache.updateCache(pImpl->regions);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -425,16 +429,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
+        // Use neuron cache to get all neurons for O(1) access by type
+        // Batch process neurons instead of triple nested loops
+        const auto& neuronsByType = pImpl->neuronCache.getNeuronsByType(NeuronType::Internal);
+        for (auto* neuron : neuronsByType) {
+            // Dopamine modulates excitability by injecting additional current
+            // Positive dopamine adds excitatory bias
+            float excitabilityMod = dopamineLevel * 0.5f;
+            if (excitabilityMod > 0.0f) {
+                neuron->injectCurrent(excitabilityMod);
             }
         }
     }
@@ -617,26 +620,18 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // Use neuron lookup cache for O(1) access instead of O(n) search
+    Neuron* n = pImpl->neuronCache.getNeuron(neuron);
+    if (n) {
+        n->injectCurrent(current);
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
-                }
-            }
-        }
+    // Use neuron cache to get neurons by type for O(1) access
+    const auto& neuronsOfType = pImpl->neuronCache.getNeuronsByType(type);
+    for (auto* neuron : neuronsOfType) {
+        neuron->injectCurrent(current);
     }
 }
 
@@ -757,6 +752,9 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Invalidate neuron cache after reset
+    pImpl->neuronCache.invalidate();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -912,6 +910,10 @@ RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
+    
+    // Update neuron cache to include new region
+    pImpl->neuronCache.updateCache(pImpl->regions);
+    
     return id;
 }
 
