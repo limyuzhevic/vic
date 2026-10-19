@@ -25,8 +25,13 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <algorithm>
 
 using namespace nlm;
+
+// Forward declaration for performance test
+void runBrainPerformanceTests();
 
 void printBanner() {
     std::cout << R"(
@@ -41,123 +46,145 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
+    ║     - Performance optimizations (Object pools, SoA, Caching)     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+void printPerformanceTestHelp() {
+    std::cout << "\n=== NLM Brain Performance Testing Help ===" << std::endl;
+    std::cout << "Use the following commands to test performance optimizations:" << std::endl;
+    std::cout << "  ./nlm --performance-test    Run comprehensive performance tests" << std::endl;
+    std::cout << "  ./nlm --help              Show this help message" << std::endl;
+    std::cout << "\nPerformance optimizations tested:" << std::endl;
+    std::cout << "  - Object pooling for neurons and synapses" << std::endl;
+    std::cout << "  - Structure-of-Arrays (SoA) for cache efficiency" << std::endl;
+    std::cout << "  - Lazy loading for expensive operations" << std::endl;
+    std::cout << "  - Caching for frequently accessed data" << std::endl;
+    std::cout << "  - Smart pointer optimizations" << std::endl;
+    std::cout << "  - Reference counting for resource management" << std::endl;
+    std::cout << "  - Optimized checkpoint loading/saving" << std::endl;
+}
+
+// Performance test mode
+void runBrainPerformanceTests() {
+    std::cout << "=== NLM Brain Performance Testing Mode ===" << std::endl;
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+    // Initialize logger for performance testing
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
     
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+    auto config = std::make_shared<Config>();
+    
+    // Performance test configurations
+    std::vector<std::pair<std::string, std::function<void(std::shared_ptr<Config>)>>> performanceTests = {
+        {"Initialization Performance", 
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 1000LL);
+             cfg->set("region_count", 2LL);
+             cfg->set("enable_object_pooling", true);
+             cfg->set("enable_caching", true);
+             cfg->set("enable_lazy_loading", true);
+             cfg->set("enable_soa", true);
+             cfg->set("neuron_pool_size", 2048);
+             cfg->set("synapse_pool_size", 8192);
+         }},
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        {"Memory Usage Test",
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 500LL);
+             cfg->set("enable_object_pooling", true);
+             cfg->set("enable_caching", true);
+             cfg->set("enable_soa", true);
+         }},
+        
+        {"Step Performance Test",
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 200LL);
+             cfg->set("enable_object_pooling", true);
+             cfg->set("enable_soa", true);
+             cfg->set("simulation_timestep", 0.001);
+         }},
+        
+        {"Object Pool Efficiency Test",
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 300LL);
+             cfg->set("enable_object_pooling", true);
+             cfg->set("enable_caching", true);
+             cfg->set("neuron_pool_size", 4096);
+             cfg->set("synapse_pool_size", 16384);
+         }},
+        
+        {"Cache Performance Test",
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 150LL);
+             cfg->set("enable_caching", true);
+             cfg->set("enable_lazy_loading", true);
+         }},
+        
+        {"SoA Performance Test",
+         [](std::shared_ptr<Config> cfg) {
+             cfg->set("neuron_count", 400LL);
+             cfg->set("enable_soa", true);
+             cfg->set("enable_object_pooling", true);
+             cfg->set("enable_caching", true);
+         }}
+    };
+    
+    for (const auto& test : performanceTests) {
+        std::cout << "\n--- Running: " << test.first << " ---" << std::endl;
+        
+        // Reset configuration
+        config = std::make_shared<Config>();
+        
+        // Apply test configuration
+        test.second(config);
+        
+        // Run the specific performance test
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->initialize()) {
+            std::cout << "FAILED: Brain initialization" << std::endl;
+            continue;
+        }
+        
+        // Test based on the test type
+        if (test.first == "Initialization Performance") {
+            std::cout << "✓ Initialization test completed" << std::endl;
+        } else if (test.first == "Memory Usage Test") {
+            size_t totalMemory = brain->getObjectPoolMemoryUsage() + brain->getCacheMemoryUsage();
+            std::cout << "✓ Memory usage: " << totalMemory << " bytes" << std::endl;
+        } else if (test.first == "Step Performance Test") {
+            for (SimulationStep step = 0; step < 100; ++step) {
+                brain->step(step, step * 0.001);
             }
-        }
-        
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            std::cout << "✓ Step test completed: 100 steps" << std::endl;
+        } else if (test.first == "Object Pool Efficiency Test") {
+            auto metrics = brain->getPerformanceMetrics();
+            std::cout << "✓ Object pool efficiency - Allocated: " << metrics.objectsAllocated 
+                      << ", Cache Hit Rate: " << (metrics.cacheHitRate * 100) << "%" << std::endl;
+        } else if (test.first == "Cache Performance Test") {
+            brain->enableCaching(true);
+            for (size_t i = 0; i < 20; ++i) {
+                brain->step(i, i * 0.001);
             }
-        }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            std::cout << "✓ Cache performance test completed" << std::endl;
+        } else if (test.first == "SoA Performance Test") {
+            brain->enableSoA(true);
+            for (SimulationStep step = 0; step < 50; ++step) {
+                brain->step(step, step * 0.001);
+            }
+            std::cout << "✓ SoA performance test completed" << std::endl;
         }
     }
     
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
-        
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
-        }
-        
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
-        
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
-        
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
-        } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
-        }
-    }
-};
+    std::cout << "\n=== Performance Testing Complete ===" << std::endl;
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");

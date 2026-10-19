@@ -6,8 +6,11 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <mutex>
 
 namespace nlm {
 
@@ -42,6 +45,100 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Object pool for Neuron optimization
+using NeuronPool = MemoryPool<Neuron>;
+
+// Object pool for Synapse optimization  
+using SynapsePool = MemoryPool<Synapse>;
+
+// Enhanced ConfigEntry with reference counting
+struct ConfigEntryWithRefCount {
+    std::string key;
+    ConfigValue value;
+    ConfigSource source;
+    std::string description;
+    std::atomic<size_t> refCount{0};
+    
+    ConfigEntryWithRefCount() : key(), value(), source(ConfigSource::Default), description(), refCount(0) {}
+    ConfigEntryWithRefCount(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc), refCount(0) {}
+    
+    void addRef() { refCount.fetch_add(1, std::memory_order_relaxed); }
+    bool release() { return refCount.fetch_sub(1, std::memory_order_relaxed) == 1; }
+};
+
+// Cache entry for lazy loading
+struct CacheEntry {
+    std::chrono::time_point<std::chrono::steady_clock> timestamp;
+    std::vector<uint8_t> data;
+    bool valid;
+    size_t accessCount;
+    
+    CacheEntry() : timestamp(), valid(false), accessCount(0) {}
+};
+
+// Performance optimization structures
+struct BrainPerformanceOptimizations {
+    // Object pools for memory efficiency
+    std::unique_ptr<NeuronPool> neuronPool;
+    std::unique_ptr<SynapsePool> synapsePool;
+    std::unique_ptr<MemoryPool<ConfigEntryWithRefCount>> configEntryPool;
+    
+    // SoA (Structure of Arrays) for better cache locality
+    struct alignas(64) NeuralStateSoA {
+        std::vector<float> membranePotential;
+        std::vector<float> restingPotential;
+        std::vector<float> threshold;
+        std::vector<float> resetPotential;
+        std::vector<float> leakConductance;
+        std::vector<float> synapseInput;
+        std::vector<uint8_t> firingState;
+        std::vector<uint32_t> refractoryRemaining;
+        std::vector<uint32_t> refractoryPeriod;
+        std::vector<float> lastSpikeTime;
+        std::vector<uint64_t> neuronType;
+        
+        void initialize(size_t size);
+        void clear();
+        size_t memoryUsage() const;
+    };
+    
+    // Cache for frequently accessed data
+    std::unordered_map<std::string, CacheEntry> dataCache;
+    std::mutex cacheMutex;
+    static constexpr size_t MAX_CACHE_SIZE = 1024;
+    
+    // Performance metrics
+    struct PerformanceMetrics {
+        size_t totalMemoryUsage;
+        size_t objectsAllocated;
+        size_t objectsDeallocated;
+        double averageAllocationTime;
+        double cacheHitRate;
+        uint64_t lastCheckpointSize;
+    } metrics;
+    
+    // Lazy loading flags
+    bool lazyLoadingEnabled;
+    bool cachingEnabled;
+    bool objectPoolingEnabled;
+    
+    // Resource management
+    std::atomic<size_t> activeAllocations;
+    std::mutex allocationMutex;
+    
+    // Statistics
+    struct Statistics {
+        uint64_t totalAllocations;
+        uint64_t totalDeallocations;
+        uint64_t cacheHits;
+        uint64_t cacheMisses;
+        uint64_t checkpointSaves;
+        uint64_t checkpointLoads;
+        std::chrono::steady_clock::time_point lastUpdate;
+    } stats;
 };
 
 // Brain: The central coordinator of the neural system
@@ -184,18 +281,38 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+// Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
+
+    // Performance optimization interfaces
+    void enableObjectPooling(bool enable);
+    void enableCaching(bool enable);
+    void enableLazyLoading(bool enable);
+    void enableSoA(bool enable);
     
+    // Performance monitoring
+    BrainPerformanceOptimizations::PerformanceMetrics getPerformanceMetrics() const;
+    size_t getObjectPoolMemoryUsage() const;
+    size_t getCacheMemoryUsage() const;
+    
+    // Batch operations for performance
+    void batchInitializeNeurons(const std::vector<NeuronId>& neuronIds);
+    void batchCreateSynapses(const std::vector<std::pair<NeuronId, NeuronId>>& connections);
+    void batchUpdateWeights(const std::vector<std::pair<SynapseId, float>>& weightUpdates);
+
     // Logging
     void logStatus() const;
-    
+    void logPerformanceStats() const;
+
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Performance optimization instance
+    std::unique_ptr<BrainPerformanceOptimizations> performanceOpts;
 };
 
 } // namespace nlm

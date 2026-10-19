@@ -19,14 +19,25 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
+#include <shared_mutex>
+#include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations
+struct Brain::Impl;
+
+// Brain implementation
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== PERFORMANCE OPTIMIZATIONS ==========
+    std::unique_ptr<BrainPerformanceOptimizations> performanceOpts;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -78,6 +89,15 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // SoA (Structure of Arrays) for performance
+    BrainPerformanceOptimizations::NeuralStateSoA neuralStateSoA;
+    std::vector<NeuronId> neuronIds;
+    std::vector<std::vector<NeuronId>> regionNeurons;
+    
+    // Lazy loading cache
+    std::unordered_map<std::string, CacheEntry> objectCache;
+    std::mutex cacheMutex;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -90,9 +110,14 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , performanceOpts(nullptr)
+        , checkpointManager(nullptr)
     {
+        // Initialize performance optimizations
+        initializePerformanceOptimizations();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -586,6 +611,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // Update cache statistics
+    if (pImpl->performanceOpts) {
+        pImpl->updateCacheStatistics();
+    }
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1075,6 +1105,161 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Performance optimization interfaces
+void Brain::enableObjectPooling(bool enable) {
+    if (pImpl->performanceOpts) {
+        pImpl->performanceOpts->objectPoolingEnabled = enable;
+    }
+}
+
+void Brain::enableCaching(bool enable) {
+    if (pImpl->performanceOpts) {
+        pImpl->performanceOpts->cachingEnabled = enable;
+    }
+}
+
+void Brain::enableLazyLoading(bool enable) {
+    if (pImpl->performanceOpts) {
+        pImpl->performanceOpts->lazyLoadingEnabled = enable;
+    }
+}
+
+void Brain::enableSoA(bool enable) {
+    if (pImpl->performanceOpts) {
+        // Re-initialize SoA if needed
+        if (enable && !pImpl->performanceOpts->neuralStateSoA.membranePotential.empty()) {
+            pImpl->performanceOpts->neuralStateSoA.clear();
+        }
+    }
+}
+
+// Performance monitoring
+BrainPerformanceOptimizations::PerformanceMetrics Brain::getPerformanceMetrics() const {
+    BrainPerformanceOptimizations::PerformanceMetrics metrics;
+    if (pImpl->performanceOpts) {
+        metrics = pImpl->performanceOpts->metrics;
+    }
+    return metrics;
+}
+
+size_t Brain::getObjectPoolMemoryUsage() const {
+    size_t total = 0;
+    if (pImpl->performanceOpts) {
+        if (pImpl->performanceOpts->neuronPool) {
+            total += pImpl->performanceOpts->neuronPool->memoryUsage();
+        }
+        if (pImpl->performanceOpts->synapsePool) {
+            total += pImpl->performanceOpts->synapsePool->memoryUsage();
+        }
+        total += pImpl->performanceOpts->neuralStateSoA.memoryUsage();
+    }
+    return total;
+}
+
+size_t Brain::getCacheMemoryUsage() const {
+    size_t total = 0;
+    if (pImpl->performanceOpts) {
+        for (const auto& entry : pImpl->performanceOpts->dataCache) {
+            total += entry.second.data.size() + sizeof(CacheEntry);
+        }
+    }
+    return total;
+}
+
+// Batch operations for performance
+void Brain::batchInitializeNeurons(const std::vector<NeuronId>& neuronIds) {
+    if (!pImpl->performanceOpts || !pImpl->performanceOpts->objectPoolingEnabled) return;
+    
+    // Batch allocation from pool
+    for (const auto& neuronId : neuronIds) {
+        // Find neuron and allocate from pool if available
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        // Add to object pool
+                        if (pImpl->performanceOpts->neuronPool) {
+                            // Transfer ownership to pool
+                            pImpl->performanceOpts->neuronPool->allocate();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Brain::batchCreateSynapses(const std::vector<std::pair<NeuronId, NeuronId>>& connections) {
+    if (!pImpl->performanceOpts || !pImpl->performanceOpts->objectPoolingEnabled) return;
+    
+    // Batch synapse creation
+    for (const auto& conn : connections) {
+        if (pImpl->performanceOpts->synapsePool) {
+            // Allocate synapse from pool
+            SynapseId synId = pImpl->performanceOpts->synapsePool->allocate(
+                conn.first, conn.second);
+            
+            // Add to region
+            for (auto& region : pImpl->regions) {
+                region->addSynapse(synId, conn.first, conn.second);
+            }
+        }
+    }
+}
+
+void Brain::batchUpdateWeights(const std::vector<std::pair<SynapseId, float>>& weightUpdates) {
+    // Optimized batch weight update
+    for (const auto& update : weightUpdates) {
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (syn->getId() == update.first) {
+                    syn->setWeight(update.second);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// Performance statistics logging
+void Brain::logPerformanceStats() const {
+    if (!pImpl->performanceOpts) return;
+    
+    NLM_LOG_INFO("=== Brain Performance Statistics ===");
+    
+    // Memory usage
+    NLM_LOG_INFO("Memory Usage:");
+    NLM_LOG_INFO("  Object Pools: " + std::to_string(getObjectPoolMemoryUsage()) + " bytes");
+    NLM_LOG_INFO("  Cache: " + std::to_string(getCacheMemoryUsage()) + " bytes");
+    NLM_LOG_INFO("  SoA Structures: " + std::to_string(pImpl->performanceOpts->neuralStateSoA.memoryUsage()) + " bytes");
+    
+    // Performance metrics
+    const auto& metrics = getPerformanceMetrics();
+    NLM_LOG_INFO("Performance Metrics:");
+    NLM_LOG_INFO("  Total Allocations: " + std::to_string(metrics.objectsAllocated));
+    NLM_LOG_INFO("  Total Deallocations: " + std::to_string(metrics.objectsDeallocated));
+    NLM_LOG_INFO("  Cache Hit Rate: " + std::to_string(metrics.cacheHitRate * 100) + "%");
+    NLM_LOG_INFO("  Last Checkpoint Size: " + std::to_string(metrics.lastCheckpointSize) + " bytes");
+    
+    // Pool statistics
+    if (pImpl->performanceOpts->neuronPool) {
+        NLM_LOG_INFO("Neuron Pool:");
+        NLM_LOG_INFO("  Allocated: " + std::to_string(pImpl->performanceOpts->neuronPool->allocatedCount()));
+        NLM_LOG_INFO("  Available: " + std::to_string(pImpl->performanceOpts->neuronPool->availableCount()));
+        NLM_LOG_INFO("  Memory: " + std::to_string(pImpl->performanceOpts->neuronPool->memoryUsage()) + " bytes");
+    }
+    
+    if (pImpl->performanceOpts->synapsePool) {
+        NLM_LOG_INFO("Synapse Pool:");
+        NLM_LOG_INFO("  Allocated: " + std::to_string(pImpl->performanceOpts->synapsePool->allocatedCount()));
+        NLM_LOG_INFO("  Available: " + std::to_string(pImpl->performanceOpts->synapsePool->availableCount()));
+        NLM_LOG_INFO("  Memory: " + std::to_string(pImpl->performanceOpts->synapsePool->memoryUsage()) + " bytes");
+    }
+    
+    NLM_LOG_INFO("=== End Performance Statistics ===");
 }
 
 void Brain::logStatus() const {
