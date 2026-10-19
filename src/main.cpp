@@ -19,12 +19,10 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
+#include <cstring>
+#include <stdexcept>
 #include <iomanip>
-#include <numeric>
+#include <sstream>
 
 using namespace nlm;
 
@@ -321,8 +319,115 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+int main(int argc, char** argv);
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "=====================================" << std::endl;
+    std::cout << "A demonstration of real spiking neural computation with:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with synaptic delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --help-all                Show all available options and advanced settings" << std::endl;
+    std::cout << "  --config=FILE             Load configuration from FILE (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --random_seed=SEED        Set random seed for reproducibility" << std::endl;
+    std::cout << "  --neuron_count=N          Set number of neurons in the brain" << std::endl;
+    std::cout << "  --simulation_timestep=DT  Set simulation timestep in seconds" << std::endl;
+    std::cout << "  --region_count=N          Set number of brain regions" << std::endl;
+    std::cout << "  --connection_probability=P Set probability of synaptic connections" << std::endl;
+    std::cout << "  --stdp_ltp_weight=W       Set STDP LTP weight factor" << std::endl;
+    std::cout << "  --stdp_ltd_weight=W       Set STDP LTD weight factor" << std::endl;
+    std::cout << "  --stdp_tau=T              Set STDP tau parameter" << std::endl;
+    std::cout << "  --synaptogenesis_rate=R   Set synaptic formation rate" << std::endl;
+    std::cout << "  --pruning_rate=R          Set synaptic pruning rate" << std::endl;
+    std::cout << "  --version                 Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << "                          Run with default settings" << std::endl;
+    std::cout << "  " << programName << " --config=my_config.cfg" << std::endl;
+    std::cout << "  " << programName << " --neuron_count=1000 --region_count=3" << std::endl;
+    std::cout << "  " << programName << " --help" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced configuration can be combined. Later command-line arguments override earlier ones." << std::endl;
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Handle help flags
+    bool showHelp = false;
+    bool showHelpAll = false;
+    bool showVersion = false;
+    
+    // Parse command line arguments for help/version flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--help-all") {
+            showHelpAll = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        }
+    }
+    
+    // Show help/version and exit
+    if (showHelp) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (showHelpAll) {
+        printHelp(argv[0] + " --all");
+        return 0;
+    }
+    
+    if (showVersion) {
+        std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+        std::cout << "Version: 2.0.0" << std::endl;
+        std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+        std::cout << "Git: " << __git_version__ << std::endl;
+        return 0;
+    }
+    
+    // Show help if no valid arguments provided and argc <= 1
+    if (argc <= 1) {
+        printHelp(argv[0]);
+        std::cout << std::endl;
+        std::cout << "Note: No arguments provided. Running with default settings..." << std::endl;
+    }
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Show help if no valid arguments provided and argc <= 1
+    if (argc <= 1) {
+        printHelp(argv[0]);
+        std::cout << std::endl;
+        std::cout << "Note: No arguments provided. Running with default settings..." << std::endl;
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -347,13 +452,25 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        if (arg == "--help" || arg == "-h" || arg == "--help-all" || arg == "--version") {
+            // These flags have already been handled above
+            continue;
         }
+        
+        // Handle --config=FILE format
+        if (arg.rfind("--config=", 0) == 0) {
+            configFile = arg.substr(9); // Length of "--config="
+        } 
+        // Handle --config FILE format
+        else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+    }
+    
+    // Validate config file path
+    std::filesystem::path configPath(configFile);
+    if (!std::filesystem::exists(configPath.parent_path())) {
+        NLM_LOG_WARN("Configuration directory does not exist: " + configPath.parent_path().string());
     }
     
     // Load config from file (ignore if not found)

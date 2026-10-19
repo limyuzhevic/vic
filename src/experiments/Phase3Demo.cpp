@@ -1,12 +1,6 @@
-#include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <iostream>
-#include <fstream>
+#include <cstring>
+#include <stdexcept>
+#include <iomanip>
 #include <sstream>
 
 namespace nlm {
@@ -242,16 +236,112 @@ private:
 
 } // namespace nlm
 
-// Main entry point for Phase 3 demo
+int main(int argc, char* argv[]); // Forward declaration for help function
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 3 Demo: World Interaction" << std::endl;
+    std::cout << "====================================" << std::endl;
+    std::cout << "Phase 3 demonstrates: Experience -> Neural Activity -> Action -> Consequence -> Learning" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --episodes=N             Number of episodes to run (default: 5)" << std::endl;
+    std::cout << "  --steps=N                 Number of steps per episode (default: 200)" << std::endl;
+    std::cout << "  --config=FILE             Load configuration from FILE" << std::endl;
+    std::cout << "  --seed=N                  Set random seed for reproducibility" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << "                          Run with default settings (5 episodes, 200 steps)" << std::endl;
+    std::cout << "  " << programName << " --episodes=10 --steps=300" << std::endl;
+    std::cout << "  " << programName << " --help" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Note: Configuration loaded from command line (--config) overrides file settings." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    std::string configFile = "";
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Check for help flag
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg.rfind("--episodes=", 0) == 0) {
+            try {
+                size_t pos;
+                int value = std::stoi(arg.substr(11), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --episodes: '" << arg.substr(11) << "'" << std::endl;
+                    return 1;
+                }
+                if (value < 1 || value > 100) {
+                    std::cerr << "Error: --episodes must be between 1 and 100" << std::endl;
+                    return 1;
+                }
+                numEpisodes = value;
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --episodes: '" << arg.substr(11) << "'" << std::endl;
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --episodes out of range" << std::endl;
+                return 1;
+            }
+        } else if (arg.rfind("--steps=", 0) == 0) {
+            try {
+                size_t pos;
+                int value = std::stoi(arg.substr(7), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --steps: '" << arg.substr(7) << "'" << std::endl;
+                    return 1;
+                }
+                if (value < 10 || value > 10000) {
+                    std::cerr << "Error: --steps must be between 10 and 10000" << std::endl;
+                    return 1;
+                }
+                stepsPerEpisode = value;
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --steps: '" << arg.substr(7) << "'" << std::endl;
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --steps out of range" << std::endl;
+                return 1;
+            }
+        } else if (arg.rfind("--config=", 0) == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.rfind("--seed=", 0) == 0) {
+            try {
+                size_t pos;
+                unsigned long value = std::stoul(arg.substr(7), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --seed: '" << arg.substr(7) << "'" << std::endl;
+                    return 1;
+                }
+                // Set the random seed if available
+                if (auto seedPtr = std::make_shared<Config>(); seedPtr) {
+                    seedPtr->set("random_seed", static_cast<uint64_t>(value), ConfigSource::CommandLine);
+                }
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --seed: '" << arg.substr(7) << "'" << std::endl;
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --seed out of range" << std::endl;
+                return 1;
+            }
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    // Show help and exit if requested
+    if (showHelp) {
+        printHelp(argv[0]);
+        return 0;
     }
     
     nlm::Phase3Demo demo;

@@ -193,9 +193,38 @@ public:
     // Logging
     void logStatus() const;
     
+// Integration forward declarations for modular architecture
+namespace nlm {
+    namespace brain_integration {
+        class BrainInitializer;
+        class BrainStepIntegrator;
+        class BrainMemoryIntegration;
+        class BrainCognitiveIntegration;
+        class BrainNeuromodIntegration;
+    }
+}
+
+// Integration member variables (PIMPL pattern)
+class Brain {
+    // ... existing public methods ...
+    
 private:
     struct Impl;
     Impl* pImpl;
-};
+    
+    // Integration modules (will be lazily initialized)
+    std::unique_ptr<brain_integration::BrainInitializer> brainInitializer_;
+    std::unique_ptr<brain_integration::BrainStepIntegrator> stepIntegrator_;
+    std::unique_ptr<brain_integration::BrainMemoryIntegration> memoryIntegrator_;
+    std::unique_ptr<brain_integration::BrainCognitiveIntegration> cognitiveIntegrator_;
+    std::unique_ptr<brain_integration::BrainNeuromodIntegration> neuromodIntegrator_;
+    
+    // Integration helper methods
+    void ensureBrainInitializerExists();
+    void ensureStepIntegratorExists();
+    void ensureMemoryIntegratorExists();
+    void ensureCognitiveIntegratorExists();
+    void ensureNeuromodIntegratorExists();
+}; 
 
 } // namespace nlm

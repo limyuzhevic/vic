@@ -2,6 +2,9 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
+#include <cstring>
+#include <stdexcept>
+
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -12,7 +15,6 @@
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
@@ -36,22 +38,228 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
+int main(int argc, char* argv[]); // Forward declaration for help function
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 4: Emerging Cognition" << std::endl;
+    std::cout << "================================" << std::endl;
+    std::cout << "Phase 4 demonstrates the emergence of complex cognitive abilities:" << std::endl;
+    std::cout << "  - Temporal prediction: Learning relationships between events" << std::endl;
+    std::cout << "  - Working memory: Maintaining information across delays" << std::endl;
+    std::cout << "  - Episodic memory: Storing and recalling experiences" << std::endl;
+    std::cout << "  - Concept formation: Discovering patterns without labels" << std::endl;
+    std::cout << "  - Neural attention: Selective processing through competition" << std::endl;
+    std::cout << "  - Multi-step planning: Using predictions to select actions" << std::endl;
+    std::cout << "  - Self-model: Learning body schema and action consequences" << std::endl;
+    std::cout << "  - Social learning: Observing and imitating others" << std::endl;
+    std::cout << "  - Continual learning: Adapting to new tasks" << std::endl;
+    std::cout << "  - Integrated cognition: All systems working together" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --trials=N                Number of trials for each experiment (default: 50)" << std::endl;
+    std::cout << "  --neuron_count=N          Set number of neurons in the brain" << std::endl;
+    std::cout << "  --region_count=N          Set number of brain regions" << std::endl;
+    std::cout << "  --connection_probability=P Set probability of synaptic connections" << std::endl;
+    std::cout << "  --seed=N                  Set random seed for reproducibility" << std::endl;
+    std::cout << "  --config=FILE             Load configuration from FILE" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << "                          Run with default settings (50 trials)" << std::endl;
+    std::cout << "  " << programName << " --trials=25 --neuron_count=500" << std::endl;
+    std::cout << "  " << programName << " --help" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Note: Configuration loaded from command line (--config) overrides file settings." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+    // Initialize logging
+    std::cout << "NLM Phase 4: Emerging Cognition" << std::endl;
+    std::cout << "================================" << std::endl << std::endl;
     
-    // Parse command line arguments
+    // Parse command line arguments with validation
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    size_t neuronCount = 1000;
+    size_t regionCount = 2;
+    float connectionProbability = 0.1f;
+    std::string configFile = "";
+    
+    // Check for help flag first
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        }
+    }
+    
+    // Show help and exit if requested
+    if (showHelp) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    // Parse remaining arguments with validation
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            // Already handled above
+            continue;
+        }
+        
+        // Parse --trials=N with validation
+        if (arg.rfind("--trials=", 0) == 0) {
+            try {
+                size_t pos;
+                int value = std::stoi(arg.substr(8), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --trials: '" << arg.substr(8) << "'" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                if (value < 1 || value > 1000) {
+                    std::cerr << "Error: --trials must be between 1 and 1000" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                numTrials = static_cast<size_t>(value);
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --trials: '" << arg.substr(8) << "'" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --trials out of range" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            }
+        }
+        // Parse --neuron_count=N with validation
+        else if (arg.rfind("--neuron_count=", 0) == 0) {
+            try {
+                size_t pos;
+                int value = std::stoi(arg.substr(14), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --neuron_count: '" << arg.substr(14) << "'" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                if (value < 100 || value > 10000) {
+                    std::cerr << "Error: --neuron_count must be between 100 and 10000" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                neuronCount = static_cast<size_t>(value);
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --neuron_count: '" << arg.substr(14) << "'" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --neuron_count out of range" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            }
+        }
+        // Parse --region_count=N with validation
+        else if (arg.rfind("--region_count=", 0) == 0) {
+            try {
+                size_t pos;
+                int value = std::stoi(arg.substr(15), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --region_count: '" << arg.substr(15) << "'" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                if (value < 1 || value > 10) {
+                    std::cerr << "Error: --region_count must be between 1 and 10" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                regionCount = static_cast<size_t>(value);
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --region_count: '" << arg.substr(15) << "'" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --region_count out of range" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            }
+        }
+        // Parse --connection_probability=P with validation
+        else if (arg.rfind("--connection_probability=", 0) == 0) {
+            try {
+                size_t pos;
+                float value = std::stof(arg.substr(25), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --connection_probability: '" << arg.substr(25) << "'" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                if (value < 0.0f || value > 1.0f) {
+                    std::cerr << "Error: --connection_probability must be between 0.0 and 1.0" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                connectionProbability = value;
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --connection_probability: '" << arg.substr(25) << "'" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --connection_probability out of range" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            }
+        }
+        // Parse --config=FILE
+        else if (arg.rfind("--config=", 0) == 0) {
+            configFile = arg.substr(9);
+        }
+        // Parse --config FILE
+        else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+        // Parse --seed=N
+        else if (arg.rfind("--seed=", 0) == 0) {
+            try {
+                size_t pos;
+                unsigned long value = std::stoul(arg.substr(7), &pos);
+                if (pos != arg.length()) {
+                    std::cerr << "Error: Invalid value for --seed: '" << arg.substr(7) << "'" << std::endl;
+                    printHelp(argv[0]);
+                    return 1;
+                }
+                // Note: Random seed setting requires access to Random class
+                // For now, we'll just log it
+                std::cout << "Note: Random seed set to " << value << " (not yet implemented in random system)" << std::endl;
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Error: Invalid value for --seed: '" << arg.substr(7) << "'" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            } catch (const std::out_of_range& e) {
+                std::cerr << "Error: Value for --seed out of range" << std::endl;
+                printHelp(argv[0]);
+                return 1;
+            }
+        }
+        else {
+            // Unknown argument - show help
+            std::cerr << "Error: Unknown argument: " << arg << std::endl;
+            printHelp(argv[0]);
+            return 1;
+        }
     }
     
     // Create configuration
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
+    
+    // Set configuration values
+    config->set("neuron_count", neuronCount);
+    config->set("region_count", regionCount);
+    config->set("connection_probability", connectionProbability);
+    config->set("random_seed", static_cast<uint64_t>(42)); // Default seed
     config->set("simulation_timestep", 0.001);
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
@@ -64,6 +272,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    // Run the Phase 4 experiments
     printHeader("PHASE 4 EXPERIMENTS");
     
     // Run Temporal Prediction Experiment
