@@ -6,6 +6,9 @@
 #include <variant>
 #include <optional>
 
+// nlohmann/json for JSON parsing
+#include <nlohmann/json.hpp>
+
 namespace nlm {
 
 // Forward declarations
@@ -43,6 +46,14 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validator interface
+class ConfigValidator {
+public:
+    virtual ~ConfigValidator() = default;
+    virtual bool validate(const ConfigEntry& entry) const = 0;
+    virtual std::string getErrorMessage(const ConfigEntry& entry) const = 0;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -61,7 +72,7 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +104,24 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation
+    void setValidator(std::unique_ptr<ConfigValidator> validator);
+    bool validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    mutable std::unique_ptr<ConfigValidator> validator_;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML helpers
+    static void flattenJson(const nlohmann::json& json, const std::string& prefix,
+                           std::vector<std::pair<std::string, nlohmann::json>>& flatItems);
+    static ConfigValue jsonToConfigValue(const nlohmann::json& json);
+    static nlohmann::json configValueToJson(const ConfigValue& value);
 };
 
 } // namespace nlm

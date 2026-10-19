@@ -52,6 +52,12 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get new neuromodulator levels
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getAcetylcholineLevel() const { return acetylcholineLevel_; }
+    float getNorepinephrineLevel() const { return norepinephrineLevel_; }
+    float getSerotoninLevel() const { return serotoninLevel_; }
+    
     // Reset agent for new episode
     void reset();
     
@@ -94,10 +100,41 @@ private:
     
     // Neuromodulation state
     float dopamineLevel_;
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    
+    // Development state
+    double developmentalAge_;
+    float plasticityModifier_;
+    
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
+    
+    // Previous sensory state for novelty detection
+    std::vector<float> previousVision_;
+    float sensoryNoveltyDecay_;
+    
+    // Acetylcholine state
+    float acetylcholineActivation_;
+    float memoryConsolidationLevel_;
+    
+    // Norepinephrine state
+    float locusCoeruleusFiringRate_;
+    float stressLevel_;
+    float arousalLevel_;
+    
+    // Serotonin state
+    float moodLevel_;
+    float socialBehaviorLevel_;
+    float impulsivityControl_;
     
     // Development state
     double developmentalAge_;

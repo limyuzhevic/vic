@@ -1,0 +1,137 @@
+{
+  "version": "2.0",
+  "name": "NLM Configuration",
+  "description": "Neural Learning Machine configuration file",
+  
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "initial_weight_mean": 0.5,
+    "initial_weight_std": 0.1,
+    "v_thresh": -50.0,
+    "v_rest": -70.0,
+    "v_reset": -75.0,
+    "tau_mem": 20.0,
+    "tau_ref": 2.0,
+    "refractory_period": 5.0,
+    "sensory_neurons": 50,
+    "motor_neurons": 50,
+    "modulatory_neurons": 20
+  },
+  
+  "plasticity": {
+    "enable_stdp": true,
+    "stdp": {
+      "learning_rate": 0.001,
+      "tau_plus": 20.0,
+      "tau_minus": 20.0,
+      "ltp_weight": 0.02,
+      "ltd_weight": 0.015,
+      "max_weight": 1.0,
+      "min_weight": -1.0
+    },
+    "enable_hebbian": true,
+    "hebbian": {
+      "learning_rate": 0.001,
+      "cooperativity": 2.0,
+      "decay_rate": 0.99
+    },
+    "enable_structural": true,
+    "structural": {
+      "synaptogenesis_rate": 0.0001,
+      "pruning_rate": 0.00001,
+      "max_synapses_per_neuron": 100,
+      "min_synapses_per_neuron": 5
+    }
+  },
+  
+  "neuromodulation": {
+    "enable_dopamine": true,
+    "dopamine": {
+      "baseline": 0.0,
+      "scale": 1.0,
+      "learning_rate": 0.01,
+      "adaptation_rate": 0.001
+    },
+    "enable_curiosity": true,
+    "curiosity": {
+      "baseline": 0.0,
+      "scale": 1.0,
+      " Novelty threshold": 0.5,
+      "exploration_bonus": 0.1
+    },
+    "enable_reward": true,
+    "reward": {
+      "discount_factor": 0.99,
+      "prediction_error_gain": 0.1,
+      "reward_shaping": false
+    }
+  },
+  
+  "development": {
+    "enable_synaptogenesis": true,
+    "synaptogenesis_rate": 0.001,
+    "enable_pruning": true,
+    "pruning_rate": 0.0001,
+    "critical_period": 100.0,
+    "maturation_rate": 0.01,
+    "plasticity_window": 50.0
+  },
+  
+  "environment": {
+    "name": "GridWorld",
+    "width": 20,
+    "height": 20,
+    "vision_width": 8,
+    "vision_height": 8,
+    "time_step": 0.1,
+    "max_energy": 100.0,
+    "enable_obstacles": true,
+    "obstacle_density": 0.2
+  },
+  
+  "simulation": {
+    "timestep": 0.001,
+    "max_steps": 10000,
+    "time_limit": 0.0,
+    "checkpoint_interval": 1000,
+    "enable_logging": true,
+    "log_level": "INFO",
+    "log_to_file": true,
+    "log_filename": "nlm.log",
+    "enable_profiling": false,
+    "performance_monitoring": true
+  },
+  
+  "visualization": {
+    "enable": false,
+    "update_rate": 30.0,
+    "window_width": 1280,
+    "window_height": 720,
+    "neuron_scale": 1.0,
+    "synapse_scale": 1.0,
+    "color_scheme": "default"
+  },
+  
+  "learning": {
+    "episode_length": 500,
+    "max_episodes": 1000,
+    "exploration_rate": 0.1,
+    "exploration_decay": 0.9995,
+    "learning_rate": 0.001,
+    "discount_factor": 0.99,
+    "batch_size": 32,
+    "target_network_update": 100,
+    "replay_buffer_size": 10000
+  },
+  
+  "metadata": {
+    "created": "2024-01-01T00:00:00Z",
+    "modified": "2024-01-19T17:08:00Z",
+    "version": "2.0.0",
+    "author": "NLM Team",
+    "tags": ["production", "research", "experimental"],
+    "notes": "Production configuration for NLM Phase 2 experiments"
+  }
+}

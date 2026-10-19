@@ -26,6 +26,8 @@ Real neurons maintain membrane potentials, fire action potentials when threshold
 ### Computational Implementation
 - **Integrate-and-Fire**: Simple model where membrane potential integrates input until threshold
 - **Leaky Integration**: Membrane potential decays towards rest
+- **Hodgkin-Huxley (HH)**: Detailed model of ion channel dynamics with Na+, K+, and H+ gating variables
+- **FitzHugh-Nagumo (FHN)**: Reduced 2-variable model (V, w) capturing excitability and Hopf bifurcation
 
 ### Known Limitations
 - Real neurons have complex ion channel dynamics (Hodgkin-Huxley)
@@ -48,6 +50,60 @@ Brain development involves:
 
 ### Known Limitations
 - Real development involves complex genetic programs, activity-dependent refinement, and-glia interactions
+
+## Advanced Neural Dynamics Models
+
+### Hodgkin-Huxley (HH) Model
+The HH model simulates detailed ion channel dynamics for action potential generation. It includes:
+
+- **Na+ gating variables (m, h)**: Sodium channel activation and inactivation
+- **K+ gating variable (n)**: Potassium channel activation
+- **Alpha/Beta rate functions**: Voltage-dependent gating variable kinetics
+- **I_ion currents**: Sodium, potassium, and leak currents
+- **Action potential generation**: With proper spike shape and refractory period
+
+**Equations:**
+- dV/dt = -(I_ion - I_syn) / C_m
+- dm/dt = α_m(V)(1-m) - β_m(V)m
+- dh/dt = α_h(V)(1-h) - β_h(V)h
+- dn/dt = α_n(V)(1-n) - β_n(V)n
+
+### FitzHugh-Nagumo (FHN) Model
+The FHN model provides a simplified 2-variable representation of neuronal dynamics:
+
+- **Membrane potential (V)**: Fast variable representing depolarization
+- **Recovery variable (w)**: Slow variable representing potassium dynamics and adaptation
+- **Excitability and Hopf bifurcation**: Captures oscillatory behavior and threshold phenomena
+- **Reduced complexity**: Easier to analyze mathematically while preserving key dynamics
+
+**Equations:**
+- dv/dt = 0.5*(v-w+V) - dv/dt
+- dw/dt = (v+a-b)/tau*w + I
+
+**Use Cases:**
+- Studying neural excitability and oscillations
+- Analyzing bifurcations in neuronal systems
+- Simplified modeling for large-scale networks
+- Teaching fundamental concepts of neuronal dynamics
+
+### Implementation Integration
+
+These advanced dynamics models extend the basic integrate-and-fire framework:
+
+- **Dynamic thresholding**: HH/FHN models use voltage-dependent gating for more realistic spike generation
+- **Enhanced synaptic integration**: More sophisticated synaptic input processing
+- **Refractory period**: More realistic refractory dynamics based on ion channel recovery
+- **Parameter configuration**: Extensive parameter tuning options for different neuronal behaviors
+
+**Testing and Validation:**
+The NLM framework includes comprehensive tests for all dynamics models:
+- Basic spike generation tests
+- Refractory period validation
+- Synaptic input processing
+- Network activity propagation
+- Comparative behavior analysis
+
+These models enable more biologically realistic neural simulations while maintaining computational efficiency for large-scale network studies.
 - Our implementation is highly simplified
 
 ## Neuromodulation

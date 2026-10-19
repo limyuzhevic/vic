@@ -8,6 +8,9 @@ namespace nlm {
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -19,6 +22,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , acetylcholineActivation_(0.0f)
+    , memoryConsolidationLevel_(0.0f)
+    , locusCoeruleusFiringRate_(2.5f)
+    , stressLevel_(0.0f)
+    , arousalLevel_(0.5f)
+    , moodLevel_(0.0f)
+    , socialBehaviorLevel_(0.5f)
+    , impulsivityControl_(0.5f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -322,6 +333,18 @@ float AgentBrain::getNeuromodulationLevel() const {
     return dopamineLevel_;
 }
 
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    return serotoninLevel_;
+}
+
 float AgentBrain::getCuriosityLevel() const {
     return curiosityLevel_;
 }
@@ -335,13 +358,35 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    // Reset all neuromodulator levels
     dopamineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+    
+    // Reset neuromodulator-specific states
+    acetylcholineActivation_ = 0.0f;
+    memoryConsolidationLevel_ = 0.0f;
+    locusCoeruleusFiringRate_ = 2.5f;
+    stressLevel_ = 0.0f;
+    arousalLevel_ = 0.5f;
+    moodLevel_ = 0.0f;
+    socialBehaviorLevel_ = 0.5f;
+    impulsivityControl_ = 0.5f;
+    
+    // Reset development state
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Reset configuration flags
+    rewardModulationEnabled_ = true;
+    structuralPlasticityEnabled_ = true;
+    developmentEnabled_ = true;
+    curiosityEnabled_ = true;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

@@ -110,11 +110,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    result.acetylcholineLevel = agent.getAcetylcholineLevel();
+    result.norepinephrineLevel = agent.getNorepinephrineLevel();
+    result.serotoninLevel = agent.getSerotoninLevel();
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
+    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr && 
+                                         brain->getAcetylcholine() != nullptr && 
+                                         brain->getNorepinephrine() != nullptr && 
+                                         brain->getSerotonin() != nullptr && 
+                                         brain->getCuriosity() != nullptr && 
+                                         brain->getNovelty() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
@@ -195,6 +203,27 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getAcetylcholine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Acetylcholine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Acetylcholine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNorepinephrine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Norepinephrine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSerotonin() != nullptr) {
+        NLM_LOG_INFO("[PASS] Serotonin system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Serotonin system is NOT integrated");
         success = false;
     }
     
@@ -297,10 +326,13 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     
     // Get neuromodulation systems
     auto* dopamine = brain->getDopamine();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !acetylcholine || !norepinephrine || !serotonin || !curiosity || !novelty) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
