@@ -94,12 +94,22 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     }
 }
 
-void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
+    // Validate handler before adding
+    if (!handler) {
+        NLM_LOG_ERROR("Attempted to register null delayed spike handler");
+        return;
+    }
+    pImpl->delayedHandlers.push_back(handler);
 }
 
-void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+void SpikeSystem::registerHandler(SpikeHandler handler) {
+    // Validate handler before adding
+    if (!handler) {
+        NLM_LOG_ERROR("Attempted to register null spike handler");
+        return;
+    }
+    pImpl->handlers.push_back(handler);
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {

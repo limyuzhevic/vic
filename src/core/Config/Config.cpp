@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <json.hpp>
+#include <yaml-cpp/yaml.h>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,9 +23,70 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Detect file format
+    std::string ext = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos + 1);
+    }
     
+    // Try JSON first
+    if (ext == "json" || ext == "JSON" || ext.empty()) {
+        try {
+            return loadFromJSON(filepath);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("JSON parsing failed: ") + e.what());
+        }
+    }
+    
+    // Try YAML
+    if (ext == "yaml" || ext == "yml" || ext == "YAML" || ext == "YML") {
+        try {
+            return loadFromYAML(filepath);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("YAML parsing failed: ") + e.what());
+        }
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    json j;
+    try {
+        file >> j;
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error(std::string("JSON parse error: ") + e.what());
+    }
+    
+    parseJSON(j, ConfigSource::File);
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        YAML::Node y;
+        y = YAML::LoadFile(filepath);
+        parseYAML(y, ConfigSource::File);
+    } catch (const YAML::ParserException& e) {
+        throw std::runtime_error(std::string("YAML parse error: ") + e.what());
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,7 +96,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == ';') {
             continue;
         }
         
@@ -48,11 +113,174 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to infer type from value
             set(key, value, ConfigSource::File);
         }
     }
     
     return true;
+}
+
+void Config::parseJSON(const json& j, ConfigSource source) {
+    for (auto it = j.begin(); it != j.end(); ++it) {
+        std::string key = it.key();
+        const json& value = it.value();
+        
+        if (value.is_number_integer()) {
+            set(key, value.get<int64_t>(), source);
+        } else if (value.is_number_unsigned()) {
+            set(key, value.get<uint64_t>(), source);
+        } else if (value.is_number_float()) {
+            set(key, value.get<double>(), source);
+        } else if (value.is_boolean()) {
+            set(key, value.get<bool>(), source);
+        } else if (value.is_string()) {
+            set(key, value.get<std::string>(), source);
+        } else if (value.is_array()) {
+            // Handle array types
+            if (!value.empty()) {
+                if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_number_integer(); })) {
+                    std::vector<int64_t> arr;
+                    for (const auto& v : value) {
+                        arr.push_back(v.get<int64_t>());
+                    }
+                    set(key, arr, source);
+                } else if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_number_float(); })) {
+                    std::vector<double> arr;
+                    for (const auto& v : value) {
+                        arr.push_back(v.get<double>());
+                    }
+                    set(key, arr, source);
+                } else if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_boolean(); })) {
+                    std::vector<bool> arr;
+                    for (const auto& v : value) {
+                        arr.push_back(v.get<bool>());
+                    }
+                    set(key, arr, source);
+                } else if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_string(); })) {
+                    std::vector<std::string> arr;
+                    for (const auto& v : value) {
+                        arr.push_back(v.get<std::string>());
+                    }
+                    set(key, arr, source);
+                } else if (value[0].is_array()) {
+                    // Matrix case
+                    std::vector<std::vector<double>> matrix;
+                    for (const auto& row : value) {
+                        std::vector<double> row_data;
+                        for (const auto& elem : row) {
+                            row_data.push_back(elem.get<double>());
+                        }
+                        matrix.push_back(row_data);
+                    }
+                    set(key, matrix, source);
+                }
+            }
+        } else if (value.is_object()) {
+            // Check if it's a parameter map
+            bool has_string_keys = true;
+            for (const auto& elem : value.items()) {
+                if (!elem.key().is_string()) {
+                    has_string_keys = false;
+                    break;
+                }
+            }
+            
+            if (has_string_keys) {
+                // Try to determine value type
+                auto first_value = value.begin();
+                if (first_value.value().is_number()) {
+                    std::map<std::string, double> param_map;
+                    for (const auto& elem : value.items()) {
+                        param_map[elem.key()] = elem.value().get<double>();
+                    }
+                    set(key, param_map, source);
+                } else if (first_value.value().is_string()) {
+                    std::map<std::string, std::string> param_map;
+                    for (const auto& elem : value.items()) {
+                        param_map[elem.key()] = elem.value().get<std::string>();
+                    }
+                    set(key, param_map, source);
+                }
+            }
+        }
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == ';') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to infer type from value
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+void Config::parseYAML(const YAML::Node& y, ConfigSource source) {
+    for (const auto& it : y) {
+        std::string key = it.first.as<std::string>();
+        const YAML::Node& value = it.second;
+        
+        if (value.IsScalar()) {
+            std::string str_value = value.as<std::string>();
+            // Try to convert to appropriate type
+            if (str_value == "true" || str_value == "false") {
+                set(key, str_value == "true", source);
+            } else if (str_value.find('.') != std::string::npos) {
+                try {
+                    set(key, std::stod(str_value), source);
+                } catch (...) {
+                    set(key, str_value, source);
+                }
+            } else {
+                try {
+                    set(key, std::stoll(str_value), source);
+                } catch (...) {
+                    set(key, str_value, source);
+                }
+            }
+        } else if (value.IsSequence()) {
+            // Handle arrays
+            std::vector<double> arr;
+            for (const auto& elem : value) {
+                arr.push_back(elem.as<double>());
+            }
+            set(key, arr, source);
+        } else if (value.IsMap()) {
+            // Handle nested maps
+            std::map<std::string, double> param_map;
+            for (const auto& elem : value) {
+                param_map[elem.first.as<std::string>()] = elem.second.as<double>();
+            }
+            set(key, param_map, source);
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

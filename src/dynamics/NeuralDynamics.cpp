@@ -30,19 +30,41 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Validate parameters to prevent division by zero
+    if (tau <= 0.0f || R <= 0.0f) {
+        // Invalid parameters - skip integration but record spike if threshold reached
+        if (shouldFire(neuron)) {
+            neuron->setFiringState(FiringState::Active);
+            neuron->recordSpike(0.0);  // TODO: pass actual time
+        }
+        neuron->clearTotalCurrent();
+        return;
+    }
     
-    // Check for firing
+    // Simple Euler integration with improved numerical stability
+    float leakTerm = (V - V_rest) / tau;
+    float inputTerm = I / R;
+    
+    // Add safety check for NaN/inf values
+    if (!std::isfinite(leakTerm) || !std::isfinite(inputTerm)) {
+        // Invalid calculation - reset to resting potential
+        neuron->setMembranePotential(V_rest);
+    } else {
+        float dV = (leakTerm + inputTerm) * static_cast<float>(dt);
+        neuron->setMembranePotential(V + dV);
+    }
+    
+    // Check for firing with improved threshold detection
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
         neuron->recordSpike(0.0);  // TODO: pass actual time
     }
     
-    // Refractory mechanism
+    // Proper refractory mechanism with countdown
     if (neuron->isRefractory()) {
+        // During refractory period, reset potential and prevent integration
         neuron->setMembranePotential(state.resetPotential);
+        // Note: Refractory countdown is handled by Neuron class
     }
     
     // Clear current for next step

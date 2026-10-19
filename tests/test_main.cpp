@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_enhanced_config {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -25,11 +29,19 @@ namespace test_neuron {
     void runAll();
 }
 
+namespace test_enhanced_neuron {
+    void runAll();
+}
+
 namespace test_synapse {
     void runAll();
 }
 
 namespace test_stdp {
+    void runAll();
+}
+
+namespace test_enhanced_stdp {
     void runAll();
 }
 
@@ -65,6 +77,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Enhanced Config tests..." << std::endl;
+    try {
+        test_enhanced_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << "Running Random tests..." << std::endl;
     try {
         test_random::runAll();
@@ -92,6 +113,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Enhanced Neuron tests..." << std::endl;
+    try {
+        test_enhanced_neuron::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << "Running Synapse tests..." << std::endl;
     try {
         test_synapse::runAll();
@@ -104,6 +134,15 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced STDP tests..." << std::endl;
+    try {
+        test_enhanced_stdp::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

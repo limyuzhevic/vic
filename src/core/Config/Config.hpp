@@ -15,12 +15,19 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    int32_t,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<bool>,
+    std::vector<std::string>,
+    std::vector<std::vector<double>>,  // Matrix support
+    std::vector<float>,                 // Float arrays
+    std::map<std::string, double>,      // Named parameters
+    std::map<std::string, std::string>  // String key-value pairs
 >;
 
 // Configuration source
@@ -55,7 +62,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -77,6 +84,11 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::map<std::string, double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::map<std::string, std::string>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +104,15 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Load from specific format
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Parse helper methods
+    void parseJSON(const json& j, ConfigSource source);
+    void parseYAML(const YAML::Node& y, ConfigSource source);
     
 private:
     struct Impl;

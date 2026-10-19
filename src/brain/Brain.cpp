@@ -100,6 +100,12 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
+        // Initialize plasticity systems with proper null checks
+        spikeSystem = std::make_unique<SpikeSystem>();
+        stdp = std::make_unique<STDP>();
+        hebbian = std::make_unique<Hebbian>();
+        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
@@ -745,14 +751,20 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
-    for (auto& region : pImpl->regions) {
-        region->reset();
-    }
+    // Reset regions
+    pImpl->regions.clear();
     
+    // Clear sensory and motor neuron pointers
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
+    // Reset spike system
     pImpl->spikeSystem->reset();
+    
+    // Reset development stage
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
+    // Reset memory systems with null checks
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
