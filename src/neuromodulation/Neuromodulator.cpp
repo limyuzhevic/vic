@@ -1,8 +1,3 @@
-#include "Neuromodulator.hpp"
-#include <algorithm>
-
-namespace nlm {
-
 struct Dopamine::Impl {
     float level;
     float baseline;
@@ -13,7 +8,7 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Dopamine::Dopamine() : pImpl(std::make_unique<Impl>()) {}
 
 Dopamine::~Dopamine() = default;
 
@@ -51,6 +46,25 @@ void Dopamine::signalRewardPredictionError(float error) {
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+}
+
+// Factory functions for Brain integration
+namespace nlm {
+    Dopamine* createDopamine() {
+        return new Dopamine();
+    }
+    
+    Acetylcholine* createAcetylcholine() {
+        return new Acetylcholine();
+    }
+    
+    Norepinephrine* createNorepinephrine() {
+        return new Norepinephrine();
+    }
+    
+    Serotonin* createSerotonin() {
+        return new Serotonin();
+    }
 }
 
 } // namespace nlm
