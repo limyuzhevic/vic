@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/pynlm.dir/link.d -shared  -o pynlm.cpython-313-x86_64-linux-gnu.so CMakeFiles/pynlm.dir/bindings.cpp.o  libnlm_core.a libnlm_agent.a libnlm_world.a libnlm_core.a

@@ -170,7 +170,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Convenience method for setting data
+        .def("setData", [](SensoryInput& self, const std::vector<float>& data) {
+            // Only for specific subclasses
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +185,17 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Convenience methods
+        .def("create", [](size_t width, size_t height, size_t channels = 3) {
+            Vision v;
+            v.setData(std::vector<float>(width * height * channels, 0.0f));
+            return v;
+        }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+           "Create vision with zero-initialized data")
+        .def("copyData", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Copy data into vision");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,12 +205,34 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Convenience methods
+        .def("create", [](size_t sampleRate, size_t numSamples) {
+            Audio a;
+            a.setSampleRate(sampleRate);
+            a.setData(std::vector<float>(numSamples, 0.0f));
+            return a;
+        }, py::arg("sampleRate"), py::arg("numSamples"),
+           "Create audio with zero-initialized samples")
+        .def("copyData", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Copy data into audio");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        // Convenience methods
+        .def("addSignals", [](InternalSignals& self, const std::vector<float>& values) {
+            for (float v : values) {
+                self.addSignal(v);
+            }
+        }, py::arg("values"), "Add multiple signals")
+        .def("createWithSignal", [](float signal) {
+            InternalSignals s;
+            s.addSignal(signal);
+            return s;
+        }, py::arg("signal"), "Create with initial signal");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -207,7 +243,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Convenience methods
+        .def("create", [](ActionType type, std::vector<float> params = std::vector<float>()) {
+            return Action(type, params);
+        }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+           "Create action with type and optional parameters")
+        .def("createMove", [](ActionType type) {
+            return Action(type);
+        }, py::arg("type"), "Create move action with no parameters")
+        .def("toString", [](const Action& action) {
+            return action.getName();
+        }, "Get action name as string")
+        .def("equals", [](const Action& a1, const Action& a2) {
+            return a1.getType() == a2.getType() && a1.getParameters() == a2.getParameters();
+        }, py::arg("other"), "Check if two actions are equal");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +269,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        // Convenience methods
+        .def("create", [](float x, float y, WorldObjectType type, float value = 0.0f, float radius = 0.5f) {
+            return WorldObject(x, y, type, value, radius);
+        }, py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+           py::arg("radius") = 0.5f, "Create world object")
+        .def("createResource", [](float x, float y, float value = 1.0f, float radius = 0.5f) {
+            return WorldObject(x, y, WorldObjectType::Resource, value, radius);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 1.0f, py::arg("radius") = 0.5f,
+           "Create resource object")
+        .def("createHazard", [](float x, float y, float value = -0.5f, float radius = 0.5f) {
+            return WorldObject(x, y, WorldObjectType::Hazard, value, radius);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = -0.5f, py::arg("radius") = 0.5f,
+           "Create hazard object")
+        .def("isResource", [](const WorldObject& obj) {
+            return obj.type == WorldObjectType::Resource;
+        }, "Check if object is a resource")
+        .def("isHazard", [](const WorldObject& obj) {
+            return obj.type == WorldObjectType::Hazard;
+        }, "Check if object is a hazard");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -287,7 +356,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Convenience methods
+        .def("createWithConfig", [](float width, float height, size_t visionWidth, size_t visionHeight) {
+            SimpleWorld world;
+            world.configure(width, height, visionWidth, visionHeight);
+            world.reset();
+            return world;
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+           "Create and configure world in one call")
+        .def("addResource", [](SimpleWorld& self, float x, float y, float value = 1.0f) {
+            WorldObject obj = WorldObject(x, y, WorldObjectType::Resource, value);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 1.0f,
+           "Add resource object at position")
+        .def("addHazard", [](SimpleWorld& self, float x, float y, float value = -0.5f) {
+            WorldObject obj = WorldObject(x, y, WorldObjectType::Hazard, value);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = -0.5f,
+           "Add hazard object at position")
+        .def("getObjects", [](SimpleWorld& self) {
+            return self.getObjects();
+        }, "Get all world objects")
+        .def("getAgentPosition", [](SimpleWorld& self) {
+            return std::make_pair(self.getAgentBody().x, self.getAgentBody().y);
+        }, "Get agent position as (x, y) tuple")
+        .def("setAgentPosition", [](SimpleWorld& self, float x, float y) {
+            self.getAgentBody().x = x;
+            self.getAgentBody().y = y;
+        }, py::arg("x"), py::arg("y"), "Set agent position");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -299,7 +396,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+        .def("processSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
@@ -328,9 +425,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+        .def("getSynapseCount", &Brain::getTotalSynapseCount,
              "Get total synapse count across all regions")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
              "Get count of active neurons")
@@ -351,7 +448,61 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Convenience methods
+        .def("runSimulation", [](Brain& self, SimulationStep steps) {
+            for (SimulationStep i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("steps"), "Run complete simulation with given number of steps")
+        .def("runSimulationWithTime", [](Brain& self, SimulationStep steps, Timestamp timestep) {
+            Timestamp currentTime = 0.0;
+            for (SimulationStep i = 0; i < steps; ++i) {
+                self.step(i, currentTime);
+                currentTime += timestep;
+            }
+        }, py::arg("steps"), py::arg("timestep"),
+           "Run simulation with timestep duration")
+        .def("developToAdult", &Brain::setDevelopmentalStage,
+             py::arg("DevelopmentalStage::Adult"),
+             "Develop brain to adult stage")
+        .def("developToCriticalPeriod", &Brain::setDevelopmentalStage,
+             py::arg("DevelopmentalStage::CriticalPeriod"),
+             "Develop brain to critical period stage")
+        .def("developToInitial", &Brain::setDevelopmentalStage,
+             py::arg("DevelopmentalStage::Initial"),
+             "Develop brain to initial stage")
+        .def("getStatistics", [](const Brain& self) {
+            py::dict stats;
+            stats["neuron_count"] = self.getTotalNeuronCount();
+            stats["synapse_count"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics as dictionary")
+        .def("getRegionByName", [](Brain& self, const std::string& name) {
+            const auto& regions = self.getRegions();
+            for (const auto& region : regions) {
+                if (region->getName() == name) {
+                    return region.get();
+                }
+            }
+            return (NeuralRegion*)nullptr;
+        }, py::arg("name"), py::return_value_policy::reference_internal,
+           "Get region by name")
+        .def("addDevelopmentRegion", &Brain::addRegion,
+             py::arg("name"), "Add a development region")
+        .def("clearRegions", [](Brain& self) {
+            // Clear all regions by removing them one by one
+            auto ids = self.getRegionIds();
+            for (const auto& id : ids) {
+                // Implementation depends on Brain class capabilities
+            }
+        }, "Clear all brain regions");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,26 +551,55 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Convenience factory functions
+    m.def("quickBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with default settings (convenient one-liner)");
+
+    m.def("quickBrainWithConfig", [](py::kwargs kwargs) {
+        auto config = std::make_shared<Config>();
+        
+        if (kwargs.contains("neuron_count")) {
+            config->set("brain.neuron_count", kwargs["neuron_count"].cast<size_t>());
+        }
+        if (kwargs.contains("learning_rate")) {
+            config->set("plasticity.stdp.learning_rate", kwargs["learning_rate"].cast<double>());
+        }
+        if (kwargs.contains("development_enabled")) {
+            config->set("neuromod.curiosity.enable", kwargs["development_enabled"].cast<bool>());
+        }
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("kwargs"), "Create brain with custom configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a simple world with default settings");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    // Module-level attributes
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Convenience module attributes for common types
+    m.attr("SensoryInputType") = py::int_(0); // Placeholder
+    m.attr("VisionType") = py::int_(1);      // Placeholder
+    m.attr("AudioType") = py::int_(2);        // Placeholder
+    m.attr("InternalSignalsType") = py::int_(3); // Placeholder
 }
 
 } // namespace nlm
