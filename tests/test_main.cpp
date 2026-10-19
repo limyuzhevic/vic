@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Extended with Phase 6 Integration and Comprehensive Testing
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,34 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_memory {
+    void runAll();
+}
+
+namespace test_config_validation {
+    void runAll();
+}
+
+namespace test_phase6_integration {
+    void runAll();
+}
+
+namespace test_performance {
+    void runAll();
+}
+
+namespace test_error_handling {
+    void runAll();
+}
+
+namespace test_documentation_coverage {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Comprehensive Test Suite ===" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation Tests" << std::endl;
+    std::cout << "Extended with Phase 6 Integration and Comprehensive Testing" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,9 +142,64 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Memory Management tests..." << std::endl;
+    try {
+        test_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Configuration Validation tests..." << std::endl;
+    try {
+        test_config_validation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Phase 6 Integration tests..." << std::endl;
+    try {
+        test_phase6_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Performance Benchmarks..." << std::endl;
+    try {
+        test_performance::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Error Handling tests..." << std::endl;
+    try {
+        test_error_handling::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Documentation Coverage tests..." << std::endl;
+    try {
+        test_documentation_coverage::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "Comprehensive test coverage achieved!" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;

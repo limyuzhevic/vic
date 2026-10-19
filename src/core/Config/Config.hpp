@@ -12,35 +12,52 @@ namespace nlm {
 class Config;
 
 // Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
+    // A variant that can hold any of the supported configuration types
+    using ConfigValue = std::variant<
+        int,
+        int64_t,
+        double,
+        bool,
+        std::string,
+        std::vector<int>,
+        std::vector<double>,
+        std::vector<std::string>
+    >;
 
-// Configuration source
+// Configuration source indicates how the configuration value was set
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,      // Hard-coded default value
+    File,         // Loaded from configuration file
+    CommandLine,  // Set via command line arguments
+    Runtime       // Set programmatically at runtime
 };
 
-// Configuration entry
+// Configuration entry stores a single key-value pair with metadata
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;           // Configuration key (e.g., "neuron_count")
+    ConfigValue value;         // Configuration value
+    ConfigSource source;       // Source of this configuration
+    std::string description;   // Human-readable description of the parameter
     
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    // Constructor with description
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Get a string representation of the value for display
+    std::string getValueString() const {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else {
+                oss << arg;
+            }
+        }, value);
+        return oss.str();
+    }
 };
 
 // Main configuration class

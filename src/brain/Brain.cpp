@@ -66,6 +66,7 @@ struct Brain::Impl {
     size_t totalSpikesTotal;
     
     // Sensory neurons for input injection
+    // These are pointers to neurons owned by brain regions (no ownership transfer)
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
@@ -93,12 +94,14 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
+    // Initialize random generator with seed from config
+    // Note: rng is initially null and will be set later in initialize()
+    // This allows lazy initialization and proper separation of concerns
+    uint64_t seed = 42;  // Default seed
+    if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        seed = *seedOpt;
+    }
+    rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -591,12 +594,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
+    // Note: Input values are assumed to be in range [-1, 1] and will be scaled to [-10, 10] mV
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_DEBUG("Empty sensory input received");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("Sensory neurons initialized but no neurons available");
+        return;
+    }
+    
+    // Validate input length to prevent buffer overflows
+    if (values.size() > numSensory) {
+        NLM_LOG_WARNING("Input size (" + std::to_string(values.size()) + ") exceeds available sensory neurons (" + std::to_string(numSensory) + ")");
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -606,27 +621,36 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Inject current into this sensory neuron with null safety check
+        if (pImpl->sensoryNeurons[i]) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Also store in working memory if significant input
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            }
+        } else {
+            NLM_LOG_ERROR("Null sensory neuron at index " + std::to_string(i));
         }
     }
 }
 
-void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
+// Inject current directly into a specific neuron
+    // Note: This performs a linear search through all neurons in the brain
+    // For performance-critical applications, consider adding neuron lookup tables
+    void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* n : neurons) {
+                if (n->getId() == neuron) {
+                    n->injectCurrent(current);
+                    return;
+                }
             }
         }
+        // Neuron not found - this could be logged for debugging
+        NLM_LOG_WARNING("Neuron " + std::to_string(neuron.index()) + " not found for current injection");
     }
-}
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
