@@ -24,6 +24,11 @@ public:
     MembranePotential getMatureRestingPotential() const;
     float getMatureTimeConstant() const;
     
+    // Helper methods for real biological maturation
+    void developGeneRegulatoryNetworks(class Brain* brain);
+    void establishCircuitPatterns(class Brain* brain);
+    void formLongRangeConnections(class Brain* brain);
+    
 private:
     struct Impl;
     Impl* pImpl;

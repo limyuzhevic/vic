@@ -400,4 +400,97 @@ void SimpleWorld::checkCollisions() {
     }
 }
 
+void SimpleWorld::observe() {
+    // Generate vision
+    generateVision();
+    
+    // Generate proprioception (body position/velocity)
+    std::vector<float> proprioception(6, 0.0f);
+    proprioception[0] = agent_.x / width_;     // Normalized X
+    proprioception[1] = agent_.y / height_;    // Normalized Y
+    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
+    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
+    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
+    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
+    sensory_.setProprioception(proprioception);
+    
+    // Generate internal signals (energy, health)
+    std::vector<float> internal(4, 0.0f);
+    internal[0] = agent_.energy / maxEnergy_;  // Energy level
+    internal[1] = agent_.health;               // Health
+    internal[2] = agent_.isMoving ? 1.0f : 0.0f;  // Movement state
+    internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
+    sensory_.setInternal(internal);
+    
+    // Generate touch from objects (check for nearby objects)
+    std::vector<float> touch(6, 0.0f);  // Position, radius, type, value, active, distance
+    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+    if (obj != nullptr && obj->active) {
+        touch[0] = obj->x;      // X position
+        touch[1] = obj->y;      // Y position
+        touch[2] = obj->radius; // Radius
+        touch[3] = static_cast<float>(obj->type); // Type
+        touch[4] = obj->value;  // Value
+        touch[5] = 0.0f;        // Distance (zero for direct contact)
+        sensory_.setTouch(touch);
+    } else {
+        sensory_.setTouch({});
+    }
+    
+    // No audio for now
+    sensory_.setAudio({});
+}
+
+float SimpleWorld::computeReward(const NeuralRegion* region) const {
+    // Simple reward function based on agent's energy and position
+    float reward = 0.0f;
+    
+    // Positive reward for high energy
+    reward += (agent_.energy / maxEnergy_) * 0.1f;
+    
+    // Negative reward for low energy
+    if (agent_.energy < maxEnergy_ * 0.2f) {
+        reward -= 0.05f;
+    }
+    
+    // Check for nearby resources (positive reward if close)
+    float minResourceDist = std::numeric_limits<float>::max();
+    float minHazardDist = std::numeric_limits<float>::max();
+    
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dist = std::sqrt(std::pow(obj.x - agent_.x, 2) + std::pow(obj.y - agent_.y, 2));
+        
+        if (obj.type == WorldObjectType::Resource) {
+            if (dist < minResourceDist) minResourceDist = dist;
+        } else if (obj.type == WorldObjectType::Hazard) {
+            if (dist < minHazardDist) minHazardDist = dist;
+        }
+    }
+    
+    // Reward for being near resources
+    if (minResourceDist < 5.0f) {
+        reward += std::max(0.0f, 1.0f - minResourceDist / 5.0f) * obj.value;
+    }
+    
+    // Penalty for being near hazards
+    if (minHazardDist < 5.0f) {
+        reward -= std::max(0.0f, 1.0f - minHazardDist / 5.0f) * std::abs(obj.value);
+    }
+    
+    // Small negative reward for staying in place (encourages exploration)
+    if (agent_.isMoving) {
+        reward -= 0.001f;
+    }
+    
+    return reward;
+}
+
+ActionResult SimpleWorld::applyAction(const NeuralRegion* region, MotorCommand cmd) {
+    // Alias for applyMotorCommand with region parameter for demo compatibility
+    double currentTime = simTime_;
+    return applyMotorCommand(cmd, currentTime);
+}
+
 } // namespace nlm

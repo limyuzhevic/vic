@@ -51,6 +51,16 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Observe world state and create sensory percept
+    // This is a convenience method that simulates environment observation
+    void observe();
+    
+    // Compute reward based on current state and action
+    float computeReward(const NeuralRegion* region = nullptr) const;
+    
+    // Apply action (alias for applyMotorCommand for compatibility with demo)
+    ActionResult applyAction(const NeuralRegion* region, MotorCommand cmd);
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     

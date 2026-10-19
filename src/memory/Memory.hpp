@@ -114,8 +114,9 @@ struct Skill {
     std::string name;
     std::vector<NeuronId> neuralPattern;
     float proficiency;
+    float stability;  // How stable/reliable the skill is (0-1)
     
-    Skill() : proficiency(0.0f) {}
+    Skill() : proficiency(0.0f), stability(0.5f) {}
 };
 
 class ProceduralMemory {
