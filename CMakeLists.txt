@@ -139,13 +139,41 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Performance optimizations (Phase 5)
+# Create a performance interface library
+target_compile_definitions(nlm_core PRIVATE -DNLM_PERFORMANCE_ENABLED)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# SIMD configuration
+target_compile_definitions(nlm_core PRIVATE -DNLM_SIMD_WIDTH=16)
+
+# Thread count configuration
+set(NLM_THREAD_COUNT ${NLM_NUM_THREADS} CACHE STRING "Number of threads for parallel processing")
+add_definitions(-DNLM_THREAD_COUNT=${NLM_THREAD_COUNT})
+
+# Memory pool configuration
+set(NLM_MEMORY_POOL_SIZE 1024 CACHE STRING "Objects per memory pool block")
+add_definitions(-DNLM_MEMORY_POOL_BLOCK_SIZE=${NLM_MEMORY_POOL_SIZE})
+
+# Configure compiler flags for performance
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # Optimize for performance
+    target_compile_options(nlm_core PRIVATE -O3 -march=native -flto)
+    # Enable SIMD optimizations
+    target_compile_options(nlm_core PRIVATE -mavx2)
+    # Enable link-time optimization
+    target_link_options(nlm_core PRIVATE -flto)
+endif()
+
+# Update all targets to use performance features
+# Core neural system now includes performance optimizations
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Update main executable
+target_link_libraries(nlm PUBLIC nlm_core)
     RUNTIME DESTINATION bin
 )

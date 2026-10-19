@@ -65,14 +65,64 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Enhanced argument parsing with type detection
+                if (key == ConfigParams::NEURON_COUNT || key == ConfigParams::REGION_COUNT) {
+                    try {
+                        size_t neuronCount = std::stoul(value);
+                        set(key, neuronCount, ConfigSource::CommandLine);
+                    } catch (...) {
+                        NLM_LOG_WARNING("Invalid " + key + " value: " + value);
+                    }
+                } else if (key == ConfigParams::CONNECTION_PROBABILITY || 
+                          key == ConfigParams::SIMULATION_TIMESTEP ||
+                          key == ConfigParams::RANDOM_SEED ||
+                          key == ConfigParams::STDP_LTP_WEIGHT ||
+                          key == ConfigParams::STDP_LTD_WEIGHT ||
+                          key == ConfigParams::STDP_TAU ||
+                          key == ConfigParams::STRUCTURAL_PLASTICITY_RATE ||
+                          key == ConfigParams::PRUNING_RATE ||
+                          key == ConfigParams::DOPAMINE_BASELINE ||
+                          key == ConfigParams::CURIOUSITY_THRESHOLD ||
+                          key == ConfigParams::NOVELTY_THRESHOLD ||
+                          key == ConfigParams::CRITICAL_PERIOD_DURATION ||
+                          key == ConfigParams::PLASTICITY_DEVELOPMENT_FACTOR) {
+                    try {
+                        float floatValue = std::stof(value);
+                        set(key, floatValue, ConfigSource::CommandLine);
+                    } catch (...) {
+                        NLM_LOG_WARNING("Invalid " + key + " value: " + value);
+                    }
+                } else {
+                    // Generic string handling for other parameters
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Type-aware parsing for known parameters
+            if (key == ConfigParams::NEURON_COUNT || key == ConfigParams::REGION_COUNT) {
+                try {
+                    size_t intValue = std::stoul(value);
+                    set(key, intValue, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid " + key + " value: " + value);
+                }
+            } else if (key == ConfigParams::CONNECTION_PROBABILITY || 
+                      key == ConfigParams::SIMULATION_TIMESTEP) {
+                try {
+                    double doubleValue = std::stod(value);
+                    set(key, doubleValue, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid " + key + " value: " + value);
+                }
+            } else {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -211,5 +261,252 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Enhanced error handling and validation functions
+void Config::validateParameter(const std::string& key, const ConfigValue& value) {
+    // Enhanced parameter validation
+    ConfigError error = ConfigError::SYSTEM_ERROR;
+    std::string errorMessage;
+    
+    // Validate neuron parameters
+    if (key == ConfigParams::NEURON_COUNT) {
+        try {
+            size_t neuronCount = std::get<size_t>(value);
+            if (neuronCount == 0) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "Neuron count cannot be zero: " + std::to_string(neuronCount);
+                NLM_LOG_ERROR(errorMessage);
+            } else if (neuronCount > 10000) {
+                NLM_LOG_WARNING("High neuron count may impact performance: " + std::to_string(neuronCount));
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for neuron_count (expected integer): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::REGION_COUNT) {
+        try {
+            size_t regionCount = std::get<size_t>(value);
+            if (regionCount == 0) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "Region count cannot be zero: " + std::to_string(regionCount);
+                NLM_LOG_ERROR(errorMessage);
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for region_count (expected integer): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::CONNECTION_PROBABILITY) {
+        try {
+            float prob = std::get<float>(value);
+            if (prob < 0.0f || prob > 1.0f) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "Connection probability must be between 0.0 and 1.0: " + std::to_string(prob);
+                NLM_LOG_ERROR(errorMessage);
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for connection_probability (expected float): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::SIMULATION_TIMESTEP) {
+        try {
+            double timestep = std::get<double>(value);
+            if (timestep <= 0.0) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "Simulation timestep must be positive: " + std::to_string(timestep);
+                NLM_LOG_ERROR(errorMessage);
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for simulation_timestep (expected double): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::RANDOM_SEED) {
+        try {
+            uint64_t seed = std::get<uint64_t>(value);
+            // Warning about default seed usage
+            if (seed == 42) {
+                NLM_LOG_WARNING("Using default random seed (42). For reproducibility, consider setting a specific seed.");
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for random_seed (expected uint64_t): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::STDP_LTP_WEIGHT || key == ConfigParams::STDP_LTD_WEIGHT) {
+        try {
+            float weight = std::get<float>(value);
+            if (weight < 0.0f) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "STDP weight must be non-negative: " + std::to_string(weight);
+                NLM_LOG_ERROR(errorMessage);
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for STDP weight (expected float): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+    else if (key == ConfigParams::STRUCTURAL_PLASTICITY_RATE || key == ConfigParams::PRUNING_RATE) {
+        try {
+            float rate = std::get<float>(value);
+            if (rate < 0.0f || rate > 1.0f) {
+                error = ConfigError::OUT_OF_RANGE;
+                errorMessage = "Plasticity rate must be between 0.0 and 1.0: " + std::to_string(rate);
+                NLM_LOG_ERROR(errorMessage);
+            }
+        } catch (const std::bad_variant_access&) {
+            error = ConfigError::INVALID_VALUE_TYPE;
+            errorMessage = "Invalid value type for plasticity rate (expected float): " + key;
+            NLM_LOG_ERROR(errorMessage);
+        }
+    }
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Enhanced argument parsing with type detection and validation
+                try {
+                    // Determine parameter type based on known keys
+                    if (key == ConfigParams::NEURON_COUNT || key == ConfigParams::REGION_COUNT) {
+                        size_t intValue = std::stoul(value);
+                        validateParameter(key, ConfigValue(intValue));
+                        set(key, intValue, ConfigSource::CommandLine);
+                    } else if (key == ConfigParams::CONNECTION_PROBABILITY || 
+                              key == ConfigParams::SIMULATION_TIMESTEP ||
+                              key == ConfigParams::RANDOM_SEED ||
+                              key == ConfigParams::STDP_LTP_WEIGHT ||
+                              key == ConfigParams::STDP_LTD_WEIGHT ||
+                              key == ConfigParams::STDP_TAU ||
+                              key == ConfigParams::STRUCTURAL_PLASTICITY_RATE ||
+                              key == ConfigParams::PRUNING_RATE ||
+                              key == ConfigParams::DOPAMINE_BASELINE ||
+                              key == ConfigParams::CURIOUSITY_THRESHOLD ||
+                              key == ConfigParams::NOVELTY_THRESHOLD ||
+                              key == ConfigParams::CRITICAL_PERIOD_DURATION ||
+                              key == ConfigParams::PLASTICITY_DEVELOPMENT_FACTOR) {
+                        float floatValue = std::stof(value);
+                        validateParameter(key, ConfigValue(floatValue));
+                        set(key, floatValue, ConfigSource::CommandLine);
+                    } else if (key == ConfigParams::CHECKPOINT_INTERVAL || 
+                              key == ConfigParams::MAX_CHECKPOINTS ||
+                              key == ConfigParams::REPLAY_INTERVAL ||
+                              key == ConfigParams::CONSOLIDATION_INTERVAL) {
+                        size_t sizeValue = std::stoul(value);
+                        validateParameter(key, ConfigValue(sizeValue));
+                        set(key, sizeValue, ConfigSource::CommandLine);
+                    } else {
+                        // Generic string handling for other parameters
+                        validateParameter(key, ConfigValue(value));
+                        set(key, value, ConfigSource::CommandLine);
+                    }
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid command line argument --" + key + "=" + value + ": " + e.what());
+                }
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            
+            // Type-aware parsing and validation for known parameters
+            try {
+                if (key == ConfigParams::NEURON_COUNT || key == ConfigParams::REGION_COUNT) {
+                    size_t intValue = std::stoul(value);
+                    validateParameter(key, ConfigValue(intValue));
+                    set(key, intValue, ConfigSource::CommandLine);
+                } else if (key == ConfigParams::CONNECTION_PROBABILITY || 
+                          key == ConfigParams::SIMULATION_TIMESTEP) {
+                    double doubleValue = std::stod(value);
+                    validateParameter(key, ConfigValue(doubleValue));
+                    set(key, doubleValue, ConfigSource::CommandLine);
+                } else if (key == ConfigParams::RANDOM_SEED ||
+                          key == ConfigParams::STDP_LTP_WEIGHT ||
+                          key == ConfigParams::STDP_LTD_WEIGHT ||
+                          key == ConfigParams::STDP_TAU ||
+                          key == ConfigParams::STRUCTURAL_PLASTICITY_RATE ||
+                          key == ConfigParams::PRUNING_RATE ||
+                          key == ConfigParams::DOPAMINE_BASELINE ||
+                          key == ConfigParams::CURIOUSITY_THRESHOLD ||
+                          key == ConfigParams::NOVELTY_THRESHOLD ||
+                          key == ConfigParams::CRITICAL_PERIOD_DURATION ||
+                          key == ConfigParams::PLASTICITY_DEVELOPMENT_FACTOR) {
+                    float floatValue = std::stof(value);
+                    validateParameter(key, ConfigValue(floatValue));
+                    set(key, floatValue, ConfigSource::CommandLine);
+                } else if (key == ConfigParams::CHECKPOINT_INTERVAL || 
+                          key == ConfigParams::MAX_CHECKPOINTS ||
+                          key == ConfigParams::REPLAY_INTERVAL ||
+                          key == ConfigParams::CONSOLIDATION_INTERVAL) {
+                    size_t sizeValue = std::stoul(value);
+                    validateParameter(key, ConfigValue(sizeValue));
+                    set(key, sizeValue, ConfigSource::CommandLine);
+                } else {
+                    validateParameter(key, ConfigValue(value));
+                    set(key, value, ConfigSource::CommandLine);
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Invalid command line argument -" + key + " " + value + ": " + e.what());
+            }
+        }
+    }
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
+        return false;
+    }
+    
+    // Write header with metadata
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM configuration system\n";
+    file << "# Format: # comments, key = value\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        // Write value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n\n";
+            } else {
+                file << entry.key << " = " << arg << "\n\n";
+            }
+        }, entry.value);
+    }
+    
+    NLM_LOG_INFO("Configuration saved successfully to: " + filepath);
+    return true;
+}
+
+// Explicit template instantiations
+// Rest of the original file remains unchanged
 
 } // namespace nlm

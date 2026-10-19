@@ -366,21 +366,128 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Initialize experiment runner for Phase 2
+    NLM_LOG_INFO("Initializing NLM Phase 2: Real Neural Computation...")
+    NLM_LOG_INFO("Running comprehensive neural computation experiments with integrated memory and plasticity systems.")
+    NLM_LOG_INFO("")
+    NLM_LOG_INFO("Available advanced options (experimental):")
+    NLM_LOG_INFO("  --performance=mode           Set performance mode: 'balanced', 'fast', or 'memory'")
+    NLM_LOG_INFO("  --experiment=mode           Set experiment mode: 'basic', 'advanced', or 'demo'")
+    NLM_LOG_INFO("  --visualization[=interval]   Enable visualization with update interval (default 0.1s)")
+    NLM_LOG_INFO("  --checkpoint=file            Save checkpoint to file path")
+    NLM_LOG_INFO("  --verbose[=level]           Set verbosity level (0-3)")
+    NLM_LOG_INFO("  --config=custom.cfg         Load custom configuration file")
+    NLM_LOG_INFO("  --seed=value                Set random seed for reproducible experiments")
+    NLM_LOG_INFO("  --debug                     Enable debug mode with detailed logging")
+    NLM_LOG_INFO("")
+    NLM_LOG_INFO("For advanced usage, check documentation in docs/ or README.md")
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Initialize experiment runner
+    auto experimentRunner = std::make_shared<ExperimentRunner>();
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Configure experiment based on mode
+    std::string experimentMode = config->getOr<std::string>(ConfigParams::EXPERIMENT_MODE, "basic");
+    if (experimentMode == "advanced") {
+        NLM_LOG_INFO("Running ADVANCED experiment mode - extended duration with complex learning patterns")
+        // Enhanced experiment settings
+        config->set(ConfigParams::NEURON_COUNT, static_cast<size_t>(2000), ConfigSource::Runtime);
+        config->set(ConfigParams::STRUCTURAL_PLASTICITY_RATE, 0.00005f, ConfigSource::Runtime);
+        config->set(ConfigParams::PRUNING_RATE, 0.000005f, ConfigSource::Runtime);
+        config->set(ConfigParams::WORKING_MEMORY_CAPACITY, 200, ConfigSource::Runtime);
+    } else if (experimentMode == "demo") {
+        NLM_LOG_INFO("Running DEMO experiment mode - quick demonstration with reduced parameters")
+        // Demo mode settings for quick testing
+        config->set(ConfigParams::NEURON_COUNT, static_cast<size_t>(200), ConfigSource::Runtime);
+        config->set(ConfigParams::REGION_COUNT, static_cast<size_t>(1), ConfigSource::Runtime);
+        config->set(ConfigParams::SIMULATION_TIMESTEP, 0.01, ConfigSource::Runtime);
+        config->set(ConfigParams::STRUCTURAL_PLASTICITY_RATE, 0.001f, ConfigSource::Runtime);
+        config->set(ConfigParams::PRUNING_RATE, 0.0001f, ConfigSource::Runtime);
+    }
+    
+    // Configure visualization if enabled
+    bool visualizationEnabled = config->getOr<bool>(ConfigParams::VISUALIZATION_ENABLED, false);
+    if (visualizationEnabled) {
+        double vizInterval = config->getOr<double>(ConfigParams::VISUALIZATION_UPDATE_INTERVAL, 0.1);
+        NLM_LOG_INFO("Visualization enabled with update interval: " + std::to_string(vizInterval) + "s")
+        
+        // Create visualization interface
+        auto visualization = std::make_shared<VisualizationInterface>();
+        visualization->setUpdateInterval(vizInterval);
+        
+        // Register visualization callback
+        brain->registerVisualizationCallback([visualization](const Brain& b) {
+            visualization->update(b);
+        });
+    }
+    
+    // Enable debug mode if requested
+    bool debugMode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--debug" || arg == "-d") {
+            debugMode = true;
+            config->set(ConfigParams::LOG_LEVEL, std::string("debug"), ConfigSource::Runtime);
+            NLM_LOG_INFO("Debug mode enabled - detailed logging active")
+            break;
+        }
+    }
+    
+    if (debugMode) {
+        NLM_LOG_INFO("Debug mode features:")
+        NLM_LOG_INFO("  - Detailed spike event logging")
+        NLM_LOG_INFO("  - Memory system state tracking")
+        NLM_LOG_INFO("  - Plasticity rule debugging")
+        NLM_LOG_INFO("  - Configuration change tracking")
+    }
+    
+    // Set verbose level if provided
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        size_t pos = arg.find("=verbose");
+        if (pos != std::string::npos && arg.substr(0, pos) == "--verbose") {
+            std::string levelStr = arg.substr(pos + 8);
+            try {
+                int level = std::stoi(levelStr);
+                if (level >= 0 && level <= 3) {
+                    NLM_LOG_INFO("Verbose level set to: " + levelStr)
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid verbose level: " + levelStr)
+            }
+        }
+    }
+    
+    // Configure performance mode if specified
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        size_t pos = arg.find("=performance");
+        if (pos != std::string::npos && arg.substr(0, pos) == "--performance") {
+            std::string mode = arg.substr(pos + 12);
+            if (mode == "balanced" || mode == "fast" || mode == "memory") {
+                config->set(ConfigParams::PERFORMANCE_MODE, mode, ConfigSource::Runtime);
+                NLM_LOG_INFO("Performance mode set to: " + mode)
+                
+                // Apply performance optimizations based on mode
+                if (mode == "fast") {
+                    // Fast mode: reduced accuracy, higher speed
+                    config->set(ConfigParams::SIMULATION_TIMESTEP, 0.001, ConfigSource::Runtime);
+                    config->set(ConfigParams::STRUCTURAL_PLASTICITY_RATE, 0.001f, ConfigSource::Runtime);
+                    NLM_LOG_INFO("Fast mode: Optimizing for speed")
+                } else if (mode == "memory") {
+                    // Memory mode: increased accuracy, higher memory usage
+                    config->set(ConfigParams::NEURON_COUNT, static_cast<size_t>(5000), ConfigSource::Runtime);
+                    config->set(ConfigParams::WORKING_MEMORY_CAPACITY, 500, ConfigSource::Runtime);
+                    NLM_LOG_INFO("Memory mode: Optimizing for accuracy")
+                } else {
+                    // Balanced mode: normal settings
+                    config->set(ConfigParams::SIMULATION_TIMESTEP, 0.001, ConfigSource::Runtime);
+                    NLM_LOG_INFO("Balanced mode: Normal performance settings")
+                }
+            } else {
+                NLM_LOG_WARNING("Unknown performance mode: " + mode)
+            }
+        }
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
