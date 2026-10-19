@@ -41,6 +41,10 @@ public:
     // Update structural plasticity
     void update(Brain* brain, class RandomGenerator& rng);
     
+    // Additional methods for eligibility trace management
+    void expireEligibilityTraces(Brain* brain, float decayRate);
+    void updateWithTraceManagement(Brain* brain, class RandomGenerator& rng, float eligibilityDecayRate);
+    
 private:
     struct Impl;
     Impl* pImpl;

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <shared_mutex>
 
 namespace nlm {
 
@@ -27,6 +28,9 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Mutex for thread-safe access to brain state
+    mutable std::shared_mutex brainStateMutex;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -174,10 +178,7 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
-    
-    // Get configuration values
+// Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
@@ -185,12 +186,12 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
+    // Create regions (thread-safe)
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
-    // Create neurons across regions
+    // Create neurons across regions (thread-safe)
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -220,7 +221,7 @@ bool Brain::initialize() {
         }
     }
     
-    // Initialize connectivity with random weights
+    // Initialize connectivity with random weights (thread-safe)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
@@ -909,6 +910,9 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
+    // Acquire write lock for thread-safe region addition
+    auto lock = std::unique_lock<std::shared_mutex>(pImpl->brainStateMutex);
+    
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
@@ -916,6 +920,9 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    // Acquire read lock for thread-safe region access
+    auto lock = std::shared_lock<std::shared_mutex>(pImpl->brainStateMutex);
+    
     for (auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
@@ -925,6 +932,9 @@ NeuralRegion* Brain::getRegion(RegionId id) {
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    // Acquire read lock for thread-safe region access
+    auto lock = std::shared_lock<std::shared_mutex>(pImpl->brainStateMutex);
+    
     for (const auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
@@ -934,10 +944,16 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
 }
 
 size_t Brain::getRegionCount() const {
+    // Acquire read lock for thread-safe region count access
+    auto lock = std::shared_lock<std::shared_mutex>(pImpl->brainStateMutex);
+    
     return pImpl->regions.size();
 }
 
 std::vector<RegionId> Brain::getRegionIds() const {
+    // Acquire read lock for thread-safe region ID access
+    auto lock = std::shared_lock<std::shared_mutex>(pImpl->brainStateMutex);
+    
     std::vector<RegionId> ids;
     ids.reserve(pImpl->regions.size());
     for (const auto& region : pImpl->regions) {

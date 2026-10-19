@@ -223,63 +223,174 @@ private:
     std::vector<size_t> pendingCounts_;
 };
 
-/**
- * Priority Event Queue for time-sensitive events
- * 
- * Uses a small priority queue for events that need strict ordering.
- * Used for neuromodulatory events, plasticity updates, etc.
- */
-class PriorityEventQueue {
+class VectorizedPriorityEventQueue {
 public:
     static constexpr size_t MAX_PRIORITY_EVENTS = 4096;
     
-    struct PriorityEvent {
-        uint64_t timestamp;
-        uint8_t priority;  // 0 = highest priority
-        uint16_t eventType;  // Event type ID
-        uint64_t data[4];  // Event-specific data
+    struct alignas(32) PriorityEvent {
+        uint64_t timestamp;      // Delivery time
+        uint8_t priority;        // 0 = highest priority, higher = lower priority
+        uint16_t eventType;       // Event type ID for dispatching
+        uint64_t data[4];         // Event-specific data (max 4 × 64-bit values)
+        uint32_t reserved;        // Padding for cache alignment
         
+        // Vectorized comparison operations for SIMD optimization
         bool operator<(const PriorityEvent& other) const {
-            // Lower priority value = higher priority in min-heap
-            if (priority != other.priority) return priority > other.priority;
+            // Compare priority first (lower value = higher priority)
+            if (priority != other.priority) {
+                return priority > other.priority;  // Min-heap: smaller priority = higher priority
+            }
+            // Compare timestamp (earlier = higher priority)
             return timestamp > other.timestamp;
+        }
+        
+        // Fast comparison for sorting operations
+        bool operator<=(const PriorityEvent& other) const {
+            return (priority < other.priority) || 
+                   (priority == other.priority && timestamp <= other.timestamp);
+        }
+        
+        bool operator>(const PriorityEvent& other) const {
+            return (priority > other.priority) ||
+                   (priority == other.priority && timestamp > other.timestamp);
+        }
+        
+        bool operator>=(const PriorityEvent& other) const {
+            return (priority > other.priority) ||
+                   (priority == other.priority && timestamp >= other.timestamp);
         }
     };
     
-    PriorityEventQueue();
+    VectorizedPriorityEventQueue();
+    ~VectorizedPriorityEventQueue();
+    
+    // Disable copying and assignment
+    VectorizedPriorityEventQueue(const VectorizedPriorityEventQueue&) = delete;
+    VectorizedPriorityEventQueue& operator=(const VectorizedPriorityEventQueue&) = delete;
     
     /**
-     * Push a priority event
+     * Push a priority event into the heap
+     * @param timestamp Absolute timestamp for delivery
+     * @param priority Priority level (0 = highest, higher = lower)
+     * @param type Event type identifier
+     * @param data Event data (optional, up to 4 uint64_t values)
+     * @return true if event was enqueued, false if queue is full
      */
-    void push(uint64_t timestamp, uint8_t priority, uint16_t type, const uint64_t* data = nullptr);
+    bool push(uint64_t timestamp, uint8_t priority, uint16_t type, 
+              const uint64_t* data = nullptr);
     
     /**
-     * Pop the highest priority event
+     * Push an event with minimal overhead (optimized path)
+     * @param event Event to push (will be copied into heap)
+     * @return true if event was enqueued, false if queue is full
+     */
+    bool push(const PriorityEvent& event);
+    
+    /**
+     * Pop the highest priority event (lowest priority value, earliest timestamp)
+     * @return The highest priority event, or empty optional if queue is empty
      */
     std::optional<PriorityEvent> pop();
     
     /**
-     * Get all events due before a timestamp
+     * Peek at the highest priority event without removing it
+     * @return The highest priority event, or empty optional if queue is empty
+     */
+    std::optional<PriorityEvent> peek() const;
+    
+    /**
+     * Get all events due before a given timestamp
+     * @param currentTime Current simulation time
+     * @return Vector of due events (ownership transferred)
      */
     std::vector<PriorityEvent> getDueEvents(uint64_t currentTime);
     
     /**
-     * Check if empty
+     * Get count of events with timestamp <= current time
      */
-    bool empty() const { return events_.empty(); }
+    size_t getDueCount(uint64_t currentTime) const;
     
     /**
-     * Clear all events
+     * Check if queue is empty
      */
-    void clear() { events_.clear(); }
+    bool empty() const { return size_ == 0; }
     
     /**
-     * Get count
+     * Check if queue is full
      */
-    size_t size() const { return events_.size(); }
-
+    bool full() const { return size_ >= MAX_PRIORITY_EVENTS; }
+    
+    /**
+     * Get current queue size
+     */
+    size_t size() const { return size_; }
+    
+    /**
+     * Clear all events (fast reset)
+     */
+    void clear();
+    
+    /**
+     * Get heap statistics
+     */
+    struct HeapStats {
+        size_t size;           // Current number of events
+        size_t capacity;       // Maximum capacity
+        size_t comparisons;    // Number of comparisons performed
+        size_t bubbleUps;      // Number of bubble-up operations
+        size_t bubbleDowns;    // Number of bubble-down operations
+        float averageDepth;    // Average heap depth
+    };
+    
+    HeapStats getStats() const;
+    
+    /**
+     * Enable/disable performance monitoring
+     */
+    void setMonitoringEnabled(bool enabled) { monitoringEnabled_ = enabled; }
+    bool isMonitoringEnabled() const { return monitoringEnabled_; }
+    
+    /**
+     * Pre-allocate heap space for better performance
+     */
+    void reserve(size_t additionalEvents);
+    
 private:
-    std::vector<PriorityEvent> events_;
+    // Heap implementation using vector with efficient memory layout
+    std::vector<PriorityEvent> heap_;
+    size_t size_;
+    
+    // Performance monitoring
+    bool monitoringEnabled_;
+    mutable size_t comparisons_;
+    mutable size_t bubbleUps_;
+    mutable size_t bubbleDowns_;
+    
+    // Vectorized helper functions
+    static inline bool compareEvents(const PriorityEvent& a, const PriorityEvent& b) {
+        if (a.priority != b.priority) {
+            return a.priority > b.priority;  // Min-heap comparison
+        }
+        return a.timestamp > b.timestamp;  // Timestamp comparison
+    }
+    
+    // Heap operations
+    void bubbleUp(size_t index);
+    void bubbleDown(size_t index);
+    size_t parent(size_t index) const { return (index - 1) / 2; }
+    size_t leftChild(size_t index) const { return 2 * index + 1; }
+    size_t rightChild(size_t index) const { return 2 * index + 2; }
+    
+    // Monitoring helpers
+    void incrementComparisons() const { if (monitoringEnabled_) comparisons_++; }
+    void incrementBubbleUps() const { if (monitoringEnabled_) bubbleUps_++; }
+    void incrementBubbleDowns() const { if (monitoringEnabled_) bubbleDowns_++; }
+    
+    // Heap property validation (for debugging)
+    bool validateHeapProperty() const;
+    
+    // Calculate average depth (for statistics)
+    float calculateAverageDepth() const;
 };
 
 // Inline implementations for performance

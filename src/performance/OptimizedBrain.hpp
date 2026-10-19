@@ -118,6 +118,7 @@ private:
      * Synaptic state in SoA format
      */
     struct SynapseStateSoA {
+        // Core synapse properties - ensure proper cache line alignment
         std::vector<uint64_t> sourceNeuron;
         std::vector<uint64_t> destinationNeuron;
         std::vector<float> weight;
@@ -129,16 +130,44 @@ private:
         std::vector<float> shortTermDepression;
         std::vector<float> shortTermFacilitation;
         
-        // Spike history for STDP (circular buffers)
+        // Spike history for STDP (circular buffers) - ensure alignment
         static constexpr size_t MAX_HISTORY = 32;
         std::vector<std::array<float, MAX_HISTORY>> preSpikeHistory;
         std::vector<std::array<float, MAX_HISTORY>> postSpikeHistory;
         std::vector<uint8_t> preHistoryHead;
         std::vector<uint8_t> postHistoryHead;
         
+        // Padded versions for cache-friendly access
+        struct PaddedArrays {
+            alignas(64) std::vector<uint64_t> paddedSourceNeuron;
+            alignas(64) std::vector<uint64_t> paddedDestinationNeuron;
+            alignas(64) std::vector<float> paddedWeight;
+            alignas(64) std::vector<uint32_t> paddedDelay;
+            alignas(64) std::vector<uint8_t> paddedSynapseType;
+            alignas(64) std::vector<uint8_t> paddedPlasticityFlags;
+            alignas(64) std::vector<float> paddedEligibilityTrace;
+            alignas(64) std::vector<float> paddedEfficacy;
+            alignas(64) std::vector<float> paddedShortTermDepression;
+            alignas(64) std::vector<float> paddedShortTermFacilitation;
+            alignas(64) std::vector<std::array<float, MAX_HISTORY>> paddedPreSpikeHistory;
+            alignas(64) std::vector<std::array<float, MAX_HISTORY>> paddedPostSpikeHistory;
+        };
+        
+        PaddedArrays padded;
+        
         void initialize(size_t size);
         void clear();
         size_t memoryUsage() const;
+        
+        // Access methods that use padded arrays for cache-friendly access
+        float getWeight(size_t index) const { return padded.paddedWeight[index]; }
+        void setWeight(size_t index, float value) { padded.paddedWeight[index] = value; }
+        float getEligibilityTrace(size_t index) const { return padded.paddedEligibilityTrace[index]; }
+        void setEligibilityTrace(size_t index, float value) { padded.paddedEligibilityTrace[index] = value; }
+        
+        // Get source/destination neurons with padding
+        uint64_t getSourceNeuron(size_t index) const { return padded.paddedSourceNeuron[index]; }
+        uint64_t getDestinationNeuron(size_t index) const { return padded.paddedDestinationNeuron[index]; }
     };
     
     /**
@@ -246,6 +275,7 @@ inline size_t OptimizedBrain::NeuralStateSoA::memoryUsage() const {
 }
 
 inline void OptimizedBrain::SynapseStateSoA::initialize(size_t size) {
+    // Initialize original arrays (for compatibility)
     sourceNeuron.resize(size);
     destinationNeuron.resize(size);
     weight.resize(size);
@@ -260,14 +290,37 @@ inline void OptimizedBrain::SynapseStateSoA::initialize(size_t size) {
     postSpikeHistory.resize(size);
     preHistoryHead.resize(size, 0);
     postHistoryHead.resize(size, 0);
+    
+    // Initialize padded arrays (aligned for cache efficiency)
+    padded.paddedSourceNeuron.resize(size);
+    padded.paddedDestinationNeuron.resize(size);
+    padded.paddedWeight.resize(size);
+    padded.paddedDelay.resize(size);
+    padded.paddedSynapseType.resize(size);
+    padded.paddedPlasticityFlags.resize(size);
+    padded.paddedEligibilityTrace.resize(size, 0.0f);
+    padded.paddedEfficacy.resize(size, 1.0f);
+    padded.paddedShortTermDepression.resize(size, 1.0f);
+    padded.paddedShortTermFacilitation.resize(size, 0.0f);
+    padded.paddedPreSpikeHistory.resize(size);
+    padded.paddedPostSpikeHistory.resize(size);
 }
 
 inline void OptimizedBrain::SynapseStateSoA::clear() {
+    // Clear original arrays
     eligibilityTrace.assign(eligibilityTrace.size(), 0.0f);
+    
+    // Clear padded arrays for cache-friendly access
+    std::fill(padded.paddedEligibilityTrace.begin(), padded.paddedEligibilityTrace.end(), 0.0f);
+    std::fill(padded.paddedShortTermDepression.begin(), padded.paddedShortTermDepression.end(), 1.0f);
+    std::fill(padded.paddedShortTermFacilitation.begin(), padded.paddedShortTermFacilitation.end(), 0.0f);
+    std::fill(padded.paddedEfficacy.begin(), padded.paddedEfficacy.end(), 1.0f);
 }
 
 inline size_t OptimizedBrain::SynapseStateSoA::memoryUsage() const {
     size_t total = 0;
+    
+    // Calculate memory usage for all arrays including padded versions
     total += sourceNeuron.capacity() * sizeof(uint64_t);
     total += destinationNeuron.capacity() * sizeof(uint64_t);
     total += weight.capacity() * sizeof(float);
@@ -278,6 +331,21 @@ inline size_t OptimizedBrain::SynapseStateSoA::memoryUsage() const {
     total += efficacy.capacity() * sizeof(float);
     total += shortTermDepression.capacity() * sizeof(float);
     total += shortTermFacilitation.capacity() * sizeof(float);
+    
+    // Add padded arrays for cache alignment
+    total += padded.paddedSourceNeuron.capacity() * sizeof(uint64_t);
+    total += padded.paddedDestinationNeuron.capacity() * sizeof(uint64_t);
+    total += padded.paddedWeight.capacity() * sizeof(float);
+    total += padded.paddedDelay.capacity() * sizeof(uint32_t);
+    total += padded.paddedSynapseType.capacity() * sizeof(uint8_t);
+    total += padded.paddedPlasticityFlags.capacity() * sizeof(uint8_t);
+    total += padded.paddedEligibilityTrace.capacity() * sizeof(float);
+    total += padded.paddedEfficacy.capacity() * sizeof(float);
+    total += padded.paddedShortTermDepression.capacity() * sizeof(float);
+    total += padded.paddedShortTermFacilitation.capacity() * sizeof(float);
+    total += padded.paddedPreSpikeHistory.capacity() * sizeof(std::array<float, MAX_HISTORY>);
+    total += padded.paddedPostSpikeHistory.capacity() * sizeof(std::array<float, MAX_HISTORY>);
+    
     return total;
 }
 

@@ -77,24 +77,59 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
     return INVALID_SYNAPSE_ID;
 }
 
-bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
+void StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     if (!brain || synapse == INVALID_SYNAPSE_ID) {
-        return false;
+        return;
     }
     
     // Search all regions for the synapse
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
+            // Reset eligibility trace to prevent future plasticity on removed synapse
+            syn->setEligibilityTrace(0.0f);
+            
+            // Mark the synapse for removal by zeroing its weight
             // Actual removal would require modifying the region's synapse storage
             syn->setWeight(0.0f);
             ++pImpl->totalSynapsesPruned;
-            return true;
+            return;
         }
     }
+}
+
+// Eligibility trace expiration mechanism
+void StructuralPlasticity::expireEligibilityTraces(Brain* brain, float decayRate) {
+    if (!brain || decayRate <= 0.0f) {
+        return;
+    }
     
-    return false;
+    // Decay eligibility traces for all synapses in all regions
+    for (auto& region : brain->getRegions()) {
+        for (auto& syn : region->getSynapses()) {
+            // Decay eligibility traces based on time since last plasticity event
+            float currentTrace = syn->getEligibilityTrace();
+            float decayedTrace = currentTrace * std::exp(-decayRate);
+            
+            // Reset to zero if below threshold to prevent numerical drift
+            if (std::abs(decayedTrace) < 1e-6f) {
+                decayedTrace = 0.0f;
+            }
+            
+            syn->setEligibilityTrace(decayedTrace);
+        }
+    }
+}
+
+// Additional update method with eligibility trace management
+void StructuralPlasticity::updateWithTraceManagement(Brain* brain, RandomGenerator& rng, float eligibilityDecayRate) {
+    // First, update structural plasticity
+    update(brain, rng);
+    
+    // Then, manage eligibility traces
+    if (eligibilityDecayRate > 0.0f) {
+        expireEligibilityTraces(brain, eligibilityDecayRate);
+    }
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
