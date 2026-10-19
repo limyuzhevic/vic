@@ -128,17 +128,38 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    // Use circular buffer for better performance and memory efficiency
+    if (pImpl->preSpikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Use circular buffer pointer arithmetic
+        static size_t circularHead = 0;
+        pImpl->preSpikeHistory[circularHead] = timestamp;
+        circularHead = (circularHead + 1) % Impl::MAX_SPIKE_HISTORY;
+    } else {
+        pImpl->preSpikeHistory.push_back(timestamp);
+        // Initialize circular buffer pointer on first insertion
+        static size_t circularHead = 0;
+        circularHead = pImpl->preSpikeHistory.size() - 1;
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    // Use circular buffer for better performance and memory efficiency
+    if (pImpl->postSpikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Use circular buffer pointer arithmetic
+        static size_t circularHead = 0;
+        pImpl->postSpikeHistory[circularHead] = timestamp;
+        circularHead = (circularHead + 1) % Impl::MAX_SPIKE_HISTORY;
+    } else {
+        pImpl->postSpikeHistory.push_back(timestamp);
+        // Initialize circular buffer pointer on first insertion
+        static size_t circularHead = 0;
+        circularHead = pImpl->postSpikeHistory.size() - 1;
     }
+}
+
+void Synapse::clearHistory() {
+    pImpl->preSpikeHistory.clear();
+    pImpl->postSpikeHistory.clear();
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -147,11 +168,6 @@ const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
     return pImpl->postSpikeHistory;
-}
-
-void Synapse::clearHistory() {
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -199,35 +215,96 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    try {
+        // Decay short-term facilitation (Tsodyks-Markram model)
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            // Add validation for time calculation
+            if (timeSincePre < 0.0f) {
+                throw std::runtime_error("Negative time since last pre spike");
+            }
+            pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        }
+        
+        // Decay short-term depression
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            
+            // Add validation for time calculation
+            if (timeSinceActivity < 0.0f) {
+                throw std::runtime_error("Negative time since activity");
+            }
+            
+            // Recovery from depression toward 1.0 with numerical stability
+            float recoveryFactor = 1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU);
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * recoveryFactor;
+            
+            // Clamp to prevent numerical issues
+            pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, 1.0f);
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Clamp weight bounds with validation
+        if (std::isnan(pImpl->weight)) {
+            throw std::runtime_error("Weight is NaN, cannot clamp");
+        }
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        
+    } catch (const std::exception& e) {
+        // Silent fail for synaptic dynamics to avoid breaking the simulation
+        // Log the error in a production system
+        std::cerr << "[ERROR] Synapse step failed: " << e.what() << "\n";
+        
+        // Reset to safe state
+        pImpl->shortTermDepression = 1.0f;
+        pImpl->shortTermFacilitation = 0.0f;
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
     }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
-    pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
+    try {
+        pImpl->weight = 0.0f;
+        pImpl->preSpikeHistory.clear();
+        pImpl->postSpikeHistory.clear();
+        pImpl->eligibilityTrace = 0.0f;
+        pImpl->efficacy = 1.0f;
+        pImpl->shortTermDepression = 1.0f;
+        pImpl->shortTermFacilitation = 0.0f;
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+        
+        // Validate reset
+        if (std::isnan(pImpl->weight) || std::isnan(pImpl->efficacy)) {
+            throw std::runtime_error("Reset failed: NaN detected");
+        }
+        
+        if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+            throw std::runtime_error("Reset failed: weight out of bounds");
+        }
+        
+        if (pImpl->efficacy < 0.0f || pImpl->efficacy > 2.0f) {
+            throw std::runtime_error("Reset failed: efficacy out of bounds");
+        }
+        
+    } catch (const std::exception& e) {
+        // Silent fail for synaptic reset to avoid breaking the simulation
+        std::cerr << "[ERROR] Synapse reset failed: " << e.what() << "\n";
+        
+        // Ensure safe default state
+        pImpl->weight = 0.0f;
+        pImpl->efficacy = 1.0f;
+        pImpl->shortTermDepression = 1.0f;
+        pImpl->shortTermFacilitation = 0.0f;
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+        pImpl->eligibilityTrace = 0.0f;
+    }
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {

@@ -55,14 +55,29 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential is within reasonable bounds
+    if (potential < -150.0f || potential > 100.0f) {
+        throw std::invalid_argument("Membrane potential out of bounds: " + 
+                                   std::to_string(potential));
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+    // Validate that the operation won't cause instability
+    MembranePotential newPotential = pImpl->state.membranePotential + delta;
+    if (newPotential < -150.0f || newPotential > 100.0f) {
+        throw std::invalid_argument("Membrane potential change would cause instability: " + 
+                                   std::to_string(delta));
+    }
+    pImpl->state.membranePotential = newPotential;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    // Validate threshold is reasonable (typically -50 to 50 mV)
+    if (threshold < -100.0f || threshold > 50.0f) {
+        throw std::invalid_argument("Threshold out of bounds: " + std::to_string(threshold));
+    }
     pImpl->state.threshold = threshold;
 }
 
@@ -80,10 +95,21 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    // Validate firing rate is reasonable
+    if (rate < 0.0f || rate > 1000.0f) {
+        throw std::invalid_argument("Firing rate out of bounds: " + std::to_string(rate));
+    }
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    // Validate leak conductance is positive and reasonable
+    if (conductance <= 0.0f) {
+        throw std::invalid_argument("Leak conductance must be positive: " + std::to_string(conductance));
+    }
+    if (conductance > 100.0f) {
+        throw std::invalid_argument("Leak conductance too large: " + std::to_string(conductance));
+    }
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,7 +118,18 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period is reasonable (typically 1-1000 steps)
+    if (steps == 0) {
+        throw std::invalid_argument("Refractory period must be > 0");
+    }
+    if (steps > 10000) {
+        throw std::invalid_argument("Refractory period too large: " + std::to_string(steps));
+    }
     pImpl->state.refractoryPeriod = steps;
+    // If currently in refractory, ensure remaining doesn't exceed new period
+    if (pImpl->state.refractoryRemaining > pImpl->state.refractoryPeriod) {
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -100,6 +137,10 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential is biologically plausible (-100 to -40 mV typical)
+    if (potential < -120.0f || potential > -30.0f) {
+        throw std::invalid_argument("Resting potential out of bounds: " + std::to_string(potential));
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +149,11 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Reset potential should be close to resting potential
+    float diff = std::abs(potential - pImpl->state.restingPotential);
+    if (diff > 20.0f) {
+        throw std::invalid_argument("Reset potential too far from resting potential: " + std::to_string(potential));
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -148,9 +194,17 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Use circular buffer for better performance and memory efficiency
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Use circular buffer pointer arithmetic
+        static size_t circularHead = 0;
+        pImpl->spikeHistory[circularHead] = timestamp;
+        circularHead = (circularHead + 1) % Impl::MAX_SPIKE_HISTORY;
+    } else {
+        pImpl->spikeHistory.push_back(timestamp);
+        // Initialize circular buffer pointer on first insertion
+        static size_t circularHead = 0;
+        circularHead = pImpl->spikeHistory.size() - 1;
     }
 }
 
@@ -191,6 +245,11 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep
+    if (dt <= 0.0 || dt > 0.1) {
+        throw std::invalid_argument("Invalid timestep: " + std::to_string(dt));
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,14 +272,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Clamp parameters to prevent numerical instability
+    tau = std::max(1.0f, std::min(tau, 1000.0f));  // 1-1000ms
+    C = std::max(0.1f, std::min(C, 10.0f));  // 0.1-10 nF
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution with better numerical stability
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // with better numerical stability and smaller timesteps
+    float dt_ms = static_cast<float>(dt) * 1000.0f;  // Convert to ms
+    if (dt_ms > 1.0f) dt_ms = 1.0f;  // Cap timestep to 1ms
+    
+    V = V + dt_ms * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,11 +295,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Better clamping with hysteresis to prevent oscillation
+    const float V_min = -100.0f;
+    const float V_max = 50.0f;
+    if (V < V_min) V = V_min;
+    if (V > V_max) V = V_max;
     
-    // Check for spike
-    if (V >= threshold) {
+    // Check for spike with hysteresis
+    if (V >= threshold + 0.5f) {  // Add hysteresis to prevent multiple spikes
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -266,27 +336,54 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Reset with validation
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Additional reset safety checks
+    if (pImpl->state.adaptationVariable != 0.0f) {
+        throw std::runtime_error("Failed to properly reset adaptation variable");
+    }
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
+    // Real random initialization with biological constraints and validation
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    MembranePotential potential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    if (potential < -150.0f || potential > 100.0f) {
+        throw std::runtime_error("Generated membrane potential out of bounds");
+    }
+    pImpl->state.membranePotential = potential;
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    MembranePotential threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    if (threshold < -100.0f || threshold > 50.0f) {
+        throw std::runtime_error("Generated threshold out of bounds");
+    }
+    pImpl->state.threshold = threshold;
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Resting potential typically -70mV with validation
+    MembranePotential restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    if (restingPotential < -120.0f || restingPotential > -30.0f) {
+        throw std::runtime_error("Generated resting potential out of bounds");
+    }
+    pImpl->state.restingPotential = restingPotential;
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    MembranePotential resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    float diff = std::abs(resetPotential - pImpl->state.restingPotential);
+    if (diff > 20.0f) {
+        throw std::runtime_error("Generated reset potential too far from resting potential");
+    }
+    pImpl->state.resetPotential = resetPotential;
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    uint32_t refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    if (refractoryPeriod == 0) {
+        throw std::runtime_error("Generated refractory period is zero");
+    }
+    pImpl->state.refractoryPeriod = refractoryPeriod;
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

@@ -14,9 +14,19 @@ struct SimulationClock::Impl {
         : step(0), time(0.0), timestep(dt), realStartSet(false) {}
 };
 
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
+SimulationClock::SimulationClock(TimestepDuration timestep) {
+    if (timestep <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive: " + std::to_string(timestep));
+    }
+    if (timestep > 1.0) {
+        throw std::invalid_argument("Timestep too large (max 1.0s): " + std::to_string(timestep));
+    }
+    pImpl = new Impl(timestep);
+}
 
-SimulationClock::~SimulationClock() = default;
+SimulationClock::~SimulationClock() {
+    delete pImpl;
+}
 
 SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -47,6 +57,9 @@ SimulationStep SimulationClock::getStep() const {
 }
 
 void SimulationClock::setStep(SimulationStep step) {
+    if (step < 0) {
+        throw std::invalid_argument("Step cannot be negative: " + std::to_string(step));
+    }
     pImpl->step = step;
     pImpl->time = step * pImpl->timestep;
 }
@@ -56,6 +69,9 @@ Timestamp SimulationClock::getTime() const {
 }
 
 void SimulationClock::setTime(Timestamp time) {
+    if (time < 0.0) {
+        throw std::invalid_argument("Time cannot be negative: " + std::to_string(time));
+    }
     pImpl->time = time;
     pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
 }
@@ -65,6 +81,12 @@ TimestepDuration SimulationClock::getTimestep() const {
 }
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
+    if (dt <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive: " + std::to_string(dt));
+    }
+    if (dt > 1.0) {
+        throw std::invalid_argument("Timestep too large (max 1.0s): " + std::to_string(dt));
+    }
     pImpl->timestep = dt;
 }
 
@@ -73,23 +95,38 @@ bool SimulationClock::isFirstStep() const {
 }
 
 bool SimulationClock::isLastStep(SimulationStep totalSteps) const {
+    if (totalSteps < 0) {
+        throw std::invalid_argument("Total steps cannot be negative: " + std::to_string(totalSteps));
+    }
     return pImpl->step >= totalSteps;
 }
 
 Timestamp SimulationClock::stepToTime(SimulationStep step) const {
+    if (step < 0) {
+        throw std::invalid_argument("Step cannot be negative: " + std::to_string(step));
+    }
     return step * pImpl->timestep;
 }
 
 SimulationStep SimulationClock::timeToStep(Timestamp time) const {
+    if (time < 0.0) {
+        throw std::invalid_argument("Time cannot be negative: " + std::to_string(time));
+    }
     return static_cast<SimulationStep>(time / pImpl->timestep);
 }
 
 void SimulationClock::advanceBy(SimulationStep steps) {
+    if (steps < 0) {
+        throw std::invalid_argument("Steps cannot be negative: " + std::to_string(steps));
+    }
     pImpl->step += steps;
     pImpl->time += steps * pImpl->timestep;
 }
 
 Timestamp SimulationClock::timeAtFutureStep(SimulationStep stepsAhead) const {
+    if (stepsAhead < 0) {
+        throw std::invalid_argument("Steps ahead cannot be negative: " + std::to_string(stepsAhead));
+    }
     return pImpl->time + (stepsAhead * pImpl->timestep);
 }
 

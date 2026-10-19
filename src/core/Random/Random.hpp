@@ -75,21 +75,29 @@ public:
     // Fill range with random bytes
     void fillBytes(void* data, size_t size);
     
-    // Get underlying engine for advanced use
-    std::mt19937_64& engine();
-    const std::mt19937_64& engine() const;
+    // Additional distributions
+    uint32_t gamma(double shape, double scale);
+    uint32_t chiSquare(uint32_t degreesOfFreedom);
+    uint32_t exponential(float lambda);
+    float gamma(float shape, float scale);
+    float chiSquare(uint32_t degreesOfFreedom);
+    double exponential(double lambda);
     
-    // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    // Thread-safe random number generation
+    uint32_t random32();
+    uint64_t random64();
     
-    // Operator for compatibility with std functions
-    result_type operator()() { return static_cast<result_type>(engine()()); }
+    // Fisher-Yates shuffle algorithm
+    void shuffle(uint32_t* array, uint64_t n);
+    void shuffle(float* array, uint64_t n);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Batch random number generation for performance
+    void fillUniform32(uint32_t* buffer, size_t count, uint32_t min, uint32_t max);
+    void fillUniformFloat(float* buffer, size_t count, float min, float max);
+    
+    // Improved seed management
+    void seedFromSystem();
+    void seedFromTime();
 
 // Template implementations
 template<typename Container>

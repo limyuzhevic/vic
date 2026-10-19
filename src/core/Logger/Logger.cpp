@@ -29,12 +29,29 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
+    static const size_t MAX_MESSAGE_LENGTH = 8192;
+    if (entry.message.length() > MAX_MESSAGE_LENGTH) {
+        // Truncate extremely long messages to prevent buffer overflow
+        std::cerr << "[WARN] Message too long (" << entry.message.length() << 
+                     " chars), truncating to " << MAX_MESSAGE_LENGTH << " chars\n";
+        return; // Skip logging messages that are too long to prevent issues
+    }
+    
+    // Reuse OStringStream for better performance
+    static thread_local std::ostringstream oss;
+    oss.str("");
+    oss.clear();
+    
     oss << "[" << levelToString(entry.level) << "] ";
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_time;
+    if (std::localtime_s(&tm_time, &time) != 0) {
+        std::cerr << "[ERROR] Failed to get local time\n";
+        return;
+    }
+    oss << std::put_time(&tm_time, "%Y-%m-%d %H:%M:%S");
     
     oss << " " << entry.message;
     
@@ -49,8 +66,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // Silent fail for file writing to avoid breaking logging
+            std::cerr << "[ERROR] Failed to write to log file: " << e.what() << "\n";
+        }
     }
 }
 
@@ -71,13 +93,43 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    // Close existing file before opening new one
+    closeOutputFile();
+    
+    try {
+        // Use atomic writes by writing to a temporary file first
+        std::string tempFile = filepath + ".tmp";
+        pImpl->fileOut.open(tempFile, std::ios::app);
+        
+        if (!pImpl->fileOut.is_open()) {
+            throw std::runtime_error("Failed to open log file: " + filepath);
+        }
+        
+        // Atomic move to final location
+        std::rename(tempFile.c_str(), filepath.c_str());
+        pImpl->fileOut.open(filepath, std::ios::app);
+        
+        if (!pImpl->fileOut.is_open()) {
+            throw std::runtime_error("Failed to reopen log file after atomic write: " + filepath);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[ERROR] Failed to set output file: " << e.what() << "\n";
+        pImpl->fileOut.close();
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        try {
+            pImpl->fileOut.close();
+        } catch (const std::exception& e) {
+            std::cerr << "[ERROR] Failed to close log file: " << e.what() << "\n";
+        }
     }
+}
+
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {

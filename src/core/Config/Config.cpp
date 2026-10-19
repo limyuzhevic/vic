@@ -19,27 +19,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Validate filepath before attempting to open
+        if (filepath.empty()) {
+            throw std::invalid_argument("Empty filepath provided");
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open config file: " + filepath);
+        }
+        
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(file, line)) {
+            lineNumber++;
+            
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                throw std::runtime_error("Invalid config format at line " + std::to_string(lineNumber) + ": missing '='");
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty()) {
+                throw std::runtime_error("Empty key at line " + std::to_string(lineNumber));
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -50,9 +63,14 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log error and return failure
+        std::cerr << "[ERROR] Config loadFromFile failed: " << e.what() << "\n";
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
