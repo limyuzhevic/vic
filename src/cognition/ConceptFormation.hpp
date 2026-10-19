@@ -125,10 +125,16 @@ public:
     bool isNovel(const std::vector<float>& pattern,
                  float similarityThreshold = 0.7f) const;
 
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
-    // Clear all concepts
+    // Get concepts discovered in recent steps
+    std::vector<size_t> getRecentConcepts() const;
+    
+    // Process current state to detect concept formation
+    void processCurrentState(const std::vector<float>& currentPattern);
+    
+    // Get concept for pattern (alias for findConceptForPattern)
+    size_t getConceptForPattern(const std::vector<float>& pattern) const {
+        return findConceptForPattern(pattern);
+    }
     void clear();
 
     // Get generalization ability (can concept handle variations?)

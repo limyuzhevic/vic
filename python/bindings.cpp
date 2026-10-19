@@ -29,66 +29,52 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // Helper function to create repetitive ID class bindings
+    auto bindIdClass = [&m](const std::string& name, const std::string& doc) {
+        py::class_<NeuronId>(m, name.c_str(), doc.c_str())
+            .def(py::init<>())
+            .def(py::init<uint64_t>(), py::arg("value"))
+            .def_readwrite("value", &NeuronId::value)
+            .def("index", &NeuronId::index)
+            .def("__eq__", &NeuronId::operator==)
+            .def("__ne__", &NeuronId::operator!=)
+            .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+            .def("__repr__", [](const NeuronId& id) {
+                return "<" + name + ": " + std::to_string(id.value) + ">";
+            });
+    };
+    
+    // Helper function to create repetitive enum bindings
+    auto bindEnum = [&m](const std::string& name, const std::string& doc, const std::vector<std::pair<std::string, int>>& values) {
+        py::enum_<NeuronType> enumClass(m, name.c_str(), doc.c_str());
+        for (const auto& value : values) {
+            enumClass.value(value.first, static_cast<NeuronType>(value.second));
+        }
+        enumClass.export_values();
+    };
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+    // Create ID classes using helper function
+    bindIdClass("NeuronId", "Unique identifier for a neuron");
+    bindIdClass("SynapseId", "Unique identifier for a synapse");
+    bindIdClass("RegionId", "Unique identifier for a brain region");
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+    // Create enum classes using helper function
+    bindEnum("NeuronType", "Neuron type enumeration", {
+        {"Excitatory", NeuronType::Excitatory},
+        {"Inhibitory", NeuronType::Inhibitory},
+        {"Modulatory", NeuronType::Modulatory},
+        {"Sensory", NeuronType::Sensory},
+        {"Motor", NeuronType::Motor},
+        {"Internal", NeuronType::Internal}
+    });
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+    bindEnum("SynapseType", "Synapse type enumeration", {
+        {"Excitatory", SynapseType::Excitatory},
+        {"Inhibitory", SynapseType::Inhibitory},
+        {"Modulatory", SynapseType::Modulatory},
+        {"Electrical", SynapseType::Electrical},
+        {"GapJunction", SynapseType::GapJunction}
+    });
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
@@ -142,6 +128,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Config class - enhanced with better error handling
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -154,12 +141,44 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (value) return py::object(*value);
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"), "Get configuration value")
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            auto typeName = defaultValue.getattr("__class__").attr("__name__").cast<std::string>();
+            if (typeName == "int") {
+                return self.getOr<int>(key, defaultValue.cast<int>());
+            } else if (typeName == "float") {
+                return self.getOr<float>(key, defaultValue.cast<float>());
+            } else if (typeName == "string") {
+                return self.getOr<std::string>(key, defaultValue.cast<std::string>());
+            } else if (typeName == "bool") {
+                return self.getOr<bool>(key, defaultValue.cast<bool>());
+            }
+            return self.getOr<std::string>(key, "");
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            auto typeName = value.getattr("__class__").attr("__name__").cast<std::string>();
+            if (typeName == "int") {
+                self.set(key, value.cast<int>());
+            } else if (typeName == "float") {
+                self.set(key, value.cast<float>());
+            } else if (typeName == "string") {
+                self.set(key, value.cast<std::string>());
+            } else if (typeName == "bool") {
+                self.set(key, value.cast<bool>());
+            } else {
+                throw py::type_error("Unsupported type for configuration value");
+            }
+        }, py::arg("key"), py::arg("value"), "Set configuration value")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -181,7 +200,17 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("__len__", [](const Vision& self) {
+            return self.getData().size();
+        })
+        .def("__getitem__", [](const Vision& self, size_t index) {
+            const auto& data = self.getData();
+            if (index < data.size()) {
+                return data[index];
+            }
+            throw py::index_error("Vision data index out of range");
+        });
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -189,13 +218,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+             "Set sample rate")
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("__len__", [](const Audio& self) {
+            return self.getNumSamples();
+        });
 
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
-        .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
+    .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
@@ -203,11 +234,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<ActionType>(), py::arg("type"))
         .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
         .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("setType", &Action::setType, py::arg("type"), "Set action type")
+        .def("getParameters", [](const Action& self) {
+            return self.getParameters();
+        })
+        .def("setParameters", &Action::setParameters, py::arg("params"), "Set parameters")
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())

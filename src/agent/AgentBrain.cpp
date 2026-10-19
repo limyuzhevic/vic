@@ -21,6 +21,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
+    // NOTE: These are raw pointers to neurons owned by the brain.
+    // Safety: Must ensure brain_ is not reset while these pointers are used.
+    // Recommended usage: Don't call reset() on brain while this AgentBrain is active.
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {

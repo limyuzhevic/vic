@@ -14,6 +14,20 @@ That's it! NLM simulates all of this.
 
 ---
 
+## What We've Improved
+
+**Phase 6 Integration Complete!** NLM now has a fully integrated artificial brain with:
+
+- **Memory Systems**: Working memory, episodic memory, and associative memory all working together
+- **Prediction System**: Real-time prediction of sensory states with prediction error minimization
+- **Concept Formation**: Discovers patterns and forms abstract concepts from experience
+- **Advanced Neuromodulation**: Dopamine, curiosity, and reward signals work together
+- **Developmental Stages**: Brain matures through Initial → CriticalPeriod → Maturation → Adult stages
+- **Enhanced Python API**: Better error handling, type conversion, and Pythonic interfaces
+- **CLI Tools**: Command-line tools for running simulations and managing configurations
+
+---
+
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
@@ -69,6 +83,82 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Advanced Agent with Learning (NEW!)
+
+```python
+import pynlm
+
+def run_advanced_agent_simulation(num_steps=500):
+    """Run a complete agent simulation with learning and development."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    config.set("random_seed", 12345)  # Reproducible experiments
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)  # Start in center
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable advanced features (NEW!)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage().name}")
+    
+    return brain, agent, world
+
+# Run the simulation
+brain, agent, world = run_advanced_agent_simulation(1000)
 ```
 
 ---
@@ -143,7 +233,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (NEW!)
 
 ```python
 # These are all optional:
@@ -152,6 +242,39 @@ agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
+
+---
+
+## Command Line Tools (NEW!)
+
+NLM now includes command-line tools for:
+
+### Basic Simulation
+```bash
+python nlm-cli.py run-simulation --steps 1000 --verbose
+```
+
+### Phase 6 Integration Demo
+```bash
+python nlm-cli.py phase6-demo --world-size 30 --steps 500
+```
+
+### Configuration Management
+```bash
+# Load configuration
+python nlm-cli.py config load my_config.cfg
+
+# Save configuration  
+python nlm-cli.py config save my_config.cfg
+
+# Set configuration value
+python nlm-cli.py config set brain.neuron_count 2000
+
+# Show current configuration
+python nlm-cli.py config show
+```
+
+See the `nlm-cli.py` file for more details and additional options.
 
 ---
 
@@ -221,7 +344,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (Enhanced)
 
 ```python
 import pynlm
@@ -285,13 +408,26 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Advanced features not working"**
+- Make sure you're calling `agent.enableRewardModulation(True)` etc.
+- Check that you're providing proper sensory input
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read HOW_TO_USE.md** for more detailed technical information
+2. **Experiment with different configurations** - try different neuron counts, learning rates, etc.
+3. **Try the command-line tools** - use `nlm-cli.py` for easier simulation management
+4. **Create your own experiments** - combine the features to test different scenarios
+
+The enhanced Python API now includes:
+- Better error handling with descriptive Python exceptions
+- Type conversion for seamless data exchange
+- Support for advanced features like prediction systems and concept formation
+- Command-line tools for easier simulation management
+
+That's it! You're now ready to use NLM Phase 6 with all its advanced capabilities.
+

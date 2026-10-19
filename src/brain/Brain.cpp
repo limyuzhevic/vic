@@ -94,10 +94,7 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
+        uint64_t seed = config->getOr<uint64_t>("random_seed", 123456789);  // Better default seed
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
@@ -243,7 +240,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +508,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get current sensory observation for prediction
+        // This would normally come from the environment/world
+        SensoryInput dummyObservation;
+        std::vector<float> dummyVision(16 * 16, 0.0f); // 16x16 vision
+        dummyObservation.setVision(dummyVision);
+        
+        // Make prediction for next timestep
+        auto prediction = pImpl->predictionSystem->predictNextState(dummyObservation);
+        
+        // Update predictions based on sensory input
+        if (prediction) {
+            pImpl->predictionSystem->updatePredictions(*prediction, dummyObservation);
+        }
+        
+        // Train prediction system with current observation
+        pImpl->predictionSystem->train(dummyObservation);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +542,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires encoding current sensory and neural state
+        
+        // Collect current neural activity
+        std::vector<float> currentActivityPatterns;
+        
+        // Sample neural activity from different regions
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                float activity = pop->getActivityLevel();
+                if (activity > 0.01f) {  // Only include active populations
+                    currentActivityPatterns.push_back(activity);
+                }
+            }
+        }
+        
+        if (!currentActivityPatterns.empty()) {
+            // Encode current state as a concept pattern
+            // This is a simplified version - real concept formation would be more complex
+            pImpl->conceptFormation->processCurrentState(currentActivityPatterns);
+            
+            // Check if new concepts have formed
+            auto newConcepts = pImpl->conceptFormation->getRecentConcepts();
+            if (!newConcepts.empty()) {
+                NLM_LOG_INFO("New concepts formed: " + std::to_string(newConcepts.size()));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

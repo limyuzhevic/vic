@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 
@@ -14,11 +15,15 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Initialize with brain for neural integration
+    void initialize(Brain* brain);
+    
+    // Make prediction for next timestep based on current neural activity
+    // Uses predictive coding with prediction error minimization
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
+    // Computes prediction error and updates internal models
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
@@ -31,8 +36,15 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model with new observation
+    // Updates internal predictive models based on experience
     void train(const SensoryInput& observation);
+    
+    // Update prediction system for new timestep
+    void update(double timestep);
+    
+    // Get most active prediction neurons
+    std::vector<NeuronId> getActivePredictionNeurons(size_t count) const;
     
 private:
     struct Impl;
