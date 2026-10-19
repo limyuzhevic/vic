@@ -87,6 +87,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Create a concrete SensoryInput from the percept for working memory integration
+    // We'll use InternalSignals since it can handle generic sensor values
+    auto tempInput = std::make_unique<InternalSignals>();
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -94,6 +98,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+            
+            // Collect vision values for working memory (first 8 for compact representation)
+            if (i < 8) {
+                tempInput->addSignal(vision[i]);
+            }
         }
     }
     
@@ -103,6 +112,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+            
+            // Collect touch values
+            tempInput->addSignal(touch[i]);
         }
     }
     
@@ -112,6 +124,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+            
+            // Collect internal values
+            tempInput->addSignal(intern[i]);
         }
     }
     
@@ -121,7 +136,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+            
+            // Collect proprioception values
+            tempInput->addSignal(proprio[i]);
         }
+    }
+    
+    // Send sensory input to brain for working memory storage
+    if (tempInput && tempInput->getDimensions() > 0) {
+        brain_->receiveSensoryInput(*tempInput);
     }
     
     // Compute novelty (difference from previous vision)
