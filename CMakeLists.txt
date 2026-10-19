@@ -29,6 +29,11 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CommandSystem/CommandSystem.cpp
+    src/core/PerformanceMonitor/PerformanceMonitor.cpp
+    src/core/ErrorHandling/ErrorHandling.cpp
+    src/core/DevelopmentTesting/DevelopmentTesting.cpp
+    src/core/DevelopmentTesting/DevelopmentTestingUtilities.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -90,6 +95,10 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/CommandSystem>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/PerformanceMonitor>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/ErrorHandling>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/DevelopmentTesting>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)

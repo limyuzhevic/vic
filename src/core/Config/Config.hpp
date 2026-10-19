@@ -78,6 +78,14 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Convenience methods for common types
+    template<typename T>
+    void set(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type conversion helpers
+    template<typename T>
+    static std::string getTypeName();
+    
     // Check existence
     bool has(const std::string& key) const;
     
