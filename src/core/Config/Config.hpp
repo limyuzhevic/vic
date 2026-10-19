@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <chrono>
+#include <sstream>
+#include <ctime>
 
 namespace nlm {
 
@@ -28,7 +33,9 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Template,
+    Encrypted
 };
 
 // Configuration entry
@@ -37,10 +44,45 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string validationError;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), validationError() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), validationError() {}
+};
+
+// Schema validation result
+struct ValidationResult {
+    bool isValid;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    ValidationResult() : isValid(true) {}
+    ValidationResult(bool valid, const std::vector<std::string>& errs, const std::vector<std::string>& warns = {})
+        : isValid(valid), errors(errs), warnings(warns) {}
+};
+
+// Configuration change record
+struct ConfigChangeRecord {
+    std::chrono::system_clock::time_point timestamp;
+    std::string key;
+    ConfigValue oldValue;
+    ConfigValue newValue;
+    ConfigSource source;
+    std::string description;
+    
+    ConfigChangeRecord(const std::string& k, const ConfigValue& oldVal, const ConfigValue& newVal, 
+                      ConfigSource src, const std::string& desc = "")
+        : key(k), oldValue(oldVal), newValue(newVal), source(src), description(desc) {
+        timestamp = std::chrono::system_clock::now();
+    }
+};
+
+// Configuration monitor interface
+class ConfigMonitor {
+public:
+    virtual ~ConfigMonitor() = default;
+    virtual void onConfigurationChanged(const std::string& key, const ConfigValue& oldValue, const ConfigValue& newValue, ConfigSource source) = 0;
 };
 
 // Main configuration class
@@ -92,6 +134,54 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // ========== ADVANCED CONFIGURATION MANAGEMENT ==========
+    
+    // Schema validation
+    bool hasValidSchema() const;
+    std::string getSchema() const;
+    ValidationResult validateConfiguration() const;
+    void setValidationEnabled(bool enabled);
+    bool isValidationEnabled() const;
+    std::vector<std::string> getValidationErrors() const;
+    void clearValidationErrors();
+    
+    // Configuration templates
+    size_t getTemplateCount() const;
+    std::vector<std::string> getTemplateNames() const;
+    std::shared_ptr<Config> getTemplate(const std::string& templateName) const;
+    bool addTemplate(const std::string& templateName, const Config& templateConfig);
+    bool removeTemplate(const std::string& templateName);
+    bool loadTemplate(const std::string& templateName, const std::string& filepath);
+    
+    // Configuration monitoring
+    bool hasMonitor() const;
+    std::shared_ptr<ConfigMonitor> getMonitor() const;
+    void setMonitor(std::shared_ptr<ConfigMonitor> monitor);
+    void onConfigurationChanged(const std::string& key, const ConfigValue& oldValue, const ConfigValue& newValue, ConfigSource source);
+    std::vector<ConfigChangeRecord> getConfigurationHistory() const;
+    std::vector<ConfigChangeRecord> getRecentChanges(size_t maxChanges = 10) const;
+    bool rollback(size_t changeIndex);
+    std::string getDifferences(const Config& otherConfig) const;
+    
+    // Configuration comparison
+    static std::string compareConfigurations(const Config& config1, const Config& config2);
+    static std::string getConfigurationDifferences(const Config& config1, const Config& config2);
+    static void mergeConfigurations(const Config& config1, const Config& config2, Config& result);
+    
+    // Configuration encryption/security
+    std::string encryptConfiguration(const std::string& key) const;
+    bool decryptConfiguration(const std::string& encryptedData, const std::string& key);
+    bool validateSignature(const std::string& signature, const std::string& data) const;
+    void setEncryptionKey(const std::string& key);
+    std::string getEncryptionStatus() const;
+    
+    // Configuration export/import
+    bool exportConfiguration(const std::string& filepath, const std::string& format = "json") const;
+    bool importConfiguration(const std::string& filepath, const std::string& format = "json");
+    std::vector<std::string> getExportFormats() const;
+    void setExportPath(const std::string& path);
+    std::string getExportPath() const;
     
 private:
     struct Impl;

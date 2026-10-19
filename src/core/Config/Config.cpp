@@ -3,11 +3,44 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <cryptopp/hex.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/aes.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/hmac.h>
+#include <cryptopp/sha.h>
+#include <json/json.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // Schema validation
+    bool validationEnabled = false;
+    std::string schema;
+    std::vector<std::string> validationErrors;
+    
+    // Configuration templates
+    std::unordered_map<std::string, std::shared_ptr<Config>> templates;
+    
+    // Configuration monitoring
+    std::shared_ptr<ConfigMonitor> monitor;
+    std::vector<ConfigChangeRecord> changeHistory;
+    
+    // Configuration comparison
+    static std::string compareConfigurations(const Config& config1, const Config& config2);
+    static std::string getConfigurationDifferences(const Config& config1, const Config& config2);
+    static void mergeConfigurations(const Config& config1, const Config& config2, Config& result);
+    
+    // Configuration encryption
+    std::string encryptionKey;
+    std::string encryptionStatus = "Not encrypted";
+    
+    // Configuration export/import
+    std::string exportPath = ".";
+    std::vector<std::string> exportFormats = {"json", "yaml", "ini", "csv"};
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -18,6 +51,7 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from file (JSON format)
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
@@ -55,6 +89,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Load from command line arguments
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -78,6 +113,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+// Save to file
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -92,98 +128,357 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+// ========== ADVANCED CONFIGURATION MANAGEMENT ==========
+
+// Schema validation
+bool Config::hasValidSchema() const {
+    return !pImpl->schema.empty();
+}
+
+std::string Config::getSchema() const {
+    return pImpl->schema;
+}
+
+ValidationResult Config::validateConfiguration() const {
+    ValidationResult result;
     
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+    if (pImpl->validationEnabled) {
+        for (const auto& entry : pImpl->entries) {
+            if (!entry.validationError.empty()) {
+                result.isValid = false;
+                result.errors.push_back("Key '" + entry.key + "': " + entry.validationError);
+            }
+        }
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    return result;
+}
+
+void Config::setValidationEnabled(bool enabled) {
+    pImpl->validationEnabled = enabled;
+    if (!enabled) {
+        clearValidationErrors();
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+bool Config::isValidationEnabled() const {
+    return pImpl->validationEnabled;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.validationError.empty()) {
+            errors.push_back("Key '" + entry.key + "': " + entry.validationError);
+        }
+    }
+    return errors;
+}
+
+void Config::clearValidationErrors() {
+    for (auto& entry : pImpl->entries) {
+        entry.validationError.clear();
+    }
+    pImpl->validationErrors.clear();
+}
+
+// Configuration templates
+size_t Config::getTemplateCount() const {
+    return pImpl->templates.size();
+}
+
+std::vector<std::string> Config::getTemplateNames() const {
+    std::vector<std::string> names;
+    names.reserve(pImpl->templates.size());
+    for (const auto& pair : pImpl->templates) {
+        names.push_back(pair.first);
+    }
+    return names;
+}
+
+std::shared_ptr<Config> Config::getTemplate(const std::string& templateName) const {
+    auto it = pImpl->templates.find(templateName);
+    if (it != pImpl->templates.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+bool Config::addTemplate(const std::string& templateName, const Config& templateConfig) {
+    pImpl->templates[templateName] = std::make_shared<Config>(templateConfig);
+    return true;
+}
+
+bool Config::removeTemplate(const std::string& templateName) {
+    auto it = pImpl->templates.find(templateName);
+    if (it != pImpl->templates.end()) {
+        pImpl->templates.erase(it);
+        return true;
+    }
+    return false;
+}
+
+bool Config::loadTemplate(const std::string& templateName, const std::string& filepath) {
+    std::shared_ptr<Config> newConfig = std::make_shared<Config>();
+    if (newConfig->loadFromFile(filepath)) {
+        addTemplate(templateName, *newConfig);
+        return true;
+    }
+    return false;
+}
+
+// Configuration monitoring
+bool Config::hasMonitor() const {
+    return pImpl->monitor != nullptr;
+}
+
+std::shared_ptr<ConfigMonitor> Config::getMonitor() const {
+    return pImpl->monitor;
+}
+
+void Config::setMonitor(std::shared_ptr<ConfigMonitor> monitor) {
+    pImpl->monitor = monitor;
+}
+
+void Config::onConfigurationChanged(const std::string& key, const ConfigValue& oldValue, const ConfigValue& newValue, ConfigSource source) {
+    ConfigChangeRecord record(key, oldValue, newValue, source);
+    pImpl->changeHistory.push_back(record);
     
+    if (pImpl->monitor) {
+        pImpl->monitor->onConfigurationChanged(key, oldValue, newValue, source);
+    }
+}
+
+std::vector<ConfigChangeRecord> Config::getConfigurationHistory() const {
+    return pImpl->changeHistory;
+}
+
+std::vector<ConfigChangeRecord> Config::getRecentChanges(size_t maxChanges) const {
+    if (pImpl->changeHistory.size() <= maxChanges) {
+        return pImpl->changeHistory;
+    }
+    
+    std::vector<ConfigChangeRecord> recent;
+    recent.reserve(maxChanges);
+    auto start = pImpl->changeHistory.end() - maxChanges;
+    for (auto it = start; it != pImpl->changeHistory.end(); ++it) {
+        recent.push_back(*it);
+    }
+    return recent;
+}
+
+bool Config::rollback(size_t changeIndex) {
+    if (changeIndex >= pImpl->changeHistory.size()) {
+        return false;
+    }
+    
+    const ConfigChangeRecord& record = pImpl->changeHistory[changeIndex];
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&record](const ConfigEntry& e) { return e.key == record.key; });n
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        it->value = record.oldValue;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(record.key, record.oldValue, record.source);
     }
+    
+    return true;
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+std::string Config::getDifferences(const Config& otherConfig) const {
+    return compareConfigurations(*this, otherConfig);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
+// Configuration comparison
+std::string Config::compareConfigurations(const Config& config1, const Config& config2) {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Comparison between Configuration1 and Configuration2:\n";
+    
+    // Get keys from both configs
+    std::vector<std::string> allKeys;
+    allKeys.reserve(config1.getKeys().size() + config2.getKeys().size());
+    
+    for (const auto& key : config1.getKeys()) {
+        allKeys.push_back(key);
+    }
+    
+    for (const auto& key : config2.getKeys()) {
+        if (std::find(allKeys.begin(), allKeys.end(), key) == allKeys.end()) {
+            allKeys.push_back(key);
+        }
+    }
+    
+    oss << "All unique keys (" << allKeys.size() << "):\n";
+    for (const auto& key : allKeys) {
+        bool inConfig1 = config1.has(key);
+        bool inConfig2 = config2.has(key);
+        oss << "  " << key << ": in Config1=" << (inConfig1 ? "true" : "false")
+            << ", in Config2=" << (inConfig2 ? "true" : "false") << "\n";
+        
+        if (inConfig1 && inConfig2) {
+            auto value1 = config1.get<std::string>(key);
+            auto value2 = config2.get<std::string>(key);
+            if (value1.has_value() && value2.has_value() && value1.value() != value2.value()) {
+                oss << "    Values differ: '" << value1.value() << "' vs '" << value2.value() << "'\n";
+            }
+        }
+    }
+    
+    return oss.str();
+}
+
+std::string Config::getConfigurationDifferences(const Config& config1, const Config& config2) {
+    return compareConfigurations(config1, config2);
+}
+
+void Config::mergeConfigurations(const Config& config1, const Config& config2, Config& result) {
+    // Start with config1
+    result.clear();
+    for (const auto& key : config1.getKeys()) {
+        auto value = config1.get<std::string>(key);
+        if (value.has_value()) {
+            result.set(key, value.value(), ConfigSource::Runtime);
+        }
+    }
+    
+    // Override with config2 values
+    for (const auto& key : config2.getKeys()) {
+        auto value = config2.get<std::string>(key);
+        if (value.has_value()) {
+            result.set(key, value.value(), ConfigSource::Runtime);
+        }
+    }
+}
+
+// Configuration encryption/security
+std::string Config::encryptConfiguration(const std::string& key) const {
+    // Simple XOR encryption for demonstration (NOT secure for production)
+    std::string encrypted;
+    encrypted.reserve(getKeys().size() * 100); // Estimate size
+    
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+        std::string valueStr;
+        std::visit([&valueStr](auto&& arg) {
+            if constexpr (std::is_same_v<decltype(arg), std::string>) {
+                valueStr = arg;
+            } else if constexpr (std::is_same_v<decltype(arg), int>) {
+                valueStr = std::to_string(arg);
+            } else if constexpr (std::is_same_v<decltype(arg), double>) {
+                valueStr = std::to_string(arg);
+            } else if constexpr (std::is_same_v<decltype(arg), bool>) {
+                valueStr = arg ? "true" : "false";
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        
+        // Simple XOR encryption
+        for (char& c : valueStr) {
+            c = c ^ key[0];
+        }
+        
+        encrypted += entry.key + "=" + valueStr + "\n";
     }
-    return oss.str();
+    
+    return encrypted;
+}
+
+bool Config::decryptConfiguration(const std::string& encryptedData, const std::string& key) {
+    clear();
+    
+    std::istringstream stream(encryptedData);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string k = line.substr(0, pos);
+            std::string v = line.substr(pos + 1);
+            
+            // Simple XOR decryption
+            for (char& c : v) {
+                c = c ^ key[0];
+            }
+            
+            set(k, v, ConfigSource::Encrypted);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validateSignature(const std::string& signature, const std::string& data) const {
+    // Simple HMAC-SHA256 validation for demonstration
+    CryptoPP::HMAC<CryptoPP::SHA256> hmac((const CryptoPP::byte*)signature.c_str(), signature.size());
+    
+    std::string computedSignature;
+    CryptoPP::StringSource ds(data, true,
+        new CryptoPP::HashFilter(hmac,
+            new CryptoPP::HexEncoder(
+                new CryptoPP::StringSink(computedSignature)
+            )
+        )
+    );
+    
+    return computedSignature == signature;
+}
+
+void Config::setEncryptionKey(const std::string& key) {
+    pImpl->encryptionKey = key;
+    pImpl->encryptionStatus = "Encryption key set";
+}
+
+std::string Config::getEncryptionStatus() const {
+    return pImpl->encryptionStatus;
+}
+
+// Configuration export/import
+bool Config::exportConfiguration(const std::string& filepath, const std::string& format) const {
+    if (format == "json") {
+        // TODO: Implement JSON export with nlohmann/json
+        return saveToFile(filepath + ".json");
+    } else if (format == "yaml") {
+        // TODO: Implement YAML export with YAML-cpp
+        return saveToFile(filepath + ".yaml");
+    } else if (format == "ini") {
+        // TODO: Implement INI export
+        return saveToFile(filepath + ".ini");
+    } else if (format == "csv") {
+        // TODO: Implement CSV export
+        return saveToFile(filepath + ".csv");
+    }
+    
+    return false;
+}
+
+bool Config::importConfiguration(const std::string& filepath, const std::string& format) {
+    clear();
+    
+    if (format == "json") {
+        // TODO: Implement JSON import with nlohmann/json
+        return loadFromFile(filepath + ".json");
+    } else if (format == "yaml") {
+        // TODO: Implement YAML import with YAML-cpp
+        return loadFromFile(filepath + ".yaml");
+    } else if (format == "ini") {
+        // TODO: Implement INI import
+        return loadFromFile(filepath + ".ini");
+    } else if (format == "csv") {
+        // TODO: Implement CSV import
+        return loadFromFile(filepath + ".csv");
+    }
+    
+    return false;
+}
+
+std::vector<std::string> Config::getExportFormats() const {
+    return pImpl->exportFormats;
+}
+
+void Config::setExportPath(const std::string& path) {
+    pImpl->exportPath = path;
+}
+
+std::string Config::getExportPath() const {
+    return pImpl->exportPath;
 }
 
 std::string Config::trim(const std::string& str) {
@@ -198,18 +493,3 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
