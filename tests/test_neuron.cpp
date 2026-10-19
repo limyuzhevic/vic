@@ -147,6 +147,89 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testNeuronValidation() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test initial state validation
+    assert(neuron.validateState());
+    
+    // Test membrane potential validation
+    neuron.setMembranePotential(-80.0f); // Valid: -100 <= -80 <= 50
+    assert(neuron.validateMembranePotential(-80.0f));
+    
+    neuron.setMembranePotential(60.0f);  // Invalid: > 50
+    assert(!neuron.validateMembranePotential(60.0f));
+    
+    neuron.setMembranePotential(-110.0f); // Invalid: < -100
+    assert(!neuron.validateMembranePotential(-110.0f));
+    
+    // Test threshold validation (should be > resting potential)
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-60.0f);  // Valid: -60 > -70
+    assert(neuron.validateThreshold(-60.0f));
+    
+    neuron.setThreshold(-75.0f);   // Invalid: -75 <= -70
+    assert(!neuron.validateThreshold(-75.0f));
+    
+    // Test refractory period validation
+    neuron.setRefractoryPeriod(10);   // Valid: 0 <= 10 <= 1000
+    assert(neuron.validateRefractoryPeriod(10));
+    
+    neuron.setRefractoryPeriod(-5);   // Invalid: < 0
+    assert(!neuron.validateRefractoryPeriod(-5));
+    
+    neuron.setRefractoryPeriod(2000); // Invalid: > 1000
+    assert(!neuron.validateRefractoryPeriod(2000));
+    
+    // Test adaptation variable validation
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-60.0f);
+    
+    // Test leak conductance validation
+    neuron.setLeakConductance(10.0f);   // Valid: 0 <= 10 <= 100
+    assert(neuron.validateLeakConductance(10.0f));
+    
+    neuron.setLeakConductance(-5.0f);   // Invalid: < 0
+    assert(!neuron.validateLeakConductance(-5.0f));
+    
+    neuron.setLeakConductance(150.0f);  // Invalid: > 100
+    assert(!neuron.validateLeakConductance(150.0f));
+    
+    // Test neuron ID validation
+    assert(neuron.validateNeuronId());
+    
+    std::cout << "    testNeuronValidation passed" << std::endl;
+}
+
+void testNeuronValidationClamp() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test that setters clamp invalid values
+    neuron.setMembranePotential(60.0f);  // Should clamp to 50.0f
+    assert(neuron.getMembranePotential() == 50.0f);
+    
+    neuron.setMembranePotential(-110.0f); // Should clamp to -100.0f
+    assert(neuron.getMembranePotential() == -100.0f);
+    
+    neuron.setThreshold(-80.0f);   // Should be > resting potential (-70)
+    // Since threshold was -60 before, it should be valid
+    assert(neuron.getThreshold() == -60.0f); // Unchanged due to validation
+    
+    neuron.setRefractoryPeriod(-5);   // Should clamp to 0
+    assert(neuron.getRefractoryPeriod() == 0);
+    
+    neuron.setRefractoryPeriod(2000); // Should clamp to 1000
+    assert(neuron.getRefractoryPeriod() == 1000);
+    
+    neuron.setLeakConductance(-5.0f);   // Should clamp to 0
+    assert(neuron.getLeakConductance() == 0.0f);
+    
+    neuron.setLeakConductance(150.0f);  // Should clamp to 100
+    assert(neuron.getLeakConductance() == 100.0f);
+    
+    std::cout << "    testNeuronValidationClamp passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +241,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNeuronValidation();
+    testNeuronValidationClamp();
 }
 
 } // namespace test_neuron

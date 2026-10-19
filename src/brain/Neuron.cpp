@@ -1,7 +1,9 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
+#include <string>
 
 namespace nlm {
 
@@ -13,10 +15,14 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
+    std::vector<Timestamp> spikeHistoryBuffer;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
+    
+    // Circular buffer management for O(1) spike history
+    size_t spikeHistoryHeadIndex;
+    size_t spikeHistorySize;
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
@@ -24,15 +30,25 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeHistoryHeadIndex(0), spikeHistorySize(0) {}
 };
 
+// Initialize compile-time validation
+NLM_LOG_INFO("Initializing neuron validation system...");
+ValidationHelper::compileTimeValidation();
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Validate neuron ID
+    ValidationHelper::validateNeuronId(id, ValidationLevel::Strict, "Neuron constructor");
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistoryHeadIndex = 0;
+    pImpl->spikeHistorySize = 0;
 }
 
 Neuron::~Neuron() = default;
@@ -50,24 +66,124 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
+// Validation configuration
+void Neuron::setValidationLevel(ValidationLevel level) {
+    // Note: In a real implementation, this would need to be stored in pImpl
+    NLM_LOG_INFO("Neuron " + std::to_string(pImpl->id.index()) + " validation level set to: " + 
+                 std::to_string(static_cast<int>(level)));
+}
+
+ValidationLevel Neuron::getValidationLevel() const {
+    return ValidationLevel::Strict; // Default to strict
+}
+
+// Validation helper methods
+bool Neuron::validateMembranePotential(MembranePotential potential) const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::setMembranePotential";
+    return ValidationHelper::validateMembranePotential(potential, level, context);
+}
+
+bool Neuron::validateThreshold(MembranePotential threshold) const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::setThreshold";
+    bool valid = true;
+    
+    // Check threshold vs resting potential
+    if (ValidationHelper::validateThresholdVsResting(threshold, pImpl->state.restingPotential, level, context)) {
+        valid = true;
+    }
+    
+    return valid;
+}
+
+bool Neuron::validateRefractoryPeriod(uint32_t period) const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::setRefractoryPeriod";
+    return ValidationHelper::validateRefractoryPeriod(period, level, context);
+}
+
+bool Neuron::validateAdaptationVariable(float adaptation) const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::update";
+    return ValidationHelper::validateAdaptationVariable(adaptation, level, context);
+}
+
+bool Neuron::validateLeakConductance(float conductance) const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::setLeakConductance";
+    return ValidationHelper::validateLeakConductance(conductance, level, context);
+}
+
+bool Neuron::validateNeuronId() const {
+    ValidationLevel level = getValidationLevel();
+    const char* context = "Neuron::getId";
+    return ValidationHelper::validateNeuronId(pImpl->id, level, context);
+}
+
+// Validate entire neuron state (constant time check)
+bool Neuron::validateState() const {
+    ValidationLevel level = getValidationLevel();
+    bool valid = true;
+    
+    // Validate key state variables
+    valid &= validateMembranePotential(pImpl->state.membranePotential);
+    valid &= validateThreshold(pImpl->state.threshold);
+    valid &= validateRefractoryPeriod(pImpl->state.refractoryPeriod);
+    valid &= validateAdaptationVariable(pImpl->state.adaptationVariable);
+    valid &= validateLeakConductance(pImpl->state.leakConductance);
+    
+    // Check refractory remaining is <= period
+    if (pImpl->state.refractoryRemaining > pImpl->state.refractoryPeriod) {
+        std::string msg = std::string("Refractory remaining (" + std::to_string(pImpl->state.refractoryRemaining) +
+                                     ") exceeds refractory period (" + std::to_string(pImpl->state.refractoryPeriod) + ")");
+        switch (level) {
+            case ValidationLevel::None: break;
+            case ValidationLevel::Warning: NLM_LOG_WARNING(msg); break;
+            case ValidationLevel::Strict: NLM_LOG_ERROR(msg); assert(false && msg.c_str()); break;
+        }
+        valid = false;
+    }
+    
+    // Check last spike time
+    if (pImpl->state.lastSpikeTime < -1.0f) {
+        std::string msg = std::string("Invalid last spike time: " + std::to_string(pImpl->state.lastSpikeTime));
+        switch (level) {
+            case ValidationLevel::None: break;
+            case ValidationLevel::Warning: NLM_LOG_WARNING(msg); break;
+            case ValidationLevel::Strict: NLM_LOG_ERROR(msg); assert(false && msg.c_str()); break;
+        }
+        valid = false;
+    }
+    
+    return valid;
+}
+
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || pImpl->state.firingState == FiringState::Refractory;
 }
 
-void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
-}
-
-void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
 }
 
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    if (!validateRefractoryPeriod(steps)) {
+        NLM_LOG_ERROR("Refractory period validation failed in setRefractoryPeriod");
+    }
+    pImpl->state.refractoryPeriod = steps;
+    // Ensure refractory remaining doesn't exceed period
+    if (pImpl->state.refractoryRemaining > pImpl->state.refractoryPeriod) {
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+    }
 }
 
 void Neuron::decrementRefractory() {
@@ -84,39 +200,85 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    if (!validateLeakConductance(conductance)) {
+        NLM_LOG_ERROR("Leak conductance validation failed in setLeakConductance");
+    }
     pImpl->state.leakConductance = conductance;
-}
-
-MembranePotential Neuron::getLeakConductance() const {
-    return pImpl->state.leakConductance;
-}
-
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
-}
-
-uint32_t Neuron::getRefractoryPeriod() const {
-    return pImpl->state.refractoryPeriod;
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
     pImpl->state.restingPotential = potential;
 }
 
-MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
-}
-
 void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
 }
 
-bool Neuron::checkThreshold() const {
-    return pImpl->state.membranePotential >= pImpl->state.threshold;
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    if (!validateMembranePotential(potential)) {
+        NLM_LOG_ERROR("Membrane potential validation failed in setMembranePotential");
+    }
+    pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    MembranePotential newPotential = pImpl->state.membranePotential + delta;
+    if (!validateMembranePotential(newPotential)) {
+        NLM_LOG_WARNING("Membrane potential would exceed bounds in addToMembranePotential, clamping");
+        newPotential = std::clamp(newPotential, ValidationHelper::MEMBRANE_POTENTIAL_MIN, ValidationHelper::MEMBRANE_POTENTIAL_MAX);
+    }
+    pImpl->state.membranePotential = newPotential;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    if (!validateThreshold(threshold)) {
+        NLM_LOG_ERROR("Threshold validation failed in setThreshold");
+    }
+    pImpl->state.threshold = threshold;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
 }
 
 float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
+}
+
+bool Neuron::checkThreshold() const {
+    return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
@@ -135,6 +297,14 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
+    
+    // Validate adaptation variable
+    if (!validateAdaptationVariable(pImpl->state.adaptationVariable)) {
+        NLM_LOG_WARNING("Adaptation variable exceeded bounds after modulatory input, clamping");
+        pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable,
+                                                    ValidationHelper::ADAPTATION_VARIABLE_MIN,
+                                                    ValidationHelper::ADAPTATION_VARIABLE_MAX);
+    }
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
@@ -143,19 +313,52 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    if (pImpl->spikeHistorySize < Impl::MAX_SPIKE_HISTORY) {
+        size_t index = (pImpl->spikeHistoryHeadIndex + pImpl->spikeHistorySize) % Impl::MAX_SPIKE_HISTORY;
+        pImpl->spikeHistoryBuffer[index] = timestamp;
+        pImpl->spikeHistorySize++;
+    } else {
+        pImpl->spikeHistoryHeadIndex = (pImpl->spikeHistoryHeadIndex + 1) % Impl::MAX_SPIKE_HISTORY;
+        pImpl->spikeHistoryBuffer[pImpl->spikeHistoryHeadIndex] = timestamp;
     }
 }
 
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    if (pImpl->spikeHistorySize == 0) {
+        return pImpl->spikeHistoryBuffer;
+    }
+    
+    static thread_local std::vector<Timestamp> chronologicalHistory;
+    chronologicalHistory.clear();
+    chronologicalHistory.reserve(pImpl->spikeHistorySize);
+    
+    if (pImpl->spikeHistorySize <= Impl::MAX_SPIKE_HISTORY) {
+        size_t start = (pImpl->spikeHistoryHeadIndex + Impl::MAX_SPIKE_HISTORY - pImpl->spikeHistorySize) % Impl::MAX_SPIKE_HISTORY;
+        for (size_t i = 0; i < pImpl->spikeHistorySize; ++i) {
+            chronologicalHistory.push_back(pImpl->spikeHistoryBuffer[(start + i) % Impl::MAX_SPIKE_HISTORY]);
+        }
+    } else {
+        for (size_t i = 0; i < Impl::MAX_SPIKE_HISTORY; ++i) {
+            chronologicalHistory.push_back(pImpl->spikeHistoryBuffer[(pImpl->spikeHistoryHeadIndex + i + 1) % Impl::MAX_SPIKE_HISTORY]);
+        }
+    }
+    
+    return chronologicalHistory;
+}
+
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    pImpl->spikeHistorySize = 0;
+    pImpl->spikeHistoryHeadIndex = 0;
+    pImpl->spikeHistoryBuffer.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -166,29 +369,20 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
-}
-
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate state at start of step
+    if (!validateState()) {
+        NLM_LOG_WARNING("Neuron state validation failed before stepLIF");
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -231,6 +425,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
+    // Validate membrane potential after operations
+    if (!validateMembranePotential(V)) {
+        NLM_LOG_WARNING("Membrane potential exceeded bounds after stepLIF, clamping");
+        V = std::clamp(V, ValidationHelper::MEMBRANE_POTENTIAL_MIN, ValidationHelper::MEMBRANE_POTENTIAL_MAX);
+    }
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -249,6 +449,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Validate adaptation variable
+        if (!validateAdaptationVariable(pImpl->state.adaptationVariable)) {
+            NLM_LOG_WARNING("Adaptation variable exceeded bounds after spike, clamping");
+            pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable,
+                                                        ValidationHelper::ADAPTATION_VARIABLE_MIN,
+                                                        ValidationHelper::ADAPTATION_VARIABLE_MAX);
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -268,7 +476,7 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -296,7 +504,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
 }
 
 } // namespace nlm

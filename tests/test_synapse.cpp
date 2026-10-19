@@ -159,6 +159,101 @@ void testSynapseReset() {
     std::cout << "    testSynapseReset passed" << std::endl;
 }
 
+void testSynapseValidation() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test initial state validation
+    assert(synapse.validateState());
+    
+    // Test weight validation
+    synapse.setWeight(0.5f);  // Valid: -1.0 <= 0.5 <= 1.0
+    assert(synapse.validateWeight(0.5f));
+    
+    synapse.setWeight(2.0f);   // Invalid: > 1.0
+    assert(!synapse.validateWeight(2.0f));
+    
+    synapse.setWeight(-2.0f);  // Invalid: < -1.0
+    assert(!synapse.validateWeight(-2.0f));
+    
+    // Test delay validation
+    synapse.setDelay(5);   // Valid: 0 <= 5 <= 100
+    assert(synapse.validateDelay(5));
+    
+    synapse.setDelay(-1);  // Invalid: < 0
+    assert(!synapse.validateDelay(-1));
+    
+    synapse.setDelay(200); // Invalid: > 100
+    assert(!synapse.validateDelay(200));
+    
+    // Test efficacy validation
+    synapse.setEfficacy(1.0f);  // Valid: 0.0 <= 1.0 <= 2.0
+    assert(synapse.validateEfficacy(1.0f));
+    
+    synapse.setEfficacy(3.0f);  // Invalid: > 2.0
+    assert(!synapse.validateEfficacy(3.0f));
+    
+    synapse.setEfficacy(-1.0f); // Invalid: < 0.0
+    assert(!synapse.validateEfficacy(-1.0f));
+    
+    // Test short-term depression validation
+    synapse.setEfficacy(1.0f);  // Reset to valid
+    float std = 0.5f;  // Valid: 0.0 <= 0.5 <= 1.0
+    assert(synapse.validateShortTermDepression(std));
+    
+    float std_invalid = 1.5f;  // Invalid: > 1.0
+    assert(!synapse.validateShortTermDepression(std_invalid));
+    
+    // Test short-term facilitation validation
+    synapse.setEfficacy(1.0f);  // Reset to valid
+    float stf = 1.0f;  // Valid: 0.0 <= 1.0 <= 2.0
+    assert(synapse.validateShortTermFacilitation(stf));
+    
+    float stf_invalid = 2.5f;  // Invalid: > 2.0
+    assert(!synapse.validateShortTermFacilitation(stf_invalid));
+    
+    // Test neuron ID validation
+    assert(synapse.validateNeuronId(nlm::NeuronId(1)));
+    assert(synapse.validateNeuronId(nlm::INVALID_NEURON_ID) == false);
+    
+    // Test synapse ID validation
+    assert(synapse.validateSynapseId());
+    assert(nlm::Synapse synapse2(nlm::INVALID_SYNAPSE_ID, nlm::NeuronId(1), nlm::NeuronId(2)));
+    assert(synapse2.validateSynapseId() == false);
+    
+    // Test connection validation
+    assert(synapse.validateConnection());
+    
+    nlm::Synapse synapse_self(nlm::SynapseId(3), nlm::NeuronId(1), nlm::NeuronId(1)); // Self-connection
+    assert(synapse_self.validateConnection()); // Should pass validation but warn
+    
+    std::cout << "    testSynapseValidation passed" << std::endl;
+}
+
+void testSynapseValidationClamp() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test that setters clamp invalid values
+    synapse.setWeight(2.0f);   // Should clamp to 1.0f
+    assert(synapse.getWeight() == 1.0f);
+    
+    synapse.setWeight(-2.0f);  // Should clamp to -1.0f
+    assert(synapse.getWeight() == -1.0f);
+    
+    synapse.setDelay(-1);      // Should clamp to 0
+    assert(synapse.getDelay() == 0);
+    
+    synapse.setDelay(200);     // Should clamp to 100
+    assert(synapse.getDelay() == 100);
+    
+    synapse.setEfficacy(3.0f);  // Should clamp to 2.0f
+    assert(synapse.getEfficacy() == 2.0f);
+    
+    synapse.setEfficacy(-1.0f); // Should clamp to 0.0f
+    assert(synapse.getEfficacy() == 0.0f);
+    
+    std::cout << "    testSynapseValidationClamp passed" << std::endl;
+}
+
 void testSynapsePlasticityFlags() {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
@@ -186,6 +281,8 @@ void runAll() {
     testSynapseEfficacy();
     testSynapseRandomInitialization();
     testSynapseReset();
+    testSynapseValidation();
+    testSynapseValidationClamp();
     testSynapsePlasticityFlags();
 }
 

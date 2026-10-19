@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <atomic>
 
 namespace nlm {
 
@@ -107,6 +109,11 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Thread-safe singleton management
+    static std::once_flag initFlag;
+    static std::shared_ptr<Logger> globalInstance;
+    static void initializeGlobalLogger();
 };
 
 // Convenience macro for file/line/function info

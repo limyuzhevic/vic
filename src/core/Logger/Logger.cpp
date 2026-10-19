@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <thread>
 
 namespace nlm {
 
@@ -20,7 +21,11 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -55,26 +60,32 @@ void ConsoleLogger::log(const LogEntry& entry) {
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
@@ -102,6 +113,14 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
+// Thread-safe global logger management
+std::once_flag Logger::initFlag;
+std::shared_ptr<Logger> Logger::globalInstance;
+
+void Logger::initializeGlobalLogger() {
+    globalInstance = std::shared_ptr<Logger>(new Logger());
+}
+
 // Logger class implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
@@ -110,7 +129,10 @@ struct Logger::Impl {
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    // Clean up all registered loggers
+    clearLoggers();
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
@@ -177,13 +199,13 @@ bool Logger::isEnabled(LogLevel level) const {
 }
 
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    std::call_once(initFlag, initializeGlobalLogger);
+    return *globalInstance;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    globalInstance = logger;
 }
 
 // LogStream implementation
