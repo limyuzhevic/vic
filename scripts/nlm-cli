@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# Simple command-line interface for NLM management
+# Make sure this script is executable: chmod +x nlm-cli
+
+# Default configuration
+NLM_PHASE6_NEURON_COUNT=1000
+NLM_PHASE6_MAX_STEPS=10000
+NLM_PHASE6_ENABLE_CHECKPOINTING=true
+NLM_PHASE6_ENABLE_REPLAY=true
+NLM_PHASE6_ENABLE_DEVELOPMENT=true
+NLM_PHASE6_SUMMARY_ONLY=false
+
+# Show help
+usage() {
+    echo "NLM (Neural Learning Machine) - Command Line Interface"
+    echo "======================================================"
+    echo ""
+    echo "Usage: nlm-cli [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  run-experiment    Run Phase 6 integration experiment"
+    echo "  configure         Configure experiment settings"
+    echo "  status            Show current configuration status"
+    echo "  help              Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  nlm-cli run-experiment --neurons 5000 --steps 20000"
+    echo "  nlm-cli configure neuron-count 2000"
+    echo "  nlm-cli status"
+    echo ""
+}
+
+# Run Phase 6 experiment
+run_experiment() {
+    echo "Starting NLM Phase 6 Integration Experiment..."
+    echo "Configuration:"
+    echo "  Neurons: ${NLM_PHASE6_NEURON_COUNT:-$NLM_PHASE6_NEURON_COUNT}"
+    echo "  Max Steps: ${NLM_PHASE6_MAX_STEPS:-$NLM_PHASE6_MAX_STEPS}"
+    echo "  Checkpointing: ${NLM_PHASE6_ENABLE_CHECKPOINTING}"
+    echo "  Replay: ${NLM_PHASE6_ENABLE_REPLAY}"
+    echo "  Development: ${NLM_PHASE6_ENABLE_DEVELOPMENT}"
+    echo ""
+    
+    # Build command for nlm_phase6_demo
+    local cmd="nlm_phase6_demo"
+    
+    # Add arguments based on configuration
+    cmd="${cmd} --max-steps ${NLM_PHASE6_MAX_STEPS:-10000}"
+    cmd="${cmd} --neurons ${NLM_PHASE6_NEURON_COUNT:-1000}"
+    
+    if [ "${NLM_PHASE6_ENABLE_CHECKPOINTING}" = "true" ]; then
+        cmd="${cmd} --checkpoint"
+    fi
+    
+    if [ "${NLM_PHASE6_ENABLE_REPLAY}" = "true" ]; then
+        cmd="${cmd} --replay"
+    fi
+    
+    if [ "${NLM_PHASE6_ENABLE_DEVELOPMENT}" = "true" ]; then
+        cmd="${cmd} --development"
+    fi
+    
+    # Run the experiment
+    echo "Running: ${cmd}"
+    echo ""
+    
+    if [ "${NLM_PHASE6_SUMMARY_ONLY}" = "true" ]; then
+        echo "[SUMMARY MODE] Would run: ${cmd}"
+    else
+        eval "${cmd}"
+    fi
+}
+
+# Configure settings
+configure() {
+    local key="$1"
+    local value="$2"
+    
+    case "$key" in
+        neuron-count|neurons)
+            NLM_PHASE6_NEURON_COUNT="$value"
+            echo "Set neuron count to: $value"
+            ;;
+        max-steps|steps)
+            NLM_PHASE6_MAX_STEPS="$value"
+            echo "Set max steps to: $value"
+            ;;
+        checkpointing)
+            NLM_PHASE6_ENABLE_CHECKPOINTING="$value"
+            echo "Set checkpointing to: $value"
+            ;;
+        replay)
+            NLM_PHASE6_ENABLE_REPLAY="$value"
+            echo "Set replay to: $value"
+            ;;
+        development)
+            NLM_PHASE6_ENABLE_DEVELOPMENT="$value"
+            echo "Set development to: $value"
+            ;;
+        summary-only)
+            NLM_PHASE6_SUMMARY_ONLY="$value"
+            echo "Set summary-only mode to: $value"
+            ;;
+        *)
+            echo "Unknown configuration option: $key"
+            usage
+            return 1
+            ;;
+    esac
+}
+
+# Show current status
+status() {
+    echo "NLM Configuration Status"
+    echo "======================="
+    echo ""
+    echo "Phase 6 Configuration:"
+    echo "  Neurons: ${NLM_PHASE6_NEURON_COUNT:-1000}"
+    echo "  Max Steps: ${NLM_PHASE6_MAX_STEPS:-10000}"
+    echo "  Checkpointing: ${NLM_PHASE6_ENABLE_CHECKPOINTING:-true}"
+    echo "  Replay: ${NLM_PHASE6_ENABLE_REPLAY:-true}"
+    echo "  Development: ${NLM_PHASE6_ENABLE_DEVELOPMENT:-true}"
+    echo "  Summary Only: ${NLM_PHASE6_SUMMARY_ONLY:-false}"
+    echo ""
+    echo "Note: To apply configuration, run: nlm-cli run-experiment"
+}
+
+# Parse command line arguments
+if [ $# -eq 0 ]; then
+    usage
+    exit 0
+fi
+
+case "$1" in
+    run-experiment)
+        shift
+        # Parse additional options
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --neurons|-n)
+                    shift
+                    NLM_PHASE6_NEURON_COUNT="$1"
+                    ;;
+                --steps|-s)
+                    shift
+                    NLM_PHASE6_MAX_STEPS="$1"
+                    ;;
+                --checkpoint)
+                    NLM_PHASE6_ENABLE_CHECKPOINTING=true
+                    ;;
+                --no-checkpoint)
+                    NLM_PHASE6_ENABLE_CHECKPOINTING=false
+                    ;;
+                --replay)
+                    NLM_PHASE6_ENABLE_REPLAY=true
+                    ;;
+                --no-replay)
+                    NLM_PHASE6_ENABLE_REPLAY=false
+                    ;;
+                --development)
+                    NLM_PHASE6_ENABLE_DEVELOPMENT=true
+                    ;;
+                --no-development)
+                    NLM_PHASE6_ENABLE_DEVELOPMENT=false
+                    ;;
+                --summary)
+                    NLM_PHASE6_SUMMARY_ONLY=true
+                    ;;
+                --help|-h)
+                    usage
+                    exit 0
+                    ;;
+                *)
+                    echo "Unknown option: $1"
+                    usage
+                    exit 1
+                    ;;
+            esac
+            shift
+        done
+        run_experiment
+        ;;
+    configure)
+        if [ $# -lt 2 ]; then
+            echo "Usage: nlm-cli configure KEY VALUE"
+            exit 1
+        fi
+        configure "$1" "$2"
+        ;;
+    status)
+        status
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1"
+        usage
+        exit 1
+        ;;
+esac

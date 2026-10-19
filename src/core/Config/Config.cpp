@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 
 namespace nlm {
 
@@ -84,9 +87,56 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << getCurrentTimeString() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // String values need quotes
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // String vector - format as "value1,value2"
+                file << entry.key << " = ";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) file << ",";
+                    file << "\"" << item << "\"";
+                    first = false;
+                }
+                file << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Integer vector - format as "value1,value2"
+                file << entry.key << " = ";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) file << ",";
+                    file << item;
+                    first = false;
+                }
+                file << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                // Double vector - format as "value1,value2"
+                file << entry.key << " = ";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) file << ",";
+                    file << item;
+                    first = false;
+                }
+                file << "\n";
+            } else {
+                // Simple types
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -197,6 +247,15 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::getCurrentTimeString() {
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 // Explicit template instantiations

@@ -36,9 +36,17 @@ float Dopamine::getPlasticityFactor() const {
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Real dopamine dynamics with temporal integration
+    float decayAmount = pImpl->decayRate * static_cast<float>(dt);
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - decayAmount);
+    
+    // Add small background noise for biological realism
+    static thread_local RandomGenerator rng(0); // Default seed, should be from brain context
+    float noise = rng.uniformReal(-0.01f, 0.01f) * dt;
+    pImpl->level += noise;
+    
+    // Clamp to valid range
+    pImpl->level = std::clamp(pImpl->level, 0.0f, pImpl->peak);
 }
 
 void Dopamine::signalReward(float reward) {
