@@ -7,6 +7,9 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
@@ -71,6 +74,8 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    Timestamp sleepStartTime;
+    float sleepNeed;
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -89,6 +94,8 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepStartTime(0.0)
+        , sleepNeed(0.0f)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -576,13 +583,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 14: Sleep/rest cycle and memory consolidation ==========
+    // Check if we should enter sleep/rest phase
+    if (!pImpl->isResting) {
+        // Simple sleep decision: enter rest after accumulating enough energy/reward
+        // or after a certain number of steps without significant input
+        float energy = calculateBrainEnergy();
+        if (energy > 0.8f && currentStep > 1000 && currentStep % 500 == 0) {
+            // Enter rest period
+            pImpl->isResting = true;
+            pImpl->sleepStartTime = currentTime;
+            pImpl->sleepNeed = calculateSleepNeed();
+            NLM_LOG_INFO("Brain entering rest period for memory consolidation...");
+        }
+    }
+    
+    if (pImpl->isResting) {
+        float elapsedSleep = currentTime - pImpl->sleepStartTime;
+        
+        // During sleep, consolidate memories and replay important episodes
+        if (elapsedSleep < pImpl->sleepNeed * 2.0f) {
+            // Early sleep: replay recent memories
+            auto episodesToReplay = pImpl->episodicMemory->getRecentEpisodes(3);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            
+            // Sleep-dependent consolidation: strengthen connections
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->consolidate(0.5f);  // Higher threshold during sleep
+            }
+            
+            // Process sleep effects on plasticity
+            float sleepConsolidation = std::min(1.0f, elapsedSleep / pImpl->sleepNeed);
+            if (sleepConsolidation > 0.3f && pImpl->dopamine) {
+                // Sleep boosts plasticity for memory consolidation
+                pImpl->dopamine->setLevel(0.8f);
+            }
+        } else {
+            // Wake up after sleep duration
+            pImpl->isResting = false;
+            pImpl->sleepStartTime = 0.0;
+            pImpl->sleepNeed = 0.0f;
+            
+            // Reset dopamine levels
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(pImpl->config->getOr<float>("dopamine_baseline", 0.1f));
+            }
+            
+            NLM_LOG_INFO("Brain waking up from rest period");
+        }
+    }
+    
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -730,9 +789,24 @@ void Brain::updatePlasticity() {
     // This method is kept for API compatibility
 }
 
-void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+float Brain::calculateBrainEnergy() const {
+    // Calculate brain energy based on spike activity, dopamine levels, and metabolic costs
+    float spikeEnergy = static_cast<float>(getTotalSpikeCount()) * 0.001f;
+    float dopamineEnergy = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) * 0.5f;
+    
+    // Subtract maintenance costs
+    float maintenanceCost = 0.1f;
+    
+    return std::max(0.0f, spikeEnergy + dopamineEnergy - maintenanceCost);
+}
+
+float Brain::calculateSleepNeed() const {
+    // Calculate sleep need based on spike activity, plasticity, and memory load
+    float spikeHistory = static_cast<float>(getTotalSpikeCount()) / 1000.0f;
+    float plasticityNeed = 0.5f;  // Constant plasticity need for consolidation
+    
+    // Higher spike activity and plasticity = more sleep needed
+    return std::min(100.0f, spikeHistory + plasticityNeed);
 }
 
 void Brain::reset() {
@@ -743,6 +817,8 @@ void Brain::reset() {
     pImpl->totalSpikesThisStep = 0;
     pImpl->totalSpikesTotal = 0;
     pImpl->isResting = false;
+    pImpl->sleepStartTime = 0.0;
+    pImpl->sleepNeed = 0.0f;
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
