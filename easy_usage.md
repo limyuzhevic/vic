@@ -295,3 +295,5 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+For Phase 6 integration examples with advanced features like memory systems, neuromodulation, and development, see the Phase 6 demo executables or read the full documentation.
