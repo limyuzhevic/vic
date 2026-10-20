@@ -1,0 +1,180 @@
+# NLM Neural Learning Machine Configuration
+# YAML format - more readable and human-editable
+
+brain:
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.1
+  initial_weight_mean: 0.5
+  initial_weight_std: 0.1
+  v_thresh: -50.0
+  v_rest: -70.0
+  v_reset: -75.0
+  tau_mem: 20.0
+  tau_ref: 2.0
+  excitatory_fraction: 0.8
+  inhibitory_fraction: 0.2
+
+plasticity:
+  stdp:
+    enable: true
+    learning_rate: 0.001
+    tau_plus: 20.0
+    tau_minus: 20.0
+    ltp_weight: 0.02
+    ltd_weight: 0.015
+  hebbian:
+    enable: true
+    learning_rate: 0.0005
+  structural:
+    enable: true
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+
+neuromodulation:
+  dopamine:
+    scale: 1.0
+    baseline: 0.1
+  curiosity:
+    enable: true
+    scale: 0.5
+    decay_rate: 0.01
+  novelty:
+    enable: true
+    threshold: 0.1
+    decay_rate: 0.05
+  prediction_error:
+    enable: true
+    scale: 1.0
+    learning_rate: 0.01
+
+memory:
+  working_memory:
+    capacity: 100
+    decay_rate: 0.01
+    stability_threshold: 0.5
+  episodic_memory:
+    max_episodes: 1000
+    consolidation_rate: 0.05
+    replay_frequency: 0.1
+    similarity_threshold: 0.7
+  associative_memory:
+    strength_decay: 0.01
+    cue_association_threshold: 0.6
+
+prediction:
+  prediction_system:
+    temporal_window: 100
+    learning_rate: 0.01
+    prediction_error_threshold: 0.2
+    confidence_threshold: 0.8
+  action_consequence:
+    learning_rate: 0.02
+    prediction_horizon: 10
+    value_discount: 0.9
+
+cognition:
+  attention:
+    competition_strength: 1.0
+    top_down_bias: 0.3
+    bottom_up_gain: 1.5
+    selection_threshold: 0.5
+  planner:
+    planning_horizon: 5
+    evaluation_window: 20
+    exploration_bonus: 0.1
+    exploitation_weight: 0.9
+  concept_formation:
+    prototype_learning_rate: 0.01
+    stability_threshold: 0.7
+    category_merge_threshold: 0.3
+  self_model:
+    body_schema_learning_rate: 0.02
+    self_other_distinction_threshold: 0.5
+    capability_update_rate: 0.05
+  social_learning:
+    observation_window: 50
+    imitation_threshold: 0.8
+    social_cue_sensitivity: 0.6
+
+development:
+  development_system:
+    critical_period_start: 1.0
+    critical_period_end: 5.0
+    maturation_rate: 0.1
+    aging_start: 20.0
+    plasticity_decay_rate: 0.05
+  synaptogenesis:
+    initial_rate: 0.001
+    rate_increase_factor: 1.2
+    rate_decay_factor: 0.9
+  pruning:
+    initial_rate: 0.0001
+    rate_increase_factor: 1.5
+    rate_decay_factor: 0.95
+  maturation:
+    excitatory_maturation_rate: 0.08
+    inhibitory_maturation_rate: 0.06
+    structural_maturation_rate: 0.02
+
+simulation:
+  timestep: 0.001
+  max_steps: 10000
+  random_seed: 42
+  checkpoint_interval: 1000
+  enable_replay: true
+  enable_developmental_stages: true
+
+environment:
+  simple_world:
+    width: 20
+    height: 20
+    vision_width: 8
+    vision_height: 8
+    vision_channels: 3
+    max_energy: 100.0
+    energy_decay_rate: 0.01
+    resource_spawn_rate: 0.05
+    hazard_spawn_rate: 0.02
+    agent_start_x: 10.0
+    agent_start_y: 10.0
+
+experiments:
+  phase6_integration:
+    max_steps: 10000
+    neuron_count: 1000
+    region_count: 1
+    connection_probability: 0.1
+    enable_checkpointing: true
+    enable_replay: true
+    enable_development: true
+    checkpoint_path: "./checkpoint_test.bin"
+  phase3:
+    max_steps: 5000
+    neuron_count: 500
+    connection_probability: 0.15
+  phase4:
+    max_steps: 8000
+    neuron_count: 800
+    connection_probability: 0.12
+
+metadata:
+  version: "2.0"
+  description: "NLM Neural Learning Machine Configuration"
+  author: "NLM Research Team"
+  created_date: "2025-01-20"
+  last_modified: "2025-01-20"
+  purpose: "Integration test configuration for Phase 6 final integration"
+
+tags:
+  - production
+  - integration
+  - full_system
+  - research
+
+# Configuration notes:
+# - JSON files are ideal for programmatic access
+# - YAML files are better for human editing and version control
+# - Use dot notation for nested access in code (e.g., config.get("brain.neuron_count"))
+# - Simple key=value files still supported for backward compatibility
+# - Schema validation available for critical configurations

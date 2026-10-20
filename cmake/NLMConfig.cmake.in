@@ -1,0 +1,111 @@
+# NLM CMake Configuration Template
+# This file is used to configure the NLM package for use with find_package()
+
+set(NLM_VERSION 0.1.0)
+
+# Find required dependencies
+find_package(nlohmann_json 3.11.2 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
+# Import targets
+include(${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake)
+
+# Create imported targets for find_package usage
+add_library(nlm::core ALIAS nlm_core)
+add_library(nlm::brain ALIAS nlm_brain)
+add_library(nlm::config ALIAS nlm_config)
+add_library(nlm::dynamics ALIAS nlm_dynamics)
+add_library(nlm::plasticity ALIAS nlm_plasticity)
+add_library(nlm::development ALIAS nlm_development)
+add_library(nlm::neuromodulation ALIAS nlm_neuromodulation)
+add_library(nlm::memory ALIAS nlm_memory)
+add_library(nlm::prediction ALIAS nlm_prediction)
+add_library(nlm::cognition ALIAS nlm_cognition)
+add_library(nlm::sensory ALIAS nlm_sensory)
+add_library(nlm::motor ALIAS nlm_motor)
+add_library(nlm::environment ALIAS nlm_environment)
+add_library(nlm::agent ALIAS nlm_agent)
+add_library(nlm::experiments ALIAS nlm_experiments)
+add_library(nlm::visualization ALIAS nlm_visualization)
+add_library(nlm::phase3 ALIAS nlm_phase3)
+add_library(nlm::phase4 ALIAS nlm_phase4)
+add_library(nlm::phase6 ALIAS nlm_phase6)
+
+# Python module import
+add_library(nlm::pynlm ALIAS pynlm_module)
+
+# Package configuration
+include(CMakePackageConfigHelpers)
+
+# Generate and install package config files
+configure_package_config_file(
+    ${CMAKE_CURRENT_LIST_DIR}/NLMConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    VERSION ${NLM_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+# Install package configuration files
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+# Export targets for use by downstream projects
+export(EXPORT NLMTargets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/NLMTargets.cmake
+    NAMESPACE nlm::
+)
+
+install(EXPORT NLMTargets
+    FILE NLMTargets.cmake
+    NAMESPACE nlm::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+# Documentation for package users
+configure_file(
+    ${CMAKE_CURRENT_LIST_DIR}/NLMConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    @ONLY
+)
+
+# Print summary
+message(STATUS "NLM Package Configuration:")
+message(STATUS "  - Components available: nlm::core, nlm::brain, nlm::config, nlm::dynamics,")
+message(STATUS "                    nlm::plasticity, nlm::development, nlm::neuromodulation,")
+message(STATUS "                    nlm::memory, nlm::prediction, nlm::cognition,")
+message(STATUS "                    nlm::sensory, nlm::motor, nlm::environment,")
+message(STATUS "                    nlm::agent, nlm::experiments, nlm::visualization,")
+message(STATUS "                    nlm::phase3, nlm::phase4, nlm::phase6")
+message(STATUS "  - Python bindings: nlm::pynlm")
+message(STATUS "  - Installation prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "  - Configuration files: ${CMAKE_INSTALL_PREFIX}/etc/nlm/configs")
+message(STATUS "  - Headers: ${CMAKE_INSTALL_PREFIX}/include/nlm/")
+message(STATUS "")
+message(STATUS "To use NLM in your project:")
+message(STATUS "  find_package(nlm REQUIRED)")
+message(STATUS "  target_link_libraries(your_target PRIVATE nlm::brain nlm::config)")
+message(STATUS "")
+message(STATUS "Example CMakeLists.txt:")
+message(STATUS "  cmake_minimum_required(VERSION 3.16)")
+message(STATUS "  project(MyNLMProject)")
+message(STATUS "  ")
+message(STATUS "  find_package(nlm REQUIRED)")
+message(STATUS "  ")
+message(STATUS "  add_executable(my_simulator src/main.cpp)")
+message(STATUS "  target_link_libraries(my_simulator PRIVATE nlm::brain nlm::config)")
+message(STATUS "  target_include_directories(my_simulator PRIVATE ${nlm::brain_INCLUDE_DIRS})")
+message(STATUS "  ")
+message(STATUS "  # For Python bindings")
+message(STATUS "  pybind11_add_module(pynlm_ext python/bindings.cpp)")
+message(STATUS "  target_link_libraries(pynlm_ext PRIVATE nlm::brain nlm::config)")
+message(STATUS "  set_target_properties(pynlm_ext PROPERTIES OUTPUT_NAME \"pynlm\")")
