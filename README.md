@@ -73,14 +73,121 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── src/
+│   ├── core/           # Core utilities
+│   ├── brain/          # Neural components (integrated)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
+│   └── visualization/  # Visualization
+│   ├── tests/
+└── configs/
+```
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
 ## Running
+
+### Phase 6 Main Executable (Primary Experience)
+```bash
+./nlm
+```
+
+The main `nlm` executable now implements Phase 6 integration, providing:
+- Complete system integration demonstration
+- Interactive testing of all integrated components
+- Checkpoint save/load capabilities
+- Memory system validation
+- Neuromodulation testing
+- Cognitive architecture verification
 
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 6 integration test verifying all brain systems are connected.
+
+### Other Phase Executables
+
+- `./nlm_phase3_demo` - Phase 3: Basic computation and learning
+- `./nlm_phase4_demo` - Phase 4: Emerging cognition and perception
+- `./nlm_phase5_experiment` - Phase 5: Lifetime experiments and scaling
+
+## Configuration
+
+### Command Line Arguments
+
+The main Phase 6 executable and all demos support the following command line arguments:
+
+```bash
+./nlm [--config file.cfg] [--key=value] [-k value]
+```
+
+### Environment Variables
+
+Set environment variables to configure NLM:
+
+```bash
+export NLM_NEURON_COUNT=500
+export NLM_REGION_COUNT=2
+export NLM_SIMULATION_STEPS=10000
+export NLM_SEED=42
+export NLM_CHECKPOINT_PATH=./nlm_checkpoint.bin
+```
+
+### Configuration File Format
+
+NLM uses simple key=value configuration files:
+
+```
+# NLM Configuration File
+# Brain parameters
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+
+# Plasticity parameters
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+
+# Development parameters
+development_enabled = true
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Integration parameters
+replay_interval = 100
+consolidation_interval = 1000
+checkpoint_dir = ./checkpoints
+```
 
 ## Project Structure
 
@@ -110,9 +217,124 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
+│   ├── tests/
 └── configs/
 ```
+
+## Phase Integration Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Complete)
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
+
+### Phase 3 (Complete)
+- World interaction loop
+- Sensory input and motor output
+- Reward prediction error
+- Developmental stages
+- Novelty and curiosity
+
+### Phase 4 (Complete)
+- Neural prediction system
+- Working memory
+- Episodic-like memory
+- Concept formation
+- Neural attention (NOT Transformer)
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Checkpoint system
+
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working
+- Replay and consolidation functional
+- Phase 6 integration experiment created
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No detailed cortical architecture
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+Phase 6 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
+
+## Architecture Philosophy
+
+The NLM brain operates as a closed-loop system:
+
+```
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
+```
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
 
 ## Phase Summary
 
