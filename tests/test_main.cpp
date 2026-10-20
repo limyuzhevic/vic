@@ -128,3 +128,5 @@ int main() {
         return 1;
     }
 }
+
+} // namespace test_main

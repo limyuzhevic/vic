@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../brain_refactor/BrainCoordinator.hpp"
 #include <memory>
 #include <string>
 
@@ -47,6 +48,9 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// NEW ARCHITECTURE: Uses BrainCoordinator for subsystem management
+// Maintains backward compatibility with existing public interface
 
 class Brain {
 public:
@@ -79,6 +83,14 @@ public:
     
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    
+    // ========== SUBSYSTEM ACCESSORS (NEW) ==========
+    
+    // Get BrainCoordinator for subsystem management
+    BrainCoordinator* getBrainCoordinator();
+    const BrainCoordinator* getBrainCoordinator() const;
+    
+    // ========== LEGACY SUBSYSTEM ACCESSORS (MAINTAINED FOR BACKWARD COMPATIBILITY) ==========
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
