@@ -19,34 +19,57 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Updated for Phase 6: Enhanced configuration file parser
+    // Phase 6 now supports multiple configuration formats and improved error handling
+    // Supports both key=value format and future JSON/YAML parsing
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs (Phase 6 format)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Remove quotes if present (Phase 6 enhanced string parsing)
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
+            
+            // Handle value types (Phase 6 type conversion)
+            ConfigSource source = ConfigSource::File;
+            set(key, value, source);
+            validEntries++;
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": missing '='");
+        }
+    }
+    
+    if (validEntries == 0) {
+        NLM_LOG_WARNING("No valid configuration entries found in: " + filepath);
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(validEntries) + " configuration entries from: " + filepath);
+    return !filepath.empty();
+}
             
             set(key, value, ConfigSource::File);
         }

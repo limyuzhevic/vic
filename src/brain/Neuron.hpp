@@ -134,13 +134,14 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Phase 6: Enhanced LIF dynamics with neuromodulation integration
+    // Includes adaptive firing rates, spike-frequency adaptation, and plastic connectivity
     void step(Timestamp currentTime);
-    
-    // Reset to initial state
+
+    // Reset to initial state (Phase 6: comprehensive reset with developmental markers)
     void reset();
-    
-    // Initialize with random parameters
+
+    // Initialize with random parameters (Phase 6: development-aware initialization)
     void initializeRandom(RandomGenerator& rng);
     
 private:

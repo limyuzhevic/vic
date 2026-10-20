@@ -73,16 +73,80 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
+### Phase 6 Demo (Integration Test with Command-Line Options)
 ```bash
-./nlm_phase6_demo
+./nlm_phase6_demo [OPTIONS]
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+#### Available Options:
+
+**Basic Options:**
+- `--neurons=N` or `--neuron-count=N` - Number of neurons (default: 500)
+- `--steps=N` or `--max-steps=N` - Maximum simulation steps (default: 2000)
+- `--verbose` or `-v` - Enable verbose logging
+- `--help` or `-h` - Show this help message
+- `--version` - Show version information
+
+**Advanced Options:**
+- `--enable-checkpointing` - Enable checkpoint save/load testing
+- `--enable-replay` - Enable replay system testing
+- `--disable-development` - Disable development system
+
+#### Examples:
+```bash
+./nlm_phase6_demo --neurons=1000 --steps=5000
+./nlm_phase6_demo --enable-checkpointing --verbose
+./nlm_phase6_demo --help
+```
+
+## New CLI Interface
+
+The NLM project now includes a comprehensive command-line interface with the following commands:
+
+### Main Executable: `nlm`
+
+**Basic Commands:**
+- `help` - Show help message
+- `version` - Show version information
+- `run [OPTIONS]` - Run neural simulation
+- `demo` - Run Phase 6 integration demo with options
+
+**Advanced Commands:**
+- `experiment [FILE]` - Run experiment from file
+- `config` - Manage configuration files
+- `checkpoints` - Manage checkpoints
+- `replay` - Test replay system
+
+#### Configuration File Options:
+Configuration files can be specified with `--config=<file>` or `--output=<file>`.
+
+#### Key Improvements:
+1. **Backward Compatibility**: Original Phase 2 functionality preserved via command-line arguments
+2. **Enhanced Logging**: Verbose logging mode for debugging
+3. **Flexible Configuration**: Support for multiple configuration sources
+4. **Error Handling**: Comprehensive error reporting and recovery
+5. **Performance Optimizations**: Reduced logging frequency in intensive loops
+6. **Documentation**: Built-in help and version information
+
+#### Quick Start Examples:
+```bash
+# Run Phase 6 demo with custom settings
+./nlm demo --neurons=1000 --steps=3000 --enable-checkpointing
+
+# Run with backward compatibility (Phase 2)
+./nlm my_experiment.cfg
+
+# Get help information
+./nlm help
+./nlm --help
+
+# Check version
+./nlm version
+```
+
+For more detailed documentation, refer to the `docs/` directory and individual command documentation.
 
 ```
 NLM/

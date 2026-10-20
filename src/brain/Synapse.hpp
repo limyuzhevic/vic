@@ -71,13 +71,14 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 6: Enhanced synaptic dynamics with short-term plasticity and neuromodulation
+    // Includes eligibility traces, use-dependent modulation, and complex transmission dynamics
     void step(Timestamp currentTime);
-    
-    // Reset to initial state
+
+    // Reset to initial state (Phase 6: reset with developmental parameters)
     void reset();
-    
-    // Initialize with random parameters
+
+    // Initialize with random parameters (Phase 6: development-aware synaptogenesis)
     void initializeRandom(class RandomGenerator& rng);
     
 private:

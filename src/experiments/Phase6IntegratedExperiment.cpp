@@ -7,6 +7,39 @@
 #include <chrono>
 #include <cmath>
 
+// Initialize verbose logging from environment variable
+void initializeVerboseLogging() {
+#ifdef _WIN32
+    const char* verboseEnv = std::getenv("NLM_VERBOSE");
+#else
+    const char* verboseEnv = std::getenv("NLM_VERBOSE");
+#endif
+    if (verboseEnv) {
+        g_verboseLogging = std::string(verboseEnv) == "1" || 
+                          std::string(verboseEnv) == "true" ||
+                          std::string(verboseEnv) == "yes";
+    }
+}
+
+// Initialize verbose logging from environment variable
+void initializeVerboseLogging() {
+#ifdef _WIN32
+    const char* verboseEnv = std::getenv("NLM_VERBOSE");
+#else
+    const char* verboseEnv = std::getenv("NLM_VERBOSE");
+#endif
+    if (verboseEnv) {
+        g_verboseLogging = std::string(verboseEnv) == "1" || 
+                          std::string(verboseEnv) == "true" ||
+                          std::string(verboseEnv) == "yes";
+    }
+}
+
+// Set verbose logging from boolean parameter
+void setVerboseLogging(bool verbose) {
+    g_verboseLogging = verbose;
+}
+
 namespace nlm {
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
@@ -59,6 +92,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+
+    // Only log periodic status if verbose logging is enabled
+    const bool logPeriodicStatus = g_verboseLogging;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
@@ -92,24 +128,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+        // Periodic status logging - optimized for verbose mode
+        if (logPeriodicStatus && step % 1000 == 0) {
+            // Use direct string construction for efficiency
+            std::string status = "Step " + std::to_string(step) + 
+                                " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                                " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                                " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                                    brain->getWorkingMemory()->getActiveTraces() : 0);
+            NLM_LOG_INFO(status);
         }
     }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    // Use conditional final logging based on verbosity
+    if (!g_verboseLogging) {
+        NLM_LOG_INFO("=== Integration Experiment Summary ===");
+        NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
+        NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
+        NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
+        NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
+    } else {
+        NLM_LOG_INFO("=== Integration Experiment Summary ===");
+        NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
+        NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
+        NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
+        NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
+        NLM_LOG_INFO("Novelty level: " + std::to_string(result.noveltyLevel));
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(result.curiosityLevel));
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(result.dopamineLevel));
+    }
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
