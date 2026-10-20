@@ -134,13 +134,161 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+    .value("Empty", WorldObjectType::Empty)
+    .value("Resource", WorldObjectType::Resource)
+    .value("Hazard", WorldObjectType::Hazard)
+    .value("Wall", WorldObjectType::Wall)
+    .value("Marker", WorldObjectType::Marker)
+    .export_values();
+
+    // Group: Global Constants
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Group: Factory Functions - High-level API for quick setup
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        // Set reasonable defaults for immediate use
+        cfg->set("neuron_count", 100, ConfigSource::Default);
+        cfg->set("region_count", 1, ConfigSource::Default);
+        cfg->set("connection_probability", 0.1, ConfigSource::Default);
+        cfg->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        cfg->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        cfg->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        cfg->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        cfg->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        return cfg;
+    }, "Create a default configuration with reasonable values for quick start");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    // Group: Advanced Utility Functions
+    m.def("configure_brain_for_learning", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        // Enable all learning subsystems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Configure brain for learning
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, true);
+            }
+        }
+        
+        std::cout << "Brain configured for learning:" << std::endl;
+        std::cout << "  - Reward modulation enabled" << std::endl;
+        std::cout << "  - Structural plasticity enabled" << std::endl;
+        std::cout << "  - Development enabled" << std::endl;
+        std::cout << "  - Curiosity enabled" << std::endl;
+        std::cout << "  - Synaptic plasticity enabled" << std::endl;
+    }, py::arg("brain"), py::arg("agent"), 
+          "Configure brain and agent for advanced learning");
+
+    m.def("run_learning_experiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, 
+                                         std::shared_ptr<SimpleWorld> world, uint64_t num_steps) {
+        std::cout << "=== Learning Experiment ===" << std::endl;
+        
+        // Initial state
+        float initial_firing = brain->getAverageFiringRate();
+        float initial_curiosity = agent->getCuriosityLevel();
+        float initial_novelty = agent->getNoveltyLevel();
+        
+        // Run experiment
+        for (uint64_t step = 0; step < num_steps; ++step) {
+            // Environment update
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain processing
+            brain->step(step, step * 0.001);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Reward modulation
+            float reward = 0.0f;
+            if (world->getAgentBody().health > 0.5f) {
+                reward = 1.0f;  // Positive reward for good health
+            } else if (world->getAgentBody().energy < 0.2f) {
+                reward = -1.0f;  // Negative reward for low energy
+            }
+            
+            agent->applyRewardModulation(reward, agent->getPredictionError());
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Progress output
+            if (step % 200 == 0) {
+                std::cout << "Step " << step << ": "
+                          << "Firing: " << brain->getFiringNeuronCount() << ", "
+                          << "Curiosity: " << agent->getCuriosityLevel() << ", "
+                          << "Novelty: " << agent->getNoveltyLevel() << ", "
+                          << "Reward: " << reward << std::endl;
+            }
+        }
+        
+        // Final statistics
+        float final_firing = brain->getAverageFiringRate();
+        float final_curiosity = agent->getCuriosityLevel();
+        float final_novelty = agent->getNoveltyLevel();
+        
+        std::cout << "=== Experiment Results ===" << std::endl;
+        std::cout << "Firing rate change: " << (final_firing - initial_firing) << " Hz" << std::endl;
+        std::cout << "Curiosity change: " << (final_curiosity - initial_curiosity) << std::endl;
+        std::cout << "Novelty change: " << (final_novelty - initial_novelty) << std::endl;
+        std::cout << "Total spikes generated: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "=========================" << std::endl;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_steps"),
+          "Run a complete learning experiment with reward-based training");
+
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, uint64_t num_steps, 
+                               std::string benchmark_name = "Performance Test") {
+        std::cout << "=== " << benchmark_name << " ===" << std::endl;
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // Warm-up
+        for (uint64_t step = 0; step < 100; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        // Benchmark
+        for (uint64_t step = 0; step < num_steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        float steps_per_second = (num_steps / 1000.0f) / (duration.count() / 1000.0f);
+        float avg_firing = brain->getAverageFiringRate();
+        float total_spikes = brain->getTotalSpikeCount();
+        
+        std::cout << "Benchmark Results:" << std::endl;
+        std::cout << "  Steps: " << num_steps << std::endl;
+        std::cout << "  Time: " << duration.count() / 1000.0f << " seconds" << std::endl;
+        std::cout << "  Performance: " << steps_per_second << " steps/second" << std::endl;
+        std::cout << "  Average firing rate: " << avg_firing << " Hz" << std::endl;
+        std::cout << "  Total spikes: " << total_spikes << std::endl;
+        std::cout << "=========================" << std::endl;
+    }, py::arg("brain"), py::arg("num_steps"), py::arg("benchmark_name") = "Performance Test",
+          "Benchmark brain performance over specified steps");
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())

@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 6: Implement proper JSON/YAML parser for modern config formats
+    // PLACEHOLDER - Currently uses simple key=value format for compatibility
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
