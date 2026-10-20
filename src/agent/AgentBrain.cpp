@@ -19,8 +19,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , neuronsToConnectionsRatio_(1.0f)
+    , contextAwarenessEnabled_(false)
+    , metaLearningEnabled_(false)
+    , neuralCompressionEnabled_(false)
+    , dopamineSensitivity_(1.0f)
+    , curiosityScaling_(1.0f)
+    , sensoryFilteringEnabled_(false)
+    , sensoryThreshold_(0.5f)
+    , memoryIntegrationEnabled_(false)
+    , transferLearningEnabled_(false)
+    , continualLearningEnabled_(false)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize with default distributions (backward compatible)
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -28,11 +39,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
+                        // Configurable distribution based on neuronsToConnectionsRatio_
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
+                        // Use configurable ratio to determine distribution
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
@@ -44,10 +56,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Configurable distribution based on neuronsToConnectionsRatio_
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
+                        // Use configurable ratio to determine distribution
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;

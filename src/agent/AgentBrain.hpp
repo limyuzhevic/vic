@@ -58,16 +58,65 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Configure neuron distribution for motor and sensory groups
+    void configureMotorDistribution(size_t motorForwardCount, size_t motorBackwardCount,
+                                   size_t motorTurnLeftCount, size_t motorTurnRightCount,
+                                   size_t motorInteractCount, size_t motorWaitCount);
+    void configureSensoryDistribution(size_t visionCount, size_t touchCount,
+                                     size_t internalCount, size_t proprioceptionCount);
+    void configureNeuronsToConnectionsRatio(float ratio);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Get current configuration
+    size_t getMotorForwardCount() const { return motorForward_.size(); }
+    size_t getMotorBackwardCount() const { return motorBackward_.size(); }
+    size_t getMotorTurnLeftCount() const { return motorTurnLeft_.size(); }
+    size_t getMotorTurnRightCount() const { return motorTurnRight_.size(); }
+    size_t getMotorInteractCount() const { return motorInteract_.size(); }
+    size_t getMotorWaitCount() const { return motorWait_.size(); }
+    
+    size_t getVisionCount() const { return sensoryVision_.size(); }
+    size_t getTouchCount() const { return sensoryTouch_.size(); }
+    size_t getInternalCount() const { return sensoryInternal_.size(); }
+    size_t getProprioceptionCount() const { return sensoryProprioception_.size(); }
+    
+    // Enable/disable advanced features
+    void enableContextAwareness(bool enable) { contextAwarenessEnabled_ = enable; }
+    void enableMetaLearning(bool enable) { metaLearningEnabled_ = enable; }
+    void enableNeuralCompression(bool enable) { neuralCompressionEnabled_ = enable; }
+    
+    bool isContextAware() const { return contextAwarenessEnabled_; }
+    bool isMetaLearningEnabled() const { return metaLearningEnabled_; }
+    bool isNeuralCompressionEnabled() const { return neuralCompressionEnabled_; }
+    
+    // Advanced motor control
+    void setActionBias(const std::string& bias);  // Set bias towards certain actions
+    float getActionEntropy() const;  // Measure of exploration vs exploitation
+    
+    // Advanced sensory processing
+    void enableSensoryFiltering(bool enable) { sensoryFilteringEnabled_ = enable; }
+    void setSensoryThreshold(float threshold) { sensoryThreshold_ = threshold; }
+    bool isSensoryFilteringEnabled() const { return sensoryFilteringEnabled_; }
+    float getSensoryThreshold() const { return sensoryThreshold_; }
+    
+    // Neuromodulation enhancement
+    void setDopamineSensitivity(float sensitivity) { dopamineSensitivity_ = sensitivity; }
+    void setCuriosityScaling(float scaling) { curiosityScaling_ = scaling; }
+    float getDopamineSensitivity() const { return dopamineSensitivity_; }
+    float getCuriosityScaling() const { return curiosityScaling_; }
+    
+    // Development system enhancement
+    void setDevelopmentalSequence(const std::vector<DevelopmentalStage>& stages);
+    void setPlasticitySchedule(const std::vector<std::pair<double, float>>& schedule);
+    
+    // Memory integration
+    void enableMemoryIntegration(bool enable) { memoryIntegrationEnabled_ = enable; }
+    bool isMemoryIntegrationEnabled() const { return memoryIntegrationEnabled_; }
+    
+    // Advanced learning
+    void enableTransferLearning(bool enable) { transferLearningEnabled_ = enable; }
+    void enableContinualLearning(bool enable) { continualLearningEnabled_ = enable; }
+    bool isTransferLearningEnabled() const { return transferLearningEnabled_; }
+    bool isContinualLearningEnabled() const { return continualLearningEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
