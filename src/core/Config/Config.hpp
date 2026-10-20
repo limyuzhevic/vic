@@ -55,14 +55,26 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format with text fallback)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from text format (key=value)
+    bool loadFromText(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJson(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (format based on extension)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to text format (key=value)
+    bool saveToText(const std::string& filepath) const;
+    
+    // Save to JSON format
+    bool saveToJson(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -90,6 +102,12 @@ public:
     // Clear all
     void clear();
     
+    // Configuration validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    
+    // Update from file
+    void update(const std::string& filepath);
+    
     // Get configuration summary
     std::string summary() const;
     
@@ -100,6 +118,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    void parseJsonRecursive(const std::string& prefix, const nlohmann::json& j, ConfigSource source);
 };
+
+} // namespace nlm
 
 } // namespace nlm

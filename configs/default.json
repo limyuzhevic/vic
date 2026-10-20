@@ -1,0 +1,135 @@
+{
+  "nlm": {
+    "version": "0.1.0",
+    "description": "Neural Learning Machine Phase 6 Final Integration",
+    
+    "simulation": {
+      "timestep": 0.001,
+      "max_steps": 10000,
+      "random_seed": 42
+    },
+    
+    "brain": {
+      "neuron_count": 1000,
+      "region_count": 2,
+      "connection_probability": 0.1,
+      "initial_weight_mean": 0.5,
+      "initial_weight_std": 0.1,
+      "v_thresh": -50.0,
+      "v_rest": -70.0,
+      "v_reset": -75.0,
+      "tau_mem": 20.0,
+      "tau_ref": 2.0
+    },
+    
+    "plasticity": {
+      "stdp": {
+        "enable": true,
+        "learning_rate": 0.01,
+        "ltp_weight": 0.02,
+        "ltd_weight": 0.015,
+        "tau_plus": 20.0,
+        "tau_minus": 20.0
+      },
+      "hebbian": {
+        "enable": true,
+        "learning_rate": 0.005
+      },
+      "structural": {
+        "enable": true,
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001
+      }
+    },
+    
+    "development": {
+      "synaptogenesis_rate": 0.001,
+      "pruning_rate": 0.0001,
+      "maturation_rate": 0.0005
+    },
+    
+    "neuromodulation": {
+      "dopamine": {
+        "baseline": 0.1,
+        "scale": 1.0
+      },
+      "curiosity": {
+        "enable": true,
+        "baseline": 0.5
+      },
+      "novelty": {
+        "enable": true,
+        "sensitivity": 0.8
+      },
+      "reward": {
+        "discount_factor": 0.99,
+        "prediction_error": true
+      }
+    },
+    
+    "memory": {
+      "working_memory": {
+        "capacity": 50,
+        "decay_rate": 0.95
+      },
+      "episodic": {
+        "enable_replay": true,
+        "consolidation_interval": 1000
+      },
+      "associative": {
+        "learning_rate": 0.02,
+        "pattern_capacity": 100
+      }
+    },
+    
+    "cognition": {
+      "attention": {
+        "enable": true,
+        "competition_strength": 0.8
+      },
+      "planning": {
+        "enable": true,
+        "planning_horizon": 10
+      },
+      "concept_formation": {
+        "enable": true,
+        "similarity_threshold": 0.7
+      }
+    },
+    
+    "sensory": {
+      "vision": {
+        "enabled": true,
+        "width": 8,
+        "height": 8
+      },
+      "audio": {
+        "enabled": true,
+        "channels": 1,
+        "sample_rate": 1000
+      },
+      "internal": {
+        "enabled": true
+      }
+    },
+    
+    "environment": {
+      "name": "GridWorld",
+      "width": 10,
+      "height": 10,
+      "max_energy": 100.0
+    },
+    
+    "logging": {
+      "level": "INFO",
+      "to_file": false,
+      "filename": "nlm.log",
+      "console": true
+    },
+    
+    "visualization": {
+      "enabled": false,
+      "update_rate": 30.0
+    }
+  }
+}

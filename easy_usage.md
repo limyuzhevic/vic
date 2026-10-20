@@ -295,3 +295,5 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+**Note**: The Easy Usage Guide has been updated to reflect the modern JSON configuration system while maintaining full backward compatibility. All examples work with both legacy text configs and new JSON configs automatically.
