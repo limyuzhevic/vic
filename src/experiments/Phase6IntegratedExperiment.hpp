@@ -15,8 +15,8 @@
  * that all systems interact properly.
  */
 
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
+#include "experiments/Experiment.hpp"
+#include "experiments/Metrics.hpp"
 #include <vector>
 #include <string>
 #include <memory>

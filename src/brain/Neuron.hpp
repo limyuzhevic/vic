@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
+#include "core/Types/Types.hpp"
 #include <vector>
 #include <array>
 
@@ -40,8 +40,38 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * @class Neuron
+ * @brief Represents a single biological neuron with LIF dynamics
+ * @details This class implements a Leaky Integrate-and-Fire (LIF) neuron model,
+ * which is a fundamental model in computational neuroscience for simulating
+ * neuronal spiking behavior. The neuron integrates incoming synaptic currents
+ * and emits action potentials (spikes) when its membrane potential exceeds
+ * a threshold.
+ * 
+ * The neuron model includes:
+ * - Membrane potential dynamics with leak conductance
+ * - Refractory period after spiking
+ * - Spike-frequency adaptation via an adaptation variable
+ * - Synaptic integration (excitatory, inhibitory, modulatory)
+ * - Plasticity flags for synaptic modification
+ * - Population and region membership for network organization
+ * 
+ * Thread Safety: Each Neuron instance is not thread-safe for concurrent
+ * modification. Use external synchronization if accessing from multiple threads.
+ * 
+ * Performance: Uses pImpl pattern for efficient memory management. Most
+ * operations are O(1) except spike history and synapse management which are
+ * O(n) where n is the number of spikes/synapses.
+ * 
+ * References:
+ * - Dayan, P. & Abbott, L.F. (2001). Theoretical Neuroscience. MIT Press.
+ * - Gerstner, W. et al. (2014). Neuronal Dynamics. Cambridge University Press.
+ * 
+ * @see Synapse
+ * @see PlasticityFlags
+ * @see RandomGenerator
+ */
 class Neuron {
 public:
     // Create neuron with ID

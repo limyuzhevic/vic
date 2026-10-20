@@ -5,8 +5,84 @@
 
 namespace nlm {
 
-// Agent body state - contains physical properties and internal state
-// This is part of the environment, not the brain
+/**
+ * @struct AgentBody
+ * @brief Physical agent state containing position, orientation, and internal resources
+ * @details AgentBody represents the physical embodiment of an agent in the simulated
+ * environment. It contains the kinematic properties (position, velocity, orientation)
+ * and physiological state (energy, health, age). This structure tracks what the brain
+ * does NOT know about directly but must coordinate with for effective action.
+ * 
+ * Physical Properties:
+ * - Position and orientation in 2D space
+ * - Linear and angular velocity
+ * - Energy reserves (depleted by actions)
+ * - Health status (degrades over time)
+ * - Developmental age
+ * 
+ * State Flags:
+ * - Movement and turning states
+ * - Last action timing
+ * - Internal movement indicators
+ * 
+ * Thread Safety: This struct is not thread-safe for concurrent modification.
+ * Should be accessed with external synchronization if shared between threads.
+ * 
+ * Performance: O(1) for all field access and modification. Constant memory usage
+ * (~48 bytes including padding).
+ * 
+ * Biological Motivation:
+ * - Energy depletion mimics metabolic cost of action
+ * - Health degradation simulates aging and damage
+ * - Age tracks developmental stage and experience
+ * - Movement states indicate behavioral modes
+ * 
+ * Reset Behavior: Reset() restores initial state, useful for:
+ * - Beginning new episodes
+ * - Recovery from damage
+ * - State initialization for testing
+ * 
+ * @code
+ * // Create and use agent body
+ * AgentBody body;
+ * 
+ * // Update position (with physics integration)
+ * void updatePosition(AgentBody& body, const MotorCommand& command, float dt) {
+ *     // Apply movement
+ *     float speed = getSpeed(command);
+ *     body.velocityX += speed * cos(body.orientation) * dt;
+ *     body.velocityY += speed * sin(body.orientation) * dt;
+ *     
+ *     // Update position
+ *     body.x += body.velocityX * dt;
+ *     body.y += body.velocityY * dt;
+ *     
+ *     // Update orientation
+ *     if (command == MotorCommand::TurnLeft) {
+ *         body.orientation += TURN_RATE * dt;
+ *     } else if (command == MotorCommand::TurnRight) {
+ *         body.orientation -= TURN_RATE * dt;
+ *     }
+ *     
+ *     // Deplete energy based on action
+ *     body.energy -= ACTION_COST * dt;
+ *     body.energy = std::max(0.0f, body.energy);
+ * }
+ * 
+ * // Check for collisions
+ * bool checkCollision(const AgentBody& body, const WorldObject& obj) {
+ *     // Distance-based collision detection
+ *     float dx = body.x - obj.x;
+ *     float dy = body.y - obj.y;
+ *     float distance = sqrt(dx*dx + dy*dy);
+ *     return distance < body.size + obj.size;
+ * }
+ * @endcode
+ * 
+ * @see MotorCommand
+ * @see ActionResult
+ * @see WorldObjectType
+ */
 struct AgentBody {
     // Position in world
     float x;

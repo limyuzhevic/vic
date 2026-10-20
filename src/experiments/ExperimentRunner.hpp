@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Experiment.hpp"
-#include "../brain/Brain.hpp"
-#include "../environment/Environment.hpp"
+#include "brain/Brain.hpp"
+#include "environment/Environment.hpp"
 #include <memory>
 #include <vector>
 

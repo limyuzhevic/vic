@@ -50,10 +50,10 @@
  *   - Lifelong adaptation
  */
 
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
-#include "../experiments/AblationSystem.hpp"
-#include "../experiments/ScalingBenchmark.hpp"
+#include "experiments/Experiment.hpp"
+#include "experiments/Metrics.hpp"
+#include "experiments/AblationSystem.hpp"
+#include "experiments/ScalingBenchmark.hpp"
 #include <vector>
 #include <string>
 #include <memory>

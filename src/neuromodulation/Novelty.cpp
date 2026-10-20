@@ -1,5 +1,5 @@
 #include "Novelty.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 

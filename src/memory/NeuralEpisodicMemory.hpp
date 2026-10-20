@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+#include "core/Types/Types.hpp"
+#include "brain/Brain.hpp"
 #include <vector>
 #include <memory>
 #include <deque>
@@ -48,24 +48,100 @@ struct EpisodicMemoryItem {
         , resultingReward(0), age(0) {}
 };
 
-// NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
-// NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
-//
-// Key mechanisms:
-// - Episodes stored as neural activity patterns
-// - Retrieval via pattern completion (Hopfield-like)
-// - Temporal ordering through timestamps
-// - Relevance-weighted recall
-// - Replay during offline periods
-
+/**
+ * @class NeuralEpisodicMemory
+ * @brief Episodic memory storing experiences as neural activity patterns
+ * @details NeuralEpisodicMemory implements autobiographical memory by storing
+ * experiences as neural activity patterns that can be retrieved and replayed.
+ * Unlike traditional databases, episodes are encoded as synaptic patterns that
+ * interact with neural substrate, enabling pattern completion and integration
+ * with current neural state.
+ * 
+ * Memory Encoding:
+ * - Pattern completion: Retrieval via partial cue matching
+ * - Temporal ordering: Chronological storage with timestamps
+ * - Spatial context: Position and orientation stored
+ * - Action-outcome associations: Learned contingencies
+ * 
+ * Retrieval Mechanisms:
+ * - Similarity-based: Pattern completion using Hopfield-like dynamics
+ * - Temporal access: Time-window queries for recent events
+ * - Spatial queries: Location-based retrieval
+ * - Action-based: Event-based retrieval
+ * - Replay: Reactivation of memory traces
+ * 
+ * Thread Safety: Thread-safe for concurrent access. Memory operations are
+ * synchronized with brain simulation and cognitive processing.
+ * 
+ * Performance: O(n) for storage, O(n log n) for retrieval operations.
+ * Memory usage grows with number of stored episodes.
+ * 
+ * Storage Limits:
+ * - Maximum episodes: Configurable based on available memory
+ * - Memory consolidation: Old/redundant episodes discarded
+ * - Replay frequency: Relevant episodes replayed during rest periods
+ * - Interference: Similar episodes compete during retrieval
+ * 
+ * Biological Plausibility:
+ * - Implements hippocampal-neocortical interaction
+ * - Supports memory consolidation during sleep/replay
+ * - Compatible with memory trace theory
+ * - Supports pattern separation and completion
+ * 
+ * @code
+ * // Initialize episodic memory
+ * NeuralEpisodicMemory emem;
+ * emem.initialize(brain);
+ * emem.enableReplay(true);
+ * emem.setMaxEpisodes(10000);
+ * 
+ * // Create memory item
+ * EpisodicMemoryItem episode;
+ * episode.timestamp = currentStep;
+ * episode.sensoryState = {0.8f, 0.3f, 0.6f};  // Visual input
+ * episode.positionX = agentBody.x;
+ * episode.positionY = agentBody.y;
+ * episode.action = ActionType::MoveForward;
+ * episode.reward = 1.0f;
+ * 
+ * // Store episode
+ * emem.storeEpisode(episode);
+ * 
+ * // Retrieve similar episodes
+ * vector<const EpisodicMemoryItem*> similar = emem.retrieveSimilar(
+ *     sensoryPattern, 5 // Max 5 results
+ * );
+ * 
+ * // Replay an episode
+ * if (!similar.empty()) {
+ *     emem.replayEpisode(similar[0]);
+ * }
+ * 
+ * // Consolidation
+ * emem.consolidate(0.5f);  // Remove items with relevance < 0.5
+ * @endcode
+ * 
+ * Memory Functions:
+ * - Event recording: Store agent experiences
+ * - Pattern completion: Retrieve similar past experiences
+ * - Replay: Reactivate memories for consolidation
+ * - Attention: Focus on relevant memories
+ * - Learning: Update based on new outcomes
+ * 
+ * @see EpisodicMemoryItem
+ * @see NeuralWorkingMemory
+ * @see NeuralAssociativeMemory
+ * @see Brain
+ * @see SimulationClock
+ */
 class NeuralEpisodicMemory {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
-
+    
     // Initialize with brain reference
     void initialize(Brain* brain);
-
+    
     // Store a new experience
     // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);

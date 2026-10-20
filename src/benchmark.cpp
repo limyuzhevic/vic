@@ -34,11 +34,11 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create configuration
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    config->legacySet("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+    config->legacySet("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->legacySet("connection_probability", 0.1f, ConfigSource::Default);
+    config->legacySet("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    config->legacySet("stdp_ltd_weight", 0.012f, ConfigSource::Default);
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../agent/AgentBody.hpp"
-#include "../agent/SensoryPercept.hpp"
+#include "agent/AgentBody.hpp"
+#include "agent/SensoryPercept.hpp"
 #include <memory>
 #include <string>
 #include <vector>

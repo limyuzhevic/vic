@@ -1,6 +1,6 @@
 #include "DevelopmentSystem.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 

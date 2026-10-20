@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
 #include <memory>
 #include <string>
 

@@ -1,5 +1,5 @@
 #include "Observation.hpp"
-#include "../agent/SensoryPercept.hpp"
+#include "agent/SensoryPercept.hpp"
 
 namespace nlm {
 

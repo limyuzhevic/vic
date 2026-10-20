@@ -1,10 +1,10 @@
 #include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "agent/AgentBrain.hpp"
+#include "agent/SensoryPercept.hpp"
+#include "world/SimpleWorld.hpp"
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -195,23 +195,23 @@ public:
     
 private:
     void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
+        config->legacySet("environment_width", 20);
+        config->legacySet("environment_height", 20);
+        config->legacySet("vision_width", 16);
+        config->legacySet("vision_height", 16);
     }
     
     void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", 42u);
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+        config->legacySet("neuron_count", 500);
+        config->legacySet("region_count", 2);
+        config->legacySet("connection_probability", 0.1f);
+        config->legacySet("random_seed", 42u);
+        config->legacySet("simulation_timestep", 0.001);
+        config->legacySet("stdp_ltp_weight", 0.01f);
+        config->legacySet("stdp_ltd_weight", 0.012f);
+        config->legacySet("stdp_tau", 20.0f);
+        config->legacySet("synaptogenesis_rate", 0.0001f);
+        config->legacySet("pruning_rate", 0.00001f);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

@@ -31,11 +31,11 @@
  *    - Compact data structures
  */
 
-#include "../brain/Brain.hpp"
-#include "../performance/EventQueue.hpp"
-#include "../performance/SparseConnectivity.hpp"
-#include "../performance/ParallelProcessing.hpp"
-#include "../performance/SIMDVectorization.hpp"
+#include "brain/Brain.hpp"
+#include "performance/EventQueue.hpp"
+#include "performance/SparseConnectivity.hpp"
+#include "performance/ParallelProcessing.hpp"
+#include "performance/SIMDVectorization.hpp"
 #include <vector>
 #include <array>
 #include <optional>

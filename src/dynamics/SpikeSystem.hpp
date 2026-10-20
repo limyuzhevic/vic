@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Neuron.hpp"
+#include "core/Types/Types.hpp"
+#include "brain/Neuron.hpp"
 #include <vector>
 #include <queue>
 #include <functional>

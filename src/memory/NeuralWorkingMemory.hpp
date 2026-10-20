@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+#include "core/Types/Types.hpp"
+#include "brain/Brain.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -9,20 +9,89 @@
 
 namespace nlm {
 
-// NeuralWorkingMemory: Implements working memory using neural dynamics
-// NOT a simple storage vector - uses persistent activity and recurrent connections
-//
-// Key mechanisms:
-// - Persistent neural activity (reverberating activity)
-// - Recurrent synaptic connections for maintaining information
-// - Activity-dependent short-term plasticity
-// - Neural competition for selective retention
-
+/**
+ * @class NeuralWorkingMemory
+ * @brief Working memory using neural dynamics and persistent activity
+ * @details NeuralWorkingMemory implements working memory through persistent neural
+ * activity rather than temporary storage. It uses reverberating activity patterns
+ * maintained by recurrent connections, allowing information to be held "in mind"
+ * during cognitive processing.
+ * 
+ * Working Memory Mechanisms:
+ * - Persistent activity: Recurrent connections maintain firing patterns
+ * - Short-term plasticity: Dynamic modulation of synaptic strength
+ * - Neural competition: Winner-take-all for selective attention
+ * - Activity-dependent decay: Forgetting based on neural activity
+ * 
+ * Neural Architecture:
+ * - Memory traces: Distributed neural population codes
+ * - Recurrent loops: Feedback connections maintain activity
+ * - Competition layers: Lateral inhibition selects representations
+ * - Maintenance circuits: Sustained firing through network dynamics
+ * 
+ * Thread Safety: Thread-safe for concurrent access. Working memory is updated
+ * during simulation steps and accessed by cognitive components.
+ * 
+ * Performance: O(n) for store/retrieve operations where n is number of neurons.
+ * O(log n) for competition and decay operations.
+ * 
+ * Capacity:
+ * - Neural capacity: Limited by recurrent network properties
+ * - Number of traces: Determined by competition and capacity limits
+ * - Trace duration: Exponential decay with characteristic time constant
+ * - Interference: Cross-talk between traces reduces memory fidelity
+ * 
+ * Biological Plausibility:
+ * - Mirrors prefrontal cortex persistent activity
+ * - Implements working memory through sustained firing
+ * - Supports object working memory and spatial working memory
+ * - Compatible with delayed-response tasks
+ * 
+ * @code
+ * // Initialize working memory
+ * NeuralWorkingMemory wmem;
+ * wmem.initialize(brain);
+ * wmem.setCapacity(10);      // Number of items
+ * wmem.setDecayRate(0.01f);   // 1% decay per timestep
+ * 
+ * // Store information
+ * vector<float> pattern = {0.8f, 0.3f, 0.6f, 0.1f};
+ * wmem.store(pattern, 1.0f);
+ * 
+ * // Or store specific neuron activation
+ * wmem.storeToNeuron(42, 0.9f);  // Neuron 42 fires strongly
+ * 
+ * // Retrieve current content
+ * vector<float> content = wmem.retrieve();
+ * 
+ * // Update with decay and competition
+ * wmem.update(dt);
+ * wmem.runCompetition();
+ * 
+ * // Use for cognitive tasks
+ * if (wmem.isWinning(targetNeuron)) {
+ *     // This representation is currently dominant
+ *     // Use for planning or decision making
+ * }
+ * @endcode
+ * 
+ * Working Memory Functions:
+ * - Maintenance of information across cognitive stages
+ * - Active manipulation of stored representations
+ * - Integration with attention and working memory load
+ * - Support for sequential and simultaneous processing
+ * 
+ * @see AttentionalSelection
+ * @see Brain
+ * @see SimulationClock
+ * @see NeuralEpisodicMemory
+ * @see NeuralAssociativeMemory
+ */
 class NeuralWorkingMemory {
 public:
     NeuralWorkingMemory();
     ~NeuralWorkingMemory();
-
+    
     // Initialize with brain reference
     void initialize(Brain* brain);
 

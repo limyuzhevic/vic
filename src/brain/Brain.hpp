@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
+#include "core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "dynamics/SpikeSystem.hpp"
+#include "plasticity/STDP.hpp"
+#include "plasticity/Hebbian.hpp"
+#include "plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
@@ -44,10 +44,51 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+/**
+ * @class Brain
+ * @brief Central coordinator of the neural system implementing real spiking computation
+ * @details The Brain class serves as the main neural controller, orchestrating
+ * all components of the spiking neural network. It integrates event-driven dynamics
+ * with sophisticated memory systems, prediction mechanisms, cognitive functions,
+ * and neuromodulation to create a complete artificial brain model.
+ * 
+ * Key Features:
+ * - Real-time spiking neural computation with event-driven dynamics
+ * - Integrated memory systems (working, episodic, associative)
+ * - Prediction system for sensory forecasting
+ * - Cognitive functions (planning, concept formation, attention)
+ * - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+ * - Developmental system for plasticity modulation
+ * - Inter-regional long-range connectivity
+ * - Plasticity rules (STDP, Hebbian, structural)
+ * - Spike system for event-driven processing
+ * 
+ * Thread Safety: The Brain instance is not thread-safe for concurrent simulation.
+ * All simulation steps, sensory input, and state modifications should be
+ * synchronized when called from multiple threads.
+ * 
+ * Performance: Uses pImpl pattern for efficient memory management. Main simulation
+ * step is O(N) where N is the number of neurons and synapses. Memory systems
+ * are optimized for parallel access patterns.
+ * 
+ * Memory Management: Brain uses shared_ptr for Config and owns all internal
+ * components. It's safe to pass Brain by value (move semantics) and should be
+ * destroyed before its components.
+ * 
+ * Evolution: This represents a complete architecture for artificial general
+ * intelligence through neural coherence and predictive processing.
+ * 
+ * References:
+ * - Hawkins, J. & Blakeslee, S. (2005). On Intelligence. Henry Holt.
+ * - Friston, K. (2010). The free-energy principle. Nature Reviews Neuroscience.
+ * - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning. MIT Press.
+ * 
+ * @see Config
+ * @see SensoryInput
+ * @see Action
+ * @see Neuromodulator
+ * @see DevelopmentSystem
+ */
 class Brain {
 public:
     // Create brain with configuration

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../agent/AgentBody.hpp"
-#include "../brain/Brain.hpp"
+#include "agent/AgentBody.hpp"
+#include "brain/Brain.hpp"
 #include <string>
 #include <vector>
 #include <memory>

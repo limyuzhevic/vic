@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../agent/AgentBody.hpp"
+#include "agent/AgentBody.hpp"
 #include <string>
 #include <vector>
 

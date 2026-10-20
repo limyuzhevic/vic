@@ -6,9 +6,41 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Parallel build support
+include(ProcessorCount)
+ProcessorCount(N parallel)
+if(parallel GREATER 0)
+    set(CMAKE_BUILD_PARALLEL_LEVEL ${parallel})
+endif()
+
+# nlohmann/json - header-only JSON library
+option(BUILD_WITH_NLOHMANN_JSON "Build with nlohmann/json library" ON)
+if(BUILD_WITH_NLOHMANN_JSON)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Parallel build support
+include(ProcessorCount)
+ProcessorCount(N parallel)
+if(parallel GREATER 0)
+    set(CMAKE_BUILD_PARALLEL_LEVEL ${parallel})
+endif()
+
+# Optimization flags
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(-O3 -march=native -flto -ffast-math)
+    add_link_options(-flto)
 endif()
 
 # Enable warnings
@@ -18,8 +50,18 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Add nlohmann/json include directory
+if(BUILD_WITH_NLOHMANN_JSON)
+    target_include_directories(nlm_core PUBLIC ${nlohmann_json_SOURCE_DIR}/include)
+    target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Incremental build support
+enable_language(C)
+add_custom_target(compile_commands ALL COMMAND cmake --build . --target clean DEPENDS ${PROJECT_NAME})
 
 # Core library
 add_library(nlm_core STATIC

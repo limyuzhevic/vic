@@ -2,16 +2,84 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
+#include "brain/Brain.hpp"
+#include "world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+/**
+ * @class AgentBrain
+ * @brief Connects NLM brain to the world, handling sensory transduction and motor decoding
+ * @details The AgentBrain serves as the interface layer between the internal neural
+ * computation system (Brain) and the external environment (world). It translates
+ * sensory percepts into neural inputs and decodes neural activity into motor commands,
+ * effectively bridging the gap between the artificial brain and actionable behavior.
+ * 
+ * Core Functions:
+ * - Sensory transduction: Converts external/world sensory inputs into brain-compatible formats
+ * - Motor decoding: Translates neural activity patterns into executable motor commands
+ * - Neuromodulation: Integrates reward signals and developmental signals
+ * - State management: Maintains coherence between brain and world states
+ * 
+ * Architecture:
+ * - Input layer: Maps sensory percepts to brain neuron groups
+ * - Processing layer: Applies neuromodulation and developmental signals
+ * - Output layer: Decodes motor neuron activity to action commands
+ * - State layer: Maintains neuromodulation levels and developmental stage
+ * 
+ * Thread Safety: Not thread-safe for concurrent simulation. Should be accessed
+ * through a single agent simulation thread or with external synchronization.
+ * 
+ * Performance: O(1) for basic operations, O(n) for large-scale neural group access.
+ * Memory usage is constant per agent (~few KB for state tracking).
+ * 
+ * Agent Lifecycle:
+ * @code
+ * // Create and initialize agent
+ * auto brain = std::make_shared<Brain>(config);
+ * AgentBrain agentBrain(brain);
+ * 
+ * // Initialize with world
+ * agentBrain.initialize(world);
+ * 
+ * // Main simulation loop
+ * while (!world.isEpisodeDone()) {
+ *     // Process sensory input
+ *     SensoryPercept percept = world.getSensoryInput();
+ *     agentBrain.processSensoryInput(percept);
+ *     
+ *     // Step brain
+ *     brain->step(currentStep);
+ *     
+ *     // Decode motor command
+ *     MotorCommand cmd = agentBrain.decodeMotorCommand();
+ *     
+ *     // Apply to world
+ *     world.applyAction(cmd);
+ * }
+ * 
+ * // Reset for next episode
+ * agentBrain.reset();
+ * @endcode
+ * 
+ * Biological Plausibility:
+ * - Mirrors biological sensory-motor integration
+ * - Implements basal ganglia pathways for action selection
+ * - Uses neuromodulation for reinforcement learning
+ * - Maintains internal models of the world
+ * 
+ * @see AgentBody
+ * @see SensoryPercept
+ * @see MotorCommand
+ * @see Brain
+ * @see SimpleWorld
+ * @see DevelopmentalStage
+ */
 class AgentBrain {
+public:
+    AgentBrain(std::shared_ptr<Brain> brain);
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
