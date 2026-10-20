@@ -29,11 +29,29 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
+    # Core
+    src/core/Types/Types.cpp
+    src/core/Config/Config.cpp
+    src/core/Random/Random.cpp
+    src/core/Logger/Logger.cpp
+    src/core/SimulationClock/SimulationClock.cpp
+    # Brain - Core implementation
+    src/brain/core/BrainCore.cpp
+    # Brain - Simulation implementation (15-step main loop)
+    src/brain/simulation/BrainSimulation.cpp
+    # Brain - Memory system integration
+    src/brain/memory/BrainMemory.cpp
+    # Brain - Neuromodulation system integration
+    src/brain/neuromodulation/BrainNeuromodulation.cpp
+    # Brain - Cognition system integration
+    src/brain/cognition/BrainCognition.cpp
+    # Brain - Development system integration
+    src/brain/development/BrainDevelopment.cpp
+    # Brain - Plasticity and dynamics integration
+    src/brain/plasticity/BrainPlasticity.cpp
+    # Brain - Utilities
+    src/brain/utils/BrainUtils.cpp
+    # Original Brain interface implementation
     src/brain/Brain.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp

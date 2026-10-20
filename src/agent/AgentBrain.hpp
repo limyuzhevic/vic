@@ -1,84 +1,109 @@
-#pragma once
+// AgentBrain.hpp - Enhanced AgentBrain interface with configurable distribution
+#ifndef NLM_AGENTBRAIN_HPP
+#define NLM_AGENTBRAIN_HPP
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
+#include "brain/Brain.hpp"
+#include "neuron/NeuronId.hpp"
 #include <vector>
+#include <string>
+#include <memory>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+enum class MotorCommand {
+    Wait,
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    LookLeft,
+    LookRight,
+    Interact
+};
+
 class AgentBrain {
 public:
+    // Configuration structure for neuron distribution
+    struct NeuronDistributionConfig {
+        // Motor neuron distribution configuration
+        struct MotorConfig {
+            std::vector<std::string> motorGroupNames;
+            std::vector<size_t> neuronsPerGroup;
+            bool useModularDistribution = true;
+        } motor;
+        
+        // Sensory neuron distribution configuration
+        struct SensoryConfig {
+            std::vector<std::string> sensoryGroupNames;
+            std::vector<size_t> neuronsPerGroup;
+            bool useModularDistribution = true;
+        } sensory;
+        
+        // Advanced distribution options
+        bool enableDynamicRebalancing = false;
+        float groupBalanceThreshold = 0.2f;
+        size_t maxRedistributionSteps = 10;
+    };
+
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
-    // Initialize with world
+    // Configuration management
+    void setNeuronDistributionConfig(const NeuronDistributionConfig& config) {
+        distributionConfig_ = config;
+        redistributeNeurons();
+    }
+    
+    const NeuronDistributionConfig& getNeuronDistributionConfig() const {
+        return distributionConfig_;
+    }
+    
+    // Core processing methods
     void initialize(const SimpleWorld& world);
-    
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
-    
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
-    
-    // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
-    
-    // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
-    
-    // Apply neuromodulation based on reward
+    void updateDevelopment(double timestep);
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
-    void updateDevelopment(double timestep);
+    // Neuron access methods (enhanced)
+    const std::vector<Neuron*>& getMotorForwardNeurons() const { return motorForward_; }
+    const std::vector<Neuron*>& getMotorBackwardNeurons() const { return motorBackward_; }
+    const std::vector<Neuron*>& getMotorTurnLeftNeurons() const { return motorTurnLeft_; }
+    const std::vector<Neuron*>& getMotorTurnRightNeurons() const { return motorTurnRight_; }
+    const std::vector<Neuron*>& getMotorInteractNeurons() const { return motorInteract_; }
+    const std::vector<Neuron*>& getMotorWaitNeurons() const { return motorWait_; }
     
-    // Get current developmental stage
+    const std::vector<Neuron*>& getSensoryVisionNeurons() const { return sensoryVision_; }
+    const std::vector<Neuron*>& getSensoryTouchNeurons() const { return sensoryTouch_; }
+    const std::vector<Neuron*>& getSensoryInternalNeurons() const { return sensoryInternal_; }
+    const std::vector<Neuron*>& getSensoryProprioceptionNeurons() const { return sensoryProprioception_; }
+    
+    // Enhanced utility methods
+    size_t getTotalMotorNeurons() const;
+    size_t getTotalSensoryNeurons() const;
+    size_t getNeuronsInGroup(const std::string& groupName) const;
+    std::vector<std::string> getMotorGroupNames() const;
+    std::vector<std::string> getSensoryGroupNames() const;
+    
+    // Configuration generation methods
+    static NeuronDistributionConfig createDefaultConfig();
+    static NeuronDistributionConfig createBalancedConfig();
+    static NeuronDistributionConfig createExplorationConfig();
+    static NeuronDistributionConfig createNavigationConfig();
+    
+    // Development and state management
+    void reset();
     DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
     float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
     float getCuriosityLevel() const;
-    
-    // Get novelty level
     float getNoveltyLevel() const;
-    
-    // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
-    
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
-    
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
     std::shared_ptr<Brain> brain_;
+    NeuronDistributionConfig distributionConfig_;
     
-    // Motor neuron groups
+    // Neuron group storage (enhanced)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,32 +111,39 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
+    // Dynamic state tracking
+    std::vector<float> previousVision_;
+    double developmentalAge_;
     float dopamineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
     float plasticityModifier_;
-    
-    // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Private helper methods
+    void redistributeNeurons();
+    void initializeMotorGroups();
+    void initializeSensoryGroups();
+    void balanceGroupSizes();
+    void updateDynamicDistribution();
+    std::vector<Neuron*> getAllMotorNeurons() const;
+    std::vector<Neuron*> getAllSensoryNeurons() const;
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    float calculateGroupActivity(const std::vector<Neuron*>& neurons) const;
+    std::string getGroupNameForIndex(size_t index, bool isMotor) const;
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENTBRAIN_HPP
