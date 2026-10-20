@@ -53,4 +53,35 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::signalMotivation(float motivation) {
+    // Signal motivational state
+    pImpl->level = std::min(pImpl->peak, pImpl->level + motivation * 0.5f);
+}
+
+void Dopamine::signalAttention(float attention) {
+    // Signal attentional enhancement
+    pImpl->level = std::min(pImpl->peak, pImpl->level + attention * 0.3f);
+}
+
+float Dopamine::getMotivationLevel() const {
+    return std::max(0.0f, pImpl->level - pImpl->baseline);
+}
+
+float Dopamine::getRewardSensitivity() const {
+    // Dopamine modulates reward sensitivity
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Dopamine::setBaseline(float baseline) {
+    pImpl->baseline = std::clamp(baseline, 0.0f, 1.0f);
+}
+
+void Dopamine::setReleaseRate(float rate) {
+    pImpl->releaseRate = rate;
+}
+
+void Dopamine::setDecayRate(float rate) {
+    pImpl->decayRate = rate;
+}
+
 } // namespace nlm

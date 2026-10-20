@@ -510,9 +510,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Update prediction using neural substrate
+        // Get current working memory state as sensory input
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Convert memory neuron activity to a pattern
+            std::vector<float> currentState(memoryNeurons.size());
+            for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                currentState[i] = static_cast<float>(memoryNeurons[i]) / 100.0f;  // Normalize
+            }
+            
+            // Create a mock sensory input from working memory state
+            // In a real implementation, this would come from actual sensory neurons
+            SensoryInput sensoryState(currentState);
+            
+            // Use prediction system to predict next state
+            std::unique_ptr<SensoryInput> predictedState = 
+                pImpl->predictionSystem->predictNextState(sensoryState);
+            
+            if (predictedState) {
+                // Update predictions and learn from prediction error
+                pImpl->predictionSystem->updatePredictions(*predictedState, sensoryState);
+                
+                // Update prediction error signal for neuromodulation
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->setLevel(predictionError);
+                }
+                
+                // Train prediction system on current state
+                pImpl->predictionSystem->train(sensoryState);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +557,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Update concept formation using current neural activity patterns
+        // Get current working memory state as concept formation input
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty() && pImpl->novelty) {
+            // Create a pattern from memory neuron activity for concept formation
+            std::vector<float> pattern(memoryNeurons.size());
+            for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                pattern[i] = static_cast<float>(memoryNeurons[i]) / 100.0f;  // Normalize
+            }
+            
+            // Create mock features based on novelty and prediction error
+            std::vector<float> features;
+            if (pImpl->predictionError) {
+                features.push_back(pImpl->predictionError->getLevel());
+            }
+            if (pImpl->dopamine) {
+                features.push_back(pImpl->dopamine->getLevel());
+            }
+            features.push_back(pImpl->novelty->getLevel());
+            
+            // Present pattern to concept formation system
+            // This allows the brain to form abstract concepts from experience
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                pattern, features, pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentTime);
+            
+            // If a new concept was formed, update motor selection
+            if (conceptId > 0) {
+                // Record concept formation for planning and motor selection
+                if (pImpl->planner) {
+                    // Store concept for planning
+                    // Note: In a full implementation, concepts would be used for planning
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,58 +599,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+    // ========== STEP 11: Update neural planning ==========
+    if (pImpl->planner && pImpl->conceptFormation && pImpl->workingMemory) {
+        // Neural planning integrates with concept formation and working memory
+        // Get current state for planning
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty() && pImpl->novelty) {
+            // Convert memory activity to a planning state
+            std::vector<float> planningState(memoryNeurons.size());
+            for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                planningState[i] = static_cast<float>(memoryNeurons[i]) / 100.0f;  // Normalize
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Get current goal from concept formation if available
+            std::vector<float> currentGoal;
+            // Note: ConceptFormation doesn't currently expose getCurrentGoal()
+            // This would be added in a future enhancement
+            
+            // Simple exploration: use working memory as planning input
+            ActionType plannedAction = pImpl->planner->planAction(planningState);
+            
+            // If planning produced an action, update motor system
+            if (plannedAction != ActionType::Wait) {
+                // Store planned action for motor system
+                // This would integrate with motor neuron population selection
+                // Note: Current motor system integration needs enhancement
+                NLM_LOG_DEBUG("Planned action: " + std::to_string(static_cast<int>(plannedAction)));
+            }
+            
+            // Update plan quality based on current neuromodulation state
+            if (pImpl->dopamine) {
+                pImpl->planner->updatePlanQuality(
+                    {plannedAction}, {}, pImpl->dopamine->getLevel()
+                );
+            }
+        // ========== STEP 12: Update self-model ==========
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Self-model integration with concept formation and working memory
+        // The self-model learns how its own actions affect sensory state
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty() && pImpl->novelty) {
+            // Create a pattern from current memory state for self-model learning
+            std::vector<float> currentPattern(memoryNeurons.size());
+            for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                currentPattern[i] = static_cast<float>(memoryNeurons[i]) / 100.0f;
+            }
+            
+            // Self-model updates based on current sensory experience
+            // This records the relationship between actions and sensory changes
+            // Note: In a full implementation, this would require tracking actions taken
+            if (pImpl->conceptFormation) {
+                // The concept formation system can help maintain the self-model
+                // by providing stable representations of action-effect relationships
+                NLM_LOG_DEBUG("Self-model: Integrating action-sensory relationships");
+            }
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // ========== STEP 13: Social learning integration ==========
+    // Social learning would learn from observing other agents
+    // Currently, this is a placeholder for future implementation
+    if (pImpl->curiosity && pImpl->predictionSystem) {
+        // Social learning could be triggered by curiosity about others' behavior
+        // This would involve observing and imitating successful strategies
+        NLM_LOG_DEBUG("Social learning: Curiosity-driven social information seeking");
     }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
-    }
-}
-
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
