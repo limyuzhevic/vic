@@ -219,7 +219,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("__repr__", [](const WorldObject& obj) {
+            std::stringstream ss;
+            ss << "<WorldObject: " << obj.x << "," << obj.y << " " << static_cast<int>(obj.type)
+               << " value=" << obj.value << " active=" << (obj.active ? "true" : "false") << ">";
+            return ss.str();
+        }, "Get string representation of world object");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -266,39 +272,54 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and vision")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state (call each simulation step)")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to agent")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get current sensory percept for the agent")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall)")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             py::return_value_policy::reference_internal,
+             "Get object at position (if any)")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get maximum energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate, "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible simulations")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get current random seed")
+        .def("__repr__", [](const SimpleWorld& world) {
+            std::stringstream ss;
+            ss << "<SimpleWorld: " << world.getWidth() << "x" << world.getHeight()
+               << " (vision: " << world.getWidth() * 0.8 << "x" << world.getHeight() * 0.8
+               << ") at time " << world.getSimulationTime() << "s>";
+            return ss.str();
+        }, "Get string representation of world");
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+    // Additional brain methods from documentation
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -310,6 +331,14 @@ PYBIND11_MODULE(pynlm, m) {
              "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
+        .def("getNeuromodulationLevel", &Brain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &Brain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &Brain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &Brain::getPredictionError,
+             "Get prediction error")
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),

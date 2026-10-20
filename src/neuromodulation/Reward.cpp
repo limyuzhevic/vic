@@ -33,9 +33,25 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Real reward computation based on observation
+    // Simple heuristic: sum of resource values minus hazards
+    float reward = 0.0f;
+    
+    for (const auto& obj : observation.getObjects()) {
+        if (obj.type == WorldObjectType::Resource) {
+            // Positive reward for resources
+            reward += obj.value;
+        } else if (obj.type == WorldObjectType::Hazard) {
+            // Negative reward for hazards
+            reward -= std::abs(obj.value);
+        }
+    }
+    
+    // Add energy bonus for high energy
+    reward += std::min(10.0f, pImpl->currentValue * 0.5f);
+    
+    // Ensure reward is within reasonable bounds
+    return std::max(-100.0f, std::min(100.0f, reward));
 }
 
 const std::vector<float>& Reward::getHistory() const {

@@ -33,11 +33,23 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
+void Novelty::detectNovelty(const Observation& observation,
                             const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
+    // Extract position and features from observations
+    float currentX = observation.getPosition().x;
+    float currentY = observation.getPosition().y;
+    float prevX = previousObservation.getPosition().x;
+    float prevY = previousObservation.getPosition().y;
+    
+    // Compute movement and change
+    float dx = currentX - prevX;
+    float dy = currentY - prevY;
+    float distance = std::sqrt(dx * dx + dy * dy);
+    
+    // Movement distance contributes to novelty
+    pImpl->level = std::min(1.0f, distance / 10.0f);
+    
+    // Add to history
     pImpl->history.push_back(pImpl->level);
 }
 

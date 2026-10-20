@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -90,8 +91,27 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Set values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set values with support for structured configuration
+    void set(const std::string& key, const std::vector<int>& values, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& values, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& values, ConfigSource source = ConfigSource::Runtime);
+    
+    // Internal JSON parsing helper
+    void setJsonValue(const std::string& key, const nlohmann::json& value);
     
 private:
     struct Impl;

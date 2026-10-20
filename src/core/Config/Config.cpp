@@ -19,9 +19,51 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Read entire file
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Try to parse as JSON using nlohmann if available
+#ifdef HAVE_NLOHMANN_JSON
+        try {
+            nlohmann::json j = nlohmann::json::parse(content);
+            // JSON parsing succeeded, process as JSON
+            for (auto& [key, value] : j.items()) {
+                setJsonValue(key, value);
+            }
+            return true;
+        } catch (const nlohmann::json::parse_error& e) {
+            // JSON parsing failed, fall back to key=value format
+        }
+#else
+        // Try to parse as JSON using simple parser
+        try {
+            SimpleJson::JsonValue j = SimpleJson::parse(content);
+            if (j.type() == SimpleJson::JsonValue::Type::OBJECT) {
+                // Process JSON object
+                for (const auto& [key, value] : j.get_object()) {
+                    setJsonValue(key, value);
+                }
+                return true;
+            }
+        } catch (const std::exception& e) {
+            // JSON parsing failed, fall back to key=value format
+        }
+#endif
+        
+    } catch (const std::exception& e) {
+        // Any error falls back to key=value format
+    }
     
+    // Fall back to original key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -114,15 +156,45 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+void Config::setJsonValue(const std::string& key, const nlohmann::json& value) {
+    // Convert JSON value to ConfigValue
+    if (value.is_null()) {
+        return;
+    }
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_array()) {
+        // Handle arrays
+        std::vector<std::string> stringArray;
+        for (const auto& item : value) {
+            if (item.is_string()) {
+                stringArray.push_back(item.get<std::string>());
+            } else if (item.is_number_integer()) {
+                stringArray.push_back(std::to_string(item.get<int64_t>()));
+            } else if (item.is_number_float()) {
+                stringArray.push_back(std::to_string(item.get<double>()));
+            } else if (item.is_boolean()) {
+                stringArray.push_back(item.get<bool>() ? "true" : "false");
+            }
+        }
+        
+        if (!stringArray.empty()) {
+            // For now, store as string array
+            set(key, stringArray, ConfigSource::File);
+        }
+    } else if (value.is_object()) {
+        // Handle objects (convert to string representation for now)
+        set(key, value.dump(), ConfigSource::File);
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Unknown type, convert to string
+        set(key, value.dump(), ConfigSource::File);
     }
 }
 

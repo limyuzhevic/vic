@@ -445,5 +445,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
+    // Enhanced educational information
+    NLM_LOG_INFO("=== Educational Information ===");
+    NLM_LOG_INFO("This demonstrates how individual neurons can learn together to form a network.");
+    NLM_LOG_INFO("The brain's synaptic connections change based on activity, enabling learning.");
+    NLM_LOG_INFO("These are the foundational mechanisms that scale up to complex cognitive functions.");
+    NLM_LOG_INFO("");
+    
     return 0;
 }
