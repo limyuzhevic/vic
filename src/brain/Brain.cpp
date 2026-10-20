@@ -157,19 +157,15 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -843,67 +839,473 @@ bool Brain::save(const std::string& filepath) const {
     }
 }
 
+struct CheckpointTransaction {
+    bool inProgress = false;
+    std::string checkpointPath;
+    Timestamp originalTime;
+    SimulationStep originalStep;
+    
+    // Backup state for rollback
+    std::vector<NeuronCheckpointData> neuronBackup;
+    std::vector<float> neuronMembranePotentialBackup;
+    std::vector<float> neuronRestingPotentialBackup;
+    std::vector<float> neuronThresholdBackup;
+    std::vector<float> neuronResetPotentialBackup;
+    std::vector<float> neuronLeakConductanceBackup;
+    std::vector<uint8_t> neuronFiringStateBackup;
+    std::vector<float> neuronRefractoryPeriodBackup;
+    
+    std::vector<SynapseCheckpointData> synapseBackup;
+    
+    // Transaction ID for debugging
+    uint64_t transactionId = 0;
+    
+    CheckpointTransaction() : transactionId(0) {}
+};
+
+// Global transaction state (protected by mutex in production)
+static std::mutex s_transactionMutex;
+static CheckpointTransaction s_currentTransaction;
+
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
+    // Validate checkpoint file exists and is readable
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file.good()) {
+        NLM_LOG_ERROR("Checkpoint file not found or not readable: " + filepath);
+        return false;
+    }
+    
+    // Create transaction for rollback capability
+    CheckpointTransaction transaction;
+    transaction.checkpointPath = filepath;
+    transaction.transactionId = ++s_transactionId;
+    
+    bool transactionInProgress = false;
+    
     try {
+        // Open checkpoint reader
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
             return false;
         }
         
+        // Validate checkpoint integrity
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
         }
         
-        // Read neurons
+        // Backup current state for rollback
+        transactionInProgress = true;
+        backupCurrentState(transaction);
+        
+        // Create new transaction state
+        {
+            std::lock_guard<std::mutex> lock(s_transactionMutex);
+            s_currentTransaction = transaction;
+            s_currentTransaction.inProgress = true;
+        }
+        
+        // Load neurons with validation
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("Failed to read neurons from checkpoint: " + filepath);
+            rollbackTransaction();
             return false;
         }
         
-        // Apply neuron states
+        // Validate neuron data before applying
+        if (!validateNeuronData(neuronData, reader.getNeuronCount())) {
+            NLM_LOG_ERROR("Neuron data validation failed for checkpoint: " + filepath);
+            rollbackTransaction();
+            return false;
+        }
+        
+        // Apply neuron states atomically
+        if (!applyNeuronStatesAtomic(neuronData)) {
+            NLM_LOG_ERROR("Failed to apply neuron states: " + filepath);
+            rollbackTransaction();
+            return false;
+        }
+        
+        // Update transaction progress
+        {
+            std::lock_guard<std::mutex> lock(s_transactionMutex);
+            s_currentTransaction.neuronBackup = std::move(neuronData);
+        }
+        
+        // Load synapses with validation
+        SynapseCheckpointData synapseData;
+        if (!reader.readSynapses(synapseData)) {
+            NLM_LOG_ERROR("Failed to read synapses from checkpoint: " + filepath);
+            rollbackTransaction();
+            return false;
+        }
+        
+        // Validate synapse data before applying
+        if (!validateSynapseData(synapseData, reader.getSynapseCount())) {
+            NLM_LOG_ERROR("Synapse data validation failed for checkpoint: " + filepath);
+            rollbackTransaction();
+            return false;
+        }
+        
+        // Apply synapse states atomically
+        if (!applySynapseStatesAtomic(synapseData)) {
+            NLM_LOG_ERROR("Failed to apply synapse states: " + filepath);
+            rollbackTransaction();
+            return false;
+        }
+        
+        // Update transaction state
+        {
+            std::lock_guard<std::mutex> lock(s_transactionMutex);
+            s_currentTransaction.synapseBackup = std::move(synapseData);
+            s_currentTransaction.inProgress = false;
+        }
+        
+        // Success - update checkpoint manager
+        if (pImpl->checkpointManager) {
+            pImpl->checkpointManager->update(pImpl->currentStep, pImpl->currentTime);
+        }
+        
+        NLM_LOG_INFO("Brain state loaded successfully from: " + filepath);
+        NLM_LOG_INFO("Transaction ID " + std::to_string(transaction.transactionId) + " completed");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        rollbackTransaction();
+        return false;
+    }
+}
+
+void Brain::backupCurrentState(CheckpointTransaction& transaction) {
+    // Backup neuron states
+    size_t neuronIndex = 0;
+    transaction.neuronMembranePotentialBackup.clear();
+    transaction.neuronRestingPotentialBackup.clear();
+    transaction.neuronThresholdBackup.clear();
+    transaction.neuronResetPotentialBackup.clear();
+    transaction.neuronLeakConductanceBackup.clear();
+    transaction.neuronFiringStateBackup.clear();
+    transaction.neuronRefractoryPeriodBackup.clear();
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                if (neuron) {
+                    transaction.neuronMembranePotentialBackup.push_back(neuron->getMembranePotential());
+                    transaction.neuronRestingPotentialBackup.push_back(neuron->getRestingPotential());
+                    transaction.neuronThresholdBackup.push_back(neuron->getThreshold());
+                    transaction.neuronResetPotentialBackup.push_back(neuron->getResetPotential());
+                    transaction.neuronLeakConductanceBackup.push_back(neuron->getLeakConductance());
+                    transaction.neuronFiringStateBackup.push_back(static_cast<uint8_t>(neuron->getFiringState()));
+                    transaction.neuronRefractoryPeriodBackup.push_back(neuron->getRefractoryPeriod());
+                }
+            }
+        }
+    }
+    
+    // Backup synapse states
+    transaction.synapseBackup.clear();
+    auto synapses = getAllSynapses();
+    for (const auto& synapse : synapses) {
+        if (synapse) {
+            transaction.synapseBackup.push_back(SynapseCheckpointData {
+                synapse->getId(),
+                synapse->getSourceNeuronId(),
+                synapse->getTargetNeuronId(),
+                synapse->getWeight(),
+                synapse->getDelay()
+            });
+        }
+    }
+    
+    transaction.originalTime = pImpl->currentTime;
+    transaction.originalStep = pImpl->currentStep;
+}
+
+bool Brain::applyNeuronStatesAtomic(const NeuronCheckpointData& neuronData) {
+    // Validate data consistency
+    if (neuronData.membranePotential.size() != neuronData.restingPotential.size() ||
+        neuronData.membranePotential.size() != neuronData.threshold.size()) {
+        return false;
+    }
+    
+    // Apply neuron states atomically
+    size_t idx = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron && idx < neuronData.membranePotential.size()) {
+                    // Apply all neuron properties atomically
+                    neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                    neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                    neuron->setThreshold(neuronData.threshold[idx]);
+                    neuron->setResetPotential(neuronData.resetPotential[idx]);
+                    neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                    neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                    neuron->setRefractoryPeriod(neuronData.refractoryRemaining[idx]);
+                }
+                idx++;
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool Brain::applySynapseStatesAtomic(const SynapseCheckpointData& synapseData) {
+    // Get current synapses for matching
+    auto currentSynapses = getAllSynapses();
+    std::map<std::pair<NeuronId, NeuronId>, float> weightUpdates;
+    
+    // Map by source-target pairs for efficient lookup
+    for (const auto& synapse : synapseData) {
+        weightUpdates[{synapse.sourceNeuronId, synapse.targetNeuronId}] = synapse.weight;
+    }
+    
+    // Apply synapse weights atomically
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron) {
+                    // Update incoming synapses
+                    auto incoming = neuron->getIncomingSynapses();
+                    for (auto* syn : incoming) {
+                        if (syn) {
+                            auto key = std::make_pair(syn->getSourceNeuronId(), syn->getTargetNeuronId());
+                            auto it = weightUpdates.find(key);
+                            if (it != weightUpdates.end()) {
+                                syn->setWeight(it->second);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool Brain::validateNeuronData(const NeuronCheckpointData& data, size_t expectedCount) {
+    if (data.membranePotential.size() != expectedCount) {
+        NLM_LOG_ERROR("Neuron data size mismatch: expected " + std::to_string(expectedCount) + 
+                     ", got " + std::to_string(data.membranePotential.size()));
+        return false;
+    }
+    
+    // Validate value ranges
+    for (size_t i = 0; i < data.membranePotential.size(); ++i) {
+        if (std::isnan(data.membranePotential[i]) || std::isinf(data.membranePotential[i])) {
+            NLM_LOG_ERROR("Invalid neuron membrane potential at index " + std::to_string(i));
+            return false;
+        }
+        if (data.restingPotential[i] > data.membranePotential[i]) {
+            NLM_LOG_ERROR("Neurond resting potential greater than membrane potential at index " + std::to_string(i));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool Brain::validateSynapseData(const SynapseCheckpointData& data, size_t expectedCount) {
+    if (data.size() != expectedCount) {
+        NLM_LOG_ERROR("Synapse data size mismatch: expected " + std::to_string(expectedCount) + 
+                     ", got " + std::to_string(data.size()));
+        return false;
+    }
+    
+    // Validate synapse consistency
+    for (size_t i = 0; i < data.size(); ++i) {
+        const auto& syn = data[i];
+        if (std::isnan(syn.weight) || std::isinf(syn.weight)) {
+            NLM_LOG_ERROR("Invalid synapse weight at index " + std::to_string(i));
+            return false;
+        }
+        if (syn.weight < 0.0f || syn.weight > 1000.0f) {
+            NLM_LOG_ERROR("Synapse weight out of range at index " + std::to_string(i));
+            return false;
+        }
+        if (syn.delay < 0 || syn.delay > 1000) {
+            NLM_LOG_ERROR("Synapse delay out of range at index " + std::to_string(i));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void Brain::rollbackTransaction() {
+    std::lock_guard<std::mutex> lock(s_transactionMutex);
+    
+    if (!s_currentTransaction.inProgress) {
+        return;
+    }
+    
+    NLM_LOG_WARN("Rolling back checkpoint transaction ID: " + std::to_string(s_currentTransaction.transactionId));
+    
+    try {
+        // Restore neuron states from backup
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                    if (neuron && idx < s_currentTransaction.neuronMembranePotentialBackup.size()) {
+                        neuron->setMembranePotential(s_currentTransaction.neuronMembranePotentialBackup[idx]);
+                        neuron->setRestingPotential(s_currentTransaction.neuronRestingPotentialBackup[idx]);
+                        neuron->setThreshold(s_currentTransaction.neuronThresholdBackup[idx]);
+                        neuron->setResetPotential(s_currentTransaction.neuronResetPotentialBackup[idx]);
+                        neuron->setLeakConductance(s_currentTransaction.neuronLeakConductanceBackup[idx]);
+                        neuron->setFiringState(static_cast<FiringState>(s_currentTransaction.neuronFiringStateBackup[idx]));
+                        neuron->setRefractoryPeriod(s_currentTransaction.neuronRefractoryPeriodBackup[idx]);
                     }
                     idx++;
                 }
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        // Restore synapse states from backup
+        restoreSynapseStatesFromBackup();
+        
+        // Restore simulation time and step
+        pImpl->currentTime = s_currentTransaction.originalTime;
+        pImpl->currentStep = s_currentTransaction.originalStep;
+        
+        NLM_LOG_INFO("Transaction rollback completed successfully");
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to rollback transaction: " + std::string(e.what()));
+        // In production, you might want to implement retry logic here
+    }
+    
+    // Clear transaction state
+    s_currentTransaction.inProgress = false;
+    s_currentTransaction.checkpointPath.clear();
+    s_currentTransaction.neuronBackup.clear();
+    s_currentTransaction.synapseBackup.clear();
+}
+
+void Brain::restoreSynapseStatesFromBackup() {
+    // Get all synapses and restore from backup
+    auto synapses = getAllSynapses();
+    std::map<std::pair<NeuronId, NeuronId>, float> backupWeights;
+    
+    // Map backup weights by source-target pairs
+    for (const auto& syn : s_currentTransaction.synapseBackup) {
+        backupWeights[{syn.sourceNeuronId, syn.targetNeuronId}] = syn.weight;
+    }
+    
+    // Apply restored weights
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron) {
+                    auto incoming = neuron->getIncomingSynapses();
+                    for (auto* syn : incoming) {
+                        if (syn) {
+                            auto key = std::make_pair(syn->getSourceNeuronId(), syn->getTargetNeuronId());
+                            auto it = backupWeights.find(key);
+                            if (it != backupWeights.end()) {
+                                syn->setWeight(it->second);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool Brain::save(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving brain state to " + filepath);
+    
+    try {
+        CheckpointWriter writer;
+        if (!writer.open(filepath)) {
+            NLM_LOG_ERROR("Failed to open checkpoint file for writing: " + filepath);
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Get neuron data from all regions
+        NeuronCheckpointData neuronData;
+        size_t neuronCount = 0;
         
-        NLM_LOG_INFO("Brain state loaded successfully");
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        neuronData.membranePotential.push_back(neuron->getMembranePotential());
+                        neuronData.restingPotential.push_back(neuron->getRestingPotential());
+                        neuronData.threshold.push_back(neuron->getThreshold());
+                        neuronData.resetPotential.push_back(neuron->getResetPotential());
+                        neuronData.leakConductance.push_back(neuron->getLeakConductance());
+                        neuronData.firingState.push_back(static_cast<uint8_t>(neuron->getFiringState()));
+                        neuronData.refractoryRemaining.push_back(neuron->getRefractoryPeriod());
+                        neuronCount++;
+                    }
+                }
+            }
+        }
+        
+        if (!writer.writeNeurons(neuronData)) {
+            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            return false;
+        }
+        
+        // Get synapse data from all regions
+        SynapseCheckpointData synapseData;
+        size_t synapseCount = 0;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        auto incoming = neuron->getIncomingSynapses();
+                        for (const auto* syn : incoming) {
+                            if (syn && synapseCount < MAX_SYNAPSES_PER_CHECKPOINT) {
+                                synapseData.push_back(SynapseCheckpointData {
+                                    syn->getId(),
+                                    syn->getSourceNeuronId(),
+                                    syn->getTargetNeuronId(),
+                                    syn->getWeight(),
+                                    syn->getDelay()
+                                });
+                                synapseCount++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!writer.writeSynapses(synapseData)) {
+            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            return false;
+        }
+        
+        // Add metadata
+        writer.setMetadata("version", "2.0");
+        writer.setMetadata("neuron_count", neuronCount);
+        writer.setMetadata("synapse_count", synapseCount);
+        writer.setMetadata("timestamp", pImpl->currentTime);
+        writer.setMetadata("simulation_step", pImpl->currentStep);
+        
+        if (!writer.finalize()) {
+            NLM_LOG_ERROR("Failed to finalize checkpoint");
+            return false;
+        }
+        
+        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
         return false;
     }
 }

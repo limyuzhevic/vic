@@ -289,6 +289,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Add comprehensive network analysis tools to Brain class
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +352,362 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Network analysis and statistics methods
+        .def("analyzeNetworkTopology", &Brain::analyzeNetworkTopology,
+             "Analyze network topology and return structural metrics")
+        .def("getBrainStateStatistics", &Brain::getBrainStateStatistics,
+             "Get comprehensive brain state statistics (entropy, complexity, etc.)")
+        .def("getLearningCurve", &Brain::getLearningCurve,
+             py::arg("startStep"), py::arg("endStep"),
+             "Get learning progress over time period")
+        .def("getStructuralConnectivity", &Brain::getStructuralConnectivity,
+             "Get structural connectivity matrix for visualization")
+        .def("getNeuronTypeDistribution", &Brain::getNeuronTypeDistribution,
+             "Get distribution of neuron types across the network")
+        .def("getPlasticityMetrics", &Brain::getPlasticityMetrics,
+             "Get current plasticity activity and rates")
+        .def("detectLearning", &Brain::detectLearning,
+             "Detect if meaningful learning is occurring")
+        .def("exportNetworkData", &Brain::exportNetworkData,
+             py::arg("format") = std::string("json"),
+             "Export network data in specified format (json, csv, etc.)");
+
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Individual neuron unit)pbdoc")
+        .def(py::init<>())
+        .def("getId", &Neuron::getId, "Get neuron ID")
+        .def("getType", &Neuron::getType, "Get neuron type")
+        .def("getRegionId", &Neuron::getRegionId, "Get region ID")
+        .def("getPopulationId", &Neuron::getPopulationId, "Get population ID")
+        .def("getMembranePotential", &Neuron::getMembranePotential, "Get membrane potential")
+        .def("getRestingPotential", &Neuron::getRestingPotential, "Get resting potential")
+        .def("getThreshold", &Neuron::getThreshold, "Get firing threshold")
+        .def("getResetPotential", &Neuron::getResetPotential, "Get reset potential")
+        .def("getLeakConductance", &Neuron::getLeakConductance, "Get leak conductance")
+        .def("getFiringState", &Neuron::getFiringState, "Get firing state")
+        .def("isRefractory", &Neuron::isRefractory, "Check if neuron is refractory")
+        .def("getRefractoryPeriod", &Neuron::getRefractoryPeriod, "Get refractory period")
+        .def("getReversalPotential", &Neuron::getReversalPotential, "Get reversal potential")
+        .def("getAHPCurrent", &Neuron::getAHPCurrent, "Get afterhyperpolarization current")
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("v"), "Set membrane potential")
+        .def("setRestingPotential", &Neuron::setRestingPotential, py::arg("v"), "Set resting potential")
+        .def("setThreshold", &Neuron::setThreshold, py::arg("v"), "Set firing threshold")
+        .def("setResetPotential", &Neuron::setResetPotential, py::arg("v"), "Set reset potential")
+        .def("setLeakConductance", &Neuron::setLeakConductance, py::arg("g"), "Set leak conductance")
+        .def("setFiringState", &Neuron::setFiringState, py::arg("state"), "Set firing state")
+        .def("setRefractoryPeriod", &Neuron::setRefractoryPeriod, py::arg("period"), "Set refractory period")
+        .def("setReversalPotential", &Neuron::setReversalPotential, py::arg("v"), "Set reversal potential")
+        .def("setAHPCurrent", &Neuron::setAHPCurrent, py::arg("i"), "Set afterhyperpolarization current")
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"), "Inject current into neuron")
+        .def("update", &Neuron::update, py::arg("dt"), "Update neuron state")
+        .def("reset", &Neuron::reset, "Reset neuron to resting state")
+        .def("checkForSpike", &Neuron::checkForSpike, "Check if neuron should fire")
+        .def("getSpikingProbability", &Neuron::getSpikingProbability, py::arg("dt"), "Get probability of firing in time step")
+        .def("getInputCurrent", &Neuron::getInputCurrent, "Get input current")
+        .def("getMembraneCurrent", &Neuron::getMembraneCurrent, "Get membrane current")
+        .def("getIonChannelStates", &Neuron::getIonChannelStates, "Get ion channel states for debugging")
+        .def("exportState", &Neuron::exportState, "Export neuron state for serialization")
+        .def("importState", &Neuron::importState, py::arg("state"), "Import neuron state from serialization");
+
+    py::class_<Synapse>(m, "Synapse", R"pbdoc(Connection between two neurons)pbdoc")
+        .def(py::init<>())
+        .def("getId", &Synapse::getId, "Get synapse ID")
+        .def("getSourceNeuronId", &Synapse::getSourceNeuronId, "Get source neuron ID")
+        .def("getTargetNeuronId", &Synapse::getTargetNeuronId, "Get target neuron ID")
+        .def("getWeight", &Synapse::getWeight, "Get synaptic weight")
+        .def("getDelay", &Synapse::getDelay, "Get synaptic delay")
+        .def("getType", &Synapse::getType, "Get synapse type")
+        .def("getPlasticityFlags", &Synapse::getPlasticityFlags, "Get plasticity flags")
+        .def("getReversalPotential", &Synapse::getReversalPotential, "Get reversal potential")
+        .def("setWeight", &Synapse::setWeight, py::arg("weight"), "Set synaptic weight")
+        .def("setDelay", &Synapse::setDelay, py::arg("delay"), "Set synaptic delay")
+        .def("setType", &Synapse::setType, py::arg("type"), "Set synapse type")
+        .def("setPlasticityFlags", &Synapse::setPlasticityFlags, py::arg("flags"), "Set plasticity flags")
+        .def("setReversalPotential", &Synapse::setReversalPotential, py::arg("v"), "Set reversal potential")
+        .def("enablePlasticity", &Synapse::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("structural"), "Enable plasticity mechanisms")
+        .def("disablePlasticity", &Synapse::disablePlasticity, "Disable all plasticity mechanisms")
+        .def("update", &Synapse::update, py::arg("dt"), "Update synapse state")
+        .def("getInputStrength", &Synapse::getInputStrength, "Get input strength to target neuron")
+        .def("getOutputContribution", &Synapse::getOutputContribution, "Get contribution to source neuron")
+        .def("getTransmissionDelay", &Synapse::getTransmissionDelay, "Get transmission delay for spiking")
+        .def("getDepressionPotentiationRatio", &Synapse::getDepressionPotentiationRatio, "Get depression/potentiation ratio")
+        .def("exportState", &Synapse::exportState, "Export synapse state for serialization")
+        .def("importState", &Synapse::importState, py::arg("state"), "Import synapse state from serialization");
+
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(Biological brain region containing neural populations)pbdoc")
+        .def(py::init<>())
+        .def("getId", &NeuralRegion::getId, "Get region ID")
+        .def("getName", &NeuralRegion::getName, "Get region name")
+        .def("getRegionType", &NeuralRegion::getRegionType, "Get region type")
+        .def("getNeuronCount", &NeuralRegion::getNeuronCount, "Get neuron count")
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount, "Get synapse count")
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("count"), py::arg("type"), "Add neuron population")
+        .def("getPopulation", &NeuralRegion::getPopulation, py::arg("id"), "Get population by ID")
+        .def("getPopulations", &NeuralRegion::getPopulations, "Get all populations")
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount, "Get population count")
+        .def("getAllNeurons", &NeuralRegion::getAllNeurons, "Get all neurons")
+        .def("getAllSynapses", &NeuralRegion::getAllSynapses, "Get all synapses")
+        .def("getSensoryNeurons", &NeuralRegion::getSensoryNeurons, "Get sensory neurons")
+        .def("getMotorNeurons", &NeuralRegion::getMotorNeurons, "Get motor neurons")
+        .def("getInternalNeurons", &NeuralRegion::getInternalNeurons, "Get internal neurons")
+        .def("injectCurrentToType", &NeuralRegion::injectCurrentToType, py::arg("type"), py::arg("current"), "Inject current to neurons of type")
+        .def("getAverageMembranePotential", &NeuralRegion::getAverageMembranePotential, "Get average membrane potential")
+        .def("getFiringRate", &NeuralRegion::getFiringRate, "Get average firing rate")
+        .def("getExcitationInhibitionBalance", &NeuralRegion::getExcitationInhibitionBalance, "Get E/I balance")
+        .def("exportNetworkConnectivity", &NeuralRegion::exportNetworkConnectivity, "Export network connectivity matrix")
+        .def("importNetworkConnectivity", &NeuralRegion::importNetworkConnectivity, py::arg("connectivity"), "Import network connectivity matrix");
+
+    // Factory methods and enhanced error handling
+    m.def("createBrainWithRegions", [](std::shared_ptr<Config> config, 
+                                     const std::vector<std::string>& regionNames,
+                                     const std::vector<size_t>& neuronCounts,
+                                     const std::vector<NeuronType>& neuronTypes) {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain in factory method");
+        }
+        
+        // Create regions based on parameters
+        size_t totalNeurons = 0;
+        for (size_t i = 0; i < regionNames.size(); ++i) {
+            RegionId regionId = brain->addRegion(regionNames[i]);
+            auto* region = brain->getRegion(regionId);
+            if (region && neuronCounts.size() > i && neuronTypes.size() > i) {
+                // Note: This is a simplified factory - real implementation would need
+                // population creation with specific neuron counts and types
+                region->addPopulation(neuronCounts[i], neuronTypes[i]);
+            }
+        }
+        
+        return brain;
+    }, py::arg("config"), py::arg("region_names"), py::arg("neuron_counts"), py::arg("neuron_types"),
+        "Create a brain with pre-configured regions");
+
+    m.def("createConfigWithDefaults", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set default values for a realistic neural simulation
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        return config;
+    }, "Create a configuration with reasonable defaults");
+
+    m.def("validateBrainState", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        bool isValid = brain->validateBrainState();
+        if (!isValid) {
+            throw std::runtime_error("Brain state validation failed");
+        }
+        
+        return true;
+    }, py::arg("brain"), "Validate brain state and throw exception if invalid");
+
+    m.def("createNeuronsWithTopology", [](size_t count, const std::vector<NeuronType>& types,
+                                         const std::vector<RegionId>& regions,
+                                         const std::vector<PopulationId>& populations) {
+        std::vector<std::shared_ptr<Neuron>> neurons;
+        neurons.reserve(count);
+        
+        for (size_t i = 0; i < count; ++i) {
+            auto neuron = std::make_shared<Neuron>();
+            
+            // Set neuron properties based on input
+            if (i < types.size()) {
+                neuron->setType(types[i]);
+            }
+            if (i < regions.size()) {
+                // Note: This would require accessing region's population
+                // For now, just set a placeholder
+                neuron->setRegionId(regions[i]);
+            }
+            
+            neurons.push_back(neuron);
+        }
+        
+        return neurons;
+    }, py::arg("count"), py::arg("types"), py::arg("regions"), py::arg("populations"),
+        "Create a collection of neurons with specified topology");
+
+    m.def("analyzeLearningProgress", [](std::shared_ptr<Brain> brain, 
+                                       size_t windowSize) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        auto analysis = brain->analyzeLearningProgress(windowSize);
+        return analysis;
+    }, py::arg("brain"), py::arg("window_size"),
+        "Analyze learning progress over a time window and return metrics");
+
+    // Enhanced error handling with custom exceptions
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+
+    // Performance and debugging utilities
+    m.def("benchmarkNetworkAnalysis", [](std::shared_ptr<Brain> brain) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        // Perform various network analyses
+        auto topology = brain->analyzeNetworkTopology();
+        auto statistics = brain->getBrainStateStatistics();
+        auto learningCurve = brain->getLearningCurve(0, brain->getTotalSpikeCount());
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        std::map<std::string, double> results;
+        results["topology_analysis_time_ms"] = static_cast<double>(duration.count());
+        results["neuron_count"] = static_cast<double>(brain->getTotalNeuronCount());
+        results["synapse_count"] = static_cast<double>(brain->getTotalSynapseCount());
+        results["learning_score"] = statistics.learningScore;
+        results["network_efficiency"] = topology.efficiency;
+        
+        return results;
+    }, py::arg("brain"), "Benchmark network analysis performance");
+
+    m.def("exportCompleteNetworkData", [](std::shared_ptr<Brain> brain,
+                                        const std::string& baseFilename) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        // Export in multiple formats for comprehensive analysis
+        brain->exportNetworkData("json", baseFilename + ".json");
+        brain->exportNetworkData("csv", baseFilename + ".csv");
+        brain->exportNetworkData("npy", baseFilename + ".npy");
+        
+        return std::vector<std::string>{
+            baseFilename + ".json",
+            baseFilename + ".csv",
+            baseFilename + ".npy"
+        };
+    }, py::arg("brain"), py::arg("base_filename"),
+        "Export complete network data in multiple formats for analysis");
+
+    // Educational and research utilities
+    m.def("createTutorialBrain", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Configure for educational/tutorial purposes
+        config->set("random_seed", static_cast<int64_t>(12345), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        
+        // Add simple tutorial regions
+        brain->addRegion("SensoryRegion");
+        brain->addRegion("MotorRegion");
+        
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize tutorial brain");
+        }
+        
+        return brain;
+    }, "Create a brain configured for educational/tutorial purposes");
+
+    m.def("createResearchBrain", [](const std::string& configFile = "configs/research.cfg") {
+        auto config = std::make_shared<Config>();
+        
+        if (!config->loadFromFile(configFile)) {
+            // Use research defaults if config file not found
+            config->set("random_seed", static_cast<int64_t>(999), ConfigSource::Default);
+            config->set("simulation_timestep", 0.0001, ConfigSource::Default); // Higher precision
+            config->set("neuron_count", static_cast<int64_t>(10000), ConfigSource::Default); // Larger network
+            config->set("region_count", static_cast<int64_t>(10), ConfigSource::Default);
+            config->set("connection_probability", 0.05f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            config->set("stdp_tau", 50.0f, ConfigSource::Default); // Different STDP parameters
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize research brain");
+        }
+        
+        return brain;
+    }, py::arg("config_file") = "configs/research.cfg", "Create a brain configured for research purposes");
+
+    // Statistics and metrics utilities
+    m.def("computeNetworkStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        std::map<std::string, double> stats;
+        
+        // Basic statistics
+        stats["neuron_count"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["synapse_count"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["region_count"] = static_cast<double>(brain->getRegionCount());
+        stats["active_neuron_ratio"] = static_cast<double>(brain->getActiveNeuronCount()) / 
+                                      static_cast<double>(brain->getTotalNeuronCount());
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Performance metrics
+        stats["spike_efficiency"] = static_cast<double>(brain->getTotalSpikeCount()) / 
+                                  static_cast<double>(brain->getTotalNeuronCount() * 100);
+        
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive network statistics");
+
+    m.def("visualizeNetworkTopology", [](std::shared_ptr<Brain> brain,
+                                        const std::string& outputFile) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        auto connectivity = brain->getStructuralConnectivity();
+        brain->exportNetworkData("graphml", outputFile);
+        
+        return std::map<std::string, std::string>{
+            {"format", "graphml"},
+            {"node_count", std::to_string(brain->getTotalNeuronCount())},
+            {"edge_count", std::to_string(brain->getTotalSynapseCount())},
+            {"output_file", outputFile}
+        };
+    }, py::arg("brain"), py::arg("output_file"), "Generate network topology visualization");
+
+    // Advanced analysis functions
+    m.def("detectNetworkDynamics", [](std::shared_ptr<Brain> brain,
+                                    size_t analysisWindow) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        auto dynamics = brain->detectNetworkDynamics(analysisWindow);
+        return dynamics;
+    }, py::arg("brain"), py::arg("analysis_window"), "Detect network dynamics patterns");
+
+    m.def("predictNetworkBehavior", [](std::shared_ptr<Brain> brain,
+                                     size_t stepsAhead) {
+        if (!brain) {
+            throw std::runtime_error("Brain pointer is null");
+        }
+        
+        auto predictions = brain->predictNetworkBehavior(stepsAhead);
+        return predictions;
+    }, py::arg("brain"), py::arg("steps_ahead"), "Predict future network behavior");
+
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

@@ -103,6 +103,12 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Thread-safe access to global logger
+    static Logger& getGlobalInstance();
+    
+    // Global logger management mutex
+    static std::mutex& getGlobalLoggerMutex();
 
 private:
     struct Impl;

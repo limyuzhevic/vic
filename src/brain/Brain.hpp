@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <mutex>
 
 namespace nlm {
 
@@ -193,9 +194,23 @@ public:
     // Logging
     void logStatus() const;
     
+    // Checkpoint transaction management
+    static uint64_t getNextTransactionId() { return ++s_transactionId; }
+    static void rollbackTransaction() { Brain::rollbackTransaction(); }
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
+// Global transaction state
+extern uint64_t s_transactionId;
+extern std::mutex s_transactionMutex;
+extern CheckpointTransaction s_currentTransaction;
+
 } // namespace nlm
+
+// Global variables (defined in Brain.cpp)
+uint64_t nlm::Brain::s_transactionId = 0;
+std::mutex nlm::Brain::s_transactionMutex;
+nlm::CheckpointTransaction nlm::Brain::s_currentTransaction;

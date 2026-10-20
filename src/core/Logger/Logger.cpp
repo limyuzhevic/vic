@@ -177,21 +177,36 @@ bool Logger::isEnabled(LogLevel level) const {
 }
 
 Logger& Logger::getGlobal() {
+    // Thread-safe singleton initialization
     static Logger globalLogger;
     return globalLogger;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
+    std::lock_guard<std::mutex> lock(getGlobalLoggerMutex());
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
 }
 
-// LogStream implementation
+Logger& Logger::getGlobalInstance() {
+    // Thread-safe access to global logger instance
+    static Logger globalLogger;
+    return globalLogger;
+}
+
+std::mutex& Logger::getGlobalLoggerMutex() {
+    // Static mutex for global logger management
+    static std::mutex globalMutex;
+    return globalMutex;
+}
+
+// Enhanced LogStream with thread-safe initialization
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    // Thread-safe logging through global logger
+    Logger::getGlobalInstance().log(level_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm
