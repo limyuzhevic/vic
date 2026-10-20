@@ -1,27 +1,44 @@
 #include "Config.hpp"
 #include <fstream>
-#include <sstream>
-#include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, json> jsonCache;
+    bool isJsonCacheValid;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->isJsonCacheValid = false;
+}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first if available
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    if (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+        return loadFromJson(filepath);
+    }
+    
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +72,98 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+bool Config::loadFromJson(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        pImpl->jsonCache.clear();
+        
+        // Parse JSON recursively
+        parseJsonObject(j, "", ConfigSource::File);
+        pImpl->isJsonCacheValid = true;
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format on error
+        NLM_LOG_WARNING("JSON parsing failed, falling back to simple format: " + std::string(e.what()));
+        return loadFromFile(filepath);
+    }
+}
+
+void Config::parseJsonObject(const json& j, const std::string& prefix, ConfigSource source) {
+    if (j.is_object()) {
+        for (const auto& [key, value] : j.items()) {
+            std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+            parseJsonValue(value, fullKey, source);
+        }
+    } else if (j.is_array()) {
+        for (size_t i = 0; i < j.size(); ++i) {
+            std::string fullKey = prefix + "[" + std::to_string(i) + "]";
+            parseJsonValue(j[i], fullKey, source);
+        }
+    } else {
+        parseJsonValue(j, prefix, source);
+    }
+}
+
+void Config::parseJsonValue(const json& j, const std::string& key, ConfigSource source) {
+    ConfigValue value;
+    
+    if (j.is_number_integer()) {
+        value = j.get<int64_t>();
+    } else if (j.is_number_unsigned()) {
+        value = j.get<uint64_t>();
+    } else if (j.is_number()) {
+        value = j.get<double>();
+    } else if (j.is_boolean()) {
+        value = j.get<bool>();
+    } else if (j.is_string()) {
+        value = j.get<std::string>();
+    } else if (j.is_array()) {
+        // Try to convert array to vector
+        std::vector<double> doubleArray;
+        std::vector<int> intArray;
+        std::vector<std::string> stringArray;
+        
+        for (const auto& item : j) {
+            if (item.is_number_integer()) {
+                intArray.push_back(item.get<int>());
+            } else if (item.is_number_unsigned()) {
+                // Convert to double for consistency
+                doubleArray.push_back(item.get<double>());
+            } else if (item.is_number()) {
+                doubleArray.push_back(item.get<double>());
+            } else if (item.is_string()) {
+                stringArray.push_back(item.get<std::string>());
+            } else {
+                // Unsupported type, skip this array
+                return;
+            }
+        }
+        
+        // Prefer the most specific type
+        if (!stringArray.empty()) {
+            value = stringArray;
+        } else if (!doubleArray.empty()) {
+            value = doubleArray;
+        } else if (!intArray.empty()) {
+            value = intArray;
+        }
+    }
+    
+    if (!std::holds_alternative<std::monostate>(value)) {
+        set(key, value, source);
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -84,10 +193,32 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write in JSON format for better readability
+    json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigEntry back to JSON value
+        if (std::holds_alternative<int>(entry.value)) {
+            j[entry.key] = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            j[entry.key] = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            j[entry.key] = std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            j[entry.key] = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            j[entry.key] = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            j[entry.key] = std::get<std::vector<int>>(entry.value);
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            j[entry.key] = std::get<std::vector<double>>(entry.value);
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            j[entry.key] = std::get<std::vector<std::string>>(entry.value);
+        }
     }
+    
+    // Write formatted JSON
+    file << std::setw(2) << j << std::endl;
     
     return true;
 }
@@ -124,6 +255,9 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Invalidate JSON cache
+    pImpl->isJsonCacheValid = false;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -153,6 +287,7 @@ void Config::remove(const std::string& key) {
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    pImpl->isJsonCacheValid = false;
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -166,6 +301,8 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->jsonCache.clear();
+    pImpl->isJsonCacheValid = false;
 }
 
 std::string Config::summary() const {
@@ -187,19 +324,33 @@ std::string Config::summary() const {
 }
 
 std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
+    if (str.empty()) return str;
+    
+    size_t start = 0;
+    size_t end = str.size() - 1;
+    
+    // Find first non-whitespace character
+    while (start < str.size() && std::isspace(str[start])) {
+        ++start;
+    }
+    
+    // Find last non-whitespace character
+    while (end > start && std::isspace(str[end])) {
+        --end;
+    }
+    
     return str.substr(start, end - start + 1);
 }
 
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    std::transform(result.begin(), result.end(), result.begin(), 
+                   [](unsigned char c) { return std::tolower(c); });
     return result;
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
