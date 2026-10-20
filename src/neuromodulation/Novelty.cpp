@@ -1,3 +1,4 @@
+// Novelty implementation
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
@@ -6,23 +7,20 @@
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
     float level;
-    float decayRate;
-    std::vector<float> history;
-    std::vector<float> lastPattern;
-    float noveltyThreshold;
+    float plasticityFactor;
+    float timeConstant;
+    float surpriseBuffer;
+    float lastInputHash;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() : level(0.0f), plasticityFactor(1.0f), timeConstant(1.0f), surpriseBuffer(0.0f), lastInputHash(0.0f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
-
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+const char* Novelty::getName() const {
+    return "Novelty";
 }
 
 float Novelty::getLevel() const {
@@ -30,55 +28,58 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+    pImpl->plasticityFactor = 1.0f + pImpl->level * 0.8f;  // Range: 1.0 to 1.8
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
-}
-
-void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
-    if (currentPattern.empty() || previousPattern.empty()) {
-        pImpl->level = 0.0f;
-        return;
-    }
-    
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
-    
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
-    }
-    
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
-    
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
-    pImpl->history.push_back(pImpl->level);
-    
-    // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
+float Novelty::getPlasticityFactor() const {
+    return pImpl->plasticityFactor;
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay novelty level over time
+    pImpl->level *= std::exp(-dt / pImpl->timeConstant);
+    
+    // Process surprise signals
+    if (pImpl->surpriseBuffer > 0.001f) {
+        pImpl->level += pImpl->surpriseBuffer * 0.2f;
+        pImpl->surpriseBuffer = 0.0f;
+    }
+    
+    // Clamp level
+    pImpl->level = std::clamp(pImpl->level, 0.0f, 1.0f);
 }
 
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
+void Novelty::analyzeInputChange(const std::vector<float>& newInput) {
+    // Compute hash of current input for change detection
+    float inputHash = 0.0f;
+    for (float val : newInput) {
+        inputHash += std::abs(val);
+    }
+    
+    // Detect novelty
+    if (pImpl->lastInputHash > 0.0f) {
+        float change = std::abs(inputHash - pImpl->lastInputHash);
+        if (change > 1.0f) {
+            // Significant change - increase surprise
+            pImpl->surpriseBuffer += change * 0.1f;
+            NLM_LOG_DEBUG(std::string("Novelty detected: change = ") + std::to_string(change));
+        }
+    }
+    
+    pImpl->lastInputHash = inputHash;
 }
 
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+float Novelty::computeNovelty(const std::vector<float>& input1, const std::vector<float>& input2) {
+    if (input1.size() != input2.size()) return 1.0f;  // Max novelty for size mismatch
+    
+    float totalDifference = 0.0f;
+    for (size_t i = 0; i < input1.size(); ++i) {
+        totalDifference += std::abs(input1[i] - input2[i]);
+    }
+    
+    float averageDifference = totalDifference / input1.size();
+    return std::min(1.0f, averageDifference / 10.0f);  // Normalize to [0, 1]
 }
 
 } // namespace nlm

@@ -1,13 +1,14 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <string>
 #include <vector>
 
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Now implemented with real neural mechanisms
 
 class Neuromodulator {
 public:
@@ -21,7 +22,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Real implementation affects neural excitability and plasticity rates
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +33,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Real implementation with neural mechanisms
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,46 +45,154 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+    // Reward signaling with neural effects
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Apply effects to brain networks
+    void applyEffects(Brain* brain);
+
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Real implementation with cholinergic mechanisms
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Apply attentional effects
+    void applyToAttention(Brain* brain);
+    void enhanceMemoryConsolidation(Brain* brain);
+
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Real implementation with noradrenergic mechanisms
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Apply arousal effects
+    void increase alertness(Brain* brain);
+    void enhance signalDetection(Brain* brain);
+
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Real implementation with serotonergic mechanisms
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Apply mood and behavioral effects
+    void modulateMood(Brain* brain);
+    void regulate impulsivity(Brain* brain);
+
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Novelty: Novelty detection and exploration drive
+// Real implementation with detecting unexpected sensory input
+class Novelty : public Neuromodulator {
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Detect novelty in sensory input
+    void analyzeInputChange(const std::vector<float>& newInput);
+    float computeNovelty(const std::vector<float>& input1, const std::vector<float>& input2);
+
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Curiosity: Exploration motivation combining novelty and prediction error
+// Real implementation with integrated exploration mechanisms
+class Curiosity : public Neuromodulator {
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Drive exploration behavior
+    void increaseExploration(Brain* brain);
+    void reduceExploration(Brain* brain);
+    float computeCuriosityDrive(float novelty, float predictionError);
+
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// PredictionError: Prediction error signal for learning
+// Real implementation with predictive coding mechanisms
+class PredictionError : public Neuromodulator {
+public:
+    PredictionError();
+    ~PredictionError() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Compute prediction errors
+    float computeError(const std::vector<float>& predicted,
+                      const std::vector<float>& actual);
+    float getPredictionError() const { return lastError_; }
+    void recordError(float error, SimulationStep step);
+
+private:
+    struct Impl;
+    Impl* pImpl;
+    
+    float lastError_;
+    float surpriseThreshold_;
 };
 
 } // namespace nlm
