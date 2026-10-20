@@ -206,10 +206,112 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Implementation of config helper functions
+namespace nlm {
+    namespace config {
+        
+        template<typename T>
+        bool isType(const ConfigValue& value) {
+            return std::holds_alternative<T>(value);
+        }
+        
+        template<typename T>
+        std::optional<T> tryGetAs(const ConfigValue& value) {
+            if (isType<T>(value)) {
+                return std::get<T>(value);
+            }
+            return std::nullopt;
+        }
+        
+        bool validateRange(const ConfigValue& value, double min, double max) {
+            if (std::holds_alternative<int>(value)) {
+                return static_cast<double>(std::get<int>(value)) >= min && 
+                       static_cast<double>(std::get<int>(value)) <= max;
+            } else if (std::holds_alternative<double>(value)) {
+                double val = std::get<double>(value);
+                return val >= min && val <= max;
+            }
+            return false;
+        }
+        
+        bool validatePositive(const ConfigValue& value) {
+            if (std::holds_alternative<int>(value)) {
+                return std::get<int>(value) >= 0;
+            } else if (std::holds_alternative<double>(value)) {
+                return std::get<double>(value) >= 0.0;
+            }
+            return false;
+        }
+        
+        bool validateNonEmpty(const ConfigValue& value) {
+            if (std::holds_alternative<std::string>(value)) {
+                return !std::get<std::string>(value).empty();
+            } else if (std::holds_alternative<std::vector<int>>(value)) {
+                return !std::get<std::vector<int>>(value).empty();
+            } else if (std::holds_alternative<std::vector<double>>(value)) {
+                return !std::get<std::vector<double>>(value).empty();
+            } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+                return !std::get<std::vector<std::string>>(value).empty();
+            }
+            return false;
+        }
+        
+        template<typename T>
+        T getRequired(const Config& config, const std::string& key) {
+            auto value = config.get<T>(key);
+            if (!value) {
+                throw std::runtime_error("Missing required configuration key: " + key);
+            }
+            return *value;
+        }
+        
+        template<typename T>
+        std::optional<T> getOptional(const Config& config, const std::string& key, const T& defaultValue) {
+            auto value = config.get<T>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }
+    }
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+// Explicit instantiations for helper functions
+namespace nlm {
+    namespace config {
+        template bool isType<int>(const ConfigValue& value);
+        template bool isType<int64_t>(const ConfigValue& value);
+        template bool isType<double>(const ConfigValue& value);
+        template bool isType<bool>(const ConfigValue& value);
+        template bool isType<std::string>(const ConfigValue& value);
+        
+        template std::optional<int> tryGetAs<int>(const ConfigValue& value);
+        template std::optional<int64_t> tryGetAs<int64_t>(const ConfigValue& value);
+        template std::optional<double> tryGetAs<double>(const ConfigValue& value);
+        template std::optional<bool> tryGetAs<bool>(const ConfigValue& value);
+        template std::optional<std::string> tryGetAs<std::string>(const ConfigValue& value);
+    }
+}
+
+// Explicit instantiations for getRequired and getOptional
+namespace nlm {
+    namespace config {
+        template int getRequired<int>(const Config&, const std::string&);
+        template int64_t getRequired<int64_t>(const Config&, const std::string&);
+        template double getRequired<double>(const Config&, const std::string&);
+        template bool getRequired<bool>(const Config&, const std::string&);
+        template std::string getRequired<std::string>(const Config&, const std::string&);
+        
+        template std::optional<int> getOptional<int>(const Config&, const std::string&, const int&);
+        template std::optional<int64_t> getOptional<int64_t>(const Config&, const std::string&, const int64_t&);
+        template std::optional<double> getOptional<double>(const Config&, const std::string&, const double&);
+        template std::optional<bool> getOptional<bool>(const Config&, const std::string&, const bool&);
+        template std::optional<std::string> getOptional<std::string>(const Config&, const std::string&, const std::string&);
+    }
+}
 
 } // namespace nlm

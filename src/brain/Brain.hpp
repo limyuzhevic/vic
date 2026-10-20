@@ -8,6 +8,10 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <optional>
+#include <functional>
+#include <chrono>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -28,29 +32,140 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+// Enhanced memory system information
+struct MemorySystemStatus {
+    size_t workingMemoryTraces;
+    size_t episodicMemoryEpisodes;
+    float conceptActivation;
+    float associativeStrength;
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Brain configuration options
+struct BrainConfig {
+    uint64_t randomSeed;
+    uint64_t maxNeurons;
+    uint64_t maxRegions;
+    float connectionProbability;
+    float stdpLtpWeight;
+    float stdpLtdWeight;
+    float stdpTau;
+    float synaptogenesisRate;
+    float pruningRate;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    bool enableDevelopment;
+    bool enableCheckpointing;
+    std::string checkpointPath;
+    std::string logLevel;
+    
+    BrainConfig()
+        : randomSeed(42),
+          maxNeurons(1000),
+          maxRegions(1),
+          connectionProbability(0.1f),
+          stdpLtpWeight(0.01f),
+          stdpLtdWeight(0.012f),
+          stdpTau(20.0f),
+          synaptogenesisRate(0.0001f),
+          pruningRate(0.00001f),
+          replayInterval(100),
+          consolidationInterval(1000),
+          enableDevelopment(true),
+          enableCheckpointing(true),
+          checkpointPath("./checkpoints/brain_checkpoint.bin"),
+          logLevel("INFO") {}
+};
 
+// Brain status for monitoring and debugging
+struct BrainStatus {
+    size_t totalNeurons;
+    size_t totalSynapses;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    size_t totalSpikes;
+    size_t pendingSpikeEvents;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    uint64_t currentStep;
+    double currentTime;
+    DevelopmentalStage developmentalStage;
+    std::unordered_map<std::string, float> memorySystemStats;
+    std::unordered_map<std::string, float> neuromodulatorStats;
+    
+    BrainStatus()
+        : totalNeurons(0),
+          totalSynapses(0),
+          activeNeurons(0),
+          firingNeurons(0),
+          totalSpikes(0),
+          pendingSpikeEvents(0),
+          averageFiringRate(0.0f),
+          excitationInhibitionRatio(0.0f),
+          currentStep(0),
+          currentTime(0.0),
+          developmentalStage(DevelopmentalStage::Initial) {}
+};
+
+// Brain builder for fluent construction
+class BrainBuilder {
+public:
+    BrainBuilder();
+    ~BrainBuilder();
+    
+    // Configuration setters
+    BrainBuilder& withRandomSeed(uint64_t seed);
+    BrainBuilder& withNeuronCount(size_t count);
+    BrainBuilder& withRegionCount(size_t count);
+    BrainBuilder& withConnectionProbability(float prob);
+    BrainBuilder& withSTDPParameters(float ltp, float ltd, float tau);
+    BrainBuilder& withDevelopmentEnabled(bool enabled);
+    BrainBuilder& withCheckpointingEnabled(bool enabled);
+    BrainBuilder& withCheckpointPath(const std::string& path);
+    BrainBuilder& withLogLevel(const std::string& level);
+    
+    // Component configuration
+    BrainBuilder& enableMemorySystem(bool enable);
+    BrainBuilder& enablePredictionSystem(bool enable);
+    BrainBuilder& enableCognitionSystems(bool enable);
+    BrainBuilder& enableNeuromodulation(bool enable);
+    BrainBuilder& enableDevelopment(bool enable);
+    
+    // Customization
+    BrainBuilder& addCustomRegion(const std::string& name, size_t neuronCount);
+    BrainBuilder& configureRegion(RegionId id, const std::string& name);
+    
+    // Validation
+    bool validate() const;
+    std::string validationError() const;
+    
+    // Build
+    std::shared_ptr<Brain> build() const;
+    
+    // Post-construction configuration
+    static std::shared_ptr<Brain> fromConfig(const std::shared_ptr<Config>& config);
+    static std::shared_ptr<Brain> fromBrainConfig(const BrainConfig& config);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Brain: Enhanced artificial neural system with improved PIMPL
 class Brain {
 public:
-    // Create brain with configuration
+    // Factory methods for easy creation
+    static std::shared_ptr<Brain> create(const BrainConfig& config);
+    static std::shared_ptr<Brain> create(const std::shared_ptr<Config>& config);
+    static std::shared_ptr<Brain> createFromFile(const std::string& configFile);
+    
+    // Builder-based creation
+    static std::shared_ptr<Brain> build() {
+        return BrainBuilder().build();
+    }
+    
+    // Traditional constructor for backward compatibility
     explicit Brain(std::shared_ptr<Config> config);
     
     ~Brain();
@@ -63,15 +178,15 @@ public:
     
     // Initialize brain with configuration
     bool initialize();
+    bool initialize(const BrainConfig& config);
     
-    // Main simulation step
+    // Main simulation step with enhanced error handling
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with validation
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
@@ -94,25 +209,24 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
+    // Produce motor/action output
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
-    // Update plasticity rules (called automatically in step)
+    // Update plasticity rules
     void updatePlasticity();
     
-    // Apply developmental changes (called automatically in step)
+    // Apply developmental changes
     void develop();
     
-    // Reset brain state
+    // Reset and checkpoint management
     void reset();
+    void resetToCheckpoint(const std::string& checkpointPath);
     
-    // Save brain state to file (checkpointing)
+    // Save and load
     bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
     bool load(const std::string& filepath);
     
     // Region management
@@ -121,14 +235,15 @@ public:
     const NeuralRegion* getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
+                                  float weight = 0.0f, Delay delay = 1,
+                                  ConnectivityType type = ConnectivityType::FeedForward,
+                                  ConnectionStrength strength = Strength::Weak);
     void removeInterRegionConnection(RegionId source, RegionId target);
+    std::vector<InterRegionConnection> getInterRegionConnections() const;
     
     // Global statistics
     size_t getTotalNeuronCount() const;
@@ -137,65 +252,93 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
+    // Memory systems
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
+    // Prediction system
     PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
     
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
+    // Cognition systems
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
+    const DevelopmentSystem* getDevelopmentSystem() const;
+    
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+    // Neuromodulation systems
     Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
     
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
     
-    // Novelty - novelty detection
     Novelty* getNovelty();
+    const Novelty* getNovelty() const;
     
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    const PredictionError* getPredictionErrorSignal() const;
     
-    // Get current configuration
+    // Configuration
     std::shared_ptr<const Config> getConfig() const;
+    BrainConfig getBrainConfig() const;
     
-    // Get random generator
+    // Random generator
     RandomGenerator* getRandomGenerator();
+    const RandomGenerator* getRandomGenerator() const;
     
-    // Logging
+    // Simulation control
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
+    double getTimestep() const;
+    
+    // Logging and monitoring
     void logStatus() const;
+    BrainStatus getStatus() const;
+    
+    // Validation
+    bool validate() const;
+    std::string validationReport() const;
+    
+    // Experimental features
+    void enableReplay(bool enable);
+    void enableConsolidation(bool enable);
+    void enableDevelopment(bool enable);
+    
+    // Version and phase information
+    static std::string getVersion();
+    static std::string getPhase();
     
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Enhanced brain factory functions
+namespace brain {
+    std::shared_ptr<Brain> createStandardBrain(size_t neuronCount = 500);
+    std::shared_ptr<Brain> createResearchBrain();
+    std::shared_ptr<Brain> createDemoBrain();
+    
+    bool validateBrainConfiguration(const BrainConfig& config);
+    std::vector<std::string> getValidationErrors(const BrainConfig& config);
+}
 
 } // namespace nlm

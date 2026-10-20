@@ -23,6 +23,31 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
+// Helper functions for configuration
+namespace nlm {
+    namespace config {
+        // Type checking helpers
+        template<typename T>
+        bool isType(const ConfigValue& value);
+        
+        // Type conversion with error checking
+        template<typename T>
+        std::optional<T> tryGetAs(const ConfigValue& value);
+        
+        // Validation helpers
+        bool validateRange(const ConfigValue& value, double min, double max);
+        bool validatePositive(const ConfigValue& value);
+        bool validateNonEmpty(const ConfigValue& value);
+        
+        // Configuration convenience functions
+        template<typename T>
+        T getRequired(const Config& config, const std::string& key);
+        
+        template<typename T>
+        std::optional<T> getOptional(const Config& config, const std::string& key, const T& defaultValue);
+    }
+}
+
 // Configuration source
 enum class ConfigSource {
     Default,
