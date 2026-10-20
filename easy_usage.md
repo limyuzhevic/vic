@@ -30,7 +30,8 @@ That's it! NLM simulates all of this.
 import pynlm
 
 # Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 
 # Step 2: Turn it on
 brain.initialize()
@@ -48,7 +49,8 @@ print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 import pynlm
 
 # Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
 world = pynlm.createSimpleWorld()
@@ -85,13 +87,14 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## The Simplest Possible Example
+### The Simplest Possible Example
 
 ```python
 import pynlm
 
 # One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 
 # Initialize it
 brain.initialize()
@@ -159,7 +162,7 @@ agent.enableCuriosity(True)             # Explore new things
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+- `config` = settings for the brain (use `pynlm.createDefaultConfig()` for simple setup)
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
@@ -188,7 +191,8 @@ Reads the brain's motor neurons to decide what action to take.
 ```python
 import pynlm
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
 for i in range(10):
@@ -203,7 +207,8 @@ print("Silent brain test done!")
 import pynlm
 
 # Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
@@ -260,7 +265,7 @@ print("Agent simulation complete!")
 
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| Create brain | `config = pynlm.createDefaultConfig(); brain = pynlm.createBrain(config)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
