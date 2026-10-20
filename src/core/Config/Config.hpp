@@ -58,6 +58,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath, ConfigSource source = ConfigSource::File);
+    
+    // Load from legacy key=value format
+    bool loadFromLegacyFormat(const std::string& filepath, ConfigSource source = ConfigSource::File);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -100,6 +106,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Internal file format helpers
+    bool loadFromJSON(const std::string& filepath, ConfigSource source = ConfigSource::File);
+    bool loadFromLegacyFormat(const std::string& filepath, ConfigSource source = ConfigSource::File);
 };
 
 } // namespace nlm

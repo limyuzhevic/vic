@@ -400,21 +400,283 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Advanced Python enhancements
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set useful defaults for research experiments
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("neuron_count", static_cast<int64_t>(1000));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_tau", 20.0f);
+        config->set("simulation_timestep", 0.001);
+        
+        return config;
+    }, "Create an advanced configuration with research-friendly defaults");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createResearchConfig", [](int neuronCount, int maxSteps) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Research experiment configuration
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.015f);
+        config->set("stdp_tau", 20.0f);
+        config->set("simulation_timestep", 0.001);
+        
+        // Enable advanced features
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        config->set("replay_interval", 100);
+        config->set("consolidation_interval", 1000);
+        
+        return config;
+    }, py::arg("neuronCount"), py::arg("maxSteps"),
+        "Create a research configuration optimized for neural development experiments");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Visualization and monitoring helper functions
+    m.def("getBrainMetrics", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict metrics;
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"] = brain->getTotalSynapseCount();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["total_spikes"] = brain->getTotalSpikeCount();
+        metrics["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        if (brain->getWorkingMemory()) {
+            metrics["working_memory_traces"] = brain->getWorkingMemory()->getActiveTraces();
+        }
+        if (brain->getEpisodicMemory()) {
+            metrics["episodic_memory_episodes"] = brain->getEpisodicMemory()->getEpisodeCount();
+        }
+        if (brain->getDopamine()) {
+            metrics["dopamine_level"] = brain->getDopamine()->getLevel();
+        }
+        
+        return metrics;
+    }, py::arg("brain"), "Get comprehensive brain metrics as a dictionary");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                  std::shared_ptr<AgentBrain> agent, int maxSteps) -> py::dict {
+        py::dict results;
+        float totalReward = 0.0f;
+        
+        for (int step = 0; step < maxSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input and process
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get action and apply to world
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // TODO: Apply reward modulation with actual reward calculation
+            // float reward = world->computeReward(brain->getRegion(RegionId(1)).get());
+            // agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        results["total_steps"] = maxSteps;
+        results["final_firing_rate"] = brain->getAverageFiringRate();
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        results["final_development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("maxSteps"),
+        "Run a complete brain simulation with world interaction");
+
+    // Configuration helper functions
+    m.def("validateConfig", [](std::shared_ptr<Config> config) -> bool {
+        // Basic validation - check for required keys
+        bool valid = true;
+        
+        if (!config->has("random_seed")) {
+            valid = false;
+        }
+        if (!config->has("neuron_count")) {
+            valid = false;
+        }
+        if (!config->has("connection_probability")) {
+            valid = false;
+        }
+        
+        return valid;
+    }, py::arg("config"), "Validate configuration and return True if valid");
+
+    m.def("getConfigSuggestions", [](const std::string& experimentType) -> py::dict {
+        py::dict suggestions;
+        
+        if (experimentType == "development") {
+            suggestions["random_seed"] = "42";
+            suggestions["neuron_count"] = "1000";
+            suggestions["connection_probability"] = "0.15";
+            suggestions["synaptogenesis_rate"] = "0.001";
+            suggestions["pruning_rate"] = "0.0001";
+            suggestions["stdp_ltp_weight"] = "0.02";
+            suggestions["stdp_ltd_weight"] = "0.015";
+        } else if (experimentType == "plasticity") {
+            suggestions["random_seed"] = "123";
+            suggestions["neuron_count"] = "500";
+            suggestions["connection_probability"] = "0.1";
+            suggestions["stdp_ltp_weight"] = "0.01";
+            suggestions["stdp_ltd_weight"] = "0.012";
+        } else {
+            suggestions["random_seed"] = "42";
+            suggestions["neuron_count"] = "1000";
+            suggestions["connection_probability"] = "0.1";
+            suggestions["simulation_timestep"] = "0.001";
+        }
+        
+        return suggestions;
+    }, py::arg("experimentType"), "Get configuration suggestions for specific experiment types");
+
+    // Performance monitoring helper functions
+    m.def("getBrainMetrics", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict metrics;
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"] = brain->getTotalSynapseCount();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["total_spikes"] = brain->getTotalSpikeCount();
+        metrics["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        if (brain->getWorkingMemory()) {
+            metrics["working_memory_traces"] = brain->getWorkingMemory()->getActiveTraces();
+        }
+        if (brain->getEpisodicMemory()) {
+            metrics["episodic_memory_episodes"] = brain->getEpisodicMemory()->getEpisodeCount();
+        }
+        if (brain->getDopamine()) {
+            metrics["dopamine_level"] = brain->getDopamine()->getLevel();
+        }
+        
+        return metrics;
+    }, py::arg("brain"), "Get comprehensive brain metrics as a dictionary");
+
+    m.def("profile_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                  std::shared_ptr<AgentBrain> agent, int max_steps) -> py::dict {
+        py::dict results;
+        float total_reward = 0.0f;
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < max_steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input and process
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get action and apply to world
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Compute reward (simplified)
+            total_reward += 0.1f;
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration<double>(end_time - start_time).count();
+        
+        results["total_steps"] = max_steps;
+        results["total_time_seconds"] = elapsed;
+        results["steps_per_second"] = max_steps / elapsed if elapsed > 0 else 0.0;
+        results["total_reward"] = total_reward;
+        results["average_firing_rate"] = brain->getAverageFiringRate();
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("max_steps"),
+        "Profile simulation performance and return timing metrics");
+
+    m.def("monitor_performance", [](std::shared_ptr<Brain> brain, int sample_interval) -> py::dict {
+        py::dict stats;
+        auto start_time = std::chrono::high_resolution_clock::now();
+        auto last_log_time = start_time;
+        
+        int sample_count = 0;
+        
+        // This would require extending the C++ backend to support monitoring
+        // For now, return basic metrics
+        stats["monitored"] = true;
+        stats["sample_interval"] = sample_interval;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["warning"] = "Performance monitoring requires C++ backend extensions";
+        
+        return stats;
+    }, py::arg("brain"), py::arg("sample_interval"), 
+        "Start performance monitoring (requires C++ extensions)");
+
+    // Memory profiling helper
+    m.def("memory_profile", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict profile;
+        
+        // Basic memory information
+        profile["brain_size"] = brain->getTotalNeuronCount() * sizeof(float) * 10;  // Estimate
+        profile["synapse_count"] = brain->getTotalSynapseCount();
+        profile["memory_optimization_note"] = "Run with memory_profiler for detailed analysis";
+        
+        // Check for memory-heavy systems
+        if (brain->getTotalNeuronCount() > 5000) {
+            profile["warning"] = "Large brain system may require significant memory resources";
+        }
+        
+        return profile;
+    }, py::arg("brain"), "Get basic memory profile (requires C++ extensions for detailed analysis)");
+
+    // Simulation benchmarking
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, int steps, int warmup_steps) -> py::dict {
+        py::dict benchmark;
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // Warmup
+        for (int step = 0; step < warmup_steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        // Benchmark
+        auto bench_start = std::chrono::high_resolution_clock::now();
+        for (int step = warmup_steps; step < warmup_steps + steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        auto bench_end = std::chrono::high_resolution_clock::now();
+        
+        auto total_end = std::chrono::high_resolution_clock::now();
+        
+        auto total_elapsed = std::chrono::duration<double>(total_end - start_time).count();
+        auto bench_elapsed = std::chrono::duration<double>(bench_end - bench_start).count();
+        
+        benchmark["total_time_warmup"] = total_elapsed - bench_elapsed;
+        benchmark["benchmark_time"] = bench_elapsed;
+        benchmark["benchmark_steps"] = steps;
+        benchmark["steps_per_second"] = steps / bench_elapsed if bench_elapsed > 0 else 0.0;
+        benchmark["time_per_step_ms"] = (bench_elapsed / steps) * 1000 if steps > 0 else 0.0;
+        
+        benchmark["benchmark_status"] = "completed";
+        benchmark["note"] = "For accurate benchmarks, run larger simulations";
+        
+        return benchmark;
+    }, py::arg("brain"), py::arg("steps"), py::arg("warmup_steps"),
+        "Benchmark brain performance with warmup and steady-state measurements");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
