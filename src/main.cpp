@@ -401,9 +401,15 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+
+    if (!brain || !brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain! Check configuration and system resources.");
+        return 1;
+    }
+
+    // Validate brain was created successfully
+    if (!brain->getTotalNeuronCount() || !brain->getTotalSynapseCount()) {
+        NLM_LOG_ERROR("Brain initialization resulted in zero neurons or synapses!");
         return 1;
     }
     
@@ -414,14 +420,20 @@ int main(int argc, char** argv) {
     
     // Reset brain for plasticity experiment
     brain->reset();
-    brain->initialize();
-    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain after reset!");
+        return 1;
+    }
+
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain for STDP test!");
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status

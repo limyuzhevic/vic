@@ -1,9 +1,24 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <cmath>
 #include <algorithm>
 
 namespace nlm {
+
+// Global neuron memory pool for improved performance
+static MemoryPool<Neuron::Impl> neuronPool(1024, 16); // 1024 neurons per block, 16 initial blocks
+
+void* Neuron::operator new(size_t size) {
+    if (size != sizeof(Impl)) {
+        throw std::bad_alloc();
+    }
+    return neuronPool.allocate();
+}
+
+void Neuron::operator delete(void* ptr) noexcept {
+    neuronPool.deallocate(reinterpret_cast<Impl*>(ptr));
+}
 
 struct Neuron::Impl {
     NeuronId id;

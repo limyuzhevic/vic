@@ -1,9 +1,25 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
+
+// Global synapse memory pool for improved performance
+static MemoryPool<Synapse::Impl> synapsePool(2048, 8); // 2048 synapses per block, 8 initial blocks
+
+void* Synapse::operator new(size_t size) {
+    if (size != sizeof(Impl)) {
+        throw std::bad_alloc();
+    }
+    return synapsePool.allocate();
+}
+
+void Synapse::operator delete(void* ptr) noexcept {
+    synapsePool.deallocate(reinterpret_cast<Impl*>(ptr));
+}
 
 struct Synapse::Impl {
     SynapseId id;

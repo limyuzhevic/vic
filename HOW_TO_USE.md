@@ -498,36 +498,742 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: NLM Phase 6 Enhancements (NEW!)
 
-### Build Issues
+### Overview
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+Phase 6 represents the final integration of all NLM systems into a coherent artificial brain. This major enhancement includes:
+
+#### 1. **Complete Memory Integration**
+- **Working Memory**: Transient active information with persistent activity
+- **Episodic Memory**: Experience storage with neural pattern encoding
+- **Associative Memory**: Pattern associations with Hebbian connectivity
+
+#### 2. **Advanced Neuromodulation Systems**
+- **Dopamine**: Reward processing and reinforcement learning
+- **Curiosity**: Exploration motivation and intrinsic reward
+- **Novelty**: Change detection and adaptation drive
+
+#### 3. **Enhanced Learning Mechanisms**
+- **STDP**: Spike-Timing-Dependent Plasticity with precise timing
+- **Hebbian Learning**: Co-activation strengthening
+- **Structural Plasticity**: Growth and pruning of connections
+- **Reward-Modulated Plasticity**: Credit assignment for delayed rewards
+
+#### 4. **Cognition and Prediction Systems**
+- **Neural Planner**: Action sequence evaluation
+- **Concept Formation**: Pattern discovery and categorization
+- **Prediction System**: Forward models and error computation
+
+#### 5. **Development and Lifespan Learning**
+- **Developmental Stages**: Initial to aging
+- **Critical Period**: Sensitive learning windows
+- **Maturation**: Synaptic refinement and optimization
+
+#### 6. **Performance Optimizations**
+- **Memory Pools**: Lock-free allocation for improved performance
+- **Event Queues**: Efficient spike and event processing
+- **SIMD Support**: Vectorized operations for parallel processing
+- **Cache Optimization**: Better spatial and temporal locality
+
+### Key Improvements in Python API
+
+#### Enhanced Brain Interface
+```python
+# Create brain with configuration
+brain = pynlm.createBrain(config)
+
+# Advanced brain statistics
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Synapses: {brain.getTotalSynapseCount()}")
+print(f"Active neurons: {brain.getActiveNeuronCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+#### Memory Systems Access
+```python
+# Working memory (transient active information)
+wm = brain.getWorkingMemory()
+if wm:
+    print(f"Working memory traces: {wm.getActiveTraces()}")
+    print(f"Memory capacity: {wm.getCapacity()}")
+    print(f"Memory activity level: {wm.getMemoryActivity():.3f}")
 
-### Runtime Issues
+# Episodic memory (experience storage)
+em = brain.getEpisodicMemory()
+if em:
+    print(f"Episodic memory episodes: {em.getEpisodeCount()}")
+    print(f"Average reward: {em.getAverageReward():.3f}")
+    print(f"Replay enabled: {em.isReplayEnabled()}")
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
+# Associative memory (pattern associations)
+am = brain.getAssociativeMemory()
+if am:
+    print(f"Associative memory associations: {am.getAssociationCount()}")
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+#### Neuromodulation Systems
+```python
+# Create agent with world
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all neuromodulation systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Access neuromodulation levels
+print(f"Dopamine level: {agent.getNeuromodulationLevel():.3f}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"Novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"Prediction error: {agent.getPredictionError():.3f}")
+print(f"Developmental stage: {agent.getDevelopmentalStage()}")
+```
+
+### Enhanced Agent Simulation
+
+#### Basic Agent (Same as before, but with improved error handling)
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```
+
+#### Advanced Agent with All Features (NEW!)
+```python
+import pynlm
+
+# Setup with enhanced configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # Larger network
+config.set("brain.synapse_density", 0.15)  # More connections
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced learning systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run advanced simulation with all systems
+for step in range(1000):
+    # 1. Update world
+    world.update(0.05)
+    
+    # 2. Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # 3. Process sensory input in brain
+    agent.processSensoryInput(percept)
+    
+    # 4. Run brain step with timestamp
+    brain.step(step, step * 0.05)
+    
+    # 5. Get action from brain
+    action = agent.decodeMotorCommand()
+    
+    # 6. Apply action to world
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # 7. Apply all neuromodulation systems
+    reward = 0.1 if action.type == pynlm.ActionType.Interact else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # 8. Update development system
+    agent.updateDevelopment(0.05)
+
+# Print comprehensive statistics
+print(f"Simulation completed!")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"Novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"Prediction error: {agent.getPredictionError():.3f}")
+print(f"Developmental stage: {agent.getDevelopmentalStage()}")
+```
+
+### New Convenience Functions
+
+#### Advanced Convenience Functions (NEW!)
+```python
+import pynlm
+import time
+
+# 1. Run simple simulation and return statistics
+def run_simple_simulation(brain, steps):
+    if not brain:
+        raise ValueError("Brain cannot be null")
+    if not brain.initialize():
+        raise RuntimeError("Failed to initialize brain")
+    for i in range(steps):
+        brain.step(i)
+    return brain.getAverageFiringRate()
+
+# 2. Run complete agent simulation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+# Run complete simulation and get results
+result = pynlm.run_agent_simulation(brain, world, agent, 1000)
+print(f"Simulation results: {result}")
+
+# 3. Benchmark brain performance
+def benchmark_brain(brain, steps):
+    if not brain:
+        raise ValueError("Brain cannot be null")
+    
+    start_time = time.time()
+    if not brain.initialize():
+        raise RuntimeError("Failed to initialize brain for benchmarking")
+    
+    for step in range(steps):
+        brain.step(step, step * 0.001)
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    return {
+        'avg_firing_rate': brain.getAverageFiringRate(),
+        'total_spikes': brain.getTotalSpikeCount(),
+        'duration': duration,
+        'steps_per_sec': steps / duration if duration > 0 else 0,
+        'microseconds_per_step': duration / steps * 1000000 if steps > 0 else 0
+    }
+
+# 4. Create brain from configuration file
+brain = pynlm.create_brain_from_config("my_config.json")
+
+# 5. Save and restore brain checkpoints
+brain.save("checkpoint1.bin")
+brain2 = pynlm.load_brain_checkpoint("checkpoint1.bin")
+```
+
+### Memory Integration Features
+
+#### Working Memory
+```python
+# Check working memory availability
+wm = brain.getWorkingMemory()
+if wm:
+    print(f"Working memory active traces: {wm.getActiveTraces()}")
+    print(f"Working memory capacity: {wm.getCapacity()}")
+    print(f"Working memory activity level: {wm.getMemoryActivity():.3f}")
+```
+
+#### Episodic Memory
+```python
+# Check episodic memory functionality
+em = brain.getEpisodicMemory()
+if em:
+    print(f"Episodic memory episodes: {em.getEpisodeCount()}")
+    print(f"Episodic memory average reward: {em.getAverageReward():.3f}")
+    print(f"Episodic memory replay enabled: {em.isReplayEnabled()}")
+```
+
+#### Memory Replay
+```python
+# Replay stored memories
+em = brain.getEpisodicMemory()
+if em and em.getEpisodeCount() > 0:
+    episodes = em.getEpisodesForReplay(5)
+    print(f"Ready to replay {len(episodes)} episodes")
+    for episode in episodes:
+        em.replayEpisode(episode)
+```
+
+### Development and Growth
+
+#### Developmental Stages
+```python
+# Check and manage developmental stages
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+print(f"Initial developmental stage: {brain.getDevelopmentalStage()}")
+
+# Simulate development
+for step in range(500):
+    brain.step(step, step * 0.001)
+    
+    # Progress through developmental stages
+    if step % 100 == 0:
+        stage = brain.getDevelopmentalStage()
+        print(f"Step {step}: {stage}")
+```
+
+### Performance Monitoring
+
+#### System Health Check
+```python
+# Comprehensive system health monitoring
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+print("\n=== SYSTEM HEALTH CHECK ===")
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Synapses: {brain.getTotalSynapseCount()}")
+print(f"Active neurons: {brain.getActiveNeuronCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"Total spike count: {brain.getTotalSpikeCount()}")
+```
+
+### Error Handling and Validation
+
+#### Enhanced Error Handling
+```python
+import pynlm
+
+# Create and initialize components
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+
+# This will raise exceptions if any component is invalid
+agent.initialize(world)
+
+# Check agent status
+if agent.isRewardModulationEnabled():
+    print("✓ Reward modulation is enabled")
+else:
+    print("✗ Reward modulation is disabled")
+
+if agent.isDevelopmentEnabled():
+    print("✓ Development is enabled")
+else:
+    print("✗ Development is disabled")
+```
+
+#### Configuration Validation
+```python
+# Validate configuration before use
+config = pynlm.createDefaultConfig()
+
+# Check if configuration has required keys
+if config.has("brain.neuron_count"):
+    neurons = config.get("brain.neuron_count")
+    print(f"Configuration: {neurons} neurons")
+
+# Create brain with validated configuration
+brain = pynlm.createBrain(config)
+if not brain.initialize():
+    print("Error: Failed to initialize brain")
+    exit(1)
+```
 
 ---
 
-## Further Reading
+## Part 7: Phase 6 Integration Testing (NEW!)
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+### Integration Test Overview
+
+Phase 6 includes comprehensive integration tests to verify that all systems work together correctly:
+
+1. **Integration Verification**: Tests basic connectivity between systems
+2. **Memory Integration**: Verifies memory systems are properly connected
+3. **Neuromodulation Integration**: Tests neuromodulation systems are functional
+4. **Checkpoint System**: Validates save/load functionality
+5. **Replay System**: Tests memory replay capabilities
+
+### Running Integration Tests
+
+```bash
+# Build with tests enabled
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run Phase 6 integration demo
+./nlm_phase6_demo
+
+# Run unit tests
+./nlm_test
+
+# Run Phase 3 demo (original demo, still available)
+./nlm_phase3_demo
+
+# Run Phase 4 demo (original demo, still available)
+./nlm_phase4_demo
+```
+
+### Integration Test Results
+
+The integration tests verify:
+
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty detection
+- **Prediction**: Forward models and error computation
+- **Development**: Lifespan learning and maturation
+- **Checkpointing**: Save/load functionality
+- **Replay**: Memory consolidation and retrieval
+
+---
+
+## Part 8: Building and Installation (UPDATED)
+
+### Building with Performance Optimizations
+
+```bash
+# Configure with performance optimizations
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+          -DNLM_PERFORMANCE_ENABLED=ON \
+          -DNLM_SIMD_AVX2=ON \
+          -DNLM_THREAD_COUNT=4
+
+# Build with optimizations
+make -j4
+```
+
+### Python Installation with Performance
+
+```bash
+# Install Python bindings with performance features
+pip install . --config-settings=cmake.define.NLM_PERFORMANCE_ENABLED=ON
+
+# Or install in development mode
+pip install -e . --config-settings=cmake.define.NLM_SIMD_AVX2=ON
+```
+
+### Build Outputs (Enhanced)
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable (Phase 6) |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | Executable | **NEW** Phase 6 integration test |
+| `nlm_test` | Executable | Unit test suite |
+
+---
+
+## Part 9: Advanced Configuration Options (ENHANCED)
+
+### Performance Configuration
+
+```bash
+# Configure performance features
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+          -DNLM_PERFORMANCE_ENABLED=ON \
+          -DNLM_USE_MEMORY_POOL=ON \
+          -DNLM_USE_SOA=ON \
+          -DNLM_USE_EVENT_QUEUE=ON \
+          -DNLM_USE_SIMD=ON \
+          -DNLM_THREAD_COUNT=4
+```
+
+### Runtime Configuration
+
+```python
+import pynlm
+
+# Configure brain for performance
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)  # Larger network
+config.set("brain.synapse_density", 0.2)  # More connections
+config.set("plasticity.stdp.enable", True)  # Enable STDP
+config.set("plasticity.hebbian.enable", True)  # Enable Hebbian
+config.set("plasticity.structural.enable", True)  # Enable structural plasticity
+config.set("neuromod.curiosity.enable", True)  # Enable curiosity
+config.set("neuromod.novelty.enable", True)  # Enable novelty detection
+
+# Create optimized brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### World Configuration
+
+```python
+import pynlm
+
+# Configure world for optimal performance
+world = pynlm.createSimpleWorld()
+world.configure(
+    width=50,      # Larger world
+    height=50,     # More space for exploration
+    visionWidth=16,  # Better vision range
+    visionHeight=16
+)
+
+# Optimize world parameters
+world.setMaxEnergy(200.0)
+world.setEnergyDecayRate(0.005)
+world.setRandomSeed(12345)  # Reproducible results
+world.reset()
+```
+
+---
+
+## Part 10: Performance and Scalability (NEW!)
+
+### Performance Features
+
+NLM includes comprehensive performance optimizations:
+
+#### 1. **Memory Pool System**
+- Lock-free memory allocation for improved performance
+- Pre-allocated pools reduce allocation overhead
+- Cache-aligned structures for better locality
+
+#### 2. **Event Queue System**
+- Ring buffer for immediate spike events
+- Time-bucketed delayed spike processing
+- Lock-free operations for thread safety
+
+#### 3. **SIMD Vectorization**
+- AVX2 and SSE4.1 instruction support
+- Vectorized neural computations
+- Parallel processing capabilities
+
+#### 4. **Sparse Connectivity**
+- Efficient adjacency lists
+- Memory-efficient storage for large networks
+- Optimized synapse lookup
+
+### Scalability
+
+NLM is designed to scale from:
+- **Small networks**: 100-1,000 neurons (real-time simulation)
+- **Medium networks**: 1,000-10,000 neurons (real-time with optimizations)
+- **Large networks**: 10,000-100,000+ neurons (high-performance with parallel processing)
+
+### Performance Guidelines
+
+#### For Real-time Applications
+```python
+# Use smaller timesteps and optimized configurations
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("simulation_timestep", 0.01)  # Larger timestep
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### For Research and Analysis
+```python
+# Use larger networks for comprehensive analysis
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 10000)
+config.set("simulation_timestep", 0.001)  # Precise timesteps
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### For Long-running Simulations
+```python
+# Use checkpointing for long simulations
+for step in range(100000):
+    brain.step(step)
+    
+    if step % 10000 == 0:
+        brain.save(f"checkpoint_{step}.bin")
+        print(f"Checkpoint saved at step {step}")
+```
+
+---
+
+## Part 11: Scientific Background and Theory (ENHANCED)
+
+### Neural Model
+
+NLM implements the following biological principles:
+
+#### 1. **Leaky Integrate-and-Fire (LIF) Neurons**
+- Membrane potential integration with exponential decay
+- Spike generation when threshold is reached
+- Refractory period after spike
+- Adaptation for spike-frequency regulation
+
+#### 2. **Spike-Timing-Dependent Plasticity (STDP)**
+- Pre-before-post spikes strengthen connections (LTP)
+- Post-before-pre spikes weaken connections (LTD)
+- Time-dependent plasticity rules
+
+#### 3. **Hebbian Learning**
+- "Neurons that fire together, wire together"
+- Co-activation strengthening
+- Activity-dependent synaptic modification
+
+#### 4. **Structural Plasticity**
+- Growth of new synaptic connections
+- Pruning of weak connections
+- Synaptogenesis and retraction
+
+### Memory Systems
+
+#### 1. **Working Memory**
+- Persistent neural activity for information maintenance
+- Competitive selection among memories
+- Dynamic updating and refreshing
+
+#### 2. **Episodic Memory**
+- Neural pattern storage of experiences
+- Temporal ordering and context encoding
+- Pattern completion for retrieval
+
+#### 3. **Associative Memory**
+- Relational encoding between experiences
+- Spreading activation for inference
+- Pattern completion and completion
+
+### Neuromodulation
+
+#### 1. **Dopamine**
+- Reward prediction error signaling
+- Reinforcement learning modulation
+- Incentive motivation
+
+#### 2. **Curiosity**
+- Intrinsic motivation for exploration
+- Novelty detection and reward
+- Information seeking behavior
+
+#### 3. **Novelty**
+- Change detection and adaptation
+- Arousal and attention modulation
+- Learning rate adjustment
+
+### Developmental Principles
+
+#### 1. **Critical Periods**
+- Sensitive windows for learning
+- Plasticity reduction with age
+- Experience-dependent maturation
+
+#### 2. **Synaptic Refinement**
+- Pruning of weak connections
+- Strengthening of important connections
+- Optimization of neural circuits
+
+#### 3. **Lifespan Learning**
+- Continuous adaptation throughout life
+- Age-dependent plasticity
+- Cumulative learning and memory
+
+---
+
+## Part 12: Future Directions and Extensions (NEW!)
+
+### Research Applications
+
+#### 1. **Cognitive Modeling**
+- Implement complex cognitive tasks
+- Study decision-making processes
+- Model memory formation and retrieval
+
+#### 2. **Neurological Disorders**
+- Simulate disease states
+- Study abnormal neural dynamics
+- Test therapeutic interventions
+
+#### 3. **Machine Learning Integration**
+- Hybrid neural-symbolic systems
+- Bio-inspired artificial intelligence
+- Adaptive learning algorithms
+
+### Technical Extensions
+
+#### 1. **Hardware Acceleration**
+- GPU implementation of neural dynamics
+- Neuromorphic chip designs
+- Specialized hardware accelerators
+
+#### 2. **Distributed Computing**
+- Multi-agent simulations
+- Distributed memory systems
+- Parallel processing of large networks
+
+#### 3. **Virtual Reality Integration**
+- Immersive neural simulation environments
+- Real-time interaction with simulated brains
+- Educational and training applications
+
+### Community Resources
+
+#### Documentation
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed system architecture
+- [SCIENCE.md](docs/SCIENCE.md) - Scientific background and theory
+- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions and protocols
+- [LIMITATIONS.md](docs/LIMITATIONS.md) - Current limitations and future directions
+
+#### Software Resources
+- GitHub repository with examples and tutorials
+- Community forums for discussion and collaboration
+- Issue tracking for bug reports and feature requests
+- Regular updates and new releases
+
+---
+
+## Conclusion
+
+NLM Phase 6 represents a comprehensive advancement in brain-inspired neural simulation. Key improvements include:
+
+### 1. **Enhanced Memory Systems**
+- Complete integration of working, episodic, and associative memory
+- Neural pattern storage and retrieval mechanisms
+- Replay and consolidation capabilities
+
+### 2. **Advanced Neuromodulation**
+- Comprehensive reward and intrinsic motivation systems
+- Novelty detection and curiosity-driven exploration
+- Real-time adaptation and learning
+
+### 3. **Performance Optimizations**
+- Memory pools and event queues for efficient processing
+- SIMD vectorization and cache optimization
+- Scalability from small to very large networks
+
+### 4. **Enhanced Python Interface**
+- Comprehensive API with convenience functions
+- Improved error handling and validation
+- Extensive documentation and examples
+
+### 5. **Scientific Accuracy**
+- Biologically plausible neuron models
+- Real neural plasticity mechanisms
+- Developmental and aging processes
+
+NLM provides a powerful platform for neural research, education, and applications. Whether you're a beginner learning about neural systems or a researcher exploring advanced brain models, NLM offers the tools and capabilities you need.
+
+**For the latest updates and documentation, visit the NLM project website and contribute to the growing community of neural simulation researchers and practitioners!**

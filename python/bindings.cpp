@@ -416,10 +416,121 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    return std::make_shared<Config>();
+}, "Create a default configuration")
+    .def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration")
+    .def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world")
+    .def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Statistics and utility functions
+    m.def("run_simple_simulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Cannot run simulation: brain is null");
+        }
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for simulation");
+        }
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getAverageFiringRate();
+    }, py::arg("brain"), py::arg("steps"),
+       "Run a simple simulation and return average firing rate")
+    .def("run_agent_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent, size_t steps) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Cannot run agent simulation: required components are null");
+        }
+        if (!agent->initialize(*world)) {
+            throw std::runtime_error("Failed to initialize agent");
+        }
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for agent simulation");
+        }
+        for (size_t i = 0; i < steps; ++i) {
+            // Get observation
+            const SensoryPercept& percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(i, i * 0.001);
+            
+            // Get motor command
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            ActionResult actionResult = world->applyMotorCommand(cmd, world->getSimulationTime());
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(actionResult.reward, 0.0f);
+            
+            // Update development if enabled
+            agent->updateDevelopment(0.001);
+        }
+        return std::make_tuple(brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete agent simulation with brain-world interaction")
+    .def("benchmark_brain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Cannot benchmark: brain is null");
+        }
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for benchmarking");
+        }
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        double duration = std::chrono::duration<double>(end - start).count();
+        
+        return std::make_tuple(brain->getAverageFiringRate(),
+                              brain->getTotalSpikeCount(),
+                              duration,
+                              duration / steps * 1000000); // microseconds per step
+    }, py::arg("brain"), py::arg("steps"),
+       "Benchmark brain performance and return statistics")
+    .def("create_brain_from_config", [](const std::string& configPath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configPath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + configPath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configPath"), "Create brain from configuration file")
+    .def("save_brain_checkpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Cannot save: brain is null");
+        }
+        if (!brain->save(filepath)) {
+            throw std::runtime_error("Failed to save brain checkpoint to: " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Save brain checkpoint to file")
+    .def("load_brain_checkpoint", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain checkpoint from: " + filepath);
+        }
+        return brain;
+    }, py::arg("filepath"), "Load brain checkpoint from file and return brain");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
 } // namespace nlm
