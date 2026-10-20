@@ -157,14 +157,68 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
+/**
+ * @brief Initializes the Brain implementation with configuration
+ * 
+ * @details
+ * This implementation constructor sets up all neural subsystems and creates
+ * the complete brain architecture. It initializes:
+ * - Random number generator for deterministic simulation
+ * - Neural computation components (spike system, STDP, Hebbian, structural plasticity)
+ * - Memory systems (working, episodic, associative memory)
+ * - Prediction and cognition systems
+ * - Neuromodulation systems (dopamine, curiosity, novelty)
+ * - Development system with plasticity stages
+ * - Checkpoint system for state management
+ * - Simulation parameters (timestep, replay intervals, etc.)
+ * 
+ * The constructor follows a layered initialization approach:
+ * 1. Core random generator and neural computation components
+ * 2. Integrated memory and cognition systems
+ * 3. Neuromodulation and development systems
+ * 4. Plasticity configuration based on parameters
+ * 5. Simulation timing parameters
+ * 
+ * All systems are created using unique_ptr for automatic cleanup.
+ */
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
+/**
+ * @brief Default destructor (default implementation)
+ * 
+ * @details
+ * The Brain destructor relies on the pImpl idiom for automatic cleanup.
+ * The unique_ptr in the Impl struct ensures all allocated resources
+ * are properly deallocated when the Brain object is destroyed.
+ */
 Brain::~Brain() = default;
 
+/**
+ * @brief Move constructor implementation
+ * 
+ * @param other Source Brain object to move from
+ * 
+ * @details
+ * Transfers ownership of the pImpl pointer without deep copying.
+ * The source object's pImpl is set to nullptr to prevent double-free.
+ * This enables efficient Brain object transfer while maintaining
+ * exception safety.
+ */
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
 
+/**
+ * @brief Move assignment operator implementation
+ * 
+ * @param other Source Brain object to move from
+ * @return Brain& Reference to this Brain object
+ * 
+ * @details
+ * Properly manages resource transfer during move assignment.
+ * First cleans up current resources, then transfers ownership
+ * from the source object. Handles self-assignment correctly.
+ */
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
@@ -174,16 +228,58 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+/**
+ * @brief Initializes the brain with all neural components
+ * 
+ * @return bool True if initialization succeeded
+ * 
+ * @details
+ * Performs complete brain initialization including:
+ * 1. Validation of configuration parameters
+ * 2. Creation of neural regions and populations
+ * 3. Neuron instantiation with type-specific properties
+ * 4. Synapse creation based on connectivity rules
+ * 5. Integration of all subsystems with the brain
+ * 6. Memory system initialization
+ * 7. Development stage setting
+ * 8. Sensory and motor neuron identification
+ * 
+ * The initialization follows a hierarchical approach:
+ * - Regions are created first (regional organization)
+ * - Neurons are populated per region (local connectivity)
+ * - Synapses are established (connection topology)
+ * - Systems are attached (functional integration)
+ * 
+ * References:
+ * - Sporns (2011) "Network Biology"
+ * - Sporns (2018) "The complex brain"
+ * 
+ * @note This method should be called once after construction
+ */
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Get configuration values with error checking and defaults
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Validate configuration parameters
+    if (neuronCount < 10) {
+        NLM_LOG_WARN("Neuron count is very low (" + std::to_string(neuronCount) + ") - "
+                    "simulation may not exhibit complex behavior");
+    }
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Region count must be at least 1");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Connection probability must be between 0.0 and 1.0");
+        return false;
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {

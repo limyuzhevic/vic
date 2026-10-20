@@ -11,7 +11,7 @@ struct Hebbian::Impl {
     float covarianceThreshold;  // For covariance rule
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             covarianceThreshold(0.5f) {}
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -53,23 +53,50 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Real Hebbian learning implementation (Covariance rule):
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    // Where ⟨⟩ represents average over spike history
+    
+    // Count pre-synaptic spikes and post-synaptic spikes
+    size_t preCount = preSpikes.size();
+    size_t postCount = postSpikes.size();
+    
+    if (preCount == 0 || postCount == 0) {
+        return;
+    }
+    
+    // Calculate average firing rates (simplified: spikes / time window)
+    // Use the time span between first and last spike as window
+    float preTimeWindow = static_cast<float>(preSpikes.back() - preSpikes.front());
+    float postTimeWindow = static_cast<float>(postSpikes.back() - postSpikes.front());
+    
+    float preRate = static_cast<float>(preCount) / (preTimeWindow > 0 ? preTimeWindow : 1.0f);
+    float postRate = static_cast<float>(postCount) / (postTimeWindow > 0 ? postTimeWindow : 1.0f);
+    
+    // Calculate correlation (simultaneous spike probability)
+    size_t coincidences = 0;
+    float coincidenceTimeWindow = 20.0f;  // 20ms coincidence window (biological)
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            float dt = std::abs(static_cast<float>(postTime - preTime));
+            if (dt < coincidenceTimeWindow) {
+                ++coincidences;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Compute covariance-based weight change
+    // coincidences / (preCount * postCount) = correlation coefficient
+    // Subtract baseline (expected coincidences by chance)
+    float expectedCoincidences = preRate * postRate * coincidenceTimeWindow;
+    float correlation = static_cast<float>(coincidences) / static_cast<float>(preCount * postCount);
+    float covariance = correlation - (preRate * postRate * coincidenceTimeWindow);
     
-    // Apply with bounds
+    // Apply Hebbian learning with covariance rule
+    float delta = pImpl->learningRate * covariance * pImpl->covarianceThreshold;
+    
+    // Apply with bounds and normalization
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
     }

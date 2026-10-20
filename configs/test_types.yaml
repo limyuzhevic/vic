@@ -1,0 +1,25 @@
+simple_types:
+  integer_value: 42
+  float_value: 3.14
+  boolean_value: true
+  string_value: "Hello World"
+  null_value: null
+  array_int:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  array_float:
+    - 1.1
+    - 2.2
+    - 3.3
+  array_string:
+    - apple
+    - banana
+    - cherry
+
+nested:
+  inner_value:
+    deep_nested:
+      nested_int: 99

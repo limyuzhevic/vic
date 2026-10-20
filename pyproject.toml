@@ -27,12 +27,32 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "scikit-learn>=1.0",
+    "networkx>=2.6",
+    "psutil>=5.8",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "scikit-learn>=1.0",
+    "networkx>=2.6",
+    "psutil>=5.8",
+]
+
+[project.optional-dependencies]
+examples = [
+    "jupyter>=1.0",
+    "ipython>=7.0",
 ]
 
 [project.urls]

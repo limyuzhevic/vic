@@ -22,6 +22,7 @@ public:
     
     // Apply neuromodulatory effect to plasticity
     // TODO PHASE 2: Implement real modulation
+    // Current: Dopamine returns level-dependent factor, others return 1.0
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state

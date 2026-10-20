@@ -177,8 +177,14 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
-            } else {
+            } else if constexpr (std::is_same_v<T, int> || 
+                               std::is_same_v<T, int64_t> || 
+                               std::is_same_v<T, double> || 
+                               std::is_same_v<T, bool>) {
                 oss << arg;
+            } else {
+                // For complex types (vectors, arrays, objects), we need a generic representation
+                oss << "[complex type]";
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
