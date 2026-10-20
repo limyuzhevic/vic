@@ -55,14 +55,32 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detect format based on file extension)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from specific format
+    bool loadFromKeyValue(const std::string& filepath);
+#if defined(HAVE_NLOHMANN_JSON)
+    bool loadFromJSON(const std::string& filepath);
+#endif
+#if defined(HAVE_YAML_CPP)
+    bool loadFromYAML(const std::string& filepath);
+#endif
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Generate configuration file in specified format
+    bool generateConfigFile(const std::string& filepath, const std::string& format = "");
+    
+    // Validate configuration
+    bool validateConfig() const;
+    
+    // Configuration format detection
+    static std::string getConfigFormat(const std::string& filepath);
     
     // Get values
     template<typename T>
@@ -100,6 +118,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Friend declaration for template instantiations
+    template<typename T> friend std::optional<T> Config::get(const std::string&) const;
+    template<typename T> friend T Config::getOr(const std::string&, const T&) const;
 };
 
 } // namespace nlm

@@ -4,6 +4,23 @@
 #include <algorithm>
 #include <filesystem>
 
+#ifdef _WIN32
+    #include <filesystem>
+#else
+    #include <unistd.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
+#endif
+
+// Include JSON and YAML libraries if available
+#if defined(HAVE_NLOHMANN_JSON)
+    #include <nlohmann/json.hpp>
+#endif
+
+#if defined(HAVE_YAML_CPP)
+    #include <yaml-cpp/yaml.h>
+#endif
+
 namespace nlm {
 
 struct Config::Impl {
@@ -19,40 +36,23 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    // Try to detect file format based on extension and content
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
-    return true;
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to key=value format for .cfg, .txt, .ini, etc.
+        return loadFromKeyValue(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -197,6 +197,235 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Key-value format loader (original implementation)
+bool Config::loadFromKeyValue(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+#if defined(HAVE_NLOHMANN_JSON)
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json j;
+        file >> j;
+        
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            
+            if (it.value().is_string()) {
+                set(key, it.value().get<std::string>(), ConfigSource::File);
+            } else if (it.value().is_number_integer()) {
+                set(key, it.value().get<int64_t>(), ConfigSource::File);
+            } else if (it.value().is_number_float()) {
+                set(key, it.value().get<double>(), ConfigSource::File);
+            } else if (it.value().is_boolean()) {
+                set(key, it.value().get<bool>(), ConfigSource::File);
+            } else if (it.value().is_null()) {
+                set(key, std::string(""), ConfigSource::File);
+            } else {
+                // For complex types, convert to JSON string
+                set(key, it.value().dump(), ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON config file '" + filepath + "': " + std::string(e.what()));
+        return false;
+    }
+}
+#endif
+
+#if defined(HAVE_YAML_CPP)
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        for (const auto& key : doc) {
+            std::string keyName = key.first.as<std::string>();
+            
+            if (doc[keyName].IsScalar()) {
+                set(keyName, doc[keyName].as<std::string>(), ConfigSource::File);
+            } else if (doc[keyName].IsInteger()) {
+                set(keyName, doc[keyName].as<int64_t>(), ConfigSource::File);
+            } else if (doc[keyName].IsDouble()) {
+                set(keyName, doc[keyName].as<double>(), ConfigSource::File);
+            } else if (doc[keyName].IsBoolean()) {
+                set(keyName, doc[keyName].as<bool>(), ConfigSource::File);
+            } else if (doc[keyName].IsNull()) {
+                set(keyName, std::string(""), ConfigSource::File);
+            } else {
+                // For complex types, convert to YAML string
+                std::stringstream ss;
+                ss << doc[keyName];
+                set(keyName, ss.str(), ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse YAML config file '" + filepath + "': " + std::string(e.what()));
+        return false;
+    }
+}
+#endif
+
+// Configuration file generator
+bool Config::generateConfigFile(const std::string& filepath, const std::string& format) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    if (format == "json" || format.empty()) {
+        file << "{\n";
+        bool first = true;
+        for (const auto& entry : pImpl->entries) {
+            if (!first) file << ",\n";
+            first = false;
+            
+            file << "  \"" << entry.key << "\"": ";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                }
+            }, entry.value);
+        }
+        file << "\n}\n";
+    } else if (format == "yaml" || format == "yml") {
+        file << "# NLM Configuration File\n";
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << arg << "\"\n";
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    file << entry.key << " = " << arg << "\n";
+                } else if constexpr (std::is_same_v<T, double>) {
+                    file << entry.key << " = " << arg << "\n";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+                }
+            }, entry.value);
+            file << "\n";
+        }
+    } else { // key=value format (default)
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << arg << "\"\n";
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    file << entry.key << " = " << arg << "\n";
+                } else if constexpr (std::is_same_v<T, double>) {
+                    file << entry.key << " = " << arg << "\n";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+                }
+            }, entry.value);
+            file << "\n";
+        }
+    }
+    
+    return true;
+}
+
+// Configuration validation
+bool Config::validateConfig() const {
+    // Basic validation - check for required keys
+    const std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "neuron_count",
+        "region_count"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Configuration missing required key: '" + key + "' (using default)");
+        }
+    }
+    
+    // Validate value ranges
+    if (has("neuron_count")) {
+        auto neuronCount = get<int64_t>("neuron_count");
+        if (neuronCount && *neuronCount < 1) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(*neuronCount));
+            return false;
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto prob = get<double>("connection_probability");
+        if (prob && (*prob < 0.0 || *prob > 1.0)) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(*prob));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Get configuration format from filepath
+std::string Config::getConfigFormat(const std::string& filepath) {
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
 }
 
 // Explicit template instantiations
