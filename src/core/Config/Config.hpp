@@ -61,6 +61,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from environment variables
+    bool loadFromEnvironment();
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
