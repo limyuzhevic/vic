@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON, YAML, or simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,56 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get configuration value as Python string")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get configuration value as Python int")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get configuration value as Python float")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get configuration value as Python bool")
+        .def("getList", [](Config& self, const std::string& key) {
+            auto val = self.get<std::vector<std::string>>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get configuration value as Python list of strings")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python string")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python int")
+        .def("setFloat", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python float")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python bool")
+        .def("setList", [](Config& self, const std::string& key, const std::vector<std::string>& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python list")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -415,6 +465,76 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Create additional factory functions for easier usage
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Set some reasonable defaults for easier usage
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
+
+    m.def("createDefaultWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(16, 16, 8, 8);  // 16x16 world with 8x8 vision
+        return world;
+    }, "Create a default simple world");
+
+    // Error handling utilities
+    m.def("getVersion", []() {
+        return std::make_tuple(0, 1, 0); // Major, minor, patch
+    }, "Get NLM version");
+
+    m.def("getPlatformInfo", []() {
+        std::map<std::string, std::string> info;
+        info["name"] = "NLM - Neural Learning Machine";
+        info["version"] = "0.1.0";
+        info["description"] = "An experimental artificial developmental brain";
+        return info;
+    }, "Get platform information");
+
+    // Performance utilities
+    m.def("measurePerformance", [](std::function<void()> func, int iterations = 10) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations; ++i) {
+            func();
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        return std::make_pair(duration.count(), static_cast<double>(duration.count()) / iterations);
+    }, py::arg("func"), py::arg("iterations") = 10,
+        "Measure performance of a function over multiple iterations");
+
+    // Configuration utilities
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            // Basic validation - check for empty values
+            auto val = config->get<std::string>(key);
+            if (val.has_value() && val.value().empty()) {
+                errors.push_back("Configuration key '" + key + "' has empty value");
+            }
+        }
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
+    m.def("mergeConfigs", [](const std::vector<std::shared_ptr<Config>>& configs) {
+        auto merged = std::make_shared<Config>();
+        for (const auto& config : configs) {
+            auto keys = config->getKeys();
+            for (const auto& key : keys) {
+                auto val = config->get<std::string>(key);
+                if (val.has_value()) {
+                    merged->set(key, val.value());
+                }
+            }
+        }
+        return merged;
+    }, py::arg("configs"), "Merge multiple configuration objects into one");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -19,43 +19,91 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Improved file loading with better error handling and format detection
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+        return false;
+    }
+
+    // Detect file format by extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    try {
+        if (ext == ".json") {
+            return loadFromJSONFile(filepath);
+        } else if (ext == ".yaml" || ext == ".yml") {
+            return loadFromYAMLFile(filepath);
+        } else {
+            // Default to simple key=value format for backward compatibility
+            return loadFromSimpleFormat(filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading configuration file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
-    
+
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == ';') {
             continue;
         }
-        
-        // Parse simple key=value pairs
+
+        // Parse key=value pairs with better error handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
-            
+
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found at line " + std::to_string(lineNumber));
+                continue;
+            }
+
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
-            
+
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid line format at line " + std::to_string(lineNumber) + ": " + line);
         }
     }
-    
+
     return true;
 }
 
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // TODO: Implement proper JSON parser using nlohmann::json or similar
+    // For now, fallback to simple format
+    NLM_LOG_WARNING("JSON file loading not yet implemented for " + filepath + ", using simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Implement proper YAML parser using yaml-cpp or similar
+    // For now, fallback to simple format
+    NLM_LOG_WARNING("YAML file loading not yet implemented for " + filepath + ", using simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +114,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg + " (expected --key=value)");
+                success = false;
             }
         }
         // Handle -key value format
@@ -74,22 +125,103 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle boolean flags
+        else if (arg.substr(0, 2) == "--" && (arg.length() == 2 || arg.find('=') == std::string::npos)) {
+            // Treat --flag as --flag=true
+            std::string key = arg.substr(2);
+            set(key, true, ConfigSource::CommandLine);
+        }
+        else {
+            NLM_LOG_WARNING("Unrecognized command line argument: " + arg);
+            success = false;
+        }
     }
-    return true;
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
         return false;
     }
-    
+
+    // Detect file format by extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    try {
+        if (ext == ".json") {
+            return saveToJSONFile(filepath);
+        } else if (ext == ".yaml" || ext == ".yml") {
+            return saveToYAMLFile(filepath);
+        } else {
+            // Default to simple key=value format for backward compatibility
+            return saveToSimpleFormat(filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving configuration file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+
+    // Add file header
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::to_string(arg[i]);
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "# Source: " << static_cast<int>(entry.source) << "\n\n";
     }
-    
+
     return true;
+}
+
+bool Config::saveToJSONFile(const std::string& filepath) const {
+    // TODO: Implement proper JSON serializer
+    // For now, fallback to simple format
+    NLM_LOG_WARNING("JSON file saving not yet implemented for " + filepath + ", using simple format");
+    return saveToSimpleFormat(filepath);
+}
+
+bool Config::saveToYAMLFile(const std::string& filepath) const {
+    // TODO: Implement proper YAML serializer
+    // For now, fallback to simple format
+    NLM_LOG_WARNING("YAML file saving not yet implemented for " + filepath + ", using simple format");
+    return saveToSimpleFormat(filepath);
 }
 
 template<typename T>
@@ -171,12 +303,41 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    // Count by source
+    int defaultCount = 0, fileCount = 0, commandLineCount = 0, runtimeCount = 0;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        switch (entry.source) {
+            case ConfigSource::Default: defaultCount++; break;
+            case ConfigSource::File: fileCount++; break;
+            case ConfigSource::CommandLine: commandLineCount++; break;
+            case ConfigSource::Runtime: runtimeCount++; break;
+        }
+    }
+    
+    oss << "  Sources: Default=" << defaultCount << " File=" << fileCount 
+        << " CommandLine=" << commandLineCount << " Runtime=" << runtimeCount << "\n";
+    oss << "\n  Entries:\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "    " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::to_string(arg[i]);
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
