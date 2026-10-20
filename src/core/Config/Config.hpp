@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <filesystem>
+#include <algorithm>
 
 namespace nlm {
 
@@ -20,7 +23,9 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<ConfigValue>,  // Nested arrays
+    std::unordered_map<std::string, ConfigValue>  // Nested objects
 >;
 
 // Configuration source
@@ -43,6 +48,14 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// File format enum
+enum class ConfigFormat {
+    Unknown,
+    SimpleKeyValue,
+    JSON,
+    YAML
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +68,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/SimpleKV format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +106,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // File format detection
+    static ConfigFormat detectFileFormat(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +116,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getFileExtension(const std::string& filepath);
+    static bool endsWith(const std::string& str, const std::string& suffix);
+    
+    // Format-specific parsing methods
+    bool parseSimpleKeyValue(const std::string& content);
+    bool parseJSON(const std::string& content);
+    bool parseYAML(const std::string& content);
+    
+    // Format-specific saving methods
+    bool saveSimpleKeyValue(std::ofstream& file) const;
+    bool saveJSON(std::ofstream& file) const;
+    bool saveYAML(std::ofstream& file) const;
+    
+    // Helper methods for nested structures
+    static ConfigValue parseSimpleValue(const std::string& valueStr);
+    static std::string configValueToString(const ConfigValue& value) const;
+    static void flattenConfig(const std::string& prefix, const ConfigValue& value, std::unordered_map<std::string, ConfigValue>& flatConfig);
+    static ConfigValue unflattenConfig(const std::unordered_map<std::string, ConfigValue>& flatConfig);
 };
 
 } // namespace nlm
