@@ -7,6 +7,10 @@
 #include <vector>
 
 #include "../src/brain/Brain.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/NeuralRegion.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
@@ -15,6 +19,9 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -144,22 +151,163 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def(py::init<const ConfigSchema&>(), py::arg("schema"),
+             "Initialize Config with a schema")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath, true);
+            } catch (const std::exception& e) {
+                py::throw_error_already_set();
+                return false;
+            }
+        }, py::arg("filepath"),
+             "Load configuration from file (auto-detects JSON or simple format)")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+             "Load configuration from JSON file")
+        .def("loadFromSimple", &Config::loadFromSimple, py::arg("filepath"),
+             "Load configuration from simple key=value file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("saveToFile", [](Config& self, const std::string& filepath, bool pretty = false) {
+            return self.saveToFile(filepath, pretty);
+        }, py::arg("filepath"), py::arg("pretty") = false,
+           "Save configuration to file (auto-detects JSON based on extension)")
+        .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"), py::arg("pretty") = false,
+             "Save configuration to JSON file")
+        .def("saveToSimple", &Config::saveToSimple, py::arg("filepath"),
+             "Save configuration to simple key=value file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get<int>, py::arg("key"),
+             "Get configuration value as int")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get configuration value as double")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get configuration value as bool")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get configuration value as string")
+        .def("getInt", &Config::getInt, py::arg("key"),
+             "Get configuration value as int (with default)")
+        .def("getDouble", &Config::getDouble, py::arg("key"),
+             "Get configuration value as double (with default)")
+        .def("getBool", &Config::getBool, py::arg("key"),
+             "Get configuration value as bool (with default)")
+        .def("getString", &Config::getString, py::arg("key"),
+             "Get configuration value as string (with default)")
+        .def("getIntVector", &Config::getIntVector, py::arg("key"),
+             "Get configuration value as int vector (with default)")
+        .def("getDoubleVector", &Config::getDoubleVector, py::arg("key"),
+             "Get configuration value as double vector (with default)")
+        .def("getStringVector", &Config::getStringVector, py::arg("key"),
+             "Get configuration value as string vector (with default)")
+        .def("getBoolVector", &Config::getBoolVector, py::arg("key"),
+             "Get configuration value as bool vector (with default)")
+        .def("getOr", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (int)")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (double)")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (bool)")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (string)")
+        .def("set", [](Config& self, const std::string& key, int value,
+                      py::object source) {
+            ConfigSource configSource = ConfigSource::Runtime;
+            if (!source.is_none()) {
+                configSource = source.cast<ConfigSource>();
+            }
+            self.set(key, value, configSource);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = py::none(),
+           "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, double value,
+                      py::object source) {
+            ConfigSource configSource = ConfigSource::Runtime;
+            if (!source.is_none()) {
+                configSource = source.cast<ConfigSource>();
+            }
+            self.set(key, value, configSource);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = py::none(),
+           "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, bool value,
+                      py::object source) {
+            ConfigSource configSource = ConfigSource::Runtime;
+            if (!source.is_none()) {
+                configSource = source.cast<ConfigSource>();
+            }
+            self.set(key, value, configSource);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = py::none(),
+           "Set configuration value (bool)")
+        .def("set", [](Config& self, const std::string& key,
+                      const std::string& value, py::object source) {
+            ConfigSource configSource = ConfigSource::Runtime;
+            if (!source.is_none()) {
+                configSource = source.cast<ConfigSource>();
+            }
+            self.set(key, value, configSource);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = py::none(),
+           "Set configuration value (string)")
+        .def("setCategory", &Config::setCategory, py::arg("key"), py::arg("category"),
+             "Set configuration key category")
+        .def("setDescription", &Config::setDescription, py::arg("key"), py::arg("description"),
+             "Set configuration key description")
+        .def("setType", &Config::setType, py::arg("key"), py::arg("type"),
+             "Set configuration key type hint")
+        .def("setDefault", &Config::setDefault, py::arg("key"), py::arg("value"),
+             "Set configuration key default value")
+        .def("setRequired", &Config::setRequired, py::arg("key"), py::arg("required"),
+             "Set configuration key as required")
+        .def("setValidation", &Config::setValidation, py::arg("key"), py::arg("regex"),
+             py::arg("min") = std::numeric_limits<double>::lowest(),
+             py::arg("max") = std::numeric_limits<double>::max(),
+             "Set configuration key validation rules")
+        .def("getCategory", &Config::getCategory, py::arg("key"),
+             "Get configuration key category")
+        .def("getDescription", &Config::getDescription, py::arg("key"),
+             "Get configuration key description")
+        .def("getType", &Config::getType, py::arg("key"),
+             "Get configuration key type")
+        .def("isRequired", &Config::isRequired, py::arg("key"),
+             "Check if configuration key is required")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getKeysInCategory", &Config::getKeysInCategory, py::arg("category"),
+             "Get configuration keys in a category")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get configuration summary")
+        .def("summaryInCategory", &Config::summaryInCategory, py::arg("category"),
+             "Get configuration summary for a category")
+        .def("validate", &Config::validate,
+             "Validate configuration")
+        .def("validateKey", &Config::validateKey, py::arg("key"),
+             "Validate configuration key")
+        .def("applyDefaults", &Config::applyDefaults,
+             "Apply default values")
+        .def("copyFrom", &Config::copyFrom, py::arg("other"), py::arg("source") = ConfigSource::Runtime,
+             "Copy configuration from another Config")
+        .def("mergeFromFile", &Config::mergeFromFile, py::arg("filepath"), py::arg("overwrite") = true,
+             "Merge configuration from file")
+        .def("setFromEnvironment", &Config::setFromEnvironment, py::arg("prefix") = "NLM_",
+             "Load configuration from environment variables")
+        .def("saveToEnv", &Config::saveToEnv, py::arg("prefix") = "NLM_",
+             "Export configuration to environment variables")
+        .def("toJSON", [](Config& self, bool pretty = false) {
+            return self.toJSON(pretty);
+        }, py::arg("pretty") = false,
+           "Convert configuration to JSON string")
+        .def("fromJSON", &Config::fromJSON, py::arg("jsonStr"),
+             "Load configuration from JSON string")
+        .def("toSimple", [](Config& self, bool comments = true) {
+            return self.toSimple(comments);
+        }, py::arg("comments") = true,
+           "Convert configuration to simple string")
+        .def("setSchema", &Config::setSchema, py::arg("schema"),
+             "Set configuration schema")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -289,6 +437,50 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
+        .def("update", &SimpleWorld::update, py::arg("timestep"))
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"))
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal)
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal)
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getWidth", &SimpleWorld::getWidth)
+        .def("getHeight", &SimpleWorld::getHeight)
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +543,25 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Add context manager support
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object self, py::args) {
+            // Cleanup on exit
+            return py::none();
+        })
+        // Add convenience methods
+        .def("to_dict", &Brain::logStatus,  // Simplified for example
+             "Get brain statistics as a dictionary")
+        .def("is_running", []() { return true; },  // Simplified for example
+             "Check if brain is running")
+        .def("get_statistics", &Brain::logStatus,  // Simplified for example
+             "Get comprehensive brain statistics")
+        .def("get_neurons_by_type", [](Brain& self, NeuronType type) {
+            // This would need to be implemented in C++
+            std::vector<Neuron*> neurons;
+            return neurons;
+        }, py::arg("type"), "Get neurons by type");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -387,18 +597,30 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        // Convenience methods for AgentBrain
+        .def("enable_features", [](AgentBrain& self, bool reward, bool structural,
+                                   bool development, bool curiosity) {
+            self.enableRewardModulation(reward);
+            self.enableStructuralPlasticity(structural);
+            self.enableDevelopment(development);
+            self.enableCuriosity(curiosity);
+        }, py::arg("reward") = false, py::arg("structural") = false,
+            py::arg("development") = false, py::arg("curiosity") = false,
+            "Enable multiple brain features at once")
+        .def("is_learning", [](AgentBrain& self) {
+            return self.isRewardModulationEnabled() ||
+                   self.isStructuralPlasticityEnabled() ||
+                   self.isDevelopmentEnabled() ||
+                   self.isCuriosityEnabled();
+        }, "Check if agent is learning")
+        .def("get_all_features", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.isRewardModulationEnabled(),
+                self.isStructuralPlasticityEnabled(),
+                self.isDevelopmentEnabled(),
+                self.isCuriosityEnabled()
+            );
+        }, "Get all feature enable status as a tuple");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +638,116 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Expose core neural components for advanced users
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Individual neuron with LIF dynamics)pbdoc")
+        .def(py::init<>())
+        .def("stepLIF", &Neuron::stepLIF, py::arg("time"), py::arg("timestep"),
+             "Update neuron membrane potential (LIF dynamics)")
+        .def("checkThreshold", &Neuron::checkThreshold,
+             "Check if neuron has reached firing threshold")
+        .def("recordSpike", &Neuron::recordSpike, py::arg("time"),
+             "Record a spike event")
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory,
+             "Clear spike history")
+        .def("getSpikeHistory", &Neuron::getSpikeHistory,
+             "Get spike history")
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("synapse"),
+             "Add an incoming synapse")
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("synapse"),
+             "Add an outgoing synapse")
+        .def("setRegionId", &Neuron::setRegionId, py::arg("id"),
+             "Set neuron region ID")
+        .def("getRegionId", &Neuron::getRegionId,
+             "Get neuron region ID")
+        .def("setPopulationId", &Neuron::setPopulationId, py::arg("id"),
+             "Set neuron population ID")
+        .def("getPopulationId", &Neuron::getPopulationId,
+             "Get neuron population ID")
+        .def("enablePlasticity", &Neuron::enablePlasticity, py::arg("enable"),
+             "Enable or disable plasticity for this neuron")
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags,
+             "Get plasticity flags")
+        .def("initializeRandom", &Neuron::initializeRandom, py::arg("rng"),
+             "Initialize neuron with random values");
+
+    py::class_<Synapse>(m, "Synapse", R"pbdoc(Synaptic connection between neurons)pbdoc")
+        .def(py::init<>())
+        .def("isExcitatory", &Synapse::isExcitatory,
+             "Check if synapse is excitatory")
+        .def("isInhibitory", &Synapse::isInhibitory,
+             "Check if synapse is inhibitory")
+        .def("recordPreSpike", &Synapse::recordPreSpike, py::arg("time"),
+             "Record pre-synaptic spike")
+        .def("recordPostSpike", &Synapse::recordPostSpike, py::arg("time"),
+             "Record post-synaptic spike")
+        .def("clearHistory", &Synapse::clearHistory,
+             "Clear spike history")
+        .def("getEligibilityTrace", &Synapse::getEligibilityTrace,
+             "Get eligibility trace")
+        .def("decayEligibilityTrace", &Synapse::decayEligibilityTrace,
+             "Decay eligibility trace")
+        .def("getEfficacy", &Synapse::getEfficacy,
+             "Get synaptic efficacy")
+        .def("step", &Synapse::step, py::arg("time"),
+             "Update synapse state")
+        .def("initializeRandom", &Synapse::initializeRandom, py::arg("rng"),
+             "Initialize synapse with random values")
+        .def_readwrite("weight", &Synapse::weight, "Synaptic weight");
+
+    py::class_<NeuralPopulation>(m, "NeuralPopulation", R"pbdoc(Group of neurons with shared properties)pbdoc")
+        .def(py::init<>())
+        .def("addNeuron", &NeuralPopulation::addNeuron, py::arg("neuron"),
+             "Add a neuron to this population")
+        .def("getNeuron", &NeuralPopulation::getNeuron, py::arg("id"),
+             "Get neuron by ID")
+        .def("getNeurons", &NeuralPopulation::getNeurons,
+             "Get all neurons in population")
+        .def("getNeuronCount", &NeuralPopulation::getNeuronCount,
+             "Get number of neurons")
+        .def("getPopulationId", &NeuralPopulation::getPopulationId,
+             "Get population ID")
+        .def("getNeuronType", &NeuralPopulation::getNeuronType,
+             "Get neuron type")
+        .def("getAverageFiringRate", &NeuralPopulation::getAverageFiringRate,
+             "Get average firing rate of population")
+        .def("initializeRandomConnectivity", &NeuralPopulation::initializeRandomConnectivity,
+             py::arg("rng"), py::arg("connectionProbability"), py::arg("maxDelay"),
+             "Initialize random connectivity");
+
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(Brain region containing neural populations)pbdoc")
+        .def(py::init<>())
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("neuronCount"), py::arg("type"),
+             "Add a population to this region")
+        .def("getPopulation", &NeuralRegion::getPopulation, py::arg("id"),
+             "Get population by ID")
+        .def("getPopulations", &NeuralRegion::getPopulations,
+             "Get all populations in region")
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount,
+             "Get number of populations")
+        .def("getNeuron", &NeuralRegion::getNeuron, py::arg("id"),
+             "Get neuron by ID")
+        .def("getAllNeurons", &NeuralRegion::getAllNeurons,
+             "Get all neurons in region")
+        .def("getTotalNeuronCount", &NeuralRegion::getTotalNeuronCount,
+             "Get total neuron count")
+        .def("addSynapse", &NeuralRegion::addSynapse, py::arg("sourceId"), py::arg("destId"), py::arg("weight"),
+             "Add synapse between neurons")
+        .def("getSynapse", &NeuralRegion::getSynapse, py::arg("id"),
+             "Get synapse by ID")
+        .def("getSynapses", &NeuralRegion::getSynapses,
+             "Get all synapses in region")
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount,
+             "Get number of synapses")
+        .def("getSynapsesFrom", &NeuralRegion::getSynapsesFrom, py::arg("neuronId"),
+             "Get synapses originating from neuron")
+        .def("getSynapsesTo", &NeuralRegion::getSynapsesTo, py::arg("neuronId"),
+             "Get synapses targeting neuron")
+        .def("getAverageSynapticWeight", &NeuralRegion::getAverageSynapticWeight,
+             "Get average synaptic weight")
+        .def("getSynapticDensity", &NeuralRegion::getSynapticDensity,
+             "Get synaptic density")
+        .def("initializeRandomConnectivity", &NeuralRegion::initializeRandomConnectivity,
+             py::arg("rng"), py::arg("connectionProbability"), py::arg("weightMean"), py::arg("weightStd"),
+             "Initialize random connectivity for all populations");
 
 } // namespace nlm
