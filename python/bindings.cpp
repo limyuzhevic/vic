@@ -400,7 +400,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
@@ -415,6 +415,69 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python package version
+    m.attr("__version__") = "0.1.0";
+
+    // Demo function for easy usage
+    m.def("demo", []() {
+        std::cout << "=== NLM Python Demo ===" << std::endl;
+        std::cout << "Creating a simple brain with default configuration..." << std::endl;
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        std::cout << "Initializing brain..." << std::endl;
+        if (!brain->initialize()) {
+            std::cerr << "Failed to initialize brain!" << std::endl;
+            return 1;
+        }
+        
+        std::cout << "Running simulation for 100 steps..." << std::endl;
+        for (size_t i = 0; i < 100; ++i) {
+            brain->step(i);
+        }
+        
+        std::cout << "Simulation complete!" << std::endl;
+        std::cout << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "Active neurons: " << brain->getFiringNeuronCount() << std::endl;
+        
+        return 0;
+    }, "Run a simple demonstration of NLM");
+
+    // Test function for quick validation
+    m.def("test", []() {
+        std::cout << "=== NLM Python Test ===" << std::endl;
+        
+        try {
+            auto config = std::make_shared<Config>();
+            auto brain = std::make_shared<Brain>(config);
+            
+            if (!brain->initialize()) {
+                throw std::runtime_error("Failed to initialize brain");
+            }
+            
+            // Quick smoke test
+            brain->step(0);
+            
+            size_t neurons = brain->getTotalNeuronCount();
+            size_t synapses = brain->getTotalSynapseCount();
+            size_t spikes = brain->getTotalSpikeCount();
+            
+            std::cout << "Brain initialized successfully:" << std::endl;
+            std::cout << "  Neurons: " << neurons << std::endl;
+            std::cout << "  Synapses: " << synapses << std::endl;
+            std::cout << "  Spikes: " << spikes << std::endl;
+            
+            return 0;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Test failed with error: " << e.what() << std::endl;
+            return 1;
+        }
+    }, "Run a quick validation test of NLM");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
