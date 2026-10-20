@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Errors/Errors.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -8,6 +9,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace nlm {
 
@@ -192,6 +194,12 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Enhanced error handling methods
+    Result initializeSafe();
+    Result stepSafe(SimulationStep currentStep, Timestamp currentTime);
+    Result saveSafe(const std::string& filepath) const;
+    Result loadSafe(const std::string& filepath);
     
 private:
     struct Impl;

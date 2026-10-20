@@ -9,6 +9,9 @@
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
+#include "../src/core/Errors/Errors.hpp"
+#include "../src/core/PluginSystem/PluginSystem.hpp"
+#include "../src/core/Performance/PerformanceProfiler.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
@@ -27,7 +30,38 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register exceptions for Python
+    py::register_exception<NLMException>(m, "NLMException");
+    py::register_exception<ConfigException>(m, "ConfigException");
+    py::register_exception<ConfigLoadException>(m, "ConfigLoadException");
+    py::register_exception<ConfigValidationException>(m, "ConfigValidationException");
+    py::register_exception<BrainException>(m, "BrainException");
+    py::register_exception<BrainInitializationException>(m, "BrainInitializationException");
+    py::register_exception<SimulationStepException>(m, "SimulationStepException");
+
+    py::class_<ErrorCode>(m, "ErrorCode")
+        .value("Success", ErrorCode::Success)
+        .value("FileNotFound", ErrorCode::FileNotFound)
+        .value("InvalidFormat", ErrorCode::InvalidFormat)
+        .value("OutOfMemory", ErrorCode::OutOfMemory)
+        .value("InvalidParameter", ErrorCode::InvalidParameter)
+        .value("InitializationFailed", ErrorCode::InitializationFailed)
+        .value("SimulationError", ErrorCode::SimulationError)
+        .value("ConfigError", ErrorCode::ConfigError)
+        .value("PluginError", ErrorCode::PluginError)
+        .value("UnknownError", ErrorCode::UnknownError)
+        .export_values();
+
+    py::class_<Result>(m, "Result")
+        .def(py::init<>())
+        .def("success", &Result::success)
+        .def("errorCode", &Result::errorCode)
+        .def("message", &Result::message)
+        .def("throwIfError", &Result::throwIfError)
+        .def("__repr__", [](const Result& r) {
+            return "<Result: success=" + std::to_string(r.success()) + ", error_code=" +
+                std::to_string(static_cast<int>(r.errorCode())) + ", message=" + r.message() + ">";
+        });
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -142,27 +176,100 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Performance profiler bindings
+    py::enum_<PerformanceMetric>(m, "PerformanceMetric", R"pbdoc(Performance metric enumeration)pbdoc")
+        .value("Time", PerformanceMetric::Time)
+        .value("Memory", PerformanceMetric::Memory)
+        .value("CPU", PerformanceMetric::CPU)
+        .value("IOWait", PerformanceMetric::IOWait)
+        .value("Network", PerformanceMetric::Network)
+        .value("Custom", PerformanceMetric::Custom)
+        .export_values();
+
+    py::class_<PerformanceSample>(m, "PerformanceSample")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def_readwrite("metric", &PerformanceSample::metric)
+        .def_readwrite("value", &PerformanceSample::value)
+        .def_readwrite("description", &PerformanceSample::description)
+        .def_readwrite("tags", &PerformanceSample::tags);
+
+    py::class_<PerformanceCounter>(m, "PerformanceCounter")
+        .def(py::init<const std::string&, PerformanceMetric>(), py::arg("name"), py::arg("type") = PerformanceMetric::Time)
+        .def("getName", &PerformanceCounter::getName)
+        .def("getType", &PerformanceCounter::getType)
+        .def("get", &PerformanceCounter::get)
+        .def("update", &PerformanceCounter::update, py::arg("value"))
+        .def("increment", &PerformanceCounter::increment)
+        .def("add", &PerformanceCounter::add, py::arg("value"))
+        .def("getMin", &PerformanceCounter::getMin)
+        .def("getMax", &PerformanceCounter::getMax)
+        .def("getAverage", &PerformanceCounter::getAverage)
+        .def("getCount", &PerformanceCounter::getCount)
+        .def("getElapsedTime", &PerformanceCounter::getElapsedTime)
+        .def("setMetadata", &PerformanceCounter::setMetadata, py::arg("key"), py::arg("value"))
+        .def("getMetadata", &PerformanceCounter::getMetadata, py::arg("key"));
+
+    py::class_<PerformanceProfiler>(m, "PerformanceProfiler")
+        .def(py::init<>(), py::arg("name") = "default_session")
+        .def("start", &PerformanceProfiler::start)
+        .def("stop", &PerformanceProfiler::stop)
+        .def("isRecording", &PerformanceProfiler::isRecording)
+        .def("recordSample", &PerformanceProfiler::recordSample, py::arg("metric"), py::arg("value"), py::arg("description") = "")
+        .def("updateCounter", &PerformanceProfiler::updateCounter, py::arg("name"), py::arg("value"))
+        .def("incrementCounter", &PerformanceProfiler::incrementCounter, py::arg("name"))
+        .def("getCounter", &PerformanceProfiler::getCounter, py::arg("name"), py::return_value_policy::reference)
+        .def("getAllCounters", &PerformanceProfiler::getAllCounters)
+        .def("getSamplesByMetric", &PerformanceProfiler::getSamplesByMetric, py::arg("metric"))
+        .def("getSessionDuration", &PerformanceProfiler::getSessionDuration)
+        .def("getSamplesCount", &PerformanceProfiler::getSamplesCount)
+        .def("clear", &PerformanceProfiler::clear)
+        .def("exportSamplesToJSON", &PerformanceProfiler::exportSamplesToJSON)
+        .def("exportSamplesToCSV", &PerformanceProfiler::exportSamplesToCSV)
+        .def("exportCountersToCSV", &PerformanceProfiler::exportCountersToCSV)
+        .def("importSamplesFromJSON", &PerformanceProfiler::importSamplesFromJSON, py::arg("jsonData"));
+
+    py::class_<MemoryProfiler>(m, "MemoryProfiler")
+        .def(py::init<>())
+        .def("start", &MemoryProfiler::start)
+        .def("stop", &MemoryProfiler::stop)
+        .def("recordUsage", &MemoryProfiler::recordUsage)
+        .def("getCurrentUsage", &MemoryProfiler::getCurrentUsage)
+        .def("getMemoryUsageTrend", &MemoryProfiler::getMemoryUsageTrend)
+        .def("getMaxUsage", &MemoryProfiler::getMaxUsage)
+        .def("getMinUsage", &MemoryProfiler::getMinUsage)
+        .def("exportToCSV", &MemoryProfiler::exportToCSV);
+
+    py::class_<CPUMProfiler>(m, "CPUMProfiler")
+        .def(py::init<>())
+        .def("start", &CPUMProfiler::start)
+        .def("stop", &CPUMProfiler::stop)
+        .def("recordSample", &CPUMProfiler::recordSample)
+        .def("getCurrentCPUUsage", &CPUMProfiler::getCurrentCPUUsage)
+        .def("getAverageCPUUsage", &CPUMProfiler::getAverageCPUUsage)
+        .def("exportToCSV", &CPUMProfiler::exportToCSV);
+
+    // Convenience functions for performance profiling
+    m.def("startPerformanceProfiling", &startPerformanceProfiling, py::arg("sessionName") = "default", "Start performance profiling");
+    m.def("stopPerformanceProfiling", &stopPerformanceProfiling, "Stop performance profiling");
+    m.def("recordPerformanceSample", &recordPerformanceSample, py::arg("metric"), py::arg("value"), py::arg("description") = "", "Record a performance sample");
+    m.def("updatePerformanceCounter", &updatePerformanceCounter, py::arg("name"), py::arg("value"), "Update a performance counter");
+    m.def("recordMemoryUsage", &recordMemoryUsage, "Record current memory usage");
+    m.def("recordCPUSample", &recordCPUSample, "Record CPU usage sample");
+    m.def("exportPerformanceData", &exportPerformanceData, "Export all performance data to string");
+    m.def("exportPerformanceCountersCSV", &exportPerformanceCountersCSV, "Export performance counters to CSV format");
+
+    // Get global profiler instances
+    m.def("getPerformanceProfiler", []() -> PerformanceProfiler& {
+        return getPerformanceProfiler();
+    }, "Get the global performance profiler");
+    
+    m.def("getMemoryProfiler", []() -> MemoryProfiler& {
+        return getMemoryProfiler();
+    }, "Get the global memory profiler");
+    
+    m.def("getCPUMProfiler", []() -> CPUMProfiler& {
+        return getCPUMProfiler();
+    }, "Get the global CPU profiler");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -289,16 +396,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class with enhanced error handling)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
+        .def("initializeSafe", &Brain::initializeSafe,
+             "Initialize the brain with configuration (returns Result on error)")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        .def("stepSafe", &Brain::stepSafe, py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp (returns Result on error)")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -314,8 +425,12 @@ PYBIND11_MODULE(pynlm, m) {
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
+        .def("saveSafe", &Brain::saveSafe, py::arg("filepath"),
+             "Save brain state to file (returns Result on error)")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        .def("loadSafe", &Brain::loadSafe, py::arg("filepath"),
+             "Load brain state from file (returns Result on error)")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
@@ -352,6 +467,40 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
+
+    // Plugin system bindings
+    py::class_<IPlugin>(m, "IPlugin")
+        .def("getName", &IPlugin::getName)
+        .def("getVersion", &IPlugin::getVersion)
+        .def("getDescription", &IPlugin::getDescription)
+        .def("getAuthor", &IPlugin::getAuthor)
+        .def("initialize", &IPlugin::initialize, py::arg("config"))
+        .def("shutdown", &IPlugin::shutdown)
+        .def("preStep", &IPlugin::preStep, py::arg("dt"))
+        .def("postStep", &IPlugin::postStep, py::arg("dt"));
+
+    py::enum_<PluginType>(m, "PluginType", R"pbdoc(Plugin type enumeration)pbdoc")
+        .value("Plasticity", PluginType::Plasticity)
+        .value("Neuromodulator", PluginType::Neuromodulator)
+        .value("Development", PluginType::Development)
+        .value("Memory", PluginType::Memory)
+        .value("Cognition", PluginType::Cognition)
+        .value("Sensor", PluginType::Sensor)
+        .value("Motor", PluginType::Motor)
+        .value("Environment", PluginType::Environment)
+        .export_values();
+
+    py::class_<PluginManager>(m, "PluginManager")
+        .def(py::init<>())
+        .def("registerPlugin", &PluginManager::registerPlugin)
+        .def("unregisterPlugin", &PluginManager::unregisterPlugin)
+        .def("getPlugin", &PluginManager::getPlugin)
+        .def("getPluginsByType", &PluginManager::getPluginsByType)
+        .def("initializeAll", &PluginManager::initializeAll)
+        .def("shutdownAll", &PluginManager::shutdownAll)
+        .def("updateAll", &PluginManager::updateAll, py::arg("dt"))
+        .def("getPluginNames", &PluginManager::getPluginNames)
+        .def("getFactoryTypeNames", &PluginManager::getFactoryTypeNames);
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -415,6 +564,29 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Performance profiler convenience functions
+    m.def("startPerformanceProfiling", &startPerformanceProfiling, py::arg("sessionName") = "default", "Start performance profiling");
+    m.def("stopPerformanceProfiling", &stopPerformanceProfiling, "Stop performance profiling");
+    m.def("recordPerformanceSample", &recordPerformanceSample, py::arg("metric"), py::arg("value"), py::arg("description") = "", "Record a performance sample");
+    m.def("updatePerformanceCounter", &updatePerformanceCounter, py::arg("name"), py::arg("value"), "Update a performance counter");
+    m.def("recordMemoryUsage", &recordMemoryUsage, "Record current memory usage");
+    m.def("recordCPUSample", &recordCPUSample, "Record CPU usage sample");
+    m.def("exportPerformanceData", &exportPerformanceData, "Export all performance data to string");
+    m.def("exportPerformanceCountersCSV", &exportPerformanceCountersCSV, "Export performance counters to CSV format");
+
+    // Get global profiler instances
+    m.def("getPerformanceProfiler", []() -> PerformanceProfiler& {
+        return getPerformanceProfiler();
+    }, "Get the global performance profiler");
+    
+    m.def("getMemoryProfiler", []() -> MemoryProfiler& {
+        return getMemoryProfiler();
+    }, "Get the global memory profiler");
+    
+    m.def("getCPUMProfiler", []() -> CPUMProfiler& {
+        return getCPUMProfiler();
+    }, "Get the global CPU profiler");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

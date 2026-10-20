@@ -1,7 +1,12 @@
+// Neuron implementation with SIMD optimizations
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <xmmintrin.h>  // SSE
+#include <emmintrin.h>  // SSE2
+#include <pmmintrin.h>  // SSE3
 
 namespace nlm {
 
@@ -23,8 +28,11 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // SIMD registers for optimized computation
+    alignas(16) float leakage_coeff;  // Pre-computed leak coefficient for SIMD
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), leakage_coeff(1.0f / TIME_CONSTANT) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -202,10 +210,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
+    // SIMD-optimized LIF dynamics
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
@@ -213,14 +218,27 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // SIMD operations for speed
+    __m128 V_simd = _mm_load_ss(&V);
+    __m128 V_rest_simd = _mm_load_ss(&V_rest);
+    __m128 V_reset_simd = _mm_load_ss(&V_reset);
+    __m128 threshold_simd = _mm_load_ss(&threshold);
+    __m128 synaptic_simd = _mm_load_ss(&pImpl->synapticInput);
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution: (V_rest - V) / tau
+    __m128 leak_contrib_simd = _mm_sub_ss(V_rest_simd, V_simd);
+    leak_contrib_simd = _mm_div_ss(leak_contrib_simd, _mm_set_ps1(pImpl->leakage_coeff));
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Synaptic contribution: synaptic_input / C
+    __m128 synaptic_contrib_simd = _mm_div_ss(synaptic_simd, _mm_set_ps1(C));
+    
+    // Update membrane potential: V_new = V + dt * 1000.0f * (leak_contrib + synaptic_contrib)
+    __m128 update_simd = _mm_add_ss(leak_contrib_simd, synaptic_contrib_simd);
+    update_simd = _mm_mul_ss(update_simd, _mm_set_ps1(dt * 1000.0f));
+    V_simd = _mm_add_ss(V_simd, update_simd);
+    
+    // Store back membrane potential
+    _mm_store_ss(&V, V_simd);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -260,7 +278,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Optimized LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }
