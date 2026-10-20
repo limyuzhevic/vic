@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 2: Comprehensive Neural Subsystem Tests
 
 #include <iostream>
 #include <cassert>
@@ -34,6 +34,58 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_neural_working_memory {
+    void runAll();
+}
+
+namespace test_neural_episodic_memory {
+    void runAll();
+}
+
+namespace test_neural_associative_memory {
+    void runAll();
+}
+
+namespace test_prediction_system {
+    void runAll();
+}
+
+namespace test_neural_prediction {
+    void runAll();
+}
+
+namespace test_neural_planner {
+    void runAll();
+}
+
+namespace test_concept_formation {
+    void runAll();
+}
+
+namespace test_attention_selection {
+    void runAll();
+}
+
+namespace test_development_system {
+    void runAll();
+}
+
+namespace test_dopamine {
+    void runAll();
+}
+
+namespace test_curiosity {
+    void runAll();
+}
+
+namespace test_novelty {
+    void runAll();
+}
+
+namespace test_prediction_error {
     void runAll();
 }
 
@@ -113,6 +165,123 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Working Memory tests..." << std::endl;
+    try {
+        test_neural_working_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Episodic Memory tests..." << std::endl;
+    try {
+        test_neural_episodic_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Associative Memory tests..." << std::endl;
+    try {
+        test_neural_associative_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction System tests..." << std::endl;
+    try {
+        test_prediction_system::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Prediction tests..." << std::endl;
+    try {
+        test_neural_prediction::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Planner tests..." << std::endl;
+    try {
+        test_neural_planner::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Concept Formation tests..." << std::endl;
+    try {
+        test_concept_formation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Attentional Selection tests..." << std::endl;
+    try {
+        test_attention_selection::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development System tests..." << std::endl;
+    try {
+        test_development_system::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Dopamine tests..." << std::endl;
+    try {
+        test_dopamine::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Curiosity tests..." << std::endl;
+    try {
+        test_curiosity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Novelty tests..." << std::endl;
+    try {
+        test_novelty::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction Error tests..." << std::endl;
+    try {
+        test_prediction_error::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/Validation.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -45,17 +46,20 @@ add_library(nlm_core STATIC
     src/plasticity/StructuralPlasticity.cpp
     # Development
     src/development/DevelopmentSystem.cpp
+    src/development/AbstractDevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/AbstractNeuromodulatorStrategy.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
     src/memory/WorkingMemory.cpp
+    src/memory/AbstractMemory.cpp
     src/memory/EpisodicMemory.cpp
     src/memory/SemanticMemory.cpp
     src/memory/ProceduralMemory.cpp
@@ -64,6 +68,7 @@ add_library(nlm_core STATIC
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
+    src/cognition/AbstractCognitiveStrategy.cpp
     src/cognition/NeuralPlanner.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
@@ -72,6 +77,7 @@ add_library(nlm_core STATIC
     src/sensory/InternalSignals.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
+    src/prediction/AbstractPredictionStrategy.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp

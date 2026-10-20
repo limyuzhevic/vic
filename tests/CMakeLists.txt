@@ -14,6 +14,19 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_NeuralWorkingMemory.cpp
+    test_NeuralEpisodicMemory.cpp
+    test_NeuralAssociativeMemory.cpp
+    test_PredictionSystem.cpp
+    test_NeuralPrediction.cpp
+    test_NeuralPlanner.cpp
+    test_ConceptFormation.cpp
+    test_AttentionalSelection.cpp
+    test_DevelopmentSystem.cpp
+    test_Dopamine.cpp
+    test_Curiosity.cpp
+    test_Novelty.cpp
+    test_PredictionError.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
