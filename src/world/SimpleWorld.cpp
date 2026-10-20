@@ -81,26 +81,56 @@ void SimpleWorld::setAgentStart(float x, float y) {
 void SimpleWorld::update(double timestep) {
     simTime_ += timestep;
     
-    // Apply velocity to position
-    agent_.x += agent_.velocityX * timestep;
-    agent_.y += agent_.velocityY * timestep;
-    
-    // Apply angular velocity to orientation
-    agent_.orientation += agent_.angularVelocity * timestep;
+    // Apply velocity to position with improved integration
+    float newX = agent_.x + agent_.velocityX * static_cast<float>(timestep);
+    float newY = agent_.y + agent_.velocityY * static_cast<float>(timestep);
+    float newOrientation = agent_.orientation + agent_.angularVelocity * static_cast<float>(timestep);
     
     // Normalize orientation to [-PI, PI]
-    while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
-    while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
+    while (newOrientation > M_PI) newOrientation -= 2.0f * M_PI;
+    while (newOrientation < -M_PI) newOrientation += 2.0f * M_PI;
     
-    // Boundary collision
-    if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
-    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    // Boundary collision with more precise handling
+    bool collision = false;
     
-    // Energy decay
-    agent_.energy -= energyDecayRate_;
-    if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+    // X-axis collision
+    if (newX < 0.0f) {
+        newX = std::max(0.0f, newX);
+        agent_.velocityX = 0.0f;
+        collision = true;
+    } else if (newX >= width_) {
+        newX = std::min(width_ - 0.01f, newX);
+        agent_.velocityX = 0.0f;
+        collision = true;
+    }
+    
+    // Y-axis collision
+    if (newY < 0.0f) {
+        newY = std::max(0.0f, newY);
+        agent_.velocityY = 0.0f;
+        collision = true;
+    } else if (newY >= height_) {
+        newY = std::min(height_ - 0.01f, newY);
+        agent_.velocityY = 0.0f;
+        collision = true;
+    }
+    
+    // Apply position changes if no collision or position is valid
+    if (!collision || isValidPosition(newX, newY)) {
+        agent_.x = newX;
+        agent_.y = newY;
+        agent_.orientation = newOrientation;
+        agent_.isMoving = true;
+    }
+    
+    // Apply angular velocity
+    agent_.orientation = newOrientation;
+    
+    // Energy decay with minimum threshold
+    agent_.energy -= static_cast<float>(energyDecayRate_);
+    if (agent_.energy < 0.0f) {
+        agent_.energy = 0.0f;
+    }
     
     // Update age
     agent_.age += timestep;
@@ -120,94 +150,86 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     ActionResult result;
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
+    const float stepDistance = 0.1f;  // Movement step size
     
     // Only allow one action per step
     if (currentTime - agent_.lastActionTime < 0.1) {
-        return ActionResult(0.0f, false, "too soon");
+        result.success = false;
+        result.message = "too soon";
+        return result;
     }
     
     agent_.lastActionTime = currentTime;
     
     switch (cmd) {
-        case MotorCommand::MoveForward: {
-            float dx = std::cos(agent_.orientation) * moveSpeed;
-            float dy = std::sin(agent_.orientation) * moveSpeed;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
-                result.success = true;
-            } else {
-                result.reward = -0.05f;  // Cost for hitting wall
-                result.success = false;
-            }
-            break;
-        }
-        
-        case MotorCommand::MoveBackward: {
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.02f;
-                result.success = true;
-            } else {
-                result.reward = -0.05f;
-                result.success = false;
-            }
-            break;
-        }
-        
+        case MotorCommand::MoveForward:
+        case MotorCommand::MoveBackward:
         case MotorCommand::TurnLeft:
-            agent_.angularVelocity = -turnSpeed;
-            agent_.isTurning = true;
-            result.reward = -0.005f;
-            result.success = true;
-            break;
-            
         case MotorCommand::TurnRight:
-            agent_.angularVelocity = turnSpeed;
-            agent_.isTurning = true;
-            result.reward = -0.005f;
-            result.success = true;
-            break;
-            
         case MotorCommand::LookLeft:
-            // Pan sensor (no movement)
-            result.reward = 0.0f;
-            result.success = true;
-            break;
-            
         case MotorCommand::LookRight:
-            result.reward = 0.0f;
-            result.success = true;
+        case MotorCommand::Wait:
+            // For movement and turn commands, apply the action
+            if (cmd == MotorCommand::MoveForward) {
+                float dx = std::cos(agent_.orientation) * moveSpeed;
+                float dy = std::sin(agent_.orientation) * moveSpeed;
+                float newX = agent_.x + dx * stepDistance;
+                float newY = agent_.y + dy * stepDistance;
+                
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.isMoving = true;
+                    result.reward = -0.01f;  // Small cost for movement
+                    result.success = true;
+                } else {
+                    result.reward = -0.05f;  // Cost for hitting wall
+                    result.success = false;
+                }
+            } else if (cmd == MotorCommand::MoveBackward) {
+                float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
+                float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
+                float newX = agent_.x + dx * stepDistance;
+                float newY = agent_.y + dy * stepDistance;
+                
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.isMoving = true;
+                    result.reward = -0.02f;
+                    result.success = true;
+                } else {
+                    result.reward = -0.05f;
+                    result.success = false;
+                }
+            } else if (cmd == MotorCommand::TurnLeft) {
+                agent_.angularVelocity = -turnSpeed;
+                agent_.isTurning = true;
+                result.reward = -0.005f;
+                result.success = true;
+            } else if (cmd == MotorCommand::TurnRight) {
+                agent_.angularVelocity = turnSpeed;
+                agent_.isTurning = true;
+                result.reward = -0.005f;
+                result.success = true;
+            } else if (cmd == MotorCommand::LookLeft || cmd == MotorCommand::LookRight) {
+                // Pan sensor (no movement)
+                result.reward = 0.0f;
+                result.success = true;
+            } else {  // Wait
+                // Decay velocities
+                agent_.velocityX *= 0.9f;
+                agent_.velocityY *= 0.9f;
+                agent_.angularVelocity *= 0.9f;
+                agent_.isMoving = false;
+                agent_.isTurning = false;
+                result.reward = 0.0f;
+                result.success = true;
+            }
             break;
             
         case MotorCommand::Interact:
             result = interact();
-            break;
-            
-        case MotorCommand::Wait:
-        default:
-            // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
-            agent_.isMoving = false;
-            agent_.isTurning = false;
-            result.reward = 0.0f;
-            result.success = true;
             break;
     }
     
@@ -218,8 +240,9 @@ ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
+    result.message = "no_object";
     
-    // Check for objects in interaction range
+    // Check for objects in interaction range with efficient distance calculation
     const float interactRange = 1.0f;
     
     for (auto& obj : objects_) {
@@ -227,21 +250,31 @@ ActionResult SimpleWorld::interact() {
         
         float dx = obj.x - agent_.x;
         float dy = obj.y - agent_.y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
+        float radiusSum = interactRange + obj.radius;
         
-        if (dist < interactRange + obj.radius) {
+        // Early rejection using squared distances
+        if (distSq < radiusSum * radiusSum) {
             obj.active = false;  // Consume the object
             
             if (obj.type == WorldObjectType::Resource) {
+                // Cap energy at maximum to prevent overflow
                 agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
                 result.reward = obj.value;  // Positive reward
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                // Ensure health doesn't go below zero
+                agent_.health = std::max(0.0f, agent_.health - 0.2f);
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
+            } else if (obj.type == WorldObjectType::Wall) {
+                // Walls cannot be consumed, just log interaction
+                result.success = true;
+                result.message = "touched_wall";
+                // Reactivate wall after interaction
+                obj.active = true;
             }
             
             // Only interact with one object at a time
@@ -249,30 +282,41 @@ ActionResult SimpleWorld::interact() {
         }
     }
     
-    if (!result.success) {
-        result.message = "no_object";
-    }
-    
     return result;
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
+    // Check world boundaries with more precise collision detection
     if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
         return false;
+    }
+    
+    // Check against walls (impassable boundaries)
+    for (const auto& obj : objects_) {
+        if (obj.active && obj.type == WorldObjectType::Wall) {
+            float dx = obj.x - x;
+            float dy = obj.y - y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist < obj.radius + 0.1f) {  // Small tolerance for wall thickness
+                return false;
+            }
+        }
     }
     return true;
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
+    // Check against all objects with efficient distance calculation
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
+        float radiusSum = obj.radius;
         
-        if (dist < obj.radius) {
+        // Early rejection using squared distances
+        if (distSq < radiusSum * radiusSum) {
             return &obj;
         }
     }
@@ -284,17 +328,21 @@ void SimpleWorld::addObject(const WorldObject& obj) {
 }
 
 void SimpleWorld::removeObject(float x, float y) {
+    // Efficient removal using distance squared
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
+        float radiusSum = obj.radius;
         
-        if (dist < obj.radius) {
+        if (distSq < radiusSum * radiusSum) {
             obj.active = false;
-            return;
+            break;
         }
+    }
+}
     }
 }
 
@@ -394,9 +442,15 @@ void SimpleWorld::generateVision() {
 
 void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)
+    // More robust collision detection with efficient distance calculation
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+    if (obj != nullptr) {
+        if (obj->type == WorldObjectType::Hazard) {
+            // Ensure health doesn't go below zero
+            agent_.health = std::max(0.0f, agent_.health - 0.01f);
+        }
+        // Note: We don't handle Resource or Wall passive collisions
+        // as they have active interaction methods
     }
 }
 

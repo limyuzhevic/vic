@@ -287,11 +287,153 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Features
+
+### Pattern 1: Run a Simulation with Error Handling
+
+```python
+import pynlm
+import traceback
+
+def run_simulation(brain, world, agent, num_steps):
+    try:
+        for step in range(num_steps):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+    except Exception as e:
+        print(f"Simulation error: {e}")
+        traceback.print_exc()
+        return False
+    return True
+```
+
+### Pattern 2: Get Comprehensive Brain Statistics
+
+```python
+# Just add these inside your loop:
+stats = pynlm.getBrainStatistics(brain)
+print("Brain Statistics:")
+for key, value in stats.items():
+    print(f"  {key}: {value}")
+```
+
+### Pattern 3: Batch Processing
+
+```python
+import pynlm
+
+# Process multiple sensory inputs in batch
+percepts = [world.getSensoryPercept() for _ in range(10)]
+pynlm.batchProcessSensoryInput(agent, percepts)
+
+# Decode multiple motor commands in batch
+commands = pynlm.batchDecodeMotorCommands(agent, 10)
+for cmd in commands:
+    print(f"Command: {cmd}")
+```
+
+### Pattern 4: Save and Load Checkpoints
+
+```python
+import pynlm
+
+# Save brain checkpoint
+if pynlm.saveBrainCheckpoint(brain, "my_brain_checkpoint.bin"):
+    print("Brain checkpoint saved successfully!")
+
+# Load brain checkpoint  
+if pynlm.loadBrainCheckpoint(brain, "my_brain_checkpoint.bin"):
+    print("Brain checkpoint loaded successfully!")
+```
+
+### Pattern 5: Configuration Management
+
+```python
+import pynlm
+
+# Create configuration with validation
+config = pynlm.createDefaultConfig()
+
+# Add validation rules (advanced feature)
+config.addValidationRule("brain.neuron_count", "Neuron count validation", 
+                         lambda x: x > 0 and x <= 10000, "Neuron count must be 1-10000")
+
+# Validate configuration
+if pynlm.validateConfig(config):
+    print("Configuration is valid!")
+
+# Get configuration summary with validation
+print(pynlm.getConfigSummary(config))
+```
+
+---
+
+## Common Problems and Solutions
+
+### "My brain isn't doing anything"
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+
+### "The agent isn't moving"
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+
+### "Everything is 0"
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+### "Checkpoint save/load failed"
+- Check if you have write permissions to the directory
+- Try using absolute paths: "C:/checkpoints/brain.bin"
+
+### "Configuration validation failed"
+- Check the validation error messages with `getConfigSummary()`
+- Ensure required keys are present and have valid values
+
+---
+
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. **Read `HOW_TO_USE.md` for more details** - Covers advanced configuration options
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works** - Deep dive into the brain architecture
+3. **Experiment with different configurations** - Try changing neuron_count, connection_probability, etc.
+4. **Try the Phase 6 demo** - Run `./nlm_phase6_demo` to see the integrated brain in action
 
-That's it! You're now ready to use NLM.
+## Advanced Usage Tips
+
+### Performance Tips:
+- Use batch processing for multiple sensory inputs: `pynlm.batchProcessSensoryInput()`
+- Run longer simulations efficiently with error handling
+- Use checkpointing to save progress and resume later
+
+### Debugging Tips:
+- Use `getBrainStatistics()` to monitor brain activity
+- Check configuration validation messages for detailed errors
+- Monitor firing rates and spike counts to understand brain dynamics
+
+### Best Practices:
+- Always call `initialize()` before using any component
+- Use `reset()` to start fresh simulations
+- Save checkpoints frequently during long-running simulations
+- Validate configurations before creating brains
+
+That's it! You're now ready to use NLM at both beginner and advanced levels.
+
+---
+
+## New Advanced Features Added in Phase 6:
+
+1. **Configuration Validation**: Comprehensive validation with detailed error messages
+2. **Batch Processing**: Efficient processing of multiple inputs and outputs
+3. **Enhanced Error Handling**: Better error messages and exception handling
+4. **Advanced Simulation Utilities**: Helper functions for complex simulations
+5. **Checkpoint Management**: Improved save/load utilities with validation
+6. **Performance Monitoring**: Statistics and analysis helpers
+7. **Memory Management**: Better resource handling and cleanup
+
+These features make NLM more robust, user-friendly, and suitable for both research and production use.

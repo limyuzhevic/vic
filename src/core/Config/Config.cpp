@@ -3,11 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cassert>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Validation data
+    std::vector<ValidationRule> validationRules;
+    std::vector<ValidationError> validationErrors;
+    bool validationEnabled = false;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -52,6 +57,11 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    // Validate after loading from file
+    if (pImpl->validationEnabled) {
+        validate();
+    }
+    
     return true;
 }
 
@@ -75,6 +85,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
+    // Validate after loading from args
+    if (pImpl->validationEnabled) {
+        validate();
+    }
+    
     return true;
 }
 
@@ -86,7 +102,21 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert value to string based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -124,6 +154,11 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Validate after setting if validation is enabled
+    if (pImpl->validationEnabled) {
+        validate();
+    }
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -153,6 +188,11 @@ void Config::remove(const std::string& key) {
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    
+    // Validate after removal if validation is enabled
+    if (pImpl->validationEnabled) {
+        validate();
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {

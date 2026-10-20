@@ -400,26 +400,315 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // === ADVANCED BRAIN OPERATIONS ===
+    
+    // Batch processing for advanced users
+    m.def("batchProcessSensoryInput", [](std::shared_ptr<AgentBrain> agent, const std::vector<SensoryPercept>& percepts) {
+        for (const auto& percept : percepts) {
+            agent->processSensoryInput(percept);
+        }
+    }, py::arg("agent"), py::arg("percepts"),
+       "Process multiple sensory inputs in batch (advanced use)");
+    
+    m.def("batchDecodeMotorCommands", [](std::shared_ptr<AgentBrain> agent, size_t count) {
+        std::vector<MotorCommand> commands;
+        for (size_t i = 0; i < count; ++i) {
+            commands.push_back(agent->decodeMotorCommand());
+        }
+        return commands;
+    }, py::arg("agent"), py::arg("count"),
+       "Decode multiple motor commands in batch (advanced use)");
+    
+    // Simulation helpers
+    m.def("runSimulationSteps", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent, size_t steps,
+                                   double timestep = 0.1, bool verbose = false) {
+        float totalReward = 0.0f;
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i, i * timestep);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(percept.getInternal()[0] if !percept.getInternal().empty() else 0.0f, 0.0f);
+            
+            totalReward += (percept.getInternal()[0] if !percept.getInternal().empty() else 0.0f);
+            
+            if (verbose && i % 100 == 0) {
+                std::cout << "Step " << i << ": " 
+                          << "Firing: " << brain->getFiringNeuronCount() << " neurons, "
+                          << "Reward: " << totalReward / (i + 1) << std::endl;
+            }
+        }
+        return totalReward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       py::arg("timestep") = 0.1, py::arg("verbose") = false,
+       "Run a complete simulation for multiple steps (advanced use)");
+    
+    // Checkpoint utilities
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (brain->save(filepath)) {
+            return true;
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to save brain checkpoint");
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+       "Save brain state to file with error handling");
+    
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (brain->load(filepath)) {
+            return true;
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load brain checkpoint");
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+       "Load brain state from file with error handling");
+    
+    // Configuration utilities
+    m.def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load configuration from file");
+            return nullptr;
+        }
+        return config;
+    }, py::arg("filepath"), "Create configuration from file with error handling");
+    
+    // World utilities
+    m.def("createWorldWithObjects", [](size_t numResources = 5, size_t numHazards = 3) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 16, 16);
+        world->reset();
+        return world;
+    }, py::arg("numResources") = 5, py::arg("numHazards") = 3,
+       "Create a world with default objects (advanced use)");
+    
+    // Statistics and analysis helpers
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["developmental_stage"] = brain->getDevelopmentalStage();
+        return stats;
+    }, py::arg("brain"),
+       "Get comprehensive brain statistics (advanced analysis)");
+    
+// Simulation state utilities
+    m.def("resetSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent) {
+        brain->reset();
+        world->reset();
+        agent->reset();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Reset all simulation components (advanced use)");
+
+    // === ENHANCED CONFIGURATION UTILITIES ===
+
+    // Enhanced configuration utilities with validation
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        config->enableValidation();
+        return config;
+    }, "Create a default configuration with validation enabled");
 
+    m.def("createConfigFromFile", [](const std::string& filepath, bool validate = true) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath, validate)) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load configuration from file");
+            return nullptr;
+        }
+        return config;
+    }, py::arg("filepath"), py::arg("validate") = true,
+       "Create configuration from file with error handling");
+
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        if (!config->validate()) {
+            auto errors = config->getValidationErrors();
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                errorMsg += "  " + error.key + ": " + error.errorMessage + " (" + 
+                           std::to_string(static_cast<int>(error.source)) + ")\n";
+            }
+            PyErr_SetString(PyExc_RuntimeError, errorMsg.c_str());
+            return false;
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration with detailed error messages");
+
+    m.def("getConfigSummary", [](std::shared_ptr<Config> config) {
+        std::string summary = config->summary();
+        // Add validation status
+        if (config->isValid()) {
+            summary += "\n✓ Configuration is valid";
+        } else {
+            summary += "\n✗ Configuration has validation errors";
+            auto errors = config->getValidationErrors();
+            for (const auto& error : errors) {
+                summary += "\n  - " + error.key + ": " + error.errorMessage;
+            }
+        }
+        return summary;
+    }, py::arg("config"), "Get configuration summary with validation status");
+
+    // Enhanced brain creation with validation
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config->validate()) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid configuration for brain creation");
+            return nullptr;
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create brain with validated configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Simulation utilities with error checking
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                               std::shared_ptr<AgentBrain> agent, size_t steps,
+                               double timestep = 0.1, bool verbose = false) {
+        if (!brain || !world || !agent) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid simulation components");
+            return 0.0f;
+        }
+        
+        float totalReward = 0.0f;
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i, i * timestep);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(percept.getInternal()[0] if !percept.getInternal().empty() else 0.0f, 0.0f);
+            
+            totalReward += (percept.getInternal()[0] if !percept.getInternal().empty() else 0.0f);
+            
+            if (verbose && i % 100 == 0) {
+                std::cout << "Step " << i << ": " 
+                          << "Firing: " << brain->getFiringNeuronCount() << " neurons, "
+                          << "Reward: " << totalReward / (i + 1) << std::endl;
+            }
+        }
+        return totalReward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       py::arg("timestep") = 0.1, py::arg("verbose") = false,
+       "Run a complete simulation with error checking");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Enhanced checkpoint utilities with validation
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid brain for checkpoint saving");
+            return false;
+        }
+        if (brain->save(filepath)) {
+            return true;
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to save brain checkpoint");
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+       "Save brain state to file with error handling");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid brain for checkpoint loading");
+            return false;
+        }
+        if (brain->load(filepath)) {
+            return true;
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load brain checkpoint");
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+       "Load brain state from file with error handling");
+
+    // Batch processing utilities
+    m.def("batchProcessSensoryInput", [](std::shared_ptr<AgentBrain> agent, const std::vector<SensoryPercept>& percepts) {
+        if (!agent) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid agent for batch processing");
+            return;
+        }
+        for (const auto& percept : percepts) {
+            agent->processSensoryInput(percept);
+        }
+    }, py::arg("agent"), py::arg("percepts"),
+       "Process multiple sensory inputs in batch");
+
+    m.def("batchDecodeMotorCommands", [](std::shared_ptr<AgentBrain> agent, size_t count) {
+        if (!agent) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid agent for batch processing");
+            return std::vector<MotorCommand>();
+        }
+        std::vector<MotorCommand> commands;
+        for (size_t i = 0; i < count; ++i) {
+            commands.push_back(agent->decodeMotorCommand());
+        }
+        return commands;
+    }, py::arg("agent"), py::arg("count"),
+       "Decode multiple motor commands in batch");
+
+    // Configuration value utilities
+    m.def("setConfigValue", [](std::shared_ptr<Config> config, const std::string& key, const std::string& value) {
+        if (!config) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid configuration for setting value");
+            return;
+        }
+        config->set(key, value);
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+       "Set configuration value with error checking");
+
+    m.def("getConfigValue", [](std::shared_ptr<Config> config, const std::string& key) {
+        if (!config) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid configuration for getting value");
+            return py::none();
+        }
+        auto val = config->getOr<std::string>(key, "");
+        return val;
+    }, py::arg("config"), py::arg("key"),
+       "Get configuration value with error checking");
+
+    // Simulation state utilities
+    m.def("resetSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent) {
+        if (!brain || !world || !agent) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid simulation components");
+            return;
+        }
+        brain->reset();
+        world->reset();
+        agent->reset();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Reset all simulation components");
+
+    // Statistics and analysis helpers
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            PyErr_SetString(PyExc_RuntimeError, "Invalid brain for statistics");
+            return py::dict();
+        }
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["developmental_stage"] = brain->getDevelopmentalStage();
+        return stats;
+    }, py::arg("brain"),
+       "Get comprehensive brain statistics");
 }
 
 } // namespace nlm
+
