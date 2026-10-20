@@ -4,14 +4,14 @@
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
+    std::weak_ptr<Brain> brainPtr;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
     float decayRate;
     
     Impl() 
-        : brain(nullptr)
+        : brainPtr()
         , level(0.0f)
         , noveltyWeight(0.5f)
         , predictionErrorWeight(0.5f)
@@ -22,8 +22,8 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 
 Curiosity::~Curiosity() = default;
 
-void Curiosity::initialize(Brain* brain) {
-    pImpl->brain = brain;
+void Curiosity::initialize(std::weak_ptr<Brain> brain) {
+    pImpl->brainPtr = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
 
@@ -32,6 +32,12 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    auto brain = pImpl->brainPtr.lock();
+    if (!brain) {
+        NLM_LOG_WARNING("Brain was destroyed before curiosity system");
+        return;
+    }
+    
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;

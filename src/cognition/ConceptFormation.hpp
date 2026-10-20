@@ -78,7 +78,7 @@ public:
     ~ConceptFormation();
 
     // Initialize with brain reference
-    void initialize(Brain* brain);
+    void initialize(std::weak_ptr<Brain> brain);
 
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
@@ -137,6 +137,21 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+
+    // Safe access methods for brain reference
+    Brain* getBrain() {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    const Brain* getBrain() const {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    bool isBrainAlive() const {
+        return brainPtr_.lock() != nullptr;
+    }
 
 private:
     // Create new concept from pattern

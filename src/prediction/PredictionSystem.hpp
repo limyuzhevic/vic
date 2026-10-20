@@ -27,6 +27,10 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Get prediction features for concept formation
+    // These features represent the current state of prediction system
+    std::vector<float> getPredictionFeatures() const;
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();

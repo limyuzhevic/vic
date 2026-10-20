@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <unordered_map>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -93,110 +96,351 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+// Implementation of getValidated with type-safe validation
+template<typename T>
+T Config::getValidated(const std::string& key, const T& defaultValue) const {
+    std::string value;
+    bool hasValue = false;
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    // Get the raw string value from schema
+    const auto& schema = ConfigSchema::getSchema();
+    auto fieldIt = std::find_if(schema.begin(), schema.end(), 
+                                [&key](const ConfigSchema::Field& f) { return f.name == key; });
+    
+    if (fieldIt != schema.end()) {
+        if (auto strOpt = get<std::string>(key)) {
+            value = *strOpt;
+            hasValue = true;
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // If key not in schema, try direct lookup
+        if (auto strOpt = get<std::string>(key)) {
+            value = *strOpt;
+            hasValue = true;
+        }
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+    
+    // If we have a value, validate and convert
+    if (hasValue) {
+        if (!validateValue(key, value)) {
+            throw ConfigurationError(ErrorCode::INVALID_ARGUMENT, key, typeid(T).name(), value, "Type validation failed");
+        }
+        
+        // Convert based on type
+        try {
+            if constexpr (std::is_same_v<T, int64_t>) {
+                return std::stoll(value);
+            } else if constexpr (std::is_same_v<T, double>) {
+                return std::stod(value);
+            } else if constexpr (std::is_same_v<T, float>) {
+                return std::stof(value);
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                std::string lowerValue = toLower(value);
+                if (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes") return true;
+                if (lowerValue == "false" || lowerValue == "0" || lowerValue == "no") return false;
+                throw ConfigurationError(ErrorCode::INVALID_ARGUMENT, key, "bool", value, "Invalid boolean value");
             } else {
-                oss << arg;
+                throw ConfigurationError(ErrorCode::INVALID_ARGUMENT, key, typeid(T).name(), "", "Unsupported type");
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        } catch (const std::exception&) {
+            throw ConfigurationError(ErrorCode::INVALID_ARGUMENT, key, typeid(T).name(), value, "Conversion failed");
+        }
     }
-    return oss.str();
+    
+    // Return default if validation fails or value not found
+    return defaultValue;
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validate() const {
+    bool isValid = true;
+    
+    // Check all schema fields
+    const auto& schema = ConfigSchema::getSchema();
+    
+    for (const auto& field : schema) {
+        // Check if field exists
+        if (!has(field.name)) {
+            if (field.required) {
+                NLM_LOG_ERROR("Missing required configuration: " + field.name);
+                isValid = false;
+            }
+            continue;
+        }
+        
+        // Validate the value
+        if (auto strOpt = get<std::string>(field.name)) {
+            if (!validateValue(field.name, *strOpt)) {
+                std::string errorMsg = "Invalid configuration value for \"" + field.name + "\": ";
+                errorMsg += getValidationError(field.name, *strOpt);
+                NLM_LOG_ERROR(errorMsg);
+                isValid = false;
+            }
+        }
+    }
+    
+    return isValid;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validateValue(const std::string& key, const std::string& value) const {
+    // Check schema first
+    const auto& schema = ConfigSchema::getSchema();
+    auto fieldIt = std::find_if(schema.begin(), schema.end(), 
+                                [&key](const ConfigSchema::Field& f) { return f.name == key; });
+    
+    if (fieldIt != schema.end()) {
+        // Use schema validator if available
+        if (fieldIt->validator) {
+            return fieldIt->validator(value);
+        } else {
+            // Basic type validation based on field type
+            if (fieldIt->type == "int64_t") {
+                return validateInt64(value);
+            } else if (fieldIt->type == "double") {
+                return validateDouble(value);
+            } else if (fieldIt->type == "float") {
+                return validateFloat(value);
+            } else if (fieldIt->type == "string") {
+                return validateString(value);
+            } else if (fieldIt->type == "bool") {
+                return validateBool(value);
+            }
+        }
+    }
+    
+    // Special validation based on key name (for backward compatibility)
+    if (key == "neuron_count") {
+        return validateNeuronCount(value);
+    } else if (key == "region_count") {
+        return validateRegionCount(value);
+    } else if (key == "connection_probability") {
+        return validateConnectionProbability(value);
+    } else if (key.find("stdp_") != std::string::npos) {
+        return validateSTDPParameters(value, key);
+    } else if (key.find("_rate") != std::string::npos) {
+        return validatePlasticityRate(value, key);
+    }
+    
+    // Generic validation based on type if we can infer it
+    try {
+        size_t pos;
+        if (key.find("weight") != std::string::npos || key.find("coefficient") != std::string::npos) {
+            std::stof(value);
+            return true;
+        } else if (key.find("tau") != std::string::npos) {
+            std::stof(value);
+            return true;
+        } else if (key.find("count") != std::string::npos || key.find("size") != std::string::npos) {
+            std::stoll(value);
+            return true;
+        } else if (key.find("probability") != std::string::npos) {
+            std::stof(value);
+            return true;
+        } else if (key.find("rate") != std::string::npos) {
+            std::stof(value);
+            return true;
+        } else if (key.find("seed") != std::string::npos) {
+            std::stoull(value);
+            return true;
+        } else if (key.find("interval") != std::string::npos) {
+            std::stoll(value);
+            return true;
+        } else if (key.find("enabled") != std::string::npos || key.find("modulation") != std::string::npos) {
+            std::string lowerValue = toLower(value);
+            return lowerValue == "true" || lowerValue == "1" || lowerValue == "yes" ||
+                   lowerValue == "false" || lowerValue == "0" || lowerValue == "no";
+        } else if (key.find("dir") != std::string::npos || key.find("folder") != std::string::npos) {
+            return validateString(value);
+        } else if (key.find("learning") != std::string::npos || key.find("rate") != std::string::npos) {
+            std::stof(value);
+            return true;
+        }
+    } catch (...) {
+        return false;
+    }
+    
+    // If no specific validation found, try basic validation
+    try {
+        // Try to convert based on common patterns
+        if (key.find("int") != std::string::npos || key.find("count") != std::string::npos || 
+            key.find("size") != std::string::npos || key.find("interval") != std::string::npos ||
+            key.find("seed") != std::string::npos) {
+            std::stoll(value);
+            return true;
+        } else if (key.find("float") != std::string::npos || key.find("weight") != std::string::npos || 
+                   key.find("probability") != std::string::npos || key.find("rate") != std::string::npos ||
+                   key.find("strength") != std::string::npos || key.find("modulation") != std::string::npos ||
+                   key.find("coefficient") != std::string::npos) {
+            std::stof(value);
+            return true;
+        } else if (key.find("double") != std::string::npos) {
+            std::stod(value);
+            return true;
+        } else if (key.find("enabled") != std::string::npos || key.find("modulation") != std::string::npos) {
+            std::string lowerValue = toLower(value);
+            return lowerValue == "true" || lowerValue == "1" || lowerValue == "yes" ||
+                   lowerValue == "false" || lowerValue == "0" || lowerValue == "no";
+        } else {
+            // For unknown types, just check if it's not empty and has reasonable length
+            return validateString(value, 0, 1000);
+        }
+    } catch (...) {
+        return false;
+    }
+}
+
+std::string Config::getValidationError(const std::string& key, const std::string& value) const {
+    // Check schema first
+    const auto& schema = ConfigSchema::getSchema();
+    auto fieldIt = std::find_if(schema.begin(), schema.end(), 
+                                [&key](const ConfigSchema::Field& f) { return f.name == key; });
+    
+    if (fieldIt != schema.end()) {
+        // Use schema validator if available
+        if (fieldIt->validator && !fieldIt->validator(value)) {
+            return "Invalid value for \"" + key + "\" (type: " + fieldIt->type + ")";
+        }
+        
+        // Additional type-specific validation
+        if (fieldIt->type == "int64_t" && !validateInt64(value)) {
+            return "Invalid int64_t value for \"" + key + "\": must be integer";
+        } else if (fieldIt->type == "double" && !validateDouble(value)) {
+            return "Invalid double value for \"" + key + "\": must be floating point number";
+        } else if (fieldIt->type == "float" && !validateFloat(value)) {
+            return "Invalid float value for \"" + key + "\": must be floating point number";
+        } else if (fieldIt->type == "string" && !validateString(value)) {
+            return "Invalid string value for \"" + key + "\": must be non-empty string";
+        } else if (fieldIt->type == "bool" && !validateBool(value)) {
+            return "Invalid bool value for \"" + key + "\": must be true/false, yes/no, 1/0";
+        }
+    }
+    
+    // Special validation based on key name
+    if (key == "neuron_count" && !validateNeuronCount(value)) {
+        return "Invalid neuron_count: must be positive integer less than 100000";
+    } else if (key == "region_count" && !validateRegionCount(value)) {
+        return "Invalid region_count: must be positive integer less than 1000";
+    } else if (key == "connection_probability" && !validateConnectionProbability(value)) {
+        return "Invalid connection_probability: must be between 0.0 and 1.0";
+    } else if (key.find("stdp_") != std::string::npos && !validateSTDPParameters(value, key)) {
+        return "Invalid STDP parameter \"" + key + "\": must be within valid range";
+    } else if (key.find("_rate") != std::string::npos && !validatePlasticityRate(value, key)) {
+        return "Invalid plasticity rate \"" + key + "\": must be within valid range";
+    }
+    
+    return "Invalid value format for \"" + key + "\"";
+}
+
+// Implementation of static validation methods
+bool Config::validateInt64(const std::string& value, int64_t min, int64_t max) {
+    try {
+        size_t pos;
+        int64_t num = std::stoll(value, &pos);
+        if (pos != value.size()) return false; // Not fully consumed
+        return num >= min && num <= max;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validateDouble(const std::string& value, double min, double max) {
+    try {
+        size_t pos;
+        double num = std::stod(value, &pos);
+        if (pos != value.size()) return false; // Not fully consumed
+        return num >= min && num <= max;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validateFloat(const std::string& value, float min, float max) {
+    try {
+        size_t pos;
+        float num = std::stof(value, &pos);
+        if (pos != value.size()) return false; // Not fully consumed
+        return num >= min && num <= max;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validateString(const std::string& value, size_t minLength, size_t maxLength) {
+    if (minLength > value.size()) return false;
+    if (maxLength != std::string::npos && maxLength < value.size()) return false;
+    return true;
+}
+
+bool Config::validateBool(const std::string& value) {
+    std::string lowerValue = toLower(value);
+    return lowerValue == "true" || lowerValue == "1" || lowerValue == "yes" ||
+           lowerValue == "false" || lowerValue == "0" || lowerValue == "no";
+}
+
+bool Config::validateNeuronCount(const std::string& value) {
+    try {
+        int64_t count = std::stoll(value);
+        return count > 0 && count < 100000;
+    } catch (...) { return false; }
+}
+
+bool Config::validateRegionCount(const std::string& value) {
+    try {
+        int64_t count = std::stoll(value);
+        return count > 0 && count < 1000;
+    } catch (...) { return false; }
+}
+
+bool Config::validateConnectionProbability(const std::string& value) {
+    try {
+        float p = std::stof(value);
+        return p >= 0.0f && p <= 1.0f;
+    } catch (...) { return false; }
+}
+
+bool Config::validateSTDPParameters(const std::string& value, const std::string& paramType) {
+    try {
+        float param = std::stof(value);
+        if (paramType == "stdp_ltp_weight") {
+            return param >= 0.0f && param <= 1.0f;
+        } else if (paramType == "stdp_ltd_weight") {
+            return param >= 0.0f && param <= 1.0f;
+        } else if (paramType == "stdp_tau") {
+            return param > 0.0f && param < 1000.0f;
+        } else if (paramType == "plasticity_rate") {
+            return param >= 0.0f && param <= 0.01f;
+        } else if (paramType == "pruning_rate") {
+            return param >= 0.0f && param <= 0.001f;
+        }
+        return true;
+    } catch (...) { return false; }
+}
+
+bool Config::validatePlasticityRate(const std::string& value, const std::string& rateType) {
+    try {
+        float rate = std::stof(value);
+        if (rate < 0.0f || rate > 1.0f) return false;
+        
+        if (rateType == "synaptogenesis_rate") {
+            return rate <= 0.01f;
+        } else if (rateType == "pruning_rate") {
+            return rate <= 0.001f;
+        } else if (rateType == "learning_rate") {
+            return rate <= 1.0f;
+        } else if (rateType == "innovation_rate") {
+            return rate <= 1.0f;
+        } else if (rateType == "exploration_rate") {
+            return rate <= 1.0f;
+        }
+        
+        return true;
+    } catch (...) { return false; }
 }
 
 // Explicit template instantiations
@@ -211,5 +455,12 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Template instantiations for getValidated
+template int64_t Config::getValidated<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getValidated<double>(const std::string&, const double&) const;
+template float Config::getValidated<float>(const std::string&, const float&) const;
+template<std::string> Config::getValidated<std::string>(const std::string&, const std::string&) const;
+template bool Config::getValidated<bool>(const std::string&, const bool&) const;
 
 } // namespace nlm

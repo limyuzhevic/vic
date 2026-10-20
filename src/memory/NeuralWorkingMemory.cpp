@@ -6,7 +6,7 @@
 namespace nlm {
 
 struct NeuralWorkingMemory::Impl {
-    Brain* brain;
+    std::weak_ptr<Brain> brainPtr;
     
     // Maintenance connections (recurrent)
     std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
@@ -14,12 +14,12 @@ struct NeuralWorkingMemory::Impl {
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brainPtr() {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
+    , brainPtr_()
     , capacity_(100)
     , decayRate_(0.01f)
 {
@@ -27,14 +27,18 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
-void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+void NeuralWorkingMemory::initialize(std::weak_ptr<Brain> brain) {
+    pImpl->brainPtr = brain;
+    brainPtr_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    auto brain = pImpl->brainPtr.lock();
+    if (!brain) {
+        NLM_LOG_WARNING("Brain was destroyed before memory system");
+        return;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,7 +48,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
+        if (auto* n = brain->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
             for (auto* nn : *n) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
@@ -84,8 +88,9 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+    auto brain = pImpl->brainPtr.lock();
+    if (brain) {
+        brain->injectCurrent(neuron, activation * 5.0f);
     }
 }
 
@@ -114,7 +119,11 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    auto brain = pImpl->brainPtr.lock();
+    if (!brain) {
+        NLM_LOG_WARNING("Brain was destroyed before memory system");
+        return;
+    }
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -123,7 +132,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         
         if (activation > 0.1f) {
             // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            brain->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -173,12 +182,13 @@ void NeuralWorkingMemory::runCompetition() {
     }
     
     // Inhibitory competition - suppress non-winners
+    auto brain = pImpl->brainPtr.lock();
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
-        if (!isWinner && brain_) {
+        if (!isWinner && brain) {
             // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            brain->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
 }
@@ -207,6 +217,12 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
+    auto brain = pImpl->brainPtr.lock();
+    if (!brain) {
+        NLM_LOG_WARNING("Brain was destroyed before memory system");
+        return;
+    }
+    
     // Apply maintenance currents through recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
@@ -218,9 +234,9 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
             fromActivation = memoryActivations_[idx];
         }
         
-        if (fromActivation > 0.1f && brain_) {
+        if (fromActivation > 0.1f) {
             // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            brain->injectCurrent(conn.second, fromActivation * 2.0f);
         }
     }
 }

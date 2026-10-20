@@ -45,6 +45,32 @@ float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
 }
 
+// Get prediction features for concept formation
+// These features represent the current state of prediction system
+std::vector<float> PredictionSystem::getPredictionFeatures() const {
+    std::vector<float> features;
+    
+    // Current prediction error as a feature
+    features.push_back(getPredictionError());
+    
+    // Confidence level as a feature
+    features.push_back(getConfidence());
+    
+    // History length as a feature (how much data we have)
+    features.push_back(static_cast<float>(pImpl->errorHistory.size()));
+    
+    // Average prediction error as a feature
+    if (!pImpl->errorHistory.empty()) {
+        float sumError = std::accumulate(pImpl->errorHistory.begin(), 
+                                       pImpl->errorHistory.end(), 0.0f);
+        features.push_back(sumError / pImpl->errorHistory.size());
+    } else {
+        features.push_back(0.0f);
+    }
+    
+    return features;
+}
+
 const std::vector<float>& PredictionSystem::getErrorHistory() const {
     return pImpl->errorHistory;
 }

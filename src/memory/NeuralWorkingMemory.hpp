@@ -6,6 +6,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <mutex>
 
 namespace nlm {
 
@@ -24,13 +25,15 @@ public:
     ~NeuralWorkingMemory();
 
     // Initialize with brain reference
-    void initialize(Brain* brain);
+    void initialize(std::weak_ptr<Brain> brain);
 
     // Store information in working memory
     // The information is encoded as neural activity pattern
+    // Throws MemoryError if storage fails
     void store(const std::vector<float>& pattern, float strength = 1.0f);
 
     // Store specific neuron activation
+    // Throws MemoryError if storage fails
     void storeToNeuron(NeuronId neuron, float activation);
 
     // Retrieve current working memory content as activity levels
@@ -84,10 +87,10 @@ private:
     // Decay weak memory traces
     void decayWeakTraces();
 
-    struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
+    // Use weak_ptr to avoid circular references
+    std::weak_ptr<Brain> brainPtr_;
     size_t capacity_;
     float decayRate_;
     

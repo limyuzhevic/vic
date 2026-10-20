@@ -7,17 +7,17 @@
 namespace nlm {
 
 struct NeuralEpisodicMemory::Impl {
-    Brain* brain;
+    std::weak_ptr<Brain> brainPtr;
     
     // Pattern neurons for episodic recall
     std::vector<NeuronId> episodeNeurons;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brainPtr() {}
 };
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
+    , brainPtr_()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
@@ -25,9 +25,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
-void NeuralEpisodicMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+void NeuralEpisodicMemory::initialize(std::weak_ptr<Brain> brain) {
+    pImpl->brainPtr = brain;
+    brainPtr_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 

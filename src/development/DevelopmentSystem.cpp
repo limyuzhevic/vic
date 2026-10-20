@@ -13,9 +13,13 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), brainPtr_() {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
+
+void DevelopmentSystem::initialize(std::weak_ptr<Brain> brain) {
+    brainPtr_ = brain;
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;

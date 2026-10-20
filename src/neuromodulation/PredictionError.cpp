@@ -5,21 +5,21 @@
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
+    std::weak_ptr<Brain> brainPtr;
     float error;
     float predictedValue;
     float actualValue;
     std::vector<float> history;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brainPtr(), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
 
-void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
+void PredictionError::initialize(std::weak_ptr<Brain> brain) {
+    pImpl->brainPtr = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 

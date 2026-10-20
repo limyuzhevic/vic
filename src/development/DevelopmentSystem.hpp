@@ -45,6 +45,24 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+
+    // Initialize with brain reference
+    void initialize(std::weak_ptr<Brain> brain);
+
+    // Safe access methods for brain reference
+    Brain* getBrain() {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    const Brain* getBrain() const {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    bool isBrainAlive() const {
+        return brainPtr_.lock() != nullptr;
+    }
     
 private:
     struct Impl;

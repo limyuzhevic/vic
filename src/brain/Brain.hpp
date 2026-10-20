@@ -48,7 +48,7 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
-class Brain {
+class Brain : public std::enable_shared_from_this<Brain> {
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
@@ -93,6 +93,9 @@ public:
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    
+    // Get current brain state for planning (neural network inputs)
+    std::vector<float> getCurrentStateForPlanning();
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -185,9 +188,11 @@ public:
     PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Configuration validation
+    bool validateConfiguration() const;
     
-    // Get random generator
+    // Get configuration schema
+    static const std::vector<ConfigSchema::Field>& getConfigurationSchema();
     RandomGenerator* getRandomGenerator();
     
     // Logging

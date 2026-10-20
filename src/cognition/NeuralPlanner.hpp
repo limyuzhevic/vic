@@ -35,7 +35,7 @@ public:
     ~NeuralPlanner();
 
     // Initialize with brain reference
-    void initialize(Brain* brain);
+    void initialize(std::weak_ptr<Brain> brain);
 
     // Plan next action given current state and goal
     // Returns the best action to take now
@@ -45,7 +45,7 @@ public:
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
-                                      const std::vector<float>& startState);
+                                       const std::vector<float>& startState);
 
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
@@ -56,8 +56,8 @@ public:
 
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
+                           const std::vector<ActionType>& actualActions,
+                           float actualReward);
 
     // Clear planning cache
     void clearCache();
@@ -73,6 +73,21 @@ public:
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+
+    // Safe access methods for brain reference
+    Brain* getBrain() {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    const Brain* getBrain() const {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    bool isBrainAlive() const {
+        return brainPtr_.lock() != nullptr;
+    }
 
 private:
     // Generate possible action sequences

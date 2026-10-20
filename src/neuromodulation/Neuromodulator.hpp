@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <string>
 #include <vector>
 
@@ -27,8 +28,28 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Initialize with brain reference
+    void initialize(std::weak_ptr<Brain> brain);
+    
+    // Safe access methods for brain reference
+    Brain* getBrain() {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    const Brain* getBrain() const {
+        auto brain = brainPtr_.lock();
+        return brain.get();
+    }
+    
+    bool isBrainAlive() const {
+        return brainPtr_.lock() != nullptr;
+    }
+
 protected:
     Neuromodulator() = default;
+    
+    std::weak_ptr<Brain> brainPtr_;
 };
 
 // Dopamine: Reward and reinforcement learning signal

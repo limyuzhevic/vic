@@ -2,8 +2,102 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <string>
+#include <stdexcept>
+#include <map>
 
 namespace nlm {
+
+// Error codes for standardized error reporting
+enum class ErrorCode {
+    SUCCESS = 0,
+    UNKNOWN_ERROR = 1,
+    INVALID_ARGUMENT = 2,
+    MEMORY_ALLOCATION_FAILED = 3,
+    FILE_NOT_FOUND = 4,
+    INVALID_FORMAT = 5,
+    CONFIGURATION_ERROR = 6,
+    NEURAL_NETWORK_ERROR = 7,
+    PLASTICITY_ERROR = 8,
+    TIMEOUT = 9,
+    INVALID_STATE = 10
+};
+
+// Error hierarchy
+class NLMError : public std::exception {
+public:
+    NLMError(ErrorCode code, const std::string& message) 
+        : code_(code), message_(message) {}
+    
+    virtual ~NLMError() noexcept = default;
+    
+    virtual const char* what() const noexcept override {
+        return message_.c_str();
+    }
+    
+    ErrorCode getCode() const noexcept { return code_; }
+    const std::string& getMessage() const noexcept { return message_; }
+    
+protected:
+    ErrorCode code_;
+    std::string message_;
+};
+
+class RuntimeError : public NLMError {
+public:
+    RuntimeError(const std::string& message) 
+        : NLMError(ErrorCode::UNKNOWN_ERROR, message) {}
+    
+    RuntimeError(ErrorCode code, const std::string& message)
+        : NLMError(code, message) {}
+};
+
+class InvalidArgumentError : public NLMError {
+public:
+    InvalidArgumentError(const std::string& message) 
+        : NLMError(ErrorCode::INVALID_ARGUMENT, message) {}
+};
+
+class MemoryError : public NLMError {
+public:
+    MemoryError(const std::string& message) 
+        : NLMError(ErrorCode::MEMORY_ALLOCATION_FAILED, message) {}
+};
+
+class ConfigurationError : public NLMError {
+public:
+    ConfigurationError(const std::string& message) 
+        : NLMError(ErrorCode::CONFIGURATION_ERROR, message) {}
+
+    ConfigurationError(ErrorCode code, const std::string& key, const std::string& expected,
+                       const std::string& actual, const std::string& context = "") {
+        std::stringstream ss;
+        ss << "Configuration error for key \"" << key << "\": expected type "
+           << expected << ", got \"" << actual << "\"";
+        if (!context.empty()) ss << " (" << context << ")";
+        message_ = ss.str();
+        code_ = code;
+        // Store additional info in message as well for easy access
+        std::string extraInfo = " [key=\"" + key + "\", expected=\"" + expected + "\", actual=\"" + actual + "\"]";
+        message_ = ss.str() + extraInfo;
+    }
+};
+
+class NeuralNetworkError : public NLMError {
+public:
+    NeuralNetworkError(const std::string& message) 
+        : NLMError(ErrorCode::NEURAL_NETWORK_ERROR, message) {}
+};
+
+class PlasticityError : public NLMError {
+public:
+    PlasticityError(const std::string& message) 
+        : NLMError(ErrorCode::PLASTICITY_ERROR, message) {}
+};
+
+// Enhanced error reporting macro
+#define defineNLMError(error, context, operation) \
+    error + " during " + operation + " (" + context + ")"
 
 // Strongly-typed identifiers for safety
 

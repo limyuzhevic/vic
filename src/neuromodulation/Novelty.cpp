@@ -6,22 +6,22 @@
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
+    std::weak_ptr<Brain> brainPtr;
     float level;
     float decayRate;
     std::vector<float> history;
     std::vector<float> lastPattern;
     float noveltyThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() : brainPtr(), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
 
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
+void Novelty::initialize(std::weak_ptr<Brain> brain) {
+    pImpl->brainPtr = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
 
@@ -69,6 +69,12 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
 }
 
 void Novelty::update(TimestepDuration dt) {
+    auto brain = pImpl->brainPtr.lock();
+    if (!brain) {
+        NLM_LOG_WARNING("Brain was destroyed before novelty system");
+        return;
+    }
+    
     // Decay novelty
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
