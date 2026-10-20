@@ -28,6 +28,15 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // ========== MEMORY POOL INTEGRATION ==========
+    std::unique_ptr<nlm::NeuronPool> neuronPool;
+    std::unique_ptr<nlm::SynapsePool> synapsePool;
+    bool useMemoryPool;
+    
+    // Legacy storage for backward compatibility
+    std::vector<std::unique_ptr<Neuron>> neurons_;
+    std::vector<std::unique_ptr<Synapse>> synapses_;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -81,6 +90,7 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , useMemoryPool(true)  // Enable MemoryPool integration
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -93,6 +103,17 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Initialize MemoryPool systems
+        if (useMemoryPool) {
+            nlm::initializeMemoryPool(
+                cfg->getOr<size_t>("neuron_count", 1000),
+                cfg->getOr<size_t>("synapse_count", 10000)
+            );
+            neuronPool = std::make_unique<nlm::NeuronPool>();
+            synapsePool = std::make_unique<nlm::SynapsePool>();
+            nlm::enableMemoryPool(true);
+        }
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -175,7 +196,7 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain with MemoryPool)...");
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
@@ -184,6 +205,14 @@ bool Brain::initialize() {
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Initialize MemoryPool integration if enabled
+    if (pImpl->useMemoryPool && pImpl->neuronPool && pImpl->synapsePool) {
+        NLM_LOG_INFO("MemoryPool integration: ENABLED");
+        NLM_LOG_INFO("NeuronPool capacity: " + std::to_string(pImpl->neuronPool->size()) + 
+                    " neurons, SynapsePool capacity: " + std::to_string(pImpl->synapsePool->size()) + 
+                    " synapses");
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -1078,7 +1107,7 @@ RandomGenerator* Brain::getRandomGenerator() {
 }
 
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated with MemoryPool) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
@@ -1088,6 +1117,17 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // MemoryPool statistics
+    if (pImpl->neuronPool && pImpl->synapsePool) {
+        NLM_LOG_INFO("=== MemoryPool Integration ===");
+        NLM_LOG_INFO("NeuronPool: " + std::to_string(pImpl->neuronPool->size()) + 
+                    " neurons allocated, " + std::to_string(pImpl->neuronPool->memoryUsage()) + 
+                    " bytes used");
+        NLM_LOG_INFO("SynapsePool: " + std::to_string(pImpl->synapsePool->size()) + 
+                    " synapses allocated, " + std::to_string(pImpl->synapsePool->memoryUsage()) + 
+                    " bytes used");
+    }
     
     // Memory system status
     if (pImpl->workingMemory) {

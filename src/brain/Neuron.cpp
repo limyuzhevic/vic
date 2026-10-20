@@ -55,96 +55,135 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->membranePotentials[pImpl->arrayIndex] = potential;
+    }
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->membranePotentials[pImpl->arrayIndex] += delta;
+    }
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->thresholds[pImpl->arrayIndex] = threshold;
+    }
 }
 
 void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->firingStates[pImpl->arrayIndex] = state;
+    }
 }
 
 void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        if (pImpl->neuronArray->refractoryRemainings[pImpl->arrayIndex] > 0) {
+            --pImpl->neuronArray->refractoryRemainings[pImpl->arrayIndex];
+            if (pImpl->neuronArray->refractoryRemainings[pImpl->arrayIndex] == 0) {
+                pImpl->neuronArray->firingStates[pImpl->arrayIndex] = FiringState::Resting;
+            }
         }
     }
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
-    pImpl->state.firingRate = rate;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->firingRates[pImpl->arrayIndex] = rate;
+    }
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->leakConductances[pImpl->arrayIndex] = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
-    return pImpl->state.leakConductance;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        return pImpl->neuronArray->leakConductances[pImpl->arrayIndex];
+    }
+    return 10.0f;  // Default
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->refractoryPeriods[pImpl->arrayIndex] = steps;
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
-    return pImpl->state.refractoryPeriod;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        return pImpl->neuronArray->refractoryPeriods[pImpl->arrayIndex];
+    }
+    return 5;  // Default
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->restingPotentials[pImpl->arrayIndex] = potential;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        return pImpl->neuronArray->restingPotentials[pImpl->arrayIndex];
+    }
+    return -70.0f;  // Default
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->resetPotentials[pImpl->arrayIndex] = potential;
+    }
 }
 
 bool Neuron::checkThreshold() const {
-    return pImpl->state.membranePotential >= pImpl->state.threshold;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        return pImpl->neuronArray->membranePotentials[pImpl->arrayIndex] >= 
+               pImpl->neuronArray->thresholds[pImpl->arrayIndex];
+    }
+    return false;
 }
 
 float Neuron::getLastSpikeTime() const {
-    return pImpl->state.lastSpikeTime;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        return pImpl->neuronArray->lastSpikeTimes[pImpl->arrayIndex];
+    }
+    return -1.0f;  // Default
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    pImpl->totalCurrent += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    pImpl->totalCurrent -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    if (pImpl->neuronArray && pImpl->arrayIndex < pImpl->neuronArray->capacity) {
+        pImpl->neuronArray->adaptationVariables[pImpl->arrayIndex] += 
+            amplitude * 0.1f;
+    }
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    pImpl->totalCurrent += current;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {

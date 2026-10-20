@@ -15,6 +15,7 @@
  * Biological motivation:
  * - Like biological neural systems that maintain fixed numbers of neurons/synapses
  * - Reduces "allocation" overhead similar to how biological systems don't constantly create/destroy neurons
+ * 
  */
 
 #include <cstddef>
@@ -24,6 +25,7 @@
 #include <atomic>
 #include <array>
 #include <optional>
+#include <mutex>
 
 namespace nlm {
 
@@ -41,6 +43,22 @@ struct MemPoolNode {
  * 
  * Template parameter T specifies the object type to allocate.
  * All objects have the same fixed size determined at construction.
+ */
+// Forward declaration for NeuronPool and SynapsePool to avoid circular includes
+class NeuronPool;
+class SynapsePool;
+
+/**
+ * MemoryPool - Generic lock-free memory pool for fixed-size objects
+ * 
+ * Template parameter T specifies the object type to allocate.
+ * All objects have the same fixed size determined at construction.
+ * 
+ * Features:
+ * - Lock-free allocation and deallocation
+ * - Pre-allocated memory blocks
+ * - Memory-efficient slab allocation
+ * - Thread-safe operations
  */
 template<typename T>
 class MemoryPool {
@@ -133,6 +151,539 @@ private:
     std::atomic<size_t> allocatedCount_;
     std::atomic<size_t> availableCount_;
 };
+
+/**
+ * NeuronPool - Specialized memory pool for neurons with cache-aligned SoA storage
+ * 
+ * Provides efficient memory layout for neural computation where all neurons
+ * share the same state structure (Structure-of-Arrays), which is much more
+ * efficient for SIMD operations and batch processing.
+ * 
+ * Key optimizations:
+ * - Cache line aligned storage (64 bytes) to prevent false sharing
+ * - Structure-of-Arrays layout for better vectorization
+ * - Lock-free operations for high concurrency
+ * - Pre-allocated memory blocks to reduce fragmentation
+ */
+class NeuronPool {
+public:
+    /**
+     * Create a neuron pool
+     * @param initialNeurons Number of neurons to pre-allocate
+     */
+    explicit NeuronPool(size_t initialNeurons = 1024);
+    
+    ~NeuronPool();
+    
+    // Disable copying
+    NeuronPool(const NeuronPool&) = delete;
+    NeuronPool& operator=(const NeuronPool&) = delete;
+    
+    /**
+     * Allocate a neuron from the pool
+     * Returns a NeuronId that can be used to access the neuron in the SoA arrays
+     */
+    NeuronId allocate();
+    
+    /**
+     * Deallocate a neuron back to the pool
+     */
+    void deallocate(NeuronId id);
+    
+    /**
+     * Access neuron state directly via index (for SoA access)
+     * @param index NeuronIndex (index into the SoA arrays)
+     * @return Pointer to the neuron state at the given index
+     */
+    template<typename Member>
+    Member* getState(NeuronIndex index);
+    
+    /**
+     * Get neuron state as structured access
+     * @param index NeuronIndex
+     * @return Reference to the neuron state structure
+     */
+    NeuronState& getNeuronState(NeuronIndex index);
+    const NeuronState& getNeuronState(NeuronIndex index) const;
+    
+    /**
+     * Get total number of neurons in the pool
+     */
+    size_t size() const { return size_; }
+    
+    /**
+     * Get number of allocated neurons
+     */
+    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Get number of available slots
+     */
+    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Total memory usage of the pool (bytes)
+     */
+    size_t memoryUsage() const;
+    
+    /**
+     * Pre-allocate neurons
+     */
+    void reserve(size_t count);
+    
+    /**
+     * Get NeuronIndex from NeuronId
+     * @param id NeuronId
+     * @return Corresponding index into SoA arrays
+     */
+    NeuronIndex getIndex(NeuronId id) const;
+    
+    /**
+     * Get NeuronId from NeuronIndex
+     */
+    NeuronId getId(NeuronIndex index) const;
+    
+    /**
+     * Check if pool is empty
+     */
+    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
+    
+    /**
+     * Reset all neurons to initial state
+     */
+    void resetAllNeurons();
+    
+    /**
+     * Get cache-friendly access to neuron arrays
+     * Returns pointers to SoA arrays for direct memory access
+     */
+    const std::vector<float>* getMembranePotentials() const { return membranePotentials_.data(); }
+    const std::vector<float>* getRestingPotentials() const { return restingPotentials_.data(); }
+    const std::vector<float>* getThresholds() const { return thresholds_.data(); }
+    const std::vector<float>* getResetPotentials() const { return resetPotentials_.data(); }
+    const std::vector<float>* getLeakConductances() const { return leakConductances_.data(); }
+    const std::vector<float>* getSynapticConductances() const { return synapticConductances_.data(); }
+    const std::vector<float>* getFiringRates() const { return firingRates_.data(); }
+    const std::vector<FiringState>* getFiringStates() const { return firingStates_.data(); }
+    const std::vector<uint32_t>* getRefractoryRemainings() const { return refractoryRemainings_.data(); }
+    const std::vector<uint32_t>* getRefractoryPeriods() const { return refractoryPeriods_.data(); }
+    const std::vector<float>* getAdaptationVariables() const { return adaptationVariables_.data(); }
+    const std::vector<float>* getLastSpikeTimes() const { return lastSpikeTimes_.data(); }
+    
+    /**
+     * Get total number of available NeuronIndices
+     */
+    size_t capacity() const { return capacity_; }
+    
+private:
+    static constexpr size_t CACHE_LINE = 64;
+    
+    /**
+     * Neuron block with cache line alignment for SoA storage
+     * All neurons in this block share the same state structure layout
+     */
+    struct alignas(CACHE_LINE) alignas(sizeof(void*)) NeuronBlock {
+        // SoA storage for neuron states - all arrays have the same length
+        std::vector<float> membranePotentials;
+        std::vector<float> restingPotentials;
+        std::vector<float> thresholds;
+        std::vector<float> resetPotentials;
+        std::vector<float> leakConductances;
+        std::vector<float> synapticConductances;
+        std::vector<float> firingRates;
+        std::vector<FiringState> firingStates;
+        std::vector<uint32_t> refractoryRemainings;
+        std::vector<uint32_t> refractoryPeriods;
+        std::vector<float> adaptationVariables;
+        std::vector<float> lastSpikeTimes;
+        std::vector<uint64_t> neuronType;  // NeuronType enum
+        std::vector<uint64_t> regionId;
+        std::vector<uint64_t> populationId;
+        
+        // Per-neuron current injection (not in NeuronState, but needed for hot path)
+        std::vector<float> synapticInput;
+        
+        // For fast index-to-address translation
+        std::vector<uint64_t> indexToId;
+        
+        NeuronBlock() {}
+        
+        // Initialize block with given capacity
+        void initialize(size_t capacity);
+    };
+    
+    /**
+     * Lock-free free list for available neurons
+     */
+    std::atomic<NeuronId*> freeList_;
+    
+    /**
+     * Vector of neuron blocks for scalable memory management
+     */
+    std::vector<std::unique_ptr<NeuronBlock>> blocks_;
+    
+    /**
+     * Current block we're allocating from (for fast allocation)
+     */
+    std::atomic<NeuronBlock*> currentBlock_;
+    
+    /**
+     * Current index in current block for allocation
+     */
+    std::atomic<size_t> currentIndex_;
+    
+    /**
+     * Total number of neurons allocated
+     */
+    size_t size_;
+    
+    /**
+     * Total capacity of the pool
+     */
+    size_t capacity_;
+    
+    /**
+     * Statistics
+     */
+    std::atomic<size_t> allocatedCount_;
+    std::atomic<size_t> availableCount_;
+    
+    /**
+     * For thread-safe access to blocks
+     */
+    mutable std::mutex blocksMutex_;
+    
+    /**
+     * Mapping from NeuronId to NeuronIndex (for fast lookup)
+     */
+    std::vector<NeuronIndex> idToIndex_;
+    
+    /**
+     * Mapping from NeuronIndex to NeuronId (for fast lookup)
+     */
+    std::vector<NeuronId> indexToId_;
+    
+    /**
+     * Free list for deallocated neurons (optimization for temporary reuse)
+     */
+    std::vector<NeuronIndex> freeListIndex_;
+    std::atomic<size_t> freeListTop_;
+    
+    /**
+     * Add a new block to the pool
+     */
+    void addBlock();
+    
+    /**
+     * Initialize all neurons in a block
+     */
+    void initializeBlock(NeuronBlock* block);
+    
+    /**
+     * Cleanup a deallocated neuron
+     */
+    void cleanupNeuron(NeuronBlock* block, NeuronIndex index);
+    
+    /**
+     * Initialize global mapping tables
+     */
+    void initializeMappings();
+    
+    /**
+     * Rebuild mapping tables (when blocks change)
+     */
+    void rebuildMappings();
+};
+
+/**
+ * SynapsePool - Specialized memory pool for synapses with SoA storage
+ * 
+ * Provides efficient memory layout for synaptic connections where all synapses
+ * share the same state structure (Structure-of-Arrays), which is much more
+ * efficient for batch processing and synaptic weight updates.
+ * 
+ * Key optimizations:
+ * - Cache line aligned storage (64 bytes) to prevent false sharing
+ * - Structure-of-Arrays layout for better vectorization
+ * - Lock-free operations for high concurrency
+ * - Pre-allocated memory blocks to reduce fragmentation
+ */
+class SynapsePool {
+public:
+    /**
+     * Create a synapse pool
+     * @param initialSynapses Number of synapses to pre-allocate
+     */
+    explicit SynapsePool(size_t initialSynapses = 1024);
+    
+    ~SynapsePool();
+    
+    // Disable copying
+    SynapsePool(const SynapsePool&) = delete;
+    SynapsePool& operator=(const SynapsePool&) = delete;
+    
+    /**
+     * Allocate a synapse from the pool
+     * @param source Source neuron ID
+     * @param destination Destination neuron ID
+     * @return SynapseId identifying the allocated synapse
+     */
+    SynapseId allocate(NeuronId source, NeuronId destination);
+    
+    /**
+     * Deallocate a synapse back to the pool
+     */
+    void deallocate(SynapseId id);
+    
+    /**
+     * Access synapse state directly via index (for SoA access)
+     * @param index SynapseIndex (index into the SoA arrays)
+     * @return Pointer to the synapse state at the given index
+     */
+    template<typename Member>
+    Member* getState(SynapseIndex index);
+    
+    /**
+     * Get synapse state as structured access
+     * @param index SynapseIndex
+     * @return Reference to the synapse state structure
+     */
+    SynapseState& getSynapseState(SynapseIndex index);
+    const SynapseState& getSynapseState(SynapseIndex index) const;
+    
+    /**
+     * Get source neuron ID for a synapse
+     */
+    NeuronId getSource(SynapseIndex index) const;
+    
+    /**
+     * Get destination neuron ID for a synapse
+     */
+    NeuronId getDestination(SynapseIndex index) const;
+    
+    /**
+     * Get synaptic weight
+     */
+    SynapticWeight getWeight(SynapseIndex index) const;
+    
+    /**
+     * Set synaptic weight
+     */
+    void setWeight(SynapseIndex index, SynapticWeight weight);
+    
+    /**
+     * Get total number of synapses in the pool
+     */
+    size_t size() const { return size_; }
+    
+    /**
+     * Get number of allocated synapses
+     */
+    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Get number of available slots
+     */
+    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Total memory usage of the pool (bytes)
+     */
+    size_t memoryUsage() const;
+    
+    /**
+     * Pre-allocate synapses
+     */
+    void reserve(size_t count);
+    
+    /**
+     * Get SynapseIndex from SynapseId
+     * @param id SynapseId
+     * @return Corresponding index into SoA arrays
+     */
+    SynapseIndex getIndex(SynapseId id) const;
+    
+    /**
+     * Get SynapseId from SynapseIndex
+     */
+    SynapseId getId(SynapseIndex index) const;
+    
+    /**
+     * Check if pool is empty
+     */
+    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
+    
+    /**
+     * Reset all synapses to initial state
+     */
+    void resetAllSynapses();
+    
+    /**
+     * Get cache-friendly access to synapse arrays
+     * Returns pointers to SoA arrays for direct memory access
+     */
+    const std::vector<uint64_t>* getSourceNeurons() const { return sourceNeurons_.data(); }
+    const std::vector<uint64_t>* getDestinationNeurons() const { return destinationNeurons_.data(); }
+    const std::vector<float>* getWeights() const { return weights_.data(); }
+    const std::vector<uint32_t>* getDelays() const { return delays_.data(); }
+    const std::vector<uint8_t>* getSynapseTypes() const { return synapseTypes_.data(); }
+    const std::vector<uint8_t>* getPlasticityFlags() const { return plasticityFlags_.data(); }
+    const std::vector<float>* getShortTermDepression() const { return shortTermDepression_.data(); }
+    const std::vector<float>* getShortTermFacilitation() const { return shortTermFacilitation_.data(); }
+    const std::vector<float>* getLastPreSpikeTimes() const { return lastPreSpikeTimes_.data(); }
+    const std::vector<float>* getLastPostSpikeTimes() const { return lastPostSpikeTimes_.data(); }
+    const std::vector<float>* getEligibilityTraces() const { return eligibilityTraces_.data(); }
+    const std::vector<float>* getEfficacies() const { return efficacies_.data(); }
+    
+    /**
+     * Get total number of available SynapseIndices
+     */
+    size_t capacity() const { return capacity_; }
+    
+private:
+    static constexpr size_t CACHE_LINE = 64;
+    
+    /**
+     * Synapse block with cache line alignment for SoA storage
+     * All synapses in this block share the same state structure layout
+     */
+    struct alignas(CACHE_LINE) alignas(sizeof(void*)) SynapseBlock {
+        // SoA storage for synapse states - all arrays have the same length
+        std::vector<uint64_t> sourceNeuron;  // Source neuron ID
+        std::vector<uint64_t> destinationNeuron;  // Dest neuron ID
+        std::vector<float> weight;
+        std::vector<uint32_t> delay;
+        std::vector<uint8_t> synapseType;  // SynapseType enum
+        std::vector<uint8_t> plasticityFlags;  // Packed flags
+        
+        // Short-term plasticity
+        std::vector<float> shortTermDepression;
+        std::vector<float> shortTermFacilitation;
+        std::vector<float> lastPreSpikeTime;
+        std::vector<float> lastPostSpikeTime;
+        
+        // Eligibility trace
+        std::vector<float> eligibilityTrace;
+        
+        // Synaptic efficacy (use-dependent modulation)
+        std::vector<float> efficacy;
+        
+        // For fast index-to-address translation
+        std::vector<uint64_t> indexToId;
+        
+        SynapseBlock() {}
+        
+        // Initialize block with given capacity
+        void initialize(size_t capacity);
+    };
+    
+    /**
+     * Lock-free free list for available synapses
+     */
+    std::atomic<SynapseId*> freeList_;
+    
+    /**
+     * Vector of synapse blocks for scalable memory management
+     */
+    std::vector<std::unique_ptr<SynapseBlock>> blocks_;
+    
+    /**
+     * Current block we're allocating from (for fast allocation)
+     */
+    std::atomic<SynapseBlock*> currentBlock_;
+    
+    /**
+     * Current index in current block for allocation
+     */
+    std::atomic<size_t> currentIndex_;
+    
+    /**
+     * Total number of synapses allocated
+     */
+    size_t size_;
+    
+    /**
+     * Total capacity of the pool
+     */
+    size_t capacity_;
+    
+    /**
+     * Statistics
+     */
+    std::atomic<size_t> allocatedCount_;
+    std::atomic<size_t> availableCount_;
+    
+    /**
+     * For thread-safe access to blocks
+     */
+    mutable std::mutex blocksMutex_;
+    
+    /**
+     * Mapping from SynapseId to SynapseIndex (for fast lookup)
+     */
+    std::vector<SynapseIndex> idToIndex_;
+    
+    /**
+     * Mapping from SynapseIndex to SynapseId (for fast lookup)
+     */
+    std::vector<SynapseId> indexToId_;
+    
+    /**
+     * Free list for deallocated synapses (optimization for temporary reuse)
+     */
+    std::vector<SynapseIndex> freeListIndex_;
+    std::atomic<size_t> freeListTop_;
+    
+    /**
+     * Add a new block to the pool
+     */
+    void addBlock();
+    
+    /**
+     * Initialize all synapses in a block
+     */
+    void initializeBlock(SynapseBlock* block);
+    
+    /**
+     * Cleanup a deallocated synapse
+     */
+    void cleanupSynapse(SynapseBlock* block, SynapseIndex index);
+    
+    /**
+     * Initialize global mapping tables
+     */
+    void initializeMappings();
+    
+    /**
+     * Rebuild mapping tables (when blocks change)
+     */
+    void rebuildMappings();
+};
+
+// Global pool instances (managed by Brain)
+extern NeuronPool gNeuronPool;
+extern SynapsePool gSynapsePool;
+
+// Function to initialize global pools
+void initializeGlobalPools(size_t neuronCount = 1024, size_t synapseCount = 1024);
+
+// Function to reset global pools
+void resetGlobalPools();
+
+// Function to check if MemoryPool is enabled
+bool isMemoryPoolEnabled();
+
+// Legacy allocation function (for backward compatibility)
+Neuron* legacyAllocateNeuron();
+void legacyDeallocateNeuron(Neuron* neuron);
+
+Synapse* legacyAllocateSynapse();
+void legacyDeallocateSynapse(Synapse* synapse);
+
+// Migration helper: switch from std::make_unique to MemoryPool
+void enableMemoryPoolMigration(bool enable = true);
+
+} // namespace nlm
 
 // Template implementation must be in header for generic types
 

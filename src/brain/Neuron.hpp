@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <cstring>  // For memset and memcpy
 
 namespace nlm {
 
@@ -10,38 +11,121 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
-struct NeuronState {
-    MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
-    MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+// Optimized neuron data layout using Structure-of-Arrays (SoA) for cache efficiency
+// This layout is much more efficient for batch processing and SIMD operations
+struct NeuronSOA {
+    // All neuron state variables stored in separate arrays (contiguous memory)
+    std::vector<MembranePotential> membranePotentials;     // Current membrane potential (mV)
+    std::vector<MembranePotential> restingPotentials;     // Resting potential (mV)
+    std::vector<MembranePotential> thresholds;            // Firing threshold (mV)
+    std::vector<MembranePotential> resetPotentials;       // Post-spike reset value (mV)
+    std::vector<MembranePotential> leakConductances;      // Leak conductance (nS)
+    std::vector<MembranePotential> synapticConductances;  // Synaptic conductance (nS)
+    std::vector<FiringRate> firingRates;                 // Current firing rate (Hz)
+    std::vector<FiringState> firingStates;               // Current firing state
+    std::vector<uint32_t> refractoryRemainings;          // Steps remaining in refractory period
+    std::vector<uint32_t> refractoryPeriods;             // Total refractory period (steps)
+    std::vector<float> adaptationVariables;              // For spike-frequency adaptation
+    std::vector<float> lastSpikeTimes;                   // Timestamp of last spike (-1 if none)
     
-    NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
-        , synapseConductance(0.0f)
-        , firingRate(0.0f)
-        , firingState(FiringState::Resting)
-        , refractoryRemaining(0)
-        , refractoryPeriod(5)
-        , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+    // Performance metadata
+    size_t capacity;                                      // Allocated capacity
+    bool isInitialized;                                   // Initialization flag
+    
+    NeuronSOA() : capacity(0), isInitialized(false) {}
+    
+    // Initialize with given capacity
+    void initialize(size_t capacity) {
+        this->capacity = capacity;
+        membranePotentials.resize(capacity);
+        restingPotentials.resize(capacity);
+        thresholds.resize(capacity);
+        resetPotentials.resize(capacity);
+        leakConductances.resize(capacity);
+        synapticConductances.resize(capacity);
+        firingRates.resize(capacity);
+        firingStates.resize(capacity);
+        refractoryRemainings.resize(capacity);
+        refractoryPeriods.resize(capacity);
+        adaptationVariables.resize(capacity);
+        lastSpikeTimes.resize(capacity);
+        isInitialized = true;
+        
+        // Set default values
+        const MembranePotential defaultMembranePotential = -70.0f;
+        const MembranePotential defaultRestingPotential = -70.0f;
+        const MembranePotential defaultThreshold = -55.0f;
+        const MembranePotential defaultResetPotential = -70.0f;
+        const MembranePotential defaultLeakConductance = 10.0f;
+        
+        const FiringState defaultFiringState = FiringState::Resting;
+        const float defaultLastSpikeTime = -1.0f;
+        const uint32_t defaultRefractoryPeriod = 5;
+        
+        for (size_t i = 0; i < capacity; ++i) {
+            membranePotentials[i] = defaultMembranePotential;
+            restingPotentials[i] = defaultRestingPotential;
+            thresholds[i] = defaultThreshold;
+            resetPotentials[i] = defaultResetPotential;
+            leakConductances[i] = defaultLeakConductance;
+            synapticConductances[i] = 0.0f;
+            firingRates[i] = 0.0f;
+            firingStates[i] = defaultFiringState;
+            refractoryRemainings[i] = 0;
+            refractoryPeriods[i] = defaultRefractoryPeriod;
+            adaptationVariables[i] = 0.0f;
+            lastSpikeTimes[i] = defaultLastSpikeTime;
+        }
+    }
+    
+    // Reset neuron to default state
+    void resetNeuron(size_t index) {
+        if (index < capacity) {
+            membranePotentials[index] = -70.0f;
+            restingPotentials[index] = -70.0f;
+            thresholds[index] = -55.0f;
+            resetPotentials[index] = -70.0f;
+            leakConductances[index] = 10.0f;
+            synapticConductances[index] = 0.0f;
+            firingRates[index] = 0.0f;
+            firingStates[index] = FiringState::Resting;
+            refractoryRemainings[index] = 0;
+            refractoryPeriods[index] = 5;
+            adaptationVariables[index] = 0.0f;
+            lastSpikeTimes[index] = -1.0f;
+        }
+    }
+    
+    // Fast batch operation for all neurons
+    void resetAll() {
+        const MembranePotential defaultMembranePotential = -70.0f;
+        const MembranePotential defaultRestingPotential = -70.0f;
+        const MembranePotential defaultThreshold = -55.0f;
+        const MembranePotential defaultResetPotential = -70.0f;
+        const MembranePotential defaultLeakConductance = 10.0f;
+        
+        const FiringState defaultFiringState = FiringState::Resting;
+        const float defaultLastSpikeTime = -1.0f;
+        const uint32_t defaultRefractoryPeriod = 5;
+        
+        for (size_t i = 0; i < capacity; ++i) {
+            membranePotentials[i] = defaultMembranePotential;
+            restingPotentials[i] = defaultRestingPotential;
+            thresholds[i] = defaultThreshold;
+            resetPotentials[i] = defaultResetPotential;
+            leakConductances[i] = defaultLeakConductance;
+            synapticConductances[i] = 0.0f;
+            firingRates[i] = 0.0f;
+            firingStates[i] = defaultFiringState;
+            refractoryRemainings[i] = 0;
+            refractoryPeriods[i] = defaultRefractoryPeriod;
+            adaptationVariables[i] = 0.0f;
+            lastSpikeTimes[i] = defaultLastSpikeTime;
+        }
+    }
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Lightweight neuron wrapper for backward compatibility and individual neuron access
 class Neuron {
 public:
     // Create neuron with ID

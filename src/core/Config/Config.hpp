@@ -93,13 +93,39 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+// Performance optimization flags
+    void enableMemoryPool(bool enabled) { useMemoryPool_ = enabled; }
+    bool isMemoryPoolEnabled() const { return useMemoryPool_; }
+    
+    // Configuration validation methods
+    static bool validateKey(const std::string& key, const std::string& value);
+    static bool validateKeyValuePair(const std::string& key, const std::string& value);
+    static std::string getValidationError(const std::string& key, const std::string& value);
+    
+    // Configuration validation settings
+    static void enableStrictValidation(bool enabled);
+    static bool isStrictValidationEnabled();
+    static std::string validateConfig(const std::unordered_map<std::string, std::string>& config);
+    static std::string validateConfigFile(const std::string& filepath);
+    
+    // Set values with validation
+    bool set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime, bool validate = true);
+    bool set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime, bool validate = true);
+    bool set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime, bool validate = true);
+    bool set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime, bool validate = true);
+    bool set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime, bool validate = true);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Validation and performance settings
+    bool useMemoryPool_;
+    static bool strictValidationEnabled_;
+    
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    ConfigValue stringToConfigValue(const std::string& value) const;
+    std::string configValueToString(const ConfigValue& value) const;
+    bool isValidValueType(const ConfigValue& value, const std::type_info& type) const;
 
 } // namespace nlm
