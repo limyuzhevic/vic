@@ -321,6 +321,29 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void recordInitialState(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("Recording initial brain state...");
+    // Simple implementation for learning experiment
+    auto* region = brain->getRegion(RegionId(1));
+    if (region) {
+        NLM_LOG_INFO("  Region 1 has " + std::to_string(region->getSynapses().size()) + " synapses");
+    }
+}
+
+void recordFinalState(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("Recording final brain state...");
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
+}
+
+void computeStatistics(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Learning Experiment Statistics ===");
+    NLM_LOG_INFO("  Total spikes during experiment: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain->getAverageFiringRate()));
+    NLM_LOG_INFO("  E/I balance: " + std::to_string(brain->getExcitationInhibitionRatio()));
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
