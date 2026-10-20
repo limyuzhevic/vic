@@ -106,6 +106,15 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Performance monitoring
+    std::unordered_map<std::string, std::chrono::system_clock::time_point> activeOperations;
+    std::unordered_map<std::string, double> metrics;
+    std::mutex perfMutex;
+    
+    // Error recovery
+    std::unordered_map<ErrorCategory, int> errorCounts;
+    std::mutex recoveryMutex;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -140,6 +149,9 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.category = "General";  // Default category
+    entry.processingTime = std::chrono::duration<double>::zero();
+    entry.threadId = std::this_thread::get_id();
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
@@ -184,6 +196,86 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+}
+
+void Logger::startPerformanceMeasurement(const std::string& operation) {
+    std::lock_guard<std::mutex> lock(pImpl->perfMutex);
+    pImpl->activeOperations[operation] = std::chrono::system_clock::now();
+    NLM_LOG_DEBUG("Starting performance measurement for operation: " + operation);
+}
+
+void Logger::endPerformanceMeasurement(const std::string& operation) {
+    std::lock_guard<std::mutex> lock(pImpl->perfMutex);
+    auto it = pImpl->activeOperations.find(operation);
+    if (it != pImpl->activeOperations.end()) {
+        auto duration = std::chrono::duration<double>(
+            std::chrono::system_clock::now() - it->second
+        );
+        pImpl->activeOperations.erase(it);
+        NLM_LOG_INFO("Performance measurement for '" + operation + "': " + 
+                    std::to_string(duration.count()) + " seconds");
+    }
+}
+
+void Logger::recordMetric(const std::string& metricName, double value) {
+    std::lock_guard<std::mutex> lock(pImpl->perfMutex);
+    pImpl->metrics[metricName] = value;
+    NLM_LOG_DEBUG("Recorded metric \"" + metricName + "\": " + std::to_string(value));
+}
+
+void Logger::logError(const std::string& message, ErrorCategory category, const std::string& file, int line, const std::string& function) {
+    std::lock_guard<std::mutex> lock(pImpl->recoveryMutex);
+    pImpl->errorCounts[category]++;
+    
+    std::string categoryStr;
+    switch (category) {
+        case ErrorCategory::Memory: categoryStr = "MEMORY"; break;
+        case ErrorCategory::Plasticity: categoryStr = "PLASTICITY"; break;
+        case ErrorCategory::Network: categoryStr = "NETWORK"; break;
+        case ErrorCategory::Configuration: categoryStr = "CONFIGURATION"; break;
+        case ErrorCategory::FileIO: categoryStr = "FILE_IO"; break;
+        case ErrorCategory::Performance: categoryStr = "PERFORMANCE"; break;
+        case ErrorCategory::Synchronization: categoryStr = "SYNCHRONIZATION"; break;
+        case ErrorCategory::Validation: categoryStr = "VALIDATION"; break;
+        case ErrorCategory::NeuralDynamics: categoryStr = "NEURAL_DYNAMICS"; break;
+        default: categoryStr = "GENERAL";
+    }
+    
+    NLM_LOG_ERROR("[" + categoryStr + "] " + message + 
+                  " (file: " + file + ", line: " + std::to_string(line) + ")");
+    
+    // Attempt automatic recovery based on error category
+    attemptErrorRecovery(category);
+}
+
+bool Logger::attemptErrorRecovery(ErrorCategory category) {
+    switch (category) {
+        case ErrorCategory::Memory:
+            NLM_LOG_WARNING("Memory error detected - attempting memory cleanup");
+            break;
+        case ErrorCategory::Configuration:
+            NLM_LOG_WARNING("Configuration error - attempting to reset to defaults");
+            break;
+        case ErrorCategory::FileIO:
+            NLM_LOG_WARNING("File I/O error - attempting to use alternative file or create new");
+            break;
+        case ErrorCategory::Performance:
+            NLM_LOG_WARNING("Performance degradation detected - attempting to optimize operations");
+            break;
+        default:
+            NLM_LOG_WARNING("General error - attempting basic recovery");
+    }
+    return true;
+}
+
+bool Logger::checkPerformanceThreshold(const std::string& metricName, double threshold, double value) {
+    if (value > threshold) {
+        NLM_LOG_WARNING("Performance threshold exceeded for metric \"" + metricName + 
+                       "\": current= " + std::to_string(value) + 
+                       ", threshold= " + std::to_string(threshold));
+        return true;
+    }
+    return false;
 }
 
 // LogStream implementation

@@ -18,6 +18,28 @@ enum class LogLevel {
     Critical = 4
 };
 
+// Performance alert levels
+enum class AlertLevel {
+    Info = 0,
+    Warning = 1,
+    Error = 2,
+    Critical = 3
+};
+
+// Error categories for enhanced error handling
+enum class ErrorCategory {
+    General,
+    Memory,
+    Plasticity,
+    Network,
+    Configuration,
+    FileIO,
+    Performance,
+    Synchronization,
+    Validation,
+    NeuralDynamics
+};
+
 // Log entry structure
 struct LogEntry {
     LogLevel level;
@@ -26,6 +48,15 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    // Error category for enhanced error handling
+    std::string category;
+    
+    // Performance metrics
+    std::chrono::duration<double> processingTime;
+    
+    // Thread ID for debugging
+    std::thread::id threadId;
 };
 
 // Logger interface
@@ -98,12 +129,40 @@ public:
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
-    // Get global logger instance
+// Get global logger instance
     static Logger& getGlobal();
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+// Performance monitoring
+    void startPerformanceMeasurement(const std::string& operation);
+    void endPerformanceMeasurement(const std::string& operation);
+    void recordMetric(const std::string& metricName, double value);
+    
+    // Performance statistics
+    double getAverageExecutionTime(const std::string& operation) const;
+    double getMinExecutionTime(const std::string& operation) const;
+    double getMaxExecutionTime(const std::string& operation) const;
+    std::vector<double> getExecutionTimes(const std::string& operation) const;
+    
+    // Performance threshold checking and alerts
+    bool checkPerformanceThreshold(const std::string& metricName, double threshold, double value);
+    void setPerformanceAlert(const std::string& metricName, double threshold, AlertLevel level = AlertLevel::Warning);
+    
+    // Performance profiling
+    void startProfiling(const std::string& profileName);
+    void endProfiling(const std::string& profileName);
+    std::string generatePerformanceReport() const;
+    
+    // Memory usage monitoring
+    void recordMemoryUsage(size_t memoryBytes);
+    size_t getCurrentMemoryUsage() const;
+    size_t getPeakMemoryUsage() const;
+    
+    // Performance optimization suggestions
+    std::vector<std::string> getOptimizationSuggestions() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
