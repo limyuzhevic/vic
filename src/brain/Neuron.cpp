@@ -159,10 +159,12 @@ void Neuron::clearSpikeHistory() {
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Add synapse to incoming list for efficient spike propagation
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Add synapse to outgoing list for efficient spike propagation
     pImpl->outgoingSynapses.push_back(handle);
 }
 

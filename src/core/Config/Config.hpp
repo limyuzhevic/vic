@@ -93,6 +93,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration source tracking
+    struct ConfigSourceInfo {
+        std::string key;
+        ConfigSource source;
+        std::string valueStr;
+    };
+    std::vector<ConfigSourceInfo> getSourceInfo() const;
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    bool hasSource(ConfigSource source) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +116,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateEntry(const ConfigEntry& entry) const;
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const ConfigValue& value);
 };
 
 } // namespace nlm

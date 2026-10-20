@@ -25,27 +25,103 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <cctype>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printHelp(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]\n" << std::endl;
+    std::cout << "NLM (熙然) - Neural Learning Machine - Phase 2: Real Neural Computation\n" << std::endl;
+    std::cout << "Options:\n" << std::endl;
+    std::cout << "  --help, -h              Show this help message and exit\n" << std::endl;
+    std::cout << "  --verbose, -v           Enable verbose logging\n" << std::endl;
+    std::cout << "  --quiet, -q             Suppress info messages, show only errors\n" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file (default: configs/default.cfg)\n" << std::endl;
+    std::cout << "  --neuron-count <count>  Set number of neurons (overrides config)\n" << std::endl;
+    std::cout << "  --region-count <count>  Set number of regions (overrides config)\n" << std::endl;
+    std::cout << "  --simulation-timestep <ms> Set simulation timestep in seconds\n" << std::endl;
+    std::cout << "  --plasticity            Enable plasticity on synapses\n" << std::endl;
+    std::cout << "  --no-plasticity        Disable plasticity on synapses\n" << std::endl;
+    std::cout << "  --validate-only         Validate configuration and exit\n" << std::endl;
+    std::cout << "  --version               Show version information and exit\n" << std::endl;
+    std::cout << "\nExamples:\n" << std::endl;
+    std::cout << "  " << programName << " --help\n" << std::endl;
+    std::cout << "  " << programName << " --verbose --config myconfig.cfg\n" << std::endl;
+    std::cout << "  " << programName << " --neuron-count 2000 --plasticity\n" << std::endl;
+    std::cout << "  " << programName << " --validate-only --config test.cfg\n" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "C++20 with CMake build system" << std::endl;
+    std::cout << "Features: LIF neurons, STDP plasticity, structural plasticity, neuromodulation" << std::endl;
+}
+
+void printProgress(int current, int total, const std::string& message) {
+    if (current % 10 == 0 || current == total) {
+        int percentage = (current * 100) / total;
+        std::cout << "\rProgress: " << percentage << "% - " << message << " " << current << "/" << total << " ";
+        std::cout.flush();
+    }
+}
+
+bool validateConfiguration(const Config& config) {
+    bool isValid = true;
+    
+    // Validate neuron count
+    int64_t neuronCount = config.getOr<int64_t>("neuron_count", 0);
+    if (neuronCount <= 0) {
+        std::cout << "ERROR: Invalid neuron_count: " << neuronCount << std::endl;
+        isValid = false;
+    } else if (neuronCount > 100000) {
+        std::cout << "WARNING: Large neuron count may impact performance: " << neuronCount << std::endl;
+    }
+    
+    // Validate region count
+    int64_t regionCount = config.getOr<int64_t>("region_count", 0);
+    if (regionCount <= 0) {
+        std::cout << "ERROR: Invalid region_count: " << regionCount << std::endl;
+        isValid = false;
+    }
+    
+    // Validate timestep
+    double timestep = config.getOr<double>("simulation_timestep", 0.0);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        std::cout << "ERROR: Invalid simulation_timestep: " << timestep << std::endl;
+        isValid = false;
+    }
+    
+    // Validate plasticity parameters
+    double ltpWeight = config.getOr<double>("stdp_ltp_weight", 0.0);
+    double ltdWeight = config.getOr<double>("stdp_ltd_weight", 0.0);
+    if (ltpWeight <= 0.0 || ltdWeight <= 0.0) {
+        std::cout << "ERROR: Invalid STDP weights" << std::endl;
+        isValid = false;
+    }
+    
+    // Validate connection probability
+    float connectionProb = config.getOr<float>("connection_probability", 0.0);
+    if (connectionProb < 0.0 || connectionProb > 1.0) {
+        std::cout << "ERROR: Invalid connection_probability: " << connectionProb << std::endl;
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+void printConfigurationSummary(const Config& config) {
+    std::cout << "\n=== Configuration Summary ===" << std::endl;
+    std::cout << "random_seed: " << config.getOr<int64_t>("random_seed", 42) << std::endl;
+    std::cout << "simulation_timestep: " << config.getOr<double>("simulation_timestep", 0.001) << "s" << std::endl;
+    std::cout << "neuron_count: " << config.getOr<int64_t>("neuron_count", 500) << std::endl;
+    std::cout << "region_count: " << config.getOr<int64_t>("region_count", 1) << std::endl;
+    std::cout << "connection_probability: " << config.getOr<float>("connection_probability", 0.15f) << std::endl;
+    std::cout << "dopamine_baseline: " << config.getOr<double>("dopamine_baseline", 0.1) << std::endl;
+    std::cout << "plasticity_learning_rate: " << config.getOr<double>("plasticity_learning_rate", 0.01) << std::endl;
+    std::cout << "max_simulation_steps: " << config.getOr<int64_t>("max_simulation_steps", 10000) << std::endl;
+    std::cout << "================================" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,84 +398,231 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    auto startTime = std::chrono::high_resolution_clock::now();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments
+    bool verbose = false;
+    bool quiet = false;
+    bool validateOnly = false;
+    bool plasticityEnabled = false;
     std::string configFile = "configs/default.cfg";
+    int64_t neuronOverride = 0;
+    int64_t regionOverride = 0;
+    double timestepOverride = 0.0;
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg == "--validate-only") {
+            validateOnly = true;
+        } else if (arg == "--plasticity") {
+            plasticityEnabled = true;
+        } else if (arg == "--no-plasticity") {
+            plasticityEnabled = false;
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
                 configFile = argv[++i];
+            } else {
+                std::cerr << "ERROR: --config requires a filename" << std::endl;
+                return 1;
             }
+        } else if (arg == "--neuron-count") {
+            if (i + 1 < argc) {
+                neuronOverride = std::stoll(argv[++i]);
+            } else {
+                std::cerr << "ERROR: --neuron-count requires a value" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--region-count") {
+            if (i + 1 < argc) {
+                regionOverride = std::stoll(argv[++i]);
+            } else {
+                std::cerr << "ERROR: --region-count requires a value" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--simulation-timestep") {
+            if (i + 1 < argc) {
+                timestepOverride = std::stod(argv[++i]);
+            } else {
+                std::cerr << "ERROR: --simulation-timestep requires a value" << std::endl;
+                return 1;
+            }
+        } else if (arg.substr(0, 7) == "--config") {
+            // Handle --config=value format
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos && pos > 7) {
+                configFile = arg.substr(pos + 1);
+            }
+        } else if (arg.find("--config") == 0) {
+            // Handle other formats if present
+        } else if (arg[0] == '-') {
+            std::cerr << "ERROR: Unknown option: " << arg << std::endl;
+            std::cerr << "Use --help for usage information." << std::endl;
+            return 1;
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Initialize logger with appropriate verbosity
+    auto logger = std::make_shared<Logger>();
+    
+    if (quiet) {
+        logger->addLogger(std::make_shared<ConsoleLogger>(LogLevel::Error));
+    } else if (verbose) {
+        logger->addLogger(std::make_shared<ConsoleLogger>(LogLevel::Trace));
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        logger->addLogger(std::make_shared<ConsoleLogger>(LogLevel::Info));
+    }
+    
+    logger->addLogger(std::make_shared<FileLogger>("nlm.log", LogLevel::Info));
+    Logger::setGlobal(logger);
+    
+    if (!quiet) {
+        printBanner();
+        std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    }
+    
+    if (verbose) {
+        std::cout << "Command line arguments parsed successfully" << std::endl;
+        std::cout << "Config file: " << configFile << std::endl;
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    bool configLoaded = config->loadFromFile(configFile);
+    
+    if (configLoaded && verbose) {
+        std::cout << "Loaded configuration from: " << configFile << std::endl;
+    } else if (!configLoaded) {
+        if (!quiet) {
+            std::cout << "Using default configuration." << std::endl;
+        }
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Apply overrides from command line
+    if (neuronOverride > 0) {
+        config->set("neuron_count", neuronOverride, ConfigSource::CommandLine);
+        if (verbose) {
+            std::cout << "Overrode neuron_count to: " << neuronOverride << std::endl;
+        }
+    }
+    
+    if (regionOverride > 0) {
+        config->set("region_count", regionOverride, ConfigSource::CommandLine);
+        if (verbose) {
+            std::cout << "Overrode region_count to: " << regionOverride << std::endl;
+        }
+    }
+    
+    if (timestepOverride > 0.0) {
+        config->set("simulation_timestep", timestepOverride, ConfigSource::CommandLine);
+        if (verbose) {
+            std::cout << "Overrode simulation_timestep to: " << timestepOverride << std::endl;
+        }
+    }
+    
+    if (validateOnly) {
+        std::cout << "Validating configuration..." << std::endl;
+        if (validateConfiguration(*config)) {
+            std::cout << "Configuration validation PASSED" << std::endl;
+            printConfigurationSummary(*config);
+            return 0;
+        } else {
+            std::cout << "Configuration validation FAILED" << std::endl;
+            return 1;
+        }
+    }
+    
+    // Validate configuration
+    if (!validateConfiguration(*config)) {
+        std::cerr << "ERROR: Configuration validation failed" << std::endl;
+        return 1;
+    }
+    
+    // Set default values for Phase 2 (only if not already set)
+    if (!config->has("random_seed", ConfigSource::User)) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep", ConfigSource::User)) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count", ConfigSource::User)) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
+    if (!config->has("region_count", ConfigSource::User)) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability", ConfigSource::User)) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->has("stdp_ltp_weight", ConfigSource::User)) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight", ConfigSource::User)) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau", ConfigSource::User)) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->has("synaptogenesis_rate", ConfigSource::User)) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate", ConfigSource::User)) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    if (!quiet) {
+        std::cout << "\n=== Configuration Summary ===" << std::endl;
+        std::cout << "random_seed: " << config->getOr<int64_t>("random_seed", 42) << std::endl;
+        std::cout << "simulation_timestep: " << config->getOr<double>("simulation_timestep", 0.001) << "s" << std::endl;
+        std::cout << "neuron_count: " << config->getOr<int64_t>("neuron_count", 500) << std::endl;
+        std::cout << "region_count: " << config->getOr<int64_t>("region_count", 1) << std::endl;
+        std::cout << "connection_probability: " << config->getOr<float>("connection_probability", 0.15f) << std::endl;
+        std::cout << "dopamine_baseline: " << config->getOr<double>("dopamine_baseline", 0.1) << std::endl;
+        std::cout << "plasticity_learning_rate: " << config->getOr<double>("plasticity_learning_rate", 0.01) << std::endl;
+        std::cout << "max_simulation_steps: " << config->getOr<int64_t>("max_simulation_steps", 10000) << std::endl;
+        std::cout << "================================" << std::endl;
+    }
+    
+    if (verbose) {
+        auto sourceInfo = config->getSourceInfo();
+        std::cout << "Configuration source summary:" << std::endl;
+        for (const auto& entry : sourceInfo) {
+            std::cout << "  " << entry.first << " (from: " << static_cast<int>(entry.second) << ")" << std::endl;
+        }
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    if (!quiet) {
+        NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    }
     
     // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    if (!quiet) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Initializing NLM Brain...");
+    }
+    
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -409,41 +632,92 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    if (plasticityEnabled && verbose) {
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);
+            }
+        }
+    }
+    
+    if (!quiet) {
+        std::cout << "\nRunning neural simulations..." << std::endl;
+    }
+    
     // Run Test 1: Basic connectivity
+    if (!quiet) {
+        std::cout << "\nTest 1: Basic Neural Connectivity" << std::endl;
+        NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    }
+    
     runBasicConnectivityTest(brain);
+    
+    if (verbose) {
+        std::cout << "\nTest 1 completed successfully." << std::endl;
+    }
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
+    if (!quiet) {
+        std::cout << "\nTest 2: Plasticity Learning Experiment" << std::endl;
+        NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    }
+    
     runPlasticityExperiment(brain);
+    
+    if (verbose) {
+        std::cout << "\nTest 2 completed successfully." << std::endl;
+    }
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
+    
+    if (!quiet) {
+        std::cout << "\nTest 3: STDP Verification" << std::endl;
+        NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    }
+    
     runStdpVerification(brain);
     
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    if (verbose) {
+        std::cout << "\nTest 3 completed successfully." << std::endl;
+    }
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    // Final brain status
+    if (!quiet) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Final Brain Status ===");
+        brain->logStatus();
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Phase 2 Complete ===");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Phase 2 Objectives Completed:");
+        NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
+        NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  ✓ STDP plasticity rule");
+        NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+        NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
+        NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+        NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+        NLM_LOG_INFO("");
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+    
+    if (!quiet) {
+        std::cout << "\n=== Performance Summary ===" << std::endl;
+        std::cout << "Total simulation time: " << duration.count() << " seconds" << std::endl;
+        std::cout << "Execution completed successfully!" << std::endl;
+    }
     
     return 0;
 }

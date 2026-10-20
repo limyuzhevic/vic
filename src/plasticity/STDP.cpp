@@ -96,7 +96,7 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
+    // Clamp weight to bounds [minWeight, maxWeight]
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);

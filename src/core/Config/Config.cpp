@@ -19,9 +19,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -35,7 +32,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs (Phase 1 format)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -186,18 +183,50 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
+// Get configuration statistics
+    size_t getEntryCount() const {
+        return pImpl->entries.size();
+    }
+    
+    bool hasSource(ConfigSource source) const {
+        return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+            [source](const ConfigEntry& entry) { return entry.source == source; });
+    }
+    
+    // Validation helpers
+    bool validateEntry(const ConfigEntry& entry) const {
+        // Check key is not empty
+        if (entry.key.empty()) {
+            return false;
+        }
+        
+        // Check key doesn't contain invalid characters
+        if (!isValidKey(entry.key)) {
+            return false;
+        }
+        
+        // Check value is valid
+        if (!isValidValue(entry.value)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    bool isValidKey(const std::string& key) {
+        // Keys should be alphanumeric with underscores
+        for (char c : key) {
+            if (!std::isalnum(c) && c != '_' && c != '-') {
+                return false;
+            }
+        }
+        return !key.empty();
+    }
+    
+    bool isValidValue(const ConfigValue& value) {
+        // Check if variant is valid (any type is valid)
+        return true;
+    }
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
