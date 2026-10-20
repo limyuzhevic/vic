@@ -231,39 +231,92 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize memory systems
+    pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    pImpl->semanticMemory = std::make_unique<SemanticMemory>();
+    pImpl->semanticMemory->initialize(this);
+    
+    pImpl->proceduralMemory = std::make_unique<ProceduralMemory>();
+    pImpl->proceduralMemory->initialize(this);
+    
+    pImpl->associativeMemory = std::make_unique<AssociativeMemory>();
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
+    pImpl->planner = std::make_unique<NeuralPlanner>();
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    pImpl->conceptFormation = std::make_unique<ConceptFormation>();
     pImpl->conceptFormation->initialize(this);
     
+    pImpl->selfModel = std::make_unique<SelfModel>();
+    pImpl->selfModel->initialize(this);
+    
+    pImpl->socialLearning = std::make_unique<SocialLearning>();
+    pImpl->socialLearning->initialize(this);
+    
+    pImpl->spatialRepresentation = std::make_unique<SpatialRepresentation>();
+    pImpl->spatialRepresentation->initialize(this);
+    
+    // Initialize attention
+    pImpl->attention = std::make_unique<AttentionalSelection>();
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize development system
+    pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->novelty = std::make_unique<Novelty>();
     pImpl->novelty->initialize(this);
+    
+    pImpl->curiosity = std::make_unique<Curiosity>();
     pImpl->curiosity->initialize(this);
+    
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    pImpl->predictionError->initialize(this);
+    
+    pImpl->dopamine = std::make_unique<Dopamine>();
+    pImpl->dopamine->initialize(this);
+    
+    // Initialize other neuromodulators
+    pImpl->serotonin = std::make_unique<Serotonin>();
+    pImpl->serotonin->initialize(this);
+    
+    pImpl->norepinephrine = std::make_unique<Norepinephrine>();
+    pImpl->norepinephrine->initialize(this);
+    
+    pImpl->acetylcholine = std::make_unique<Acetylcholine>();
+    pImpl->acetylcholine->initialize(this);
+    
+    // Configure checkpoint manager
+    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Store spike in episodic memory
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->recordSpike(pImpl->currentStep, event.destination_neuron, event.weight);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -286,9 +339,18 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Register spike handler for neuromodulation
+    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+        // Update novelty detection
+        if (pImpl->novelty) {
+            pImpl->novelty->update(event.destination_neuron);
+        }
+        
+        // Update curiosity
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(event.destination_neuron);
+        }
+    });
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

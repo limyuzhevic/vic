@@ -93,7 +93,25 @@ target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm PRIVATE /bigobj)
 endif()
+
+# Add definitions for Windows compatibility
+if(WIN32)
+    target_compile_definitions(pynlm PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+# Install Python package metadata
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/exceptions.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/utils.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/examples.py
+        DESTINATION pynlm)
+
+# Package configuration for pip
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
+               ${CMAKE_CURRENT_SOURCE_DIR}/setup.py
+               @ONLY)
 
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
