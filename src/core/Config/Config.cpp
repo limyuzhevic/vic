@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "AdvancedConfigParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,6 +21,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    // First, try to use the advanced JSON/YAML parser
+    if (nlm::loadAdvancedConfig(filepath, *this)) {
+        return true;
+    }
+
+    // Fall back to the simple key=value format for backward compatibility
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -79,17 +87,42 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Determine file format based on extension
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    bool success = false;
+    if (ext == ".json" || ext == ".cfg") {
+        success = nlm::saveAdvancedConfig(filepath, *this, "json");
+    } else if (ext == ".yaml" || ext == ".yml") {
+        success = nlm::saveAdvancedConfig(filepath, *this, "yaml");
+    } else {
+        // Fallback to simple format for backward compatibility
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            // Format value based on type
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        success = true;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+    return success;
 }
 
 template<typename T>
