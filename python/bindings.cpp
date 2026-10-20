@@ -353,6 +353,129 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Advanced System Access Methods
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attentional selection system");
+
+    // Advanced Neuromodulation Controls
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine neuromodulator")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity neuromodulator")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty neuromodulator")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error signal")
+    .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+         py::arg("signal"),
+         "Apply neuromodulatory signal");
+
+    // Advanced Development System Controls
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    .def("updateDevelopment", &Brain::develop,
+         "Update developmental processes")
+    .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+         py::arg("stage"),
+         "Set developmental stage");
+
+    // Performance Monitoring
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+         py::return_value_policy::reference_internal,
+         "Get random number generator")
+    .def("getPerformanceMetrics", [](const Brain& brain) {
+        // Return comprehensive performance metrics
+        return std::make_tuple(
+            brain.getTotalNeuronCount(),
+            brain.getTotalSynapseCount(),
+            brain.getTotalSpikeCount(),
+            brain.getFiringNeuronCount(),
+            brain.getAverageFiringRate(),
+            brain.getExcitationInhibitionRatio()
+        );
+    }, "Get performance metrics")
+    .def("getPerformanceSummary", [](const Brain& brain) {
+        std::stringstream ss;
+        ss << "Performance Summary:";
+        ss << "\n  Neurons: " << brain.getTotalNeuronCount();
+        ss << "\n  Synapses: " << brain.getTotalSynapseCount();
+        ss << "\n  Total Spikes: " << brain.getTotalSpikeCount();
+        ss << "\n  Firing Neurons: " << brain.getFiringNeuronCount();
+        ss << "\n  Avg Firing Rate: " << brain.getAverageFiringRate();
+        ss << "\n  E/I Ratio: " << brain.getExcitationInhibitionRatio();
+        return ss.str();
+    }, "Get performance summary");
+
+    // Experimental Features
+    .def("getMostActiveNeurons", [](Brain& brain, size_t count) {
+        return brain.getSpikeSystem()->getMostActiveNeurons(count);
+    }, py::arg("count"),
+         "Get most active neurons")
+    .def("getTotalSpikeEventCount", &Brain::getPendingSpikeEventCount,
+         "Get pending spike events")
+    .def("getNeuralConnectivityMatrix", [](Brain& brain) {
+        // Generate simple connectivity statistics
+        auto regions = brain.getRegions();
+        std::vector<std::vector<float>> connectivity;
+        for (const auto& region : regions) {
+            std::vector<float> row;
+            for (const auto& synapse : region->getSynapses()) {
+                row.push_back(synapse->getWeight());
+            }
+            connectivity.push_back(row);
+        }
+        return connectivity;
+    }, "Get neural connectivity matrix")
+    .def("getDevelopmentStatistics", [](Brain& brain) {
+        // Get developmental statistics
+        auto stage = brain.getDevelopmentalStage();
+        return std::make_tuple(
+            static_cast<int>(stage),
+            brain.getTotalNeuronCount(),
+            brain.getTotalSynapseCount()
+        );
+    }, "Get developmental statistics");
+
+    // State Management
+    .def("saveState", &Brain::save,
+         py::arg("filepath"),
+         "Save brain state to file")
+    .def("loadState", &Brain::load,
+         py::arg("filepath"),
+         "Load brain state from file")
+    .def("getMemoryUsage", [](Brain& brain) {
+        // Return memory usage statistics (placeholder - implement actual memory monitoring)
+        return std::make_tuple(
+            brain.getTotalNeuronCount() * sizeof(float),  // Approximate neuron memory
+            brain.getTotalSynapseCount() * sizeof(float),  // Approximate synapse memory
+            static_cast<size_t>(1024)  // Placeholder for other memory
+        );
+    }, "Get memory usage statistics");
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
