@@ -1,9 +1,12 @@
 #include "Logger.hpp"
+#include "Errors.hpp"
+#include "ErrorHandling.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -23,6 +26,8 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    NLM_TRY_CATCH(false) // Don't rethrow
+    
     if (entry.level < pImpl->level) {
         return;
     }
@@ -47,10 +52,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set - with error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            NLM_THROW(ErrorCode::IO_ERROR, "Failed to write to log file: " + std::string(e.what()));
+        }
     }
 }
 
@@ -141,8 +150,15 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Log each entry with error handling
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        NLM_TRY_CATCH(false) // Don't rethrow
+        try {
+            logger->log(entry);
+        } catch (const std::exception& e) {
+            // If one logger fails, continue with others but log the error
+            std::cerr << "Warning: Logger failed: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -184,6 +200,9 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+    if (logger) {
+        NLM_LOG_INFO("Global logger set to new instance");
+    }
 }
 
 // LogStream implementation

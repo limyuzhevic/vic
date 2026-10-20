@@ -83,6 +83,20 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    # Performance optimization and profiling
+    src/performance/NLMPerformanceSystem.cpp
+    src/performance/PerformanceProfiler.cpp
+    src/performance/TimelineProfiler.cpp
+    src/performance/CallStackProfiler.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/CPUProfiler.cpp
+    src/performance/NetworkProfiler.cpp
+    src/performance/ThreadProfiler.cpp
+    src/performance/PerformanceMonitor.cpp
+    src/performance/BenchmarkRunner.cpp
+    src/performance/PerformanceAnalyzer.cpp
+    src/performance/PerformanceTuner.cpp
+    src/performance/PerformanceDashboard.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
