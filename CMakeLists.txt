@@ -92,7 +92,10 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Validation
+    src/core/Validation/Validator.cpp
+    
+    # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
