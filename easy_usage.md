@@ -143,14 +143,34 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Advanced Agent Setup
+
+For more complex scenarios with enabled features:
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+import pynlm
+
+# Setup with advanced features
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enable_all_features()  # Convenience method
+
+# Or individually
+agent.enable_reward_modulation(True)
+agent.enable_structural_plasticity(True)
+agent.enable_development(True)
+agent.enable_curiosity(True)
+
+# Run with metrics
+result = pynlm.run_simulation(brain, world, agent, 1000)
+print(f"Simulation complete! Total reward: {result.total_reward:.2f}")
+print(f"Average firing rate: {result.avg_firing_rate:.2f}")
 ```
 
 ---

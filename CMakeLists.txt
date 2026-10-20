@@ -83,9 +83,8 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
-)
+    # Advanced Configuration Management
+    src/core/AdvancedConfigManager.cpp
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
