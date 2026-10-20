@@ -77,10 +77,43 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+Alternative demo executables are also available:
+- `./nlm_phase3_demo` - Phase 3 world interaction demo
+- `./nlm_phase4_demo` - Phase 4 emerging cognition demo
+- `./nlm_phase6_demo` - Alternative Phase 6 demo (same as nlm)
+
+## Command Line Arguments
+
+### For the main `nlm` executable (Phase 6 demo):
+```bash
+./nlm [num_episodes] [steps_per_episode]
+
+Arguments:
+- num_episodes: Number of episodes to run (default: 5)
+- steps_per_episode: Steps per episode (default: 2000)
+```
+
+### For Phase 3 demo:
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+
+Arguments:
+- num_episodes: Number of episodes to run (default: 5)
+- steps_per_episode: Steps per episode (default: 200)
+```
+
+### For Phase 4 demo:
+```bash
+./nlm_phase4_demo [num_trials]
+
+Arguments:
+- num_trials: Number of trials to run (default: 50)
+```
 
 ## Project Structure
 
@@ -104,12 +137,14 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
+│   └── easy_usage.md    # Easy usage guide
+│   └── HOW_TO_USE.md     # Detailed usage guide
 ├── tests/
 └── configs/
 ```
@@ -228,3 +263,55 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Quick Start
+
+1. **Build the project:**
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run the Phase 6 integration demo (recommended):**
+   ```bash
+   ./nlm
+   ```
+   This will test all integrated brain systems and show whether they work together.
+
+3. **Or try older demos:**
+   ```bash
+   ./nlm_phase3_demo 10 500    # Phase 3 world interaction
+   ./nlm_phase4_demo 100      # Phase 4 emerging cognition
+   ```
+
+## Integration Testing
+
+The Phase 6 demo (`./nlm`) specifically tests:
+- **Memory integration:** Working and episodic memory systems
+- **Neuromodulation integration:** Dopamine, curiosity, novelty
+- **Prediction integration:** Prediction system functionality
+- **Development integration:** Age-dependent plasticity
+- **Checkpointing:** Save/load functionality
+- **Replay:** Memory replay and consolidation
+
+If all systems show "CONNECTED" or "WORKING" in the final output, then the integration was successful!
+
+## Improving NLM
+
+If you want to improve NLM:
+
+1. **Add new brain regions:** Look at `src/brain/NeuralRegion.hpp/cpp`
+2. **New plasticity rules:** Add to `src/plasticity/` directory
+3. **New neuromodulators:** Add to `src/neuromodulation/` directory
+4. **New memory types:** Add to `src/memory/` directory
+5. **Better prediction models:** Look at `src/prediction/` directory
+6. **Enhanced cognition:** Add to `src/cognition/` directory
+7. **Python bindings:** Add to `python/` directory
+
+The project is designed to be extensible - you can add new components without breaking existing functionality.
+
+---
+
+**Note:** The main `nlm` executable now runs the Phase 6 integration demo. For simpler usage, try the Phase 3 (`./nlm_phase3_demo`) or Phase 4 (`./nlm_phase4_demo`) demos first to understand the basic operation before trying the full Phase 6 integration.

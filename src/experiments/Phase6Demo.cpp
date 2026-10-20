@@ -1,19 +1,40 @@
+#include "Phase6IntegratedExperiment.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <iostream>
+
+using namespace nlm;
+
 /**
  * Phase 6 Demo - Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * 
+ * Usage:
+ *   ./nlm_phase6_demo [num_episodes] [steps_per_episode]
+ *   - num_episodes: Number of episodes to run (default: 5)
+ *   - steps_per_episode: Steps per episode (default: 2000)
  */
-
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
-#include <iostream>
-
-using namespace nlm;
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    
+    // Parse command line arguments
+    size_t numEpisodes = 5;
+    size_t stepsPerEpisode = 2000;
+    
+    if (argc > 1) {
+        numEpisodes = std::stoi(argv[1]);
+    }
+    if (argc > 2) {
+        stepsPerEpisode = std::stoi(argv[2]);
+    }
+    
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  Episodes: " << numEpisodes << std::endl;
+    std::cout << "  Steps per episode: " << stepsPerEpisode << std::endl;
+    std::cout << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -51,11 +72,11 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with configurable settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
     config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.maxSteps = stepsPerEpisode;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
