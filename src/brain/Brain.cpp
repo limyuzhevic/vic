@@ -510,9 +510,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Create sensory state representation from current neural activity
+        std::vector<float> sensoryState;
+        
+        // Get active sensory neuron activations
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        sensoryState.push_back(std::abs(state.membranePotential - state.restingPotential));
+                    }
+                }
+            }
+        }
+        
+        if (!sensoryState.empty()) {
+            // Use neural prediction system to process sensory state
+            pImpl->predictionSystem->updatePredictions(sensoryState);
+            
+            // Store in working memory as a pattern
+            pImpl->workingMemory->store("sensory_state", sensoryState, 0.3f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,14 +548,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get current working memory patterns for concept formation
+        auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        if (!memoryNeurons.empty()) {
+            // Create pattern representation from working memory
+            std::vector<float> pattern;
+            for (NeuronId neuronId : memoryNeurons) {
+                // Convert neuron ID to activation level
+                pattern.push_back(1.0f / memoryNeurons.size());
+            }
+            
+            // Process pattern through concept formation system
+            pImpl->conceptFormation->processPattern(pattern);
+            
+            // Store pattern in episodic memory for concept learning
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.conceptPattern = pattern;
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 11: Update cognition systems ==========
+    // Update neural planner with current sensory state
+    if (pImpl->planner) {
+        // Get current sensory state for planning
+        std::vector<float> sensoryState;
+        
+        // Collect sensory neuron activations
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        sensoryState.push_back(std::abs(state.membranePotential - state.restingPotential));
+                    }
+                }
+            }
+        }
+        
+        if (!sensoryState.empty()) {
+            pImpl->planner->updateState(sensoryState);
+            
+            // Get planned action from neural planner
+            auto plannedAction = pImpl->planner->getPlannedAction();
+            
+            // Store planned action in working memory
+            pImpl->workingMemory->store("planned_action", 
+                                      std::vector<float>(1, static_cast<float>(plannedAction)), 
+                                      0.8f);
+        }
+    }
+    
+    // Update concept formation with learned patterns
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get learned concepts from working memory
+        auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Form new concepts from recent memory patterns
+        std::vector<std::vector<float>> conceptPatterns;
+        if (memoryNeurons.size() >= 3) {
+            // Group similar memory patterns into concepts
+            // This is a simplified concept formation
+            std::vector<float> pattern;
+            for (NeuronId neuronId : memoryNeurons) {
+                pattern.push_back(1.0f / memoryNeurons.size());
+            }
+            conceptPatterns.push_back(pattern);
+            
+            // Process concepts for abstraction
+            pImpl->conceptFormation->processPatterns(conceptPatterns);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========

@@ -87,6 +87,48 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Connect to working memory: store sensory input patterns
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (workingMemory) {
+        // Store vision patterns in working memory
+        const auto& vision = percept.getVision();
+        if (!vision.empty()) {
+            std::vector<float> visionPattern = vision;
+            workingMemory->store("sensory_vision", visionPattern, 0.5f);
+            
+            // Also store as temporary memory trace
+            workingMemory->storeToNeuron(sensoryVision_.empty() ? INVALID_NEURON_ID : sensoryVision_[0]->getId(), 
+                                        vision.size() > 0 ? vision[0] : 0.0f);
+        }
+        
+        // Store touch patterns
+        const auto& touch = percept.getTouch();
+        if (!touch.empty()) {
+            workingMemory->store("sensory_touch", touch, 0.3f);
+        }
+        
+        // Store internal signals
+        const auto& intern = percept.getInternal();
+        if (!intern.empty()) {
+            workingMemory->store("sensory_internal", intern, 0.4f);
+        }
+        
+        // Store proprioception
+        const auto& proprio = percept.getProprioception();
+        if (!proprio.empty()) {
+            workingMemory->store("sensory_proprioception", proprio, 0.2f);
+        }
+        
+        // Trigger attention: new sensory input should attract attention
+        if (workingMemory->getActiveTraces() > 0) {
+            auto* attention = brain_->getAttention();
+            if (attention) {
+                // New sensory input triggers attentional selection
+                attention->processInputChange(vision.size() + touch.size() + intern.size() + proprio.size());
+            }
+        }
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -116,10 +158,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    const auto& proprioception = percept.getProprioception();
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprioception.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprioception[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -332,6 +374,60 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+// Access working memory content
+std::vector<float> AgentBrain::getWorkingMemoryContent(const std::string& key) const {
+    if (!brain_) return std::vector<float>();
+    
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (!workingMemory) return std::vector<float>();
+    
+    // This is a simplified implementation
+    // In a real implementation, you would query the working memory for the specific key
+    if (key == "sensory_vision") {
+        return previousVision_;
+    } else if (key == "sensory_touch") {
+        // Would need to store touch data separately
+        return std::vector<float>();
+    }
+    
+    return std::vector<float>();
+}
+
+bool AgentBrain::hasWorkingMemoryContent(const std::string& key) const {
+    if (!brain_) return false;
+    
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (!workingMemory) return false;
+    
+    // Simple check based on key
+    if (key == "sensory_vision") return !previousVision_.empty();
+    return false;
+}
+
+// Access attention system state
+float AgentBrain::getAttentionStrength() const {
+    if (!brain_) return 0.0f;
+    
+    auto* attention = brain_->getAttention();
+    if (!attention) return 0.0f;
+    
+    // Simplified attention strength calculation
+    return std::min(1.0f, static_cast<float>(previousVision_.size()) / 256.0f);
+}
+
+bool AgentBrain::isAttentive() const {
+    return getAttentionStrength() > 0.5f;
+}
+
+// Get development system information
+double AgentBrain::getDevelopmentalAge() const {
+    return developmentalAge_;
+}
+
+float AgentBrain::getPlasticityModifier() const {
+    return plasticityModifier_;
 }
 
 void AgentBrain::reset() {

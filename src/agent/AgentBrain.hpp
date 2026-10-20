@@ -52,6 +52,18 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Access working memory content
+    std::vector<float> getWorkingMemoryContent(const std::string& key) const;
+    bool hasWorkingMemoryContent(const std::string& key) const;
+    
+    // Access attention system state
+    float getAttentionStrength() const;
+    bool isAttentive() const;
+    
+    // Get development system information
+    double getDevelopmentalAge() const;
+    float getPlasticityModifier() const;
+    
     // Reset agent for new episode
     void reset();
     
