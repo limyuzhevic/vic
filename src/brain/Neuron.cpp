@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -23,8 +24,11 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Timestep configuration
+    TimestepDuration timestep;  // Current timestep for this neuron (ms)
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), timestep(0.001f) {} // 1ms default
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -259,10 +263,26 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
+void Neuron::setTimestep(TimestepDuration dt) {
+    pImpl->timestep = dt;
+}
+
+TimestepDuration Neuron::getTimestep() const {
+    return pImpl->timestep;
+}
+
+void Neuron::configureTimestepFromConfig(const Config& config) {
+    // Try to get timestep from configuration
+    auto timestepOpt = config.get<double>("simulation_timestep");
+    if (timestepOpt.has_value()) {
+        pImpl->timestep = static_cast<TimestepDuration>(timestepOpt.value());
+    }
+    // If not configured, keep default (1ms)
+}
+
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Use configured timestep instead of hardcoded 1ms
+    stepLIF(currentTime, pImpl->timestep);
 }
 
 void Neuron::reset() {

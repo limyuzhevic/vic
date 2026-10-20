@@ -98,23 +98,28 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+// LIF step function - returns true if neuron fired
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
+
     // Incoming signals (post-synaptic potentials)
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
-    
+
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
     MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
-    
+
     // Spike history (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
+
+    // Timestep configuration
+    void setTimestep(TimestepDuration dt);
+    TimestepDuration getTimestep() const;
+    void configureTimestepFromConfig(const Config& config);
     
     // Synapse management (incoming and outgoing)
     void addIncomingSynapse(SynapseHandle handle);
