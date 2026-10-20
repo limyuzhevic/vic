@@ -1,33 +1,50 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "brain/BrainManagement.hpp"
+#include "brain/BrainStep.hpp"
+#include "brain/BrainMemory.hpp"
+#include "brain/BrainNeuromodulation.hpp"
+#include "brain/BrainDevelopment.hpp"
+#include "brain/BrainPersistence.hpp"
+#include "brain/BrainAction.hpp"
+#include "core/Types/Types.hpp"
+#include "brain/NeuralRegion.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Logger/Logger.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "brain/SpikeSystem.hpp"
+#include "brain/STDP.hpp"
+#include "brain/Hebbian.hpp"
+#include "brain/StructuralPlasticity.hpp"
+#include "brain/NeuralWorkingMemory.hpp"
+#include "brain/NeuralEpisodicMemory.hpp"
+#include "brain/NeuralAssociativeMemory.hpp"
+#include "brain/PredictionSystem.hpp"
+#include "brain/NeuralPlanner.hpp"
+#include "brain/ConceptFormation.hpp"
+#include "brain/AttentionalSelection.hpp"
+#include "brain/DevelopmentSystem.hpp"
+#include "brain/Neuromodulation/Dopamine.hpp"
+#include "brain/Neuromodulation/Curiosity.hpp"
+#include "brain/Neuromodulation/PredictionError.hpp"
+#include "brain/Neuromodulation/Novelty.hpp"
+#include "brain/NeuronType.hpp"
+#include "brain/PlasticityFlags.hpp"
+#include "brain/SensoryInput.hpp"
+#include "brain/Motor/Action.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class CheckpointManager;
+class CheckpointWriter;
+class CheckpointReader;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -47,6 +64,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// This is the main interface that delegates to specialized helper classes
 
 class Brain {
 public:
@@ -190,12 +208,34 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get current simulation state
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
+    
     // Logging
     void logStatus() const;
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Helper methods that delegate to specialized classes
+    bool initializeBrainManagement();
+    bool initializeMemorySystems();
+    bool initializeNeuromodulation();
+    bool initializeDevelopment();
+    bool initializePlasticity();
+    
+    void stepCore(SimulationStep currentStep, Timestamp currentTime);
+    void stepMemorySystems(TimestepDuration timestep);
+    void stepNeuromodulation(TimestepDuration timestep);
+    void stepDevelopment(size_t currentStep);
+    void stepPlasticity(float plasticityMod);
+    void stepPrediction();
+    void stepAttention();
+    void stepConceptFormation();
+    void stepReplayAndConsolidation(size_t currentStep);
+    void stepCheckpointManager(size_t currentStep, Timestamp currentTime);
 };
 
 } // namespace nlm

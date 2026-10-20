@@ -7,11 +7,18 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+#include "brain/Brain.hpp"
+#include "brain/BrainManagement.hpp"
+#include "brain/BrainStep.hpp"
+#include "brain/BrainMemory.hpp"
+#include "brain/BrainNeuromodulation.hpp"
+#include "brain/BrainDevelopment.hpp"
+#include "brain/BrainPersistence.hpp"
+#include "brain/BrainAction.hpp"
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
 #include "sensory/SensoryInput.hpp"
@@ -179,7 +186,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        if (neurons[i]) {
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        }
     }
     
     // Run a few steps
@@ -195,9 +204,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }
@@ -214,7 +225,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            if (syn) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
         }
     }
     
@@ -264,10 +277,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     // Record initial weights
     std::vector<float> beforeWeights;
     for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+        if (synapses[i]) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " before: " + std::to_string(beforeWeights[i]));
+        }
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -299,16 +314,20 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+        if (synapses[i]) {
+            float delta = synapses[i]->getWeight() - beforeWeights[i];
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+        }
     }
     
     // Check if weights increased (LTP)
     float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        if (synapses[i]) {
+            totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        }
     }
     
     NLM_LOG_INFO("");
