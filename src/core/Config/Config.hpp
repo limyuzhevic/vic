@@ -73,31 +73,40 @@ public:
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
+
+    // Set description for existing key
+    void setDescription(const std::string& key, const std::string& description);
+
     // Check existence
     bool has(const std::string& key) const;
-    
+
     // Remove key
     void remove(const std::string& key);
-    
+
     // Get all keys
     std::vector<std::string> getKeys() const;
-    
+
     // Clear all
     void clear();
+
+    // Backup and versioning
+    bool backupToFile(const std::string& filepath) const;
+    bool saveWithVersion(const std::string& filepath, int version = 1) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Advanced configuration options
+    void enableResearchMode(bool enabled);
+    bool isResearchMode() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Configuration statistics
+    std::string getStatistics() const;
     
-    // Internal helpers
+    // Advanced validation
+    bool validateAll() const;
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
