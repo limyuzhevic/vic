@@ -6,6 +6,10 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <atomic>
+#include <unordered_map>
+#include <regex>
 
 namespace nlm {
 

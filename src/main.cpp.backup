@@ -1,0 +1,450 @@
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <sstream>
+#include <fstream>
+#include <chrono>
+#include <ctime>
+#include <map>
+#include <set>
+#include <algorithm>
+#include <cctype>
+#include <regex>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+using namespace nlm;
+
+// Forward declarations
+class CLIParser;
+class ConfigManager;
+class LoggerManager;
+class PerformanceMonitor;
+class OutputFormatter;
+class ErrorHandler;
+
+// Enums for different configuration options
+enum class LogLevel {
+    Debug = 0,
+    Info = 1,
+    Warning = 2,
+    Error = 3,
+    Critical = 4
+};
+
+enum class PlasticityMode {
+    STDP,
+    Hebbian,
+    Combined
+};
+
+enum class ExperimentType {
+    Connectivity,
+    Plasticity,
+    STDP,
+    Learning,
+    Integration
+};
+
+enum class ExperimentMode {
+    Quick,
+    Thorough,
+    Deep
+};
+
+enum class AgentMode {
+    Passive,
+    Active,
+    Reactive
+};
+
+// CLI Option structure
+struct CLIOption {
+    std::string longName;
+    char shortName;
+    std::string description;
+    std::string type;
+    std::string defaultValue;
+    bool hasArgument;
+};
+
+// Command result structure
+struct CommandResult {
+    bool success;
+    std::string message;
+    std::map<std::string, std::string> metadata;
+};
+
+// Enhanced CLI Parser Class
+class CLIParser {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    CLIParser(int argc, char** argv);
+    ~CLIParser();
+    
+    bool parse();
+    std::string getOption(const std::string& name) const;
+    bool hasOption(const std::string& name) const;
+    int getArgCount() const;
+    std::string getArg(int index) const;
+    void printHelp() const;
+    void printVersion() const;
+    std::map<std::string, std::string> getAllOptions() const;
+};
+
+// Configuration Manager Class
+class ConfigManager {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    ConfigManager();
+    ~ConfigManager();
+    
+    bool loadFromFile(const std::string& filepath);
+    bool loadFromCLI(const CLIParser& parser);
+    bool saveToFile(const std::string& filepath) const;
+    void setDefaultValues();
+    std::string get(const std::string& key) const;
+    int64_t getInt(const std::string& key) const;
+    double getDouble(const std::string& key) const;
+    float getFloat(const std::string& key) const;
+    bool getBool(const std::string& key) const;
+    void set(const std::string& key, const std::string& value);
+    bool has(const std::string& key) const;
+    std::vector<std::string> getKeys() const;
+    void validate();
+    std::string summary() const;
+};
+
+// Logger Manager Class
+class LoggerManager {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    LoggerManager();
+    ~LoggerManager();
+    
+    bool initialize(const ConfigManager& config);
+    void setLevel(const std::string& level);
+    void setLogFile(const std::string& filepath);
+    void enableConsoleOutput(bool enable);
+    void enableColors(bool enable);
+    void log(const std::string& message, LogLevel level = LogLevel::Info);
+    void logStructured(const std::map<std::string, std::string>& data);
+    void flush();
+    void close();
+};
+
+// Performance Monitor Class
+class PerformanceMonitor {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    PerformanceMonitor();
+    ~PerformanceMonitor();
+    
+    void startTiming(const std::string& operation);
+    void stopTiming(const std::string& operation);
+    double getElapsedTime(const std::string& operation) const;
+    void enableProfiling(bool enable);
+    void setProfilerFile(const std::string& filepath);
+    void logPerformanceStats();
+    void reset();
+};
+
+// Output Formatter Class
+class OutputFormatter {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    OutputFormatter();
+    ~OutputFormatter();
+    
+    void setOutputFormat(const std::string& format);
+    void setOutputFile(const std::string& filepath);
+    void printHumanReadable(const std::string& title, const std::map<std::string, std::string>& data) const;
+    void printMachineReadable(const std::string& title, const std::map<std::string, std::string>& data) const;
+    void printProgress(const std::string& message, double progress = -1.0);
+    void printResults(const std::string& title, const std::map<std::string, std::string>& data);
+    void printError(const std::string& error);
+    void printSuccess(const std::string& message);
+    void printWarning(const std::string& warning);
+};
+
+// Error Handler Class
+class ErrorHandler {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    ErrorHandler();
+    ~ErrorHandler();
+    
+    bool handle(const std::string& error);
+    void setExitOnError(bool exit);
+    int getExitCode() const;
+    void addErrorRecovery(const std::string& error, const std::string& recovery);
+};
+
+// Core NLM Simulation Interface (simplified for CLI)
+class NLMSimulation {
+public:
+    virtual ~NLMSimulation() = default;
+    
+    virtual bool initialize(const ConfigManager& config) = 0;
+    virtual void run(int steps) = 0;
+    virtual void reset() = 0;
+    virtual void logStatus() const = 0;
+    virtual int getTotalNeuronCount() const = 0;
+    virtual int getTotalSynapseCount() const = 0;
+    virtual int getTotalSpikeCount() const = 0;
+    virtual double getAverageFiringRate() const = 0;
+};
+
+// Brain Simulation Implementation (simplified)
+class BrainSimulation : public NLMSimulation {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+public:
+    BrainSimulation(const ConfigManager& config);
+    ~BrainSimulation() override;
+    
+    bool initialize(const ConfigManager& config) override;
+    void run(int steps) override;
+    void reset() override;
+    void logStatus() const override;
+    int getTotalNeuronCount() const override;
+    int getTotalSynapseCount() const override;
+    int getTotalSpikeCount() const override;
+    double getAverageFiringRate() const override;
+    
+    void runBasicConnectivityTest() const;
+    void runPlasticityExperiment() const;
+    void runStdpVerification() const;
+    void runLearningExperiment() const;
+    void exportResults(const std::string& format) const;
+    void showStatistics() const;
+};
+
+// Main Application Class
+class NLMApplication {
+private:
+    CLIParser cliParser;
+    ConfigManager configManager;
+    LoggerManager loggerManager;
+    PerformanceMonitor performanceMonitor;
+    OutputFormatter outputFormatter;
+    ErrorHandler errorHandler;
+    
+    std::unique_ptr<NLMSimulation> simulation;
+    bool verbose;
+    bool debug;
+    bool performanceMode;
+    bool profile;
+    bool stats;
+    bool exportResults;
+    std::string exportFormat;
+    std::string replayPath;
+    bool batchMode;
+    bool developmentEnabled;
+    std::string plasticityMode;
+    int neurons;
+    int regions;
+    double timestep;
+    int steps;
+    std::string experimentType;
+    std::string experimentMode;
+    int experimentSeed;
+    std::string experimentId;
+    std::string agentMode;
+    bool agentLearning;
+    double agentExploreRate;
+    double agentExploitRate;
+
+public:
+    NLMApplication(int argc, char** argv);
+    ~NLMApplication();
+    
+    bool run();
+    void cleanup();
+    
+private:
+    void setupCLI(const CLIParser& parser);
+    void setupConfiguration(const CLIParser& parser);
+    void setupLogging(const CLIParser& parser);
+    void setupPerformance(const CLIParser& parser);
+    void setupOutput(const CLIParser& parser);
+    bool validateConfiguration() const;
+    void runSimulation() const;
+    void exportResults() const;
+    void showStatistics() const;
+    void runExperiments() const;
+    void showHelp() const;
+    void showVersion() const;
+};
+
+// Helper functions
+std::string trim(const std::string& str);
+std::string toLower(const std::string& str);
+std::string getCurrentTimestamp();
+LogLevel stringToLogLevel(const std::string& level);
+PlasticityMode stringToPlasticityMode(const std::string& mode);
+ExperimentType stringToExperimentType(const std::string& type);
+ExperimentMode stringToExperimentMode(const std::string& mode);
+AgentMode stringToAgentMode(const std::string& mode);
+bool parseBoolean(const std::string& value);
+int parseInt(const std::string& value);
+double parseDouble(const std::string& value);
+float parseFloat(const std::string& value);
+
+// Global function for banner
+void printBanner();
+
+// Global function for learning experiment
+struct LearningExperiment {
+    std::shared_ptr<Brain> brain;
+    uint64_t seed;
+    size_t initialSynapseCount;
+    std::vector<float> initialWeights;
+    std::vector<float> finalWeights;
+    std::vector<NeuronId> mostActiveNeurons;
+    
+    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
+        : brain(b), seed(s), initialSynapseCount(0) {
+        if (!b) {
+            NLM_LOG_ERROR("LearningExperiment created with null brain pointer");
+            throw std::invalid_argument("Brain pointer cannot be null");
+        }
+    }
+    
+    void recordInitialState() {
+        if (!brain) {
+            NLM_LOG_ERROR("recordInitialState called on null brain");
+            return;
+        }
+        
+        initialSynapseCount = brain->getTotalSynapseCount();
+        initialWeights.clear();
+        
+        // Record initial weights from first region
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            auto& synapses = region->getSynapses();
+            initialWeights.reserve(synapses.size());
+            
+            for (size_t i = 0; i < synapses.size(); ++i) {
+                initialWeights.push_back(synapses[i]->getWeight());
+            }
+        }
+        
+        NLM_LOG_INFO("Initial state recorded:");
+        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        if (!initialWeights.empty()) {
+            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+            float mean = sum / initialWeights.size();
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
+    void recordFinalState() {
+        if (!brain) {
+            NLM_LOG_ERROR("recordFinalState called on null brain");
+            return;
+        }
+        
+        finalWeights.clear();
+        
+        // Record final weights from first region
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            auto& synapses = region->getSynapses();
+            finalWeights.reserve(synapses.size());
+            
+            for (size_t i = 0; i < synapses.size(); ++i) {
+                finalWeights.push_back(synapses[i]->getWeight());
+            }
+        }
+        
+        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        
+        NLM_LOG_INFO("Final state recorded:");
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        if (!finalWeights.empty()) {
+            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+            float mean = sum / finalWeights.size();
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
+    void computeStatistics() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Learning Experiment Results ===");
+        NLM_LOG_INFO("");
+        
+        if (initialWeights.empty() || finalWeights.empty()) {
+            NLM_LOG_INFO("ERROR: No weights recorded");
+            return;
+        }
+        
+        // Compute weight changes
+        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+        float initialMean = initialSum / initialWeights.size();
+        float finalMean = finalSum / finalWeights.size();
+        
+        NLM_LOG_INFO("Weight Statistics:");
+        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
+        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
+        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        
+        // Count synapses that changed significantly
+        size_t strengthened = 0;
+        size_t weakened = 0;
+        size_t unchanged = 0;
+        
+        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            float delta = finalWeights[i] - initialWeights[i];
+            if (delta > 0.01f) ++strengthened;
+            else if (delta < -0.01f) ++weakened;
+            else ++unchanged;
+        }
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Synaptic Changes:");
+        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
+        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
+        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Spike Activity:");
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
+        
+        // Determine if learning occurred
+        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
+                                (strengthened > 0 || weakened > 0);
+        
+        NLM_LOG_INFO("");
+        if (learningOccurred) {
+            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+        } else {
+            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+        }
+    }
+};
