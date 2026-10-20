@@ -82,6 +82,17 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 2 Basic Demo
+```bash
+./nlm
+```
+
+This runs the Phase 2 neural computation demo, demonstrating real LIF neuron dynamics, STDP plasticity, and learning.
+
+## Python Bindings
+
+NLM includes Python bindings via the `pynlm` module. See `HOW_TO_USE.md` for detailed usage.
+
 ## Project Structure
 
 ```
@@ -104,12 +115,12 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
