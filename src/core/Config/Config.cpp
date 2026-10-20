@@ -3,6 +3,13 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <vector>
+#include <cctype>
+#include <unordered_map>
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -10,32 +17,158 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+bool Config::parseJSONFirstChar(const std::string& content) const {
+    // Check first non-whitespace character for JSON indicators
+    size_t pos = 0;
+    while (pos < content.size() && std::isspace(content[pos])) pos++;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    return pos < content.size() && (content[pos] == '{' || content[pos] == '[');
+}
+
+bool Config::parseYAMLFirstChar(const std::string& content) const {
+    // Check first non-whitespace character for YAML indicators
+    size_t pos = 0;
+    while (pos < content.size() && std::isspace(content[pos])) pos++;
+    
+    return pos < content.size() && (content[pos] == '-' || content[pos] == '{' || 
+                                     content[pos] == '[' || std::isalpha(content[pos]));
+}
+
+void Config::parseJSON(const std::string& content) {
+    // Parse JSON content using RapidJSON
+    rapidjson::Document doc;
+    doc.Parse(content.c_str());
+    
+    if (doc.HasParseError()) {
+        throw std::runtime_error("JSON parse error at position " + std::to_string(doc.GetParseError()) +
+                               ": " + std::string(rapidjson::GetParseError_En(doc.GetParseError())));
     }
     
+    // Flatten JSON structure into key=value pairs
+    flattenJSON(doc, "");
+}
+
+void Config::parseYAML(const std::string& content) {
+    // Parse YAML content using YAML-CPP
+    YAML::Node doc = YAML::Load(content);
+    
+    // Flatten YAML structure into key=value pairs
+    flattenYAML(doc, "");
+}
+
+void Config::flattenJSON(const rapidjson::Value& value, const std::string& prefix) {
+    if (value.IsObject()) {
+        for (auto it = value.MemberBegin(); it != value.MemberEnd(); ++it) {
+            std::string key = prefix.empty() ? it->name.GetString() : prefix + "." + it->name.GetString();
+            flattenJSON(it->value, key);
+        }
+    } else if (value.IsArray()) {
+        for (SizeType i = 0; i < value.Size(); ++i) {
+            std::string key = prefix + ".[" + std::to_string(i) + "]";
+            flattenJSON(value[i], key);
+        }
+    } else {
+        // Leaf value
+        std::string key = prefix;
+        std::string strValue;
+        
+        if (value.IsString()) {
+            strValue = value.GetString();
+        } else if (value.IsNumber()) {
+            if (value.IsInt()) {
+                strValue = std::to_string(value.GetInt());
+            } else if (value.IsUint()) {
+                strValue = std::to_string(value.GetUint());
+            } else if (value.IsInt64()) {
+                strValue = std::to_string(value.GetInt64());
+            } else if (value.IsUint64()) {
+                strValue = std::to_string(value.GetUint64());
+            } else if (value.IsFloat()) {
+                strValue = std::to_string(value.GetFloat());
+            } else if (value.IsDouble()) {
+                strValue = std::to_string(value.GetDouble());
+            }
+        } else if (value.IsBool()) {
+            strValue = value.GetBool() ? "true" : "false";
+        } else if (value.IsNull()) {
+            strValue = "null";
+        }
+        
+        if (!key.empty()) {
+            set(key, strValue, ConfigSource::File);
+        }
+    }
+}
+
+void Config::flattenYAML(const YAML::Node& node, const std::string& prefix) {
+    if (node.IsMap()) {
+        for (auto it : node) {
+            std::string key = it.first.IsScalar() ? it.first.Scalar() : "";
+            if (!key.empty()) {
+                std::string newPrefix = prefix.empty() ? key : prefix + "." + key;
+                flattenYAML(it.second, newPrefix);
+            }
+        }
+    } else if (node.IsSequence()) {
+        for (size_t i = 0; i < node.size(); ++i) {
+            std::string key = prefix + ".[" + std::to_string(i) + "]";
+            flattenYAML(node[i], key);
+        }
+    } else {
+        // Leaf value
+        std::string key = prefix;
+        std::string strValue;
+        
+        if (node.IsScalar()) {
+            strValue = node.Scalar();
+            // Convert string representations to proper types
+            if (strValue == "true" || strValue == "false") {
+                set(key, strValue == "true", ConfigSource::File);
+                return;
+            } else if (strValue.find('.') != std::string::npos) {
+                try {
+                    double doubleVal = std::stod(strValue);
+                    set(key, doubleVal, ConfigSource::File);
+                    return;
+                } catch (...) {}
+            } else {
+                try {
+                    int intVal = std::stoi(strValue);
+                    set(key, intVal, ConfigSource::File);
+                    return;
+                } catch (...) {}
+            }
+        } else if (node.IsBoolean()) {
+            strValue = node.As<bool>() ? "true" : "false";
+        } else if (node.IsInteger()) {
+            strValue = std::to_string(node.As<int>());
+        } else if (node.IsFloat()) {
+            strValue = std::to_string(node.As<float>());
+        } else if (node.IsDouble()) {
+            strValue = std::to_string(node.As<double>());
+        } else {
+            strValue = "";
+        }
+        
+        if (!key.empty() && !strValue.empty()) {
+            set(key, strValue, ConfigSource::File);
+        }
+    }
+}
+
+bool Config::parseSimpleFormat(const std::string& content) {
+    // Original simple key=value parser for backward compatibility
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -50,6 +183,61 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Proper JSON/YAML parser with format detection and comprehensive error handling
+    // Supports both JSON (.json) and YAML (.yaml, .yml) formats with robust validation
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Detect file format based on extension and content
+    bool isJSON = false;
+    bool isYAML = false;
+    
+    if (filepath.size() >= 5) {
+        std::string extension = filepath.substr(filepath.size() - 5);
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+        
+        if (extension == ".json" || extension == ".JSON") {
+            isJSON = true;
+        } else if (extension == ".yaml" || extension == ".yml" || extension == ".YAML" || extension == ".YML") {
+            isYAML = true;
+        }
+    }
+    
+    // Auto-detect based on content if extension unknown
+    if (!isJSON && !isYAML) {
+        isJSON = parseJSONFirstChar(content);
+        if (!isJSON) {
+            isYAML = parseYAMLFirstChar(content);
+        }
+    }
+    
+    try {
+        if (isJSON) {
+            parseJSON(content);
+        } else if (isYAML) {
+            parseYAML(content);
+        } else {
+            // Fallback to simple key=value format
+            return parseSimpleFormat(content);
+        }
+    } catch (const std::exception& e) {
+        // Clear any partial entries on error
+        clear();
+        return false;
     }
     
     return true;

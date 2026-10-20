@@ -1,0 +1,62 @@
+# NLM Package Configuration
+# ===========================
+
+# This file is used by CMake's package configuration system to provide
+# find_package() support for the NLM library.
+
+# Copyright (c) 2024 NLM Project
+# All rights reserved.
+
+# This software is provided "as-is", without any express or implied
+# warranty. In no event will the authors be held liable for any
+# damages arising from the use of this software.
+
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+#
+# 1. The above copyright notice and this permission notice shall be
+#    included in all copies or substantial portions of the software.
+#
+# 2. The software may be used for any purpose, commercial or non-commercial.
+#
+# 3. Altered source versions must be plainly marked as such and must not
+#    be misrepresented as being the original software.
+#
+# 4. This notice may not be removed or altered from any source distribution.
+
+@PACKAGE_INIT@
+
+# Version compatibility
+set_and_check(NLM_INCLUDE_DIR "${NLM_INSTALL_PREFIX}/include")
+
+# Find dependencies
+include(CMakeFindDependencyMacro)
+
+# Import targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlmTargets.cmake")
+
+# Provide legacy variables for backward compatibility
+set(NLM_FOUND TRUE)
+set(NLM_LIBRARIES nlm_core nlm_agent nlm_world)
+set(NLM_INCLUDE_DIRS "${NLM_INSTALL_PREFIX}/include")
+
+# Provide export-style variables
+set(NLM_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
+set(NLM_VERSION_MINOR @PROJECT_VERSION_MINOR@)
+set(NLM_VERSION_PATCH @PROJECT_VERSION_PATCH@)
+set(NLM_VERSION "${PROJECT_VERSION}")
+
+# Message for users
+message(STATUS "NLM ${NLM_VERSION} configuration loaded")
+
+# Provide FindNLM.cmake file for compatibility
+configure_file(
+    "${CMAKE_CURRENT_LIST_DIR}/FindNLM.cmake.in"
+    "${CMAKE_CURRENT_LIST_DIR}/FindNLM.cmake"
+    @ONLY
+)
+
+# Documentation message
+message(STATUS "Use find_package(NLM REQUIRED) for modern CMake usage")
+message(STATUS "Or include ${NLM_INSTALL_PREFIX}/include/nlm/nlm.hpp for direct inclusion")

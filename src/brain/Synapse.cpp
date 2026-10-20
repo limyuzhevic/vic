@@ -193,33 +193,70 @@ void Synapse::setEfficacy(float efficacy) {
 
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // 1. Update short-term plasticity (STP) state based on time since last spikes
+    // 2. Apply activity-dependent modulation of synaptic efficacy
+    // 3. Update synaptic weight bounds to prevent instability
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Tsodyks-Markram short-term plasticity model:
+    // D = depression variable (0-1, 1 = fully recovered)
+    // F = facilitation variable (0-1, 0 = no facilitation)
+    // U = utilization parameter (fraction of resources used per spike)
+    
+    // Update short-term depression: recovery towards 1.0 over time
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Depression recovers exponentially towards 1.0
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * 
+                                      (1.0f - std::exp(-timeSincePre / Impl::STP_DEPRESSION_TAU));
+    }
+    
+    // Update short-term facilitation: decays towards 0.0 over time  
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Facilitation decays exponentially
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Calculate effective synaptic efficacy based on STP
+    // Effective weight = baseline weight * depression * facilitation
+    const float effectiveWeight = pImpl->weight * pImpl->shortTermDepression * 
+                                 (1.0f + pImpl->shortTermFacilitation);
+    
+    // Update eligibility trace for reward-modulated learning
+    // Trace decays towards zero over time
+    pImpl->eligibilityTrace *= (1.0f - dt_float * 0.001f);  // Fast decay
+    
+    // Apply use-dependent efficacy modulation
+    // Efficacy builds up with presynaptic activity and decays over time
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Efficacy increases with recent activity and decays over time
+        const float efficacyInput = 0.2f * std::exp(-timeSincePre / 50.0f);
+        pImpl->efficacy += efficacyInput * dt_float * 0.1f;
+        pImpl->efficacy *= 0.99f;  // Natural decay
+        
+        // Clamp efficacy to biologically plausible range
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Update synaptic weight based on current plasticity flags
+    if (pImpl->plasticityFlags.reward_modulated && pImpl->eligibilityTrace != 0.0f) {
+        // Reward-modulated plasticity: weight change proportional to eligibility trace
+        const float learningRate = 0.01f;
+        pImpl->weight += learningRate * pImpl->eligibilityTrace;
+    }
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    if (pImpl->plasticityFlags.stdp) {
+        // STDP will be applied at spike times, this is just weight normalization
+        // Prevent runaway weight growth
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    }
+    
+    // Track maximum activity for performance monitoring
+    const float maxActivity = std::max(pImpl->shortTermDepression, pImpl->shortTermFacilitation);
+    // This could be used for statistics collection (future enhancement)
 }
 
 void Synapse::reset() {

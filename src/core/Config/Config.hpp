@@ -100,6 +100,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers
+    static bool parseJSONFirstChar(const std::string& content);
+    static bool parseYAMLFirstChar(const std::string& content);
+    void parseJSON(const std::string& content);
+    void parseYAML(const std::string& content);
+    void flattenJSON(const rapidjson::Value& value, const std::string& prefix);
+    void flattenYAML(const YAML::Node& node, const std::string& prefix);
+    bool parseSimpleFormat(const std::string& content);
 };
 
 } // namespace nlm

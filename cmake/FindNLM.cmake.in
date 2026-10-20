@@ -1,0 +1,47 @@
+# FindNLM.cmake.in
+# ====================
+
+# FindNLM.cmake - Legacy find module for NLM
+set(NLM_FOUND FALSE)
+set(NLM_INCLUDE_DIRS)
+
+# Try to find the package using find_package first
+find_package(NLM QUIET)
+
+if(NLM_FOUND)
+    set(NLM_INCLUDE_DIRS ${NLM_INCLUDE_DIRS})
+else()
+    # Legacy fallback: search for NLM in common locations
+    find_path(NLM_INCLUDE_DIR
+        NAMES nlm.hpp nlm/config.h
+        PATHS
+            /usr/local/include
+            /usr/include
+            /opt/local/include
+            /opt/nlm/include
+        DOC "NLM include directory"
+    )
+    
+    find_library(NLM_LIBRARY
+        NAMES nlm_core nlm
+        PATHS
+            /usr/local/lib
+            /usr/lib
+            /opt/local/lib
+            /opt/nlm/lib
+        DOC "NLM library"
+    )
+    
+    set(NLM_FOUND ${NLM_LIBRARY} AND ${NLM_INCLUDE_DIR})
+    
+    if(NLM_FOUND)
+        set(NLM_INCLUDE_DIRS ${NLM_INCLUDE_DIR})
+        set(NLM_LIBRARIES ${NLM_LIBRARY})
+    endif()
+endif()
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(NLM
+    REQUIRED_VARS NLM_LIBRARY NLM_INCLUDE_DIR
+    FAIL_MESSAGE "Could NOT find NLM, try installing it first"
+)

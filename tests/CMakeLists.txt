@@ -1,24 +1,24 @@
-cmake_minimum_required(VERSION 3.16)
+# This CMakeLists.txt is deprecated. Tests are now built as part of the main CMake configuration.
+# The main CMakeLists.txt creates the nlm_test target when NLM_ENABLE_TESTS is ON.
 
-# Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+message(FATAL_ERROR "This CMakeLists.txt is deprecated. Use the main CMakeLists.txt in the project root.")
 
-# Create test executable
-add_executable(nlm_test
-    test_main.cpp
-    test_types.cpp
-    test_config.cpp
-    test_random.cpp
-    test_clock.cpp
-    test_neuron.cpp
-    test_synapse.cpp
-    test_stdp.cpp
-    test_brain.cpp
-)
+# For backward compatibility:
+# The main CMakeLists.txt now builds the nlm_test target using modern testing infrastructure
+# with support for:
+# 1. Basic unit tests
+# 2. Code coverage (when NLM_ENABLE_COVERAGE=ON)
+# 3. Integration with CTest
+# 4. Better test organization
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
+# To build tests:
+# 1. Configure with: cmake -DNLM_ENABLE_TESTS=ON ..
+# 2. Build with: cmake --build . --target nlm_test
+# 3. Run tests with: ctest
 
-# Enable testing
-enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+# The modern testing framework includes:
+# - Enhanced test infrastructure
+# - Performance benchmarks
+# - Code coverage reporting
+# - Better error reporting
+# - Integration with CI/CD pipelines

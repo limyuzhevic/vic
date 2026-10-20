@@ -13,25 +13,11 @@ Pruning::Pruning() : pImpl(new Impl) {}
 
 Pruning::~Pruning() = default;
 
-float Pruning::getThreshold() const {
-    return pImpl->threshold;
-}
-
-void Pruning::setThreshold(float threshold) {
-    pImpl->threshold = threshold;
-}
-
-float Pruning::getPruningRate() const {
-    return pImpl->pruningRate;
-}
-
-void Pruning::setPruningRate(float rate) {
-    pImpl->pruningRate = rate;
-}
-
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
     // TODO PHASE 2: Implement real pruning
     // PLACEHOLDER: Weak synapses are removed probabilistically
+    (void)brain;
+    (void)rng;
 }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {

@@ -44,9 +44,10 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+        // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void setExpectedValue(float expected);
     
 private:
     struct Impl;

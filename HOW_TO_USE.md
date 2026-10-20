@@ -16,7 +16,7 @@ This document covers:
 ### Prerequisites
 
 - **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
-- **CMake**: Version 3.16 or higher
+- **CMake**: Version 3.20 or higher (recommended)
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
 
@@ -34,7 +34,7 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # Build all targets
-make -j$(nproc)
+cmake --build . --parallel
 
 # Run tests (if built)
 ctest --output-on-failure
@@ -50,22 +50,34 @@ After successful compilation, you will have:
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
+| `nlm_phase3` | Static Library | Phase 3 experiments |
+| `nlm_phase4` | Static Library | Phase 4 experiments |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+| `pynlm` | Python Module | Python bindings |
 
 ### Build Options
 
 ```bash
+# Configure with all build options
 # Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DNLM_ENABLE_TESTS=ON -DNLM_ENABLE_BENCHMARKS=ON -DNLM_BUILD_SHARED=OFF
+
+# Release build with Python bindings
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_PYTHON_BINDINGS=ON -DNLM_ENABLE_TESTS=ON
 
 # Build with specific compiler
 cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
+
+# Build examples and documentation
+cmake .. -DNLM_EXAMPLE_BUILD=ON -DNLM_INSTALL_DEVELOPER=ON
+
+# Build with coverage (requires GCC/Clang)
+cmake .. -DNLM_ENABLE_COVERAGE=ON -DNLM_ENABLE_TESTS=ON
 ```
 
 ---
