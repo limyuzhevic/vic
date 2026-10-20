@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_validation {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -50,6 +54,15 @@ int main() {
     std::cout << "Running Types tests..." << std::endl;
     try {
         test_types::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Config Validation tests..." << std::endl;
+    try {
+        test_config_validation::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

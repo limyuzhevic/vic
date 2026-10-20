@@ -93,6 +93,13 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    void validateConfiguration();
+    
+    // Value validation based on key
+    template<typename T>
+    void validateValueForKey(const std::string& key, const T& value) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
