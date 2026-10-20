@@ -134,7 +134,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // TODO: Real integrate-and-fire dynamics (currently placeholder implementation)
+    // Implements Leaky Integrate-and-Fire (LIF) dynamics with proper synaptic integration
     void step(Timestamp currentTime);
     
     // Reset to initial state

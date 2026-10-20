@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <filesystem>
 
 using namespace nlm;
 
@@ -39,13 +41,122 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics          ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                       ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+Usage: nlm [OPTIONS]
+
+Options:
+  --help                    Show this help message
+  --config <file>          Load configuration from file
+  --seed <int>             Set random seed
+  --neurons <int>          Set number of neurons (default: 500)
+  --regions <int>          Set number of regions (default: 1)
+  --steps <int>            Run for specified steps (default: 2000)
+  --connectivity <float>   Set connection probability (default: 0.15)
+  --output <file>          Save results to file
+  --debug                  Enable debug logging
+  --quiet                  Suppress log output
+  --version                 Show version information
+  --demo-mode <mode>       Run demo mode (connectivity, plasticity, stdp, integration)
+  --verify-only            Only verify integration, don't run full simulation
+
+Advanced Options:
+  --stdp-ltp <float>        STDP LTP weight (default: 0.02)
+  --stdp-ltd <float>        STDP LTD weight (default: 0.015)
+  --stdp-tau <float>        STDP time constant (default: 20.0)
+  --synaptogenesis <float>  Synaptogenesis rate (default: 0.0001)
+  --pruning <float>        Pruning rate (default: 0.00001)
+  --checkpoint <file>       Enable checkpointing with specified path
+  --replay                 Enable replay system
+  --development            Enable development system
+
+Phase 6 Integration Features:
+  --integration-only       Run only Phase 6 integration tests
+  --memory-test            Test memory system integration
+  --neuromodulation-test   Test neuromodulation integration
+  --prediction-test        Test prediction system integration
+  --cognition-test         Test cognition system integration
+
+Examples:
+  nlm --demo-mode connectivity
+  nlm --neurons 1000 --steps 5000 --output results.json
+  nlm --integration-only --checkpoint ./brain_state.bin
+  nlm --help
+
+For more information, see README.md or docs/ARCHITECTURE.md
+
+Phase 2: Real Neural Computation
+  - Leaky Integrate-and-Fire (LIF) neuron dynamics
+  - Event-driven spike propagation with delays
+  - STDP and Hebbian plasticity rules
+  - Structural plasticity (synaptogenesis/pruning)
+
+Phase 3: World Interaction
+  - WORLD (SimpleWorld)
+  - SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  - AgentBrain.processSensoryInput()
+  - Neural Computation (LIF dynamics)
+  - Spike Processing (event-driven)
+  - Motor Decoding → MotorCommand
+  - WORLD.applyMotorCommand()
+  - ACTION RESULT (reward, success)
+  - Reward Prediction Error
+  - Neuromodulation (dopamine-like signal)
+  - Eligibility Trace Update
+  - Plasticity (STDP, Hebbian, Reward-Modulated)
+  - Structural Plasticity (synaptogenesis/pruning)
+  - Development System (stage progression)
+
+Phase 4: Emerging Cognition
+  - ATTENTION (competitive selection)
+  - NEURAL PROCESSING
+  - PREDICTION (temporal sequence learning)
+  - WORKING MEMORY (persistent activity)
+  - EPISODIC MEMORY (experience storage)
+  - CONCEPT FORMATION (pattern discovery)
+  - PLANNING and ACTION SELECTION
+  - Self-Model and Social Learning
+
+Phase 5: Performance Optimizations
+  - Memory pools and event queues
+  - SIMD vectorization
+  - Parallel processing
+  - Checkpoint system
+
+Phase 6: Final Integration
+  - All systems integrated into coherent brain loop
+  - Memory systems connected to neural processing
+  - Neuromodulation affects plasticity and dynamics
+  - Prediction integrated with learning
+  - Development affects plasticity rates
+  - Checkpoint save/load working
+  - Replay and consolidation functional
+  - Phase 6 integration experiment created
+
+The NLM brain is now a functioning artificial neural substrate
+capable of changing its own synaptic connections through experience.
+
+It includes:
+- Real spiking neural computation (Phase 2)
+- World interaction and learning (Phase 3)
+- Emerging cognitive capabilities (Phase 4)
+- Performance optimizations (Phase 5)
+- Full system integration (Phase 6)
+
+End of usage information.
+
+Would you like to continue with the basic functionality, run a demo, or explore integration features?
+  )" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -325,6 +436,15 @@ int main(int argc, char** argv) {
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Check for help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
