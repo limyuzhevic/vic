@@ -9,9 +9,8 @@
 #include <memory>
 #include <string>
 
+// Forward declarations for integrated systems
 namespace nlm {
-
-// Forward declarations
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -28,6 +27,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+}
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -67,7 +67,7 @@ public:
     // Main simulation step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with absolute time
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
@@ -166,6 +166,7 @@ public:
     
     // ========== DEVELOPMENT SYSTEM ==========
     
+    // Development system for adaptive changes
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);

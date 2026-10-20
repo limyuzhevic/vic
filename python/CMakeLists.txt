@@ -87,9 +87,23 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+pybind11_add_module(pynlm main_bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Add all the new binding source files
+target_sources(pynlm PRIVATE
+    basic_types.cpp
+    config.cpp
+    sensory.cpp
+    action.cpp
+    agent.cpp
+    world.cpp
+    brain.cpp
+    agentbrain.cpp
+    factories.cpp
+    error_handling.cpp
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
