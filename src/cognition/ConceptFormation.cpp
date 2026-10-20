@@ -1,15 +1,33 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../brain/NeuralPopulation.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_set>
 
 namespace nlm {
 
 struct ConceptFormation::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    // Pattern storage and indexing for efficient concept matching
+    std::vector<std::vector<float>> conceptPatterns;
+    std::vector<float> patternNorms;
+    
+    // Clustering parameters
+    float similarityThreshold;
+    size_t minClusterSize;
+    
+    // Feature extraction parameters
+    bool extractSensoryFeatures;
+    bool extractTemporalFeatures;
+    
+    Impl() : brain(nullptr), similarityThreshold(0.7f), minClusterSize(3),
+             extractSensoryFeatures(true), extractTemporalFeatures(false) {}
 };
 
 ConceptFormation::ConceptFormation()
@@ -18,8 +36,10 @@ ConceptFormation::ConceptFormation()
     , nextConceptId_(1)
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
-    , stabilityWindow_(5)
-{
+    , stabilityWindow_(5) {
+    
+    pImpl->similarityThreshold = formationThreshold_;
+    pImpl->minClusterSize = stabilityWindow_;
 }
 
 ConceptFormation::~ConceptFormation() = default;
@@ -30,36 +50,56 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
-    if (pattern.empty()) return 0;
-    
-    // Check if this pattern matches any existing concept
-    size_t matchingConcept = findConceptForPattern(pattern);
-    
-    if (matchingConcept > 0) {
-        // Update existing concept
-        updateConcept(matchingConcept, pattern, features, reward);
-        return matchingConcept;
+void ConceptFormation::presentExperience(const std::vector<float>& neuralActivity,
+                                        const std::vector<float>& sensoryFeatures,
+                                        float reward,
+                                        SimulationStep currentTime) {
+    if (neuralActivity.empty() || !brain_) {
+        return;
     }
     
-    // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
-        // But wait - we need a few observations before committing to a concept
-        // This prevents forming concepts from noise
-        
-        // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+    // Extract features from neural activity
+    std::vector<float> features;
+    
+    if (pImpl->extractSensoryFeatures) {
+        features = extractSensoryFeaturesFromNeural(brain_, neuralActivity);
     }
     
-    return 0;  // Not yet classifiable
+    if (pImpl->extractTemporalFeatures) {
+        features = addTemporalFeatures(features, currentTime);
+    }
+    
+    // Get matching concept
+    size_t existingConcept = findConceptForPattern(neuralActivity);
+    
+    if (existingConcept > 0) {
+        // Update existing concept with new experience
+        updateConcept(existingConcept, neuralActivity, features, reward, currentTime);
+        NLM_LOG_DEBUG("ConceptFormation: Experience added to existing concept " + 
+                     std::to_string(existingConcept));
+    } else {
+        // Check if this is a novel experience worth creating a concept for
+        if (isNovel(neuralActivity, formationThreshold_)) {
+            // But only create if we have enough similar patterns
+            // Check if we can form a stable cluster from recent experiences
+            bool canFormCluster = canFormConceptCluster(neuralActivity);
+            
+            if (canFormCluster) {
+                size_t newConcept = createConcept(neuralActivity, features, reward, currentTime);
+                NLM_LOG_INFO("ConceptFormation: Created new concept " + std::to_string(newConcept));
+            } else {
+                // Too early to form a concept, store for later
+                storeForLater(neuralActivity, features, reward, currentTime);
+                NLM_LOG_DEBUG("ConceptFormation: Storing for later concept formation");
+            }
+        }
+    }
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
-                                       const std::vector<float>& features,
-                                       float reward) {
+                                     const std::vector<float>& features,
+                                     float reward,
+                                     SimulationStep currentTime) {
     DiscoveredConcept concept;
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
@@ -69,23 +109,23 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     instance.pattern = pattern;
     instance.features = features;
     instance.observationCount = 1;
-    instance.lastObserved = 0;
+    instance.lastObserved = currentTime;
     instance.avgReward = reward;
     instance.stability = 1.0f;
     
     concept.instances.push_back(instance);
     concept.avgStability = 1.0f;
     
-    // Determine category hint based on properties
-    if (reward > 0.5f) {
-        concept.categoryHint = "rewarding";
-    } else if (reward < -0.3f) {
-        concept.categoryHint = "harmful";
-    } else {
-        concept.categoryHint = "neutral";
-    }
+    // Determine category hint based on properties and features
+    std::string category = deriveCategoryFromFeatures(features, reward);
+    concept.categoryHint = category;
     
     concepts_.push_back(concept);
+    pImpl->conceptPatterns.push_back(pattern);
+    
+    // Compute and store pattern norm for efficient similarity computation
+    float norm = computePatternNorm(pattern);
+    pImpl->patternNorms.push_back(norm);
     
     NLM_LOG_INFO("ConceptFormation: Created concept " + std::to_string(concept.id) +
                  " (category: " + concept.categoryHint + ")");
@@ -94,11 +134,15 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
 }
 
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
+                                     const std::vector<float>& features, float reward,
+                                     SimulationStep currentTime) {
     DiscoveredConcept* concept = nullptr;
-    for (auto& c : concepts_) {
-        if (c.id == conceptId) {
-            concept = &c;
+    size_t patternIndex = 0;
+    
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        if (concepts_[i].id == conceptId) {
+            concept = &concepts_[i];
+            patternIndex = i;
             break;
         }
     }
@@ -110,33 +154,42 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     instance.pattern = newPattern;
     instance.features = features;
     instance.observationCount = 1;
-    instance.lastObserved = concept->totalObservations;
+    instance.lastObserved = currentTime;
     instance.avgReward = reward;
     
     concept->instances.push_back(instance);
     concept->totalObservations++;
     
-    // Update prototype using exponential moving average (Hebbian-like)
-    updatePrototype(conceptId, newPattern);
+    // Update prototype using Hebbian averaging with adaptation
+    updatePrototype(conceptId, newPattern, patternIndex);
     
-    // Update stability
-    float newStability = 1.0f;
-    if (concept->instances.size() > 1) {
-        // Compute stability as average similarity to prototype
-        float totalSim = 0.0f;
-        size_t recentCount = std::min(concept->instances.size(), stabilityWindow_);
-        
-        for (size_t i = concept->instances.size() - recentCount; 
-             i < concept->instances.size(); ++i) {
-            totalSim += computeSimilarity(concept->instances[i].pattern, concept->prototype);
-        }
-        
-        newStability = totalSim / recentCount;
-        concept->avgStability = concept->avgStability * 0.9f + newStability * 0.1f;
+    // Update stability with more sophisticated computation
+    float newStability = computeInstanceStability(concept, concept->instances.size() - 1);
+    concept->instances.back().stability = newStability;
+    
+    // Update concept-level stability
+    concept->avgStability = computeConceptStability(concept);
+    
+    // Update stored pattern
+    pImpl->patternNorms[patternIndex] = computePatternNorm(concept->prototype);
+}
+
+float ConceptFormation::computeSimilarity(const std::vector<float>& a,
+                                       const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.empty()) return 0.0f;
+    
+    float dotProduct = 0.0f;
+    float normA = computePatternNorm(a);
+    float normB = computePatternNorm(b);
+    
+    if (normA == 0.0f || normB == 0.0f) return 0.0f;
+    
+    for (size_t i = 0; i < a.size(); ++i) {
+        dotProduct += a[i] * b[i];
     }
     
-    // Update instance stability
-    concept->instances.back().stability = newStability;
+    float cosineSimilarity = dotProduct / (normA * normB);
+    return std::max(0.0f, std::min(1.0f, cosineSimilarity));
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
@@ -229,22 +282,17 @@ void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
                  " and " + std::to_string(conceptB));
 }
 
-bool ConceptFormation::isNovel(const std::vector<float>& pattern,
-                               float similarityThreshold) const {
-    return findConceptForPattern(pattern) == 0;
-}
-
 size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern) const {
-    if (concepts_.empty()) return 0;
+    if (pImpl->conceptPatterns.empty()) return 0;
     
     float bestSimilarity = 0.0f;
     size_t bestConcept = 0;
     
-    for (const auto& concept : concepts_) {
-        float sim = computeSimilarity(pattern, concept.prototype);
-        if (sim > bestSimilarity && sim >= formationThreshold_) {
-            bestSimilarity = sim;
-            bestConcept = concept.id;
+    for (size_t i = 0; i < pImpl->conceptPatterns.size(); ++i) {
+        float similarity = computeSimilarity(pattern, pImpl->conceptPatterns[i]);
+        if (similarity > bestSimilarity && similarity >= formationThreshold_) {
+            bestSimilarity = similarity;
+            bestConcept = i + 1; // Convert to concept ID
         }
     }
     
@@ -252,10 +300,10 @@ size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern
 }
 
 float ConceptFormation::computeSimilarity(const std::vector<float>& a,
-                                         const std::vector<float>& b) const {
+                                       const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
-    // Cosine similarity
+    // Cosine similarity with robust numerical stability
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
     for (size_t i = 0; i < a.size(); ++i) {
         dot += a[i] * b[i];
@@ -265,34 +313,19 @@ float ConceptFormation::computeSimilarity(const std::vector<float>& a,
     
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
+    float cosineSimilarity = dot / (std::sqrt(normA) * std::sqrt(normB));
+    return std::max(0.0f, std::min(1.0f, cosineSimilarity));
 }
 
-bool ConceptFormation::isConceptStable(size_t conceptId) const {
-    const DiscoveredConcept* concept = getConcept(conceptId);
-    if (!concept) return false;
-    
-    return concept->avgStability >= stabilityThreshold_;
-}
-
-float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
-    const DiscoveredConcept* concept = getConcept(conceptId);
-    if (!concept) return 0.0f;
-    
-    // Generalization ability = how varied are the instances
-    if (concept->instances.size() < 2) return 0.0f;
-    
-    float totalVariance = 0.0f;
-    for (const auto& instance : concept->instances) {
-        float sim = computeSimilarity(instance.pattern, concept->prototype);
-        totalVariance += (1.0f - sim);
-    }
-    
-    return 1.0f - (totalVariance / concept->instances.size());
+bool ConceptFormation::isNovel(const std::vector<float>& pattern,
+                              float similarityThreshold) const {
+    return findConceptForPattern(pattern) == 0;
 }
 
 void ConceptFormation::clear() {
     concepts_.clear();
+    pImpl->conceptPatterns.clear();
+    pImpl->patternNorms.clear();
     nextConceptId_ = 1;
 }
 

@@ -243,7 +243,10 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem && pImpl->workingMemory && pImpl->curiosity && pImpl->dopamine) {
+        pImpl->predictionSystem->initialize(this, pImpl->workingMemory.get(),
+                                          pImpl->curiosity.get(), pImpl->dopamine.get());
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -510,9 +513,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Generate prediction for next sensory state based on current working memory
+        auto prediction = pImpl->predictionSystem->predictNextState(
+            SensoryInput::createSensoryInput(pImpl->sensoryNeurons)
+        );
+        
+        // Update prediction system with actual working memory content
+        if (prediction) {
+            pImpl->predictionSystem->updatePredictions(*prediction,
+                SensoryInput::createSensoryInput(pImpl->sensoryNeurons));
+        }
+        
+        // Use prediction error to modulate curiosity and exploration
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Apply prediction error effects
+        if (predictionError > 0.1f && confidence > 0.5f) {
+            // High prediction error with reasonable confidence = good time for exploration
+            if (pImpl->curiosity) {
+                float currentCuriosity = pImpl->curiosity->getLevel();
+                pImpl->curiosity->setLevel(std::min(1.0f, currentCuriosity + 0.05f));
+            }
+        }
+        
+        // Update working memory with prediction error information
+        if (pImpl->workingMemory && predictionError > 0.01f) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons.empty() ? 
+                NeuronId(0) : pImpl->sensoryNeurons[0]->getId(),
+                predictionError * 0.1f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
