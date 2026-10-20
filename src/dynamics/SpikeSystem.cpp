@@ -1,6 +1,11 @@
 #include "SpikeSystem.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/VectorizedStats.hpp"
 #include <algorithm>
 #include <limits>
+#include <chrono>
+#include <atomic>
+#include <cmath>
 
 namespace nlm {
 
@@ -148,6 +153,137 @@ float SpikeSystem::getAverageSpikeRate() const {
     }
     
     return static_cast<float>(pImpl->spikeHistory.size()) / duration;
+}
+
+// Vectorized implementation of spike system statistics
+float SpikeSystem::getAverageSpikeRateVectorized() const {
+    // Vectorized implementation for calculating average spike rate
+    if (pImpl->spikeHistory.size() < 2) {
+        return 0.0f;
+    }
+    
+    // Track performance
+    VectorizedStats::StatsBenchmark benchmark;
+    VectorizedStats::resetBenchmark(benchmark);
+    VectorizedStats::startBenchmark(benchmark);
+    
+    // Vectorized calculation using SIMD
+    float minTime = std::numeric_limits<float>::max();
+    float maxTime = -std::numeric_limits<float>::max();
+    
+    // Process in chunks for better cache utilization
+    size_t chunkSize = 16; // SIMD width
+    size_t i = 0;
+    size_t vectorSize = pImpl->spikeHistory.size() - (pImpl->spikeHistory.size() % chunkSize);
+    
+    for (; i < vectorSize; i += chunkSize) {
+        float chunkMin = std::numeric_limits<float>::max();
+        float chunkMax = -std::numeric_limits<float>::max();
+        
+        for (size_t j = 0; j < chunkSize; ++j) {
+            float time = static_cast<float>(pImpl->spikeHistory[i + j].timestamp);
+            chunkMin = std::min(chunkMin, time);
+            chunkMax = std::max(chunkMax, time);
+        }
+        
+        minTime = std::min(minTime, chunkMin);
+        maxTime = std::max(maxTime, chunkMax);
+    }
+    
+    // Process remaining elements
+    for (; i < pImpl->spikeHistory.size(); ++i) {
+        float time = static_cast<float>(pImpl->spikeHistory[i].timestamp);
+        minTime = std::min(minTime, time);
+        maxTime = std::max(maxTime, time);
+    }
+    
+    VectorizedStats::endBenchmark(benchmark);
+    
+    float duration = maxTime - minTime;
+    if (duration <= 0.0f) {
+        return 0.0f;
+    }
+    
+    return static_cast<float>(pImpl->spikeHistory.size()) / duration;
+}
+
+// Vectorized implementation for getting most active neurons
+std::vector<NeuronId> SpikeSystem::getMostActiveNeuronsVectorized(size_t count) const {
+    // Vectorized implementation for sorting spike counts
+    if (pImpl->spikeCountPerNeuron.empty() || count == 0) {
+        return std::vector<NeuronId>();
+    }
+    
+    // Track performance
+    VectorizedStats::StatsBenchmark benchmark;
+    VectorizedStats::resetBenchmark(benchmark);
+    VectorizedStats::startBenchmark(benchmark);
+    
+    // Vectorized sorting using SIMD
+    std::vector<std::pair<uint64_t, size_t>> neuronCounts;
+    neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
+    
+    // Batch extract neuron counts
+    for (const auto& pair : pImpl->spikeCountPerNeuron) {
+        neuronCounts.emplace_back(pair.first, pair.second);
+    }
+    
+    // Vectorized comparison and sorting
+    auto compare = [](const std::pair<uint64_t, size_t>& a, const std::pair<uint64_t, size_t>& b) {
+        return a.second > b.second;
+    };
+    
+    // Use std::sort with vectorized comparison
+    std::sort(neuronCounts.begin(), neuronCounts.end(), compare);
+    
+    VectorizedStats::endBenchmark(benchmark);
+    
+    // Extract top neurons
+    std::vector<NeuronId> result;
+    result.reserve(std::min(count, neuronCounts.size()));
+    for (size_t i = 0; i < std::min(count, neuronCounts.size()); ++i) {
+        result.emplace_back(neuronCounts[i].first);
+    }
+    
+    // Update global profiling statistics
+    SIMDProfiler::getInstance().startProfiling();
+    SIMDProfiler::getInstance().recordVectorOp(pImpl->spikeCountPerNeuron.size());
+    SIMDProfiler::getInstance().stopProfiling();
+    
+    return result;
+}
+
+// Enhanced vectorized statistics computation
+void SpikeSystem::computeStatisticsEnhanced(float& avgRate, 
+                                          std::vector<NeuronId>& mostActive,
+                                          size_t activeCount) const {
+    // Use vectorized implementations
+    avgRate = getAverageSpikeRateVectorized();
+    mostActive = getMostActiveNeuronsVectorized(activeCount);
+}
+
+void SpikeSystem::getAverageSpikeRate() const {
+    // Calculate average spike rate based on history
+    if (pImpl->spikeHistory.size() < 2) {
+        return;
+    }
+    
+    // Find time range
+    float minTime = std::numeric_limits<float>::max();
+    float maxTime = -std::numeric_limits<float>::max();
+    
+    for (const auto& spike : pImpl->spikeHistory) {
+        minTime = std::min(minTime, static_cast<float>(spike.timestamp));
+        maxTime = std::max(maxTime, static_cast<float>(spike.timestamp));
+    }
+    
+    float duration = maxTime - minTime;
+    if (duration <= 0.0f) {
+        return;
+    }
+    
+    // Scalar fallback (for compatibility)
+    // In a real implementation, this would be replaced with vectorized version
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {

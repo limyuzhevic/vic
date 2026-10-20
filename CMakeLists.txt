@@ -149,3 +149,40 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Plugin system
+add_library(nlm_plugin SYSTEM
+    src/plugin/PluginBase.cpp
+    src/plugin/PluginManager.cpp
+    src/plugin/PluginRegistry.cpp
+    src/plugin/HookSystem.cpp
+    src/plugin/ComponentFactory.cpp
+    src/plugin/EventSystem.cpp
+    src/plugin/PluginConfiguration.cpp
+    src/plugin/PluginSecurityManager.cpp
+    src/plugin/PluginUpdateManager.cpp
+)
+
+target_include_directories(nlm_plugin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plugin>
+    $<INSTALL_INTERFACE:include/plugin>
+)
+
+target_link_libraries(nlm_plugin PUBLIC nlm_core)
+
+# Plugin examples
+add_executable(nlm_plugin_demo
+    src/plugin/main.cpp
+)
+target_link_libraries(nlm_plugin_demo PUBLIC nlm_plugin)
+
+# Plugin example executables
+add_executable(enhanced_plasticity_plugin_demo
+    src/plugin/EnhancedPlasticityPlugin.cpp
+)
+target_link_libraries(enhanced_plasticity_plugin_demo PUBLIC nlm_plugin)
+
+add_executable(neuromodulation_enhancement_plugin_demo
+    src/plugin/NeuromodulationEnhancementPlugin.cpp
+)
+target_link_libraries(neuromodulation_enhancement_plugin_demo PUBLIC nlm_plugin)

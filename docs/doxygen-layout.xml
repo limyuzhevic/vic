@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doxygenlayout version="1.9.1">
+  <!-- Global layout settings -->
+  <global>
+    <index-page type="index"/>
+    <index-page type="namespace" ref="namespaces/"/>
+    <index-page type="file" ref="files/"/>
+    <index-page type="page" ref="pages/"/>
+    <index-page type="class" ref="classes/"/>
+    <layout version="1.9.1">
+      <navindex>
+        <group ref="classes/"/>
+        <group ref="namespaces/"/>
+        <group ref="files/"/>
+        <group ref="pages/"/>
+      </navindex>
+      <doxyindex>
+        <classes type="alphabetic"/>
+        <classes type="hierarchic"/>
+        <namespaces type="alphabetic"/>
+        <namespaces type="hierarchic"/>
+        <files type="alphabetic"/>
+        <files type="hierarchic"/>
+        <pages type="list"/>
+      </doxyindex>
+      <doxygenindex>
+        <mainpage/>
+        <namespace-group>
+          <navtitle ref="namespaces/nlm/"/>
+          <group ref="namespaces/nlm/"/>
+        </namespace-group>
+        <class-group>
+          <navtitle ref="classes/"/>
+          <group ref="classes/"/>
+        </class-group>
+        <file-group>
+          <navtitle ref="files/"/>
+          <group ref="files/"/>
+        </file-group>
+        <page-group>
+          <navtitle ref="pages/"/>
+          <group ref="pages/"/>
+        </page-group>
+      </doxygenindex>
+      <template-group>
+        <navtitle ref="pages/templates/"/>
+        <template-type ref="pages/templates/"/>
+      </template-group>
+      <search>
+        <searchlabel>Index</searchlabel>
+      </search>
+    </layout>
+  </global>
+  
+  <!-- Index page layout -->
+  <index>
+    <mainpage ref="main/"/>
+    <doxygenindex>
+      <mainpage ref="main/"/>
+      <namespace-group>
+        <navtitle ref="namespaces/nlm/"/>
+        <group ref="namespaces/nlm/"/>
+      </namespace-group>
+      <class-group>
+        <navtitle ref="classes/"/>
+        <group ref="classes/"/>
+      </class-group>
+      <file-group>
+        <navtitle ref="files/"/>
+        <group ref="files/"/>
+      </file-group>
+      <page-group>
+        <navtitle ref="pages/"/>
+        <group ref="pages/"/>
+      </page-group>
+    </doxygenindex>
+  </index>
+  
+  <!-- File layout -->
+  <file>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <memberdecl>
+      <inline-class>
+        <member-type ref="class/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </inline-class>
+      <class>
+        <member-type ref="class/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </class>
+      <struct>
+        <member-type ref="struct/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </struct>
+      <union>
+        <member-type ref="union/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </union>
+      <enum>
+        <member-type ref="enum/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </enum>
+      <service>
+        <member-type ref="service/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </service>
+      <property>
+        <member-type ref="property/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </property>
+      <variable>
+        <member-type ref="variable/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </variable>
+      <function>
+        <member-type ref="function/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </function>
+      <signal>
+        <member-type ref="signal/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </signal>
+      <slot>
+        <member-type ref="slot/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </slot>
+      <event>
+        <member-type ref="event/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </event>
+      <friend>
+        <member-type ref="friend/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </friend>
+      <related>
+        <member-type ref="related/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </related>
+      <define>
+        <member-type ref="define/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </define>
+    </memberdecl>
+    <memberdef>
+      <inline-class>
+        <member-def ref="index.html#1"/>
+      </inline-class>
+      <class>
+        <member-def ref="index.html#1"/>
+      </class>
+      <struct>
+        <member-def ref="index.html#1"/>
+      </struct>
+      <union>
+        <member-def ref="index.html#1"/>
+      </union>
+      <enum>
+        <member-def ref="index.html#1"/>
+      </enum>
+      <service>
+        <member-def ref="index.html#1"/>
+      </service>
+      <property>
+        <member-def ref="index.html#1"/>
+      </property>
+      <variable>
+        <member-def ref="index.html#1#1"/>
+      </variable>
+      <function>
+        <member-def ref="index.html#1#1"/>
+      </function>
+      <signal>
+        <member-def ref="index.html#1#1"/>
+      </signal>
+      <slot>
+        <member-def ref="index.html#1#1"/>
+      </slot>
+      <event>
+        <member-def ref="index.html#1#1"/>
+      </event>
+      <friend>
+        <member-def ref="index.html#1"/>
+      </friend>
+      <related>
+        <member-def ref="index.html#1#1"/>
+      </related>
+      <define>
+        <member-def ref="index.html#1#1"/>
+      </define>
+    </memberdef>
+    <location/>
+  </file>
+  
+  <!-- Namespace layout -->
+  <namespace>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <memberdecl>
+      <inline-class>
+        <member-type ref="class/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </inline-class>
+      <class>
+        <member-type ref="class/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </class>
+      <struct>
+        <member-type ref="struct/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </struct>
+      <union>
+        <member-type ref="union/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </union>
+      <enum>
+        <member-type ref="enum/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </enum>
+      <service>
+        <member-type ref="service/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </service>
+      <property>
+        <member-type ref="property/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </property>
+      <variable>
+        <member-type ref="variable/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </variable>
+      <function>
+        <member-type ref="function/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </function>
+      <signal>
+        <member-type ref="signal/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </signal>
+      <slot>
+        <member-type ref="slot/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </slot>
+      <event>
+        <member-type ref="event/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </event>
+      <friend>
+        <member-type ref="friend/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </friend>
+      <related>
+        <member-type ref="related/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </related>
+      <define>
+        <member-type ref="define/"/>
+        <member-name ref="index.html"/>
+        <member-doc ref="index.html"/>
+      </define>
+    </memberdecl>
+    <memberdef>
+      <inline-class>
+        <member-def ref="index.html#1"/>
+      </inline-class>
+      <class>
+        <member-def ref="index.html#1"/>
+      </class>
+      <struct>
+        <member-def ref="index.html#1"/>
+      </struct>
+      <union>
+        <member-def ref="index.html#1"/>
+      </union>
+      <enum>
+        <member-def ref="index.html#1"/>
+      </enum>
+      <service>
+        <member-def ref="index.html#1"/>
+      </service>
+      <property>
+        <member-def ref="index.html#1"/>
+      </property>
+      <variable>
+        <member-def ref="index.html#1#1"/>
+      </variable>
+      <function>
+        <member-def ref="index.html#1#1"/>
+      </function>
+      <signal>
+        <member-def ref="index.html#1#1"/>
+      </signal>
+      <slot>
+        <member-def ref="index.html#1#1"/>
+      </slot>
+      <event>
+        <member-def ref="index.html#1#1"/>
+      </event>
+      <friend>
+        <member-def ref="index.html#1"/>
+      </friend>
+      <related>
+        <member-def ref="index.html#1#1"/>
+      </related>
+      <define>
+        <member-def ref="index.html#1#1"/>
+      </define>
+    </memberdef>
+    <location/>
+  </namespace>
+  
+  <!-- Page layout -->
+  <page>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </page>
+  
+  <!-- Hierarchy layout -->
+  <hierarchy>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </hierarchy>
+  
+  <!-- Graph layout -->
+  <graph>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </graph>
+  
+  <!-- Glossary layout -->
+  <glossary>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </glossary>
+  
+  <!-- Search layout -->
+  <search>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </search>
+  
+  <!-- Extra section -->
+  <extra>
+    <brief-desc>
+      <para/>
+    </brief-desc>
+    <content/>
+    <location/>
+  </extra>
+</doxygenlayout>

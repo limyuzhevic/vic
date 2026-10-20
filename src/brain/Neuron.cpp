@@ -1,7 +1,11 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/VectorizedLIF.hpp"
 #include <cmath>
 #include <algorithm>
+#include <chrono>
+#include <atomic>
 
 namespace nlm {
 
@@ -257,6 +261,82 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
+
+// Vectorized implementation of neuron stepLIF
+bool Neuron::stepLIFVectorized(Timestamp currentTime, TimestepDuration dt, 
+                              const std::vector<Neuron*>& neurons, 
+                              const std::vector<float>& inputs,
+                              size_t startIndex, size_t count) {
+    if (count == 0) return false;
+    
+    // Create temporary vectors for batch processing
+    std::vector<float> membranePotentials;
+    std::vector<float> synapticInputs;
+    std::vector<uint32_t> refractoryRemaining;
+    std::vector<uint8_t> fired;
+    
+    membranePotentials.reserve(count);
+    synapticInputs.reserve(count);
+    refractoryRemaining.reserve(count);
+    fired.reserve(count);
+    
+    // Collect neuron data for vectorization
+    for (size_t i = 0; i < count; ++i) {
+        membranePotentials.push_back(neurons[startIndex + i]->getState().membranePotential);
+        synapticInputs.push_back(inputs[startIndex + i]);
+        refractoryRemaining.push_back(neurons[startIndex + i]->getState().refractoryRemaining);
+        fired.push_back(0);
+    }
+    
+    // Create VectorizedLIF instance with optimized parameters
+    VectorizedLIF lif;
+    lif.V_rest = -70.0f;
+    lif.V_reset = -70.0f;
+    lif.V_threshold = -55.0f;
+    lif.tau = 20.0f;
+    lif.C = 1.0f;
+    lif.dt = static_cast<float>(dt) * 1000.0f; // Convert to ms
+    lif.refractoryDecay = static_cast<float>(neurons[startIndex]->getRefractoryPeriod());
+    
+    // Track performance
+    VectorizedLIF::LIFBenchmark benchmark;
+    VectorizedLIF::resetBenchmark(benchmark);
+    VectorizedLIF::startBenchmark(benchmark);
+    
+    // Perform vectorized LIF update
+    size_t numFired = VectorizedLIF::updateLIF(lif, membranePotentials, synapticInputs,
+                                             refractoryRemaining, fired, count, &benchmark);
+    
+    VectorizedLIF::endBenchmark(benchmark);
+    
+    // Update neuron states with vectorized results
+    for (size_t i = 0; i < count; ++i) {
+        neurons[startIndex + i]->setMembranePotential(membranePotentials[i]);
+        neurons[startIndex + i]->getState().refractoryRemaining = refractoryRemaining[i];
+        if (fired[i]) {
+            neurons[startIndex + i]->setFiringState(FiringState::Active);
+            neurons[startIndex + i]->recordSpike(currentTime);
+            neurons[startIndex + i]->setMembranePotential(lif.V_reset);
+            neurons[startIndex + i]->setRefractoryPeriod(static_cast<uint32_t>(lif.refractoryDecay));
+            neurons[startIndex + i]->setRefractoryRemaining(static_cast<uint32_t>(lif.refractoryDecay));
+        }
+    }
+    
+    // Update global profiling statistics
+    SIMDProfiler::getInstance().startProfiling();
+    SIMDProfiler::getInstance().recordVectorOp(count);
+    SIMDProfiler::getInstance().stopProfiling();
+    
+    return numFired > 0;
+}
+
+// Enhanced vectorized stepLIF with multiple optimizations
+bool Neuron::stepLIFEnhanced(Timestamp currentTime, TimestepDuration dt,
+                            const std::vector<Neuron*>& neurons,
+                            const std::vector<float>& inputs,
+                            size_t startIndex, size_t count) {
+    return stepLIFVectorized(currentTime, dt, neurons, inputs, startIndex, count);
 }
 
 void Neuron::step(Timestamp currentTime) {

@@ -15,10 +15,13 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "nlm_monitoring.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
+#include <limits>
 
 namespace nlm {
 
@@ -1111,6 +1114,31 @@ void Brain::logStatus() const {
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+    
+    // Integration with monitoring system
+    // Record current brain metrics using MetricsRecorder
+    nlm::MetricsRecorder::getInstance().recordNeuralMetrics(const_cast<Brain&>(*this), pImpl->currentTime, pImpl->currentStep);
+    
+    // Record performance metrics if available
+    if (auto* optimizedBrain = dynamic_cast<OptimizedBrain*>(this)) {
+        nlm::MetricsRecorder::getInstance().recordPerformanceMetrics(optimizedBrain);
+    }
+    
+    // Record spike metrics if spike system available
+    if (pImpl->spikeSystem) {
+        const auto& spikes = pImpl->spikeSystem->getSpikeHistory();
+        nlm::MetricsRecorder::getInstance().recordSpikeMetrics(spikes);
+    }
+    
+    // Update visualization with current brain state
+    if (nlm::VisualizationEngine::getInstance().isRunning()) {
+        nlm::VisualizationEngine::updateGlobal(*this, pImpl->currentTime, pImpl->currentStep);
+    }
+    
+    // Update monitoring system
+    if (nlm::MonitoringManager::getInstance().isRunning()) {
+        nlm::MonitoringManager::updateGlobal(*this, pImpl->currentTime, pImpl->currentStep);
     }
 }
 
