@@ -2,25 +2,14 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然) is an experimental artificial developmental brain system. It's a neural simulation framework that creates virtual brains capable of learning, remembering, and making decisions through interaction with an environment.
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
-
-That's it! NLM simulates all of this.
-
----
-
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
+**What makes NLM special:**
+- Brain-inspired architecture with real spiking neurons
+- Event-driven dynamics and synaptic plasticity
+- Multiple learning mechanisms (STDP, Hebbian, structural)
+- Neuromodulation for reward, curiosity, and novelty
+- Memory systems (working, episodic, associative)
 
 ## Quick Start (Copy & Paste)
 
@@ -29,13 +18,14 @@ That's it! NLM simulates all of this.
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Create a default configuration
+config = pynlm.createDefaultConfig()
 
-# Step 2: Turn it on
+# Step 2: Create and initialize the brain
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Step 3: Make it think for 100 steps
+# Step 3: Run simulation for 100 steps
 for i in range(100):
     brain.step(i)  # One step of thinking
 
@@ -47,31 +37,55 @@ print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
+# Create and configure world
 world = pynlm.createSimpleWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 
+# Create agent that connects brain to world
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Run for 50 steps
+# Run simulation loop
 for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+    # Update environment
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process input in brain
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get motor action
+    action = agent.decodeMotorCommand()
+    
+    # Execute action in world
+    world.applyMotorCommand(action, world.getSimulationTime())
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
 ---
+
+## Simple Analogy
+
+| Real World | NLM Code |
+|------------|----------|
+| You see something | `percept = world.getSensoryPercept()` |
+| Your brain processes it | `agent.processSensoryInput(percept)` |
+| You decide to act | `action = agent.decodeMotorCommand()` |
+| You do the action | `world.applyMotorCommand(action, time)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
 
 ## Simple Analogy
 
@@ -157,27 +171,41 @@ agent.enableCuriosity(True)             # Explore new things
 
 ## What Each Part Does
 
+### `pynlm.createDefaultConfig()`
+Creates a configuration with sensible defaults for the brain.
+
 ### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+Creates a virtual brain with neurons and synapses based on the configuration.
 
 ### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+Sets up the brain with initial conditions and connections.
 
 ### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+Runs one simulation step: neurons process inputs, propagate spikes, update synapses.
 
 ### `world.update(time)`
-Updates the virtual world by `time` seconds.
+Advances the simulation environment by the specified time.
+
+### `world.getSensoryPercept()`
+Gets the current sensory information (vision, touch, etc.) from the world.
+
+### `pynlm.createSimpleWorld()`
+Creates a simple 2D world for simulation.
+
+### `world.configure(width, height, visionWidth, visionHeight)`
+Sets up world dimensions and agent sensing capabilities.
+
+### `pynlm.createAgentBrain(brain)`
+Creates an agent interface that connects brain to world for sensory processing and motor actions.
+
+### `agent.initialize(world)`
+Sets up the agent to work with the world.
 
 ### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+Passes sensory information to the brain for processing.
 
 ### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+Reads brain activity and produces motor commands for the world.
 
 ---
 
@@ -258,40 +286,118 @@ print("Agent simulation complete!")
 
 ## Quick Reference
 
+### Core Functions
+
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| Create config | `config = pynlm.createDefaultConfig()` |
+| Create brain | `brain = pynlm.createBrain(config)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Create world | `world = pynlm.createSimpleWorld()` |
+| Configure world | `world.configure(width, height, visionWidth, visionHeight)` |
+| Create agent | `agent = pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()`, `brain.getTotalSpikeCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+### Configuration Keys
+
+| Key | Type | Default | Description |
+|----|------|---------|-------------|
+| `brain.neuron_count` | int | 1000 | Total number of neurons |
+| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
+| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
+| `plasticity.stdp.enable` | bool | true | Enable STDP |
+| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
+| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 
 ---
 
 ## Troubleshooting
 
+### Common Issues and Solutions
+
 **"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+- Did you call `brain.initialize()`? Always call it before using the brain!
+- Try increasing the number of steps to let the brain "warm up"
+- Check if neurons have enough current to fire
 
 **"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+- Did you call `world.applyMotorCommand()`? Actions need to be applied to the world
+- Make sure `world.update()` is being called in your simulation loop
+- Check if the agent's motor neurons are active
 
 **"Everything is 0"**
-- Brains need time to "warm up" - try more steps
+- Brains need time to "warm up" - try more steps (100+ recommended)
 - Some neurons need input to fire - make sure sensory input is connected
+- Check if you're injecting current into sensory neurons
+
+**"Python import error"**
+- Make sure you have all dependencies installed: `pip install pynlm`
+- The package might not be built yet - run `pip install .` from the project root
+
+**"Configuration errors"**
+- Use `pynlm.createDefaultConfig()` for a working starting point
+- Check that configuration keys are valid (no spaces, use dots for nesting)
+
+### Debug Tips
+
+```python
+# Add debugging to your simulation loop:
+print(f"Step {step}:")
+print(f"  Sensory input size: {len(percept.getVision())}")
+print(f"  Active neurons: {brain.getActiveNeuronCount()}")
+print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  Synaptic connections: {brain.getTotalSynapseCount()}")
+
+# Check agent status:
+print(f"  Agent curiosity: {agent.getCuriosityLevel():.3f}")
+print(f"  Agent novelty: {agent.getNoveltyLevel():.3f}")
+print(f"  Agent prediction error: {agent.getPredictionError():.3f}")
+```
 
 ---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### For Beginners:
+1. **Read `HOW_TO_USE.md` for more details** - Comprehensive C++ build instructions and Python API reference
+2. **Try the example projects** in this guide to get hands-on experience
+3. **Experiment with different configurations** to see how they affect brain behavior
 
-That's it! You're now ready to use NLM.
+### For Intermediate Users:
+1. **Understand the brain architecture** - Read `docs/ARCHITECTURE.md`
+2. **Learn about scientific principles** - Read `docs/SCIENCE.md`
+3. **Explore experiment examples** - Check out `docs/EXPERIMENTS.md`
+4. **Configure advanced settings** - Modify config files for specific use cases
+
+### For Advanced Users:
+1. **Study the source code** in the `src/` directory
+2. **Implement custom learning rules** in the plasticity modules
+3. **Create custom world environments** or add new sensory modalities
+4. **Contribute to the project** - Report issues and suggest improvements
+
+### Configuration Examples
+
+```python
+import pynlm
+
+# Basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+
+# Custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)  # More neurons
+config.set("brain.synapse_density", 0.2)  # More connections
+config.set("plasticity.stdp.enable", True)  # Enable STDP
+config.set("plasticity.hebbian.enable", True)  # Enable Hebbian
+
+brain = pynlm.createBrain(config)
+```
+
+That's it! You're now ready to use NLM. The guide covers everything from getting started to advanced usage.
+
+**Need help?** Check the troubleshooting section or explore the documentation in the `docs/` folder for deeper insights into the NLM system.

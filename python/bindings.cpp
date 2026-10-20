@@ -400,13 +400,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
+
+    m.def("createConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a new configuration (alias for createDefaultConfig)");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(std::make_shared<Config>());
+    }, "Create a new brain with default configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -415,6 +423,213 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize an agent with brain and world");
+
+    m.def("createCompleteSetup", [](const std::string& configFile) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(configFile);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("configFile"), "Create a complete setup (brain, world, agent) from a configuration file");
+
+    m.def("createCompleteSetup", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete setup (brain, world, agent) with default configuration");
+
+    m.def("loadConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Load configuration from a file");
+
+    m.def("createExperimentSetup", [](int neuronCount, int steps) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("random_seed", 42);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(30, 30, 12, 12);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent, steps);
+    }, py::arg("neuronCount"), py::arg("steps"), "Create an experiment setup with specified neuron count and steps");
+
+    m.def("createQuickTest", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 4, 4);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a quick test setup with small brain for fast testing");
+
+    m.def("createAdvancedSetup", [](bool enableLearning, bool enableDevelopment, bool enableCuriosity) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.5);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(40, 40, 16, 16);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+        }
+        if (enableDevelopment) {
+            agent->enableDevelopment(true);
+        }
+        if (enableCuriosity) {
+            agent->enableCuriosity(true);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("enableLearning") = true, py::arg("enableDevelopment") = true, py::arg("enableCuriosity") = true, 
+        "Create an advanced setup with configurable features");
+
+    m.def("createDemoSetup", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(25, 25, 10, 10);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a demo setup suitable for demonstrations and tutorials");
+
+    m.def("createExplorationSetup", [](int mapSize) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(mapSize, mapSize, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("mapSize") = 20, "Create an exploration setup suitable for curiosity-driven exploration");
+
+    m.def("createStatsCalculator", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        std::ostringstream oss;
+        oss << "=== NLM System Statistics ===\n";
+        oss << "Brain:\n";
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << "\n";
+        oss << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        oss << "\nAgent:\n";
+        oss << "  Curiosity level: " << agent->getCuriosityLevel() << "\n";
+        oss << "  Novelty level: " << agent->getNoveltyLevel() << "\n";
+        oss << "  Neuromodulation level: " << agent->getNeuromodulationLevel() << "\n";
+        oss << "  Prediction error: " << agent->getPredictionError() << "\n";
+        oss << "\nWorld:\n";
+        oss << "  Width: " << world->getWidth() << "\n";
+        oss << "  Height: " << world->getHeight() << "\n";
+        oss << "  Simulation time: " << world->getSimulationTime() << "\n";
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), "Calculate and return comprehensive statistics about the system");
+
+    m.def("printSystemInfo", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        std::cout << "=== NLM System Information ===\n";
+        std::cout << "Brain Configuration:\n";
+        auto config = brain->getConfig();
+        std::cout << "  Neuron count: " << config->getOr<int64_t>("brain.neuron_count", 0) << "\n";
+        std::cout << "  Synapse density: " << config->getOr<float>("brain.synapse_density", 0.0f) << "\n";
+        std::cout << "  Connection probability: " << config->getOr<float>("brain.connection_probability", 0.0f) << "\n";
+        std::cout << "\nSystem Status:\n";
+        std::cout << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        std::cout << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        std::cout << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        std::cout << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        std::cout << "\nAgent State:\n";
+        std::cout << "  Curiosity: " << agent->getCuriosityLevel() << "\n";
+        std::cout << "  Novelty: " << agent->getNoveltyLevel() << "\n";
+        std::cout << "  Development stage: " << static_cast<int>(agent->getDevelopmentalStage()) << "\n";
+        std::cout << "\nWorld State:\n";
+        std::cout << "  Width: " << world->getWidth() << "\n";
+        std::cout << "  Height: " << world->getHeight() << "\n";
+        std::cout << "  Time: " << world->getSimulationTime() << "\n";
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), "Print comprehensive system information to console");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
