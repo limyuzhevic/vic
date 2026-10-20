@@ -54,24 +54,33 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         SpikeEvent event = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
         
-        // Create detailed event
+        // Create detailed event with additional metadata
         DetailedSpikeEvent detailed;
         detailed.source = event.source_neuron;
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
+        // Note: regionId and populationId not available in SpikeEvent,
+        // but could be added to the event structure if needed
         
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
         
-        // Track spike count per neuron
+        // Track spike count per neuron for statistics
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - maintain max size efficiently
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Remove from beginning until we meet the size requirement
+            while (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+                pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            }
+            // Also trim the spike count map
+            if (pImpl->spikeHistory.size() < pImpl->maxHistorySize * 0.1) {
+                pImpl->spikeCountPerNeuron.clear();
+            }
         }
         
-        // Call handlers
+        // Call all registered spike handlers
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }
@@ -95,11 +104,15 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+    if (handler) {
+        pImpl->handlers.push_back(std::move(handler));
+    }
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+    if (handler) {
+        pImpl->delayedHandlers.push_back(std::move(handler));
+    }
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
@@ -128,26 +141,32 @@ size_t SpikeSystem::getPendingDelayedCount() const {
 }
 
 float SpikeSystem::getAverageSpikeRate() const {
-    // Calculate average spike rate based on history
-    if (pImpl->spikeHistory.size() < 2) {
-        return 0.0f;
+    // Calculate average spike rate based on history with improved error handling
+    size_t historySize = pImpl->spikeHistory.size();
+    
+    if (historySize < 2) {
+        return 0.0f;  // Need at least 2 spikes to calculate a rate
     }
     
-    // Find time range
+    // Find time range - improved stability
     float minTime = std::numeric_limits<float>::max();
     float maxTime = -std::numeric_limits<float>::max();
     
     for (const auto& spike : pImpl->spikeHistory) {
-        minTime = std::min(minTime, static_cast<float>(spike.timestamp));
-        maxTime = std::max(maxTime, static_cast<float>(spike.timestamp));
+        float spikeTime = static_cast<float>(spike.timestamp);
+        minTime = std::min(minTime, spikeTime);
+        maxTime = std::max(maxTime, spikeTime);
     }
     
     float duration = maxTime - minTime;
+    
+    // Avoid division by zero for edge cases
     if (duration <= 0.0f) {
         return 0.0f;
     }
     
-    return static_cast<float>(pImpl->spikeHistory.size()) / duration;
+    // Calculate rate in Hz (spikes per second)
+    return static_cast<float>(historySize) / duration;
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {

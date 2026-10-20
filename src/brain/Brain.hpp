@@ -193,6 +193,18 @@ public:
     // Logging
     void logStatus() const;
     
+    // Simulation control (for advanced users and testing)
+    void pause();
+    void resume();
+    void stepOnce();
+    bool isPaused() const;
+    bool isRunning() const;
+    
+    // Simulation statistics
+    double getSimulationTime() const;
+    size_t getStepCount() const;
+    size_t getTotalStepCount() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

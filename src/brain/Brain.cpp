@@ -761,6 +761,79 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+void Brain::pause() {
+    NLM_LOG_INFO("Pausing NLM Brain simulation...");
+    pImpl->isResting = true;
+}
+
+void Brain::resume() {
+    NLM_LOG_INFO("Resuming NLM Brain simulation...");
+    pImpl->isResting = false;
+}
+
+void Brain::stepOnce() {
+    NLM_LOG_INFO("Taking single step in NLM Brain simulation...");
+    if (pImpl->isResting) {
+        NLM_LOG_WARN("Brain is paused. Step will not execute until resumed.");
+        return;
+    }
+    
+    // Execute a single simulation step
+    pImpl->currentStep++;
+    pImpl->currentTime += pImpl->timestep;
+    pImpl->totalSpikesThisStep = 0;
+    
+    // Update development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(pImpl->timestep, pImpl->currentStep);
+    }
+    
+    // Update each region
+    for (auto& region : pImpl->regions) {
+        region->step(pImpl->currentStep, pImpl->currentTime);
+    }
+    
+    // Update plasticity rules
+    updatePlasticity();
+    
+    // Update memory systems
+    if (pImpl->workingMemory) pImpl->workingMemory->update(pImpl->currentStep);
+    if (pImpl->episodicMemory) pImpl->episodicMemory->update(pImpl->currentStep);
+    if (pImpl->associativeMemory) pImpl->associativeMemory->update(pImpl->currentStep);
+    
+    // Process spike events and delayed spikes
+    pImpl->spikeSystem->processSpikes(pImpl->currentStep);
+    pImpl->spikeSystem->processDelayedSpikes(pImpl->currentStep, pImpl->currentTime);
+    
+    // Update development system for next step
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(pImpl->timestep, pImpl->currentStep);
+    }
+    
+    NLM_LOG_INFO("NLM Brain single step complete. Step: " + std::to_string(pImpl->currentStep) + 
+                 ", Time: " + std::to_string(pImpl->currentTime) + "ms");
+}
+
+bool Brain::isPaused() const {
+    return pImpl->isResting;
+}
+
+bool Brain::isRunning() const {
+    return !pImpl->isResting;
+}
+
+double Brain::getSimulationTime() const {
+    return pImpl->currentTime;
+}
+
+size_t Brain::getStepCount() const {
+    return pImpl->currentStep;
+}
+
+size_t Brain::getTotalStepCount() const {
+    return pImpl->totalSpikesTotal;
+}
+
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     

@@ -353,6 +353,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Simulation control (for advanced users and testing)
+    .def("pause", &Brain::pause,
+         "Pause the simulation")
+    .def("resume", &Brain::resume,
+         "Resume the simulation")
+    .def("stepOnce", &Brain::stepOnce,
+         "Take a single simulation step")
+    .def("isPaused", &Brain::isPaused,
+         "Check if simulation is paused")
+    .def("isRunning", &Brain::isRunning,
+         "Check if simulation is running")
+    .def("getSimulationTime", &Brain::getSimulationTime,
+         "Get current simulation time in milliseconds")
+    .def("getStepCount", &Brain::getStepCount,
+         "Get current step count")
+    .def("getTotalStepCount", &Brain::getTotalStepCount,
+         "Get total number of steps taken");
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),

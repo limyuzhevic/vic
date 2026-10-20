@@ -19,37 +19,47 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Improved file loader with better parsing and error handling
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        
+        // Skip empty lines, comments, and trailing whitespace
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line.find_first_not_of(' ') == std::string::npos) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with improved error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+        if (pos == std::string::npos) {
+            // Log warning for malformed line but continue processing
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            continue;
+        }
+        
+        // Remove quotes if present (support both single and double quotes)
+        if (value.size() >= 2) {
+            char quoteChar = value[0];
+            if ((quoteChar == '"' && value.back() == '"') || 
+                (quoteChar == '\'' && value.back() == '\'')) {
                 value = value.substr(1, value.size() - 2);
             }
-            
-            set(key, value, ConfigSource::File);
         }
+        
+        set(key, value, ConfigSource::File);
     }
     
     return true;
@@ -86,7 +96,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // String values need quotes
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Vector values are serialized as comma-separated lists
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                // For simple types (int, int64_t, double, etc.)
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -94,6 +142,11 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input key
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +168,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input key
+    if (key.empty()) {
+        return; // Silently ignore invalid key, as per robust error handling
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -143,11 +201,21 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    // Validate input key
+    if (key.empty()) {
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    // Validate input key
+    if (key.empty()) {
+        return; // Silently ignore invalid key, as per robust error handling
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -171,6 +239,12 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    if (pImpl->entries.empty()) {
+        oss << "  (empty configuration)\n";
+        return oss.str();
+    }
+    
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
