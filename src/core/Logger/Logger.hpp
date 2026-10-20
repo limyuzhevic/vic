@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <nlohmann/json.hpp>  // JSON library for structured logging
 
 namespace nlm {
 
@@ -52,6 +53,12 @@ public:
     void setUseColors(bool useColors);
     bool getUseColors() const;
     
+    // JSON logging support
+    void setUseJSON(bool useJSON);
+    bool getUseJSON() const;
+    void setJSONFormat(const std::string& format);
+    std::string getJSONFormat() const;
+    
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
@@ -62,6 +69,7 @@ private:
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatJSONEntry(const LogEntry& entry) const;
 };
 
 // Main Logger class

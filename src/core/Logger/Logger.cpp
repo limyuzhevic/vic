@@ -4,14 +4,18 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <ctime>
+#include <nlohmann/json.hpp>  // JSON library for structured logging
 
 namespace nlm {
 
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
+    bool useJSON = false;  // New: Enable JSON logging
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string jsonFormat = "%timestamp% %level% %message%";  // New: JSON log format
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -29,28 +33,62 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+    if (pImpl->useJSON) {
+        // JSON logging format
+        nlohmann::json jsonEntry;
+        
+        // Convert timestamp to ISO format
+        auto timestamp = std::chrono::system_clock::to_time_t(entry.timestamp);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            entry.timestamp.time_since_epoch()) % 1000;
+        
+        std::tm tm_buf;
+        std::tm* ptm = std::localtime(&timestamp);
+        if (ptm) {
+            std::copy(std::begin(*ptm), std::end(*ptm), std::begin(tm_buf));
+        }
+        
+        char timeBuffer[20];
+        std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &tm_buf);
+        char msBuffer[5];
+        std::snprintf(msBuffer, sizeof(msBuffer), ".%03ld", ms.count());
+        
+        jsonEntry["timestamp"] = std::string(timeBuffer) + msBuffer;
+        jsonEntry["level"] = levelToString(entry.level);
+        jsonEntry["message"] = entry.message;
+        
+        if (!entry.file.empty()) {
+            jsonEntry["file"] = entry.file;
+            jsonEntry["line"] = entry.line;
+            jsonEntry["function"] = entry.function;
+        }
+        
+        std::cout << jsonEntry.dump() << "\n";
     } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        // Traditional text logging format
+        std::ostringstream oss;
+        oss << "[" << levelToString(entry.level) << "] ";
+        
+        // Add timestamp
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        
+        oss << " " << entry.message;
+        
+        std::string output = oss.str();
+        
+        // Console output
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+        
+        // File output if set
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        }
     }
 }
 
@@ -68,6 +106,22 @@ void ConsoleLogger::setUseColors(bool useColors) {
 
 bool ConsoleLogger::getUseColors() const {
     return pImpl->useColors;
+}
+
+void ConsoleLogger::setUseJSON(bool useJSON) {
+    pImpl->useJSON = useJSON;
+}
+
+bool ConsoleLogger::getUseJSON() const {
+    return pImpl->useJSON;
+}
+
+void ConsoleLogger::setJSONFormat(const std::string& format) {
+    pImpl->jsonFormat = format;
+}
+
+std::string ConsoleLogger::getJSONFormat() const {
+    return pImpl->jsonFormat;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {

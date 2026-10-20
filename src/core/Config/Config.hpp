@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -43,6 +45,27 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    ConfigValidationError(const std::string& k, const std::string& msg) : key(k), message(msg) {}
+};
+
+// Configuration schema definition
+struct ConfigSchemaEntry {
+    std::string key;
+    ConfigValue defaultValue;
+    std::string description;
+    std::function<bool(const ConfigValue&)> validator;
+    bool required;
+    std::string type;
+    
+    ConfigSchemaEntry(const std::string& k, const ConfigValue& def, const std::string& desc, 
+                     const std::function<bool(const ConfigValue&)>& val, bool req, const std::string& typeName)
+        : key(k), defaultValue(def), description(desc), validator(val), required(req), type(typeName) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -60,6 +83,12 @@ public:
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonContent);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlContent);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +122,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    std::vector<ConfigValidationError> validate() const;
+    void setSchema(const std::vector<ConfigSchemaEntry>& schema);
+    void clearSchema();
+    
+    // Schema-based validation helpers
+    static bool isValidValue(const ConfigValue& value, const std::string& type);
+    static bool validateString(const ConfigValue& value);
+    static bool validateInt(const ConfigValue& value);
+    static bool validateDouble(const ConfigValue& value);
+    static bool validateBool(const ConfigValue& value);
+    static bool validateIntArray(const ConfigValue& value);
+    static bool validateDoubleArray(const ConfigValue& value);
+    static bool validateStringArray(const ConfigValue& value);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +144,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static std::vector<ConfigValidationError> validateAgainstSchema() const;
+    static bool isValueOfType(const ConfigValue& value, const std::string& typeName);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
