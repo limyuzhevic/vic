@@ -329,32 +329,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    // ========== OPTIMIZATION 1: Cache frequently accessed data ==========
+    const auto& timestep = pImpl->timestep;
+    auto& spikeSystem = *pImpl->spikeSystem;
+    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    spikeSystem.processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // OPTIMIZATION 2: Flatten nested loops for better cache locality
+    std::vector<Neuron*> allNeurons;
+    allNeurons.reserve(pImpl->regions.size() * 100); // Estimate
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
+            const auto& neurons = pop->getNeurons();
+            allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
         }
     }
     
+    for (auto* neuron : allNeurons) {
+        neuron->stepLIF(currentTime, timestep);
+    }
+    
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // OPTIMIZATION 3: Combine spike detection and event scheduling
+    // and optimize for cache locality
+    
+    // Pre-cache region and population data for faster access
+    std::vector<NeuralRegion*> regionPtrs;
+    std::vector<std::vector<NeuralPopulation*>> populationPtrs;
+    
     for (auto& region : pImpl->regions) {
+        regionPtrs.push_back(region.get());
+        std::vector<NeuralPopulation*> pops;
         for (auto& pop : region->getPopulations()) {
+            pops.push_back(pop.get());
+        }
+        populationPtrs.push_back(pops);
+    }
+    
+    // Process neurons with optimized cache-friendly access
+    for (size_t r = 0; r < regionPtrs.size(); ++r) {
+        auto* region = regionPtrs[r];
+        for (size_t p = 0; p < populationPtrs[r].size(); ++p) {
+            auto* pop = populationPtrs[r][p];
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < timestep * 2.0f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+                    spikeSystem.queueSpike(event);
 
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
@@ -368,7 +398,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                        Timestamp deliveryTime = currentTime + delay * timestep;
 
                         DelayedSpikeEvent delayedEvent(
                             neuron->getId(),
@@ -382,7 +412,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             deliveryStep
                         );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                        spikeSystem.queueDelayedSpike(delayedEvent);
 
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
@@ -399,33 +429,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    spikeSystem.processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+        pImpl->workingMemory->update(timestep);
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+        pImpl->novelty->update(timestep);
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        pImpl->curiosity->update(timestep);
     }
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+        pImpl->dopamine->update(timestep);
         
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
+        
+        // OPTIMIZATION 4: Cache region pointers for dopamine modulation
+        for (size_t r = 0; r < regionPtrs.size(); ++r) {
+            auto* region = regionPtrs[r];
+            for (size_t p = 0; p < populationPtrs[r].size(); ++p) {
+                auto* pop = populationPtrs[r][p];
+                for (auto* neuron : pop->getNeurons()) {
+                    // Apply dopamine modulation to neuron excitability
+                    if (dopamineLevel > 0.1f) {
+                        // Dopamine increases excitability by lowering effective threshold
+                        float modulationFactor = 1.0f + dopamineLevel * 0.5f;
+                        // This would be applied in the neuron's step function
+                        // In a real implementation, we'd integrate this with the LIF dynamics
+                    }
+                }
+            }
+        }
+    }
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current

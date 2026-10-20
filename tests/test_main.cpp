@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_enhanced {
+    void runAllEnhanced();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -37,12 +41,22 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_python_bindings {
+    void runAll();
+}
+
+namespace test_memory_manager {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "=== NLM Phase 2 Tests (Enhanced) ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Enhanced Configuration & Memory Management" << std::endl;
+    std::cout << "  - Python Bindings" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -59,6 +73,15 @@ int main() {
     std::cout << "Running Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced Config tests..." << std::endl;
+    try {
+        test_config_enhanced::runAllEnhanced();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
@@ -113,6 +136,24 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory Manager tests..." << std::endl;
+    try {
+        test_memory_manager::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -144,16 +144,63 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            bool success = self.loadFromFile(filepath);
+            if (!success) {
+                throw py::value_error("Failed to load configuration from file: " + filepath);
+            }
+        }, py::arg("filepath"), "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            bool success = self.loadFromArgs(argc, argv);
+            if (!success) {
+                throw py::value_error("Failed to load configuration from arguments");
+            }
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            bool success = self.saveToFile(filepath);
+            if (!success) {
+                throw py::value_error("Failed to save configuration to file: " + filepath);
+            }
+        }, py::arg("filepath"), "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key).value_or("");
+        }, py::arg("key"),
+             "Get a configuration value as string (returns empty string if not found)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (!val.has_value()) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get a configuration value as int (throws exception if not found)")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (!val.has_value()) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get a configuration value as float (throws exception if not found)")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (!val.has_value()) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get a configuration value as bool (throws exception if not found)")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value (string, int, float, or bool)")
+        .def("setInt", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value as int")
+        .def("setFloat", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value as float")
+        .def("setBool", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value as bool")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -289,6 +336,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Add convenience methods to Brain class for easier Python usage
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +399,40 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             "Get prediction error signal")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules (called automatically in step)")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes (called automatically in step)")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get random generator");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,8 +479,30 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getSensoryPercept", [](const SimpleWorld& world) {
+            return world.getSensoryPercept();
+        }, py::arg("world"),
+             "Get sensory percept from world")
+        .def("applyActionToWorld", [](SimpleWorld& world, const Action& action, double time) {
+            // Convert Action to MotorCommand if possible
+            if (action.getType() == ActionType::MoveForward) {
+                world.applyMotorCommand(MotorCommand::MoveForward, time);
+            } else if (action.getType() == ActionType::MoveBackward) {
+                world.applyMotorCommand(MotorCommand::MoveBackward, time);
+            } else if (action.getType() == ActionType::TurnLeft) {
+                world.applyMotorCommand(MotorCommand::TurnLeft, time);
+            } else if (action.getType() == ActionType::TurnRight) {
+                world.applyMotorCommand(MotorCommand::TurnRight, time);
+            } else if (action.getType() == ActionType::Interact) {
+                world.applyMotorCommand(MotorCommand::Interact, time);
+            } else {
+                world.applyMotorCommand(MotorCommand::Wait, time);
+            }
+        }, py::arg("world"), py::arg("action"), py::arg("time"),
+             "Apply action to world using motor command");
 
+    // Add convenience functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,6 +519,181 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Add utility functions for Python users
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        auto keys = config.getKeys();
+        
+        // Validate required brain configuration
+        if (!config.has("brain.neuron_count")) {
+            errors.push_back("Missing required configuration: brain.neuron_count");
+        }
+        if (!config.has("brain.region_count")) {
+            errors.push_back("Missing required configuration: brain.region_count");
+        }
+        
+        // Validate numeric ranges
+        if (config.has("brain.neuron_count")) {
+            auto neuronCount = config.getOr<size_t>("brain.neuron_count", 0);
+            if (neuronCount == 0) {
+                errors.push_back("brain.neuron_count must be greater than 0");
+            } else if (neuronCount > 1000000) {
+                errors.push_back("brain.neuron_count is too large (max: 1000000)");
+            }
+        }
+        
+        if (config.has("brain.connection_probability")) {
+            auto connProb = config.getOr<float>("brain.connection_probability", 0.0f);
+            if (connProb < 0.0f || connProb > 1.0f) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (!errors.empty()) {
+            throw py::value_error("Configuration validation failed:\n" + 
+                                 std::accumulate(errors.begin() + 1, errors.end(), errors[0], 
+                                                [](const std::string& a, const std::string& b) {
+                                                    return a + "\n" + b; }));
+        }
+        
+        return std::vector<std::string>(); // Empty vector means success
+    }, "Validate configuration and return list of errors (empty if valid)");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain->initialize()) {
+            throw py::runtime_error("Failed to initialize brain for benchmarking");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            duration.count()
+        );
+    }, py::arg("brain"), py::arg("steps"),
+        "Run benchmark on brain and return (spikes, neurons, synapses, time_ms)");
+
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        auto keys = config.getKeys();
+        
+        // Validate required brain configuration
+        if (!config.has("brain.neuron_count")) {
+            errors.push_back("Missing required configuration: brain.neuron_count");
+        }
+        if (!config.has("brain.region_count")) {
+            errors.push_back("Missing required configuration: brain.region_count");
+        }
+        
+        // Validate numeric ranges
+        if (config.has("brain.neuron_count")) {
+            auto neuronCount = config.getOr<size_t>("brain.neuron_count", 0);
+            if (neuronCount == 0) {
+                errors.push_back("brain.neuron_count must be greater than 0");
+            } else if (neuronCount > 1000000) {
+                errors.push_back("brain.neuron_count is too large (max: 1000000)");
+            }
+        }
+        
+        if (config.has("brain.connection_probability")) {
+            auto connProb = config.getOr<float>("brain.connection_probability", 0.0f);
+            if (connProb < 0.0f || connProb > 1.0f) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (!errors.empty()) {
+            throw py::value_error("Configuration validation failed:\\n" + 
+                                 std::accumulate(errors.begin() + 1, errors.end(), errors[0], 
+                                                [](const std::string& a, const std::string& b) {
+                                                    return a + "\\n" + b; }));
+        }
+        
+        return std::vector<std::string>(); // Empty vector means success
+    }, "Validate configuration and return list of errors (empty if valid)");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain->initialize()) {
+            throw py::runtime_error("Failed to initialize brain for benchmarking");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            duration.count()
+        );
+    }, py::arg("brain"), py::arg("steps"),
+        "Run benchmark on brain and return (spikes, neurons, synapses, time_ms)");
+
+    m.def("exportBrainState", [](const Brain& brain, const std::string& filepath) {
+        if (!brain.save(filepath)) {
+            throw py::runtime_error("Failed to save brain state to: " + filepath);
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Save brain state to file");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain->load(filepath)) {
+            throw py::runtime_error("Failed to load brain state from: " + filepath);
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Load brain state from file");
+
+    m.def("createTestConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a reasonable default configuration for testing
+        config->set("brain.neuron_count", static_cast<int64_t>(1000));
+        config->set("brain.region_count", static_cast<int64_t>(4));
+        config->set("brain.connection_probability", 0.1f);
+        config->set("brain.initial_weight_mean", 0.5f);
+        config->set("brain.initial_weight_std", 0.1f);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.v_reset", -75.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("brain.tau_ref", 2.0f);
+        
+        // Set up plasticity
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Set up neuromodulation
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        return config;
+    }, "Create a test configuration with reasonable defaults");
+
+    // Add attribute access to invalid IDs for convenience
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

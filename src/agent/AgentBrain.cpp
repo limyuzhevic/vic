@@ -144,7 +144,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float curiosityFromNovelty = noveltyLevel_ * 2.0f;
+        curiosityLevel_ = curiosityFromNovelty + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -168,8 +169,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            // Use firing state as better activity measure than membrane potential
+            switch (n->getState().firingState) {
+                case FiringState::Resting: sum += 0.0f; break;
+                case FiringState::Active: sum += 1.0f; break;
+                case FiringState::Refractory: sum += 0.5f; break;
+                case FiringState::Inhibited: sum += 0.2f; break;
+                default: sum += 0.3f; break;
+            }
         }
         return sum / neurons.size();
     };
@@ -202,7 +209,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < 0.1f) {
         return MotorCommand::Wait;
     }
     

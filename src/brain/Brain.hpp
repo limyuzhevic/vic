@@ -178,7 +178,7 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
+        // Novelty - novelty detection
     Novelty* getNovelty();
     
     // Prediction error signal

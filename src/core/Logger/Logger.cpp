@@ -14,10 +14,13 @@ struct ConsoleLogger::Impl {
     std::mutex mutex;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->fileOut.open("nlm.log", std::ios::out | std::ios::trunc);
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    pImpl->fileOut.open("nlm.log", std::ios::out | std::ios::trunc);
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
@@ -71,10 +74,13 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->fileOut.close();
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
