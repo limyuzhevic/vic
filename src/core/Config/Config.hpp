@@ -78,6 +78,9 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set values with validation
+    void setWithValidation(const std::string& key, const std::string& valueStr, ConfigSource source);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -92,6 +95,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation helper methods
+    static bool isInteger(const std::string& str);
+    static bool isInteger64(const std::string& str);
+    static bool isFloat(const std::string& str);
     
 private:
     struct Impl;

@@ -71,7 +71,20 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        NLM_LOG_WARNING("Failed to open log file: " + filepath);
+    } else {
+        NLM_LOG_INFO("Logging to file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {

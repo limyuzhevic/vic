@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
+#include <cmath>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -19,23 +24,25 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced file loading with validation and error handling
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with enhanced validation
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,11 +55,22 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate key
+            if (key.empty() || key.find_first_of(" \t") != std::string::npos) {
+                NLM_LOG_WARNING("Invalid key at line " + std::to_string(lineNum) + ": '" + key + "'");
+                hasErrors = true;
+                continue;
+            }
+            
+            // Try to set value with validation
+            setWithValidation(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNum) + ": missing '='");
+            hasErrors = true;
         }
     }
     
-    return true;
+    return !hasErrors;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +102,68 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File - Saved " << getCurrentTimestamp() << "\n";
+    file << "# Generated from " << static_cast<int>(pImpl->entries.size()) << " configuration entries\n";
+    file << "\n";
+    
+    // Save all entries
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write source indicator
+        file << "# Source: ";
+        switch (entry.source) {
+            case ConfigSource::Default: file << "Default"; break;
+            case ConfigSource::File: file << "File"; break;
+            case ConfigSource::CommandLine: file << "Command Line"; break;
+            case ConfigSource::Runtime: file << "Runtime"; break;
+        }
+        file << "\n";
+        
+        // Write the actual key-value pair
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Escape quotes in string values
+                std::string escaped = arg;
+                size_t pos = 0;
+                while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                    escaped.replace(pos, 1, "\\\"");
+                    pos += 2;
+                }
+                file << '"' << escaped << '"';
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format float with reasonable precision
+                file << std::fixed << std::setprecision(6) << arg;
+            } else {
+                // For other types, use default formatting
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 template<typename T>
@@ -114,32 +188,91 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+void Config::setWithValidation(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Enhanced set method with validation
+    std::string errorMsg;
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    // Try to determine type from value and validate
+    bool isValid = true;
+    ConfigValue validatedValue;
+    
+    // Check for special boolean values
+    if (valueStr == "true" || valueStr == "false") {
+        bool boolValue = (valueStr == "true");
+        validatedValue = boolValue;
+    }
+    // Check for integer values (including negative)
+    else if (isInteger(valueStr)) {
+        int intValue = std::stoi(valueStr);
+        validatedValue = intValue;
+    }
+    // Check for float values
+    else if (isFloat(valueStr)) {
+        float floatValue = std::stof(valueStr);
+        validatedValue = floatValue;
+    }
+    // Check for integer64 values
+    else if (isInteger64(valueStr)) {
+        int64_t int64Value = std::stoll(valueStr);
+        validatedValue = int64Value;
+    }
+    // Otherwise treat as string
+    else {
+        validatedValue = valueStr;
+    }
+    
+    // Apply validation based on key if known validation rules exist
+    if (isValid) {
+        // Apply value
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = validatedValue;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, validatedValue, source);
+        }
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::isInteger(const std::string& str) const {
+    if (str.empty()) return false;
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') start = 1;
+    
+    for (size_t i = start; i < str.size(); ++i) {
+        if (!std::isdigit(str[i])) return false;
+    }
+    return true;
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::isInteger64(const std::string& str) const {
+    if (str.empty()) return false;
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') start = 1;
+    
+    for (size_t i = start; i < str.size(); ++i) {
+        if (!std::isdigit(str[i])) return false;
+    }
+    return true;
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::isFloat(const std::string& str) const {
+    if (str.empty()) return false;
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') start = 1;
+    
+    bool hasDecimal = false;
+    for (size_t i = start; i < str.size(); ++i) {
+        if (str[i] == '.') {
+            if (hasDecimal) return false; // Multiple decimal points
+            hasDecimal = true;
+        } else if (!std::isdigit(str[i])) {
+            return false;
+        }
+    }
+    return hasDecimal || start < str.size(); // Allow integer-like floats
 }
 
 bool Config::has(const std::string& key) const {
