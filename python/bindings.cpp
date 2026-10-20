@@ -33,45 +33,61 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
+        .def("index", &NeuronId::index, R"pbdoc(Get the index value of this neuron ID)pbdoc")
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
+        .def("index", &SynapseId::index, R"pbdoc(Get the index value of this synapse ID)pbdoc")
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
+        .def("index", &RegionId::index, R"pbdoc(Get the index value of this region ID)pbdoc")
         .def("__eq__", &RegionId::operator==)
         .def("__ne__", &RegionId::operator!=)
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
+        .def("index", &PopulationId::index, R"pbdoc(Get the index value of this population ID)pbdoc")
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -150,10 +166,34 @@ PYBIND11_MODULE(pynlm, m) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
+        .def("loadFromEnv", &Config::loadFromEnv,
+             "Load configuration from environment variables")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::template get<std::string>, py::arg("key"),
+             "Get a configuration value as string (returns None if key doesn't exist)")
+        .def("getInt", &Config::template get<int>, py::arg("key"),
+             "Get a configuration value as int (returns None if key doesn't exist)")
+        .def("getFloat", &Config::template get<double>, py::arg("key"),
+             "Get a configuration value as float (returns None if key doesn't exist)")
+        .def("getBool", &Config::template get<bool>, py::arg("key"),
+             "Get a configuration value as bool (returns None if key doesn't exist)")
+        .def("getOr", &Config::template getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a configuration value with fallback default")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value from string")
+        .def("set", py::overload_cast<const std::string&, int, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value from int")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value from float")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value from bool")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,

@@ -87,7 +87,8 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Main unified Python module
+pybind11_add_module(pynlm pynlm.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
@@ -95,8 +96,82 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Modular Python modules (optional for advanced users)
+pybind11_add_module(brain_bindings brain_bindings.cpp)
+target_link_libraries(brain_bindings PRIVATE nlm_core)
+target_include_directories(brain_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+pybind11_add_module(agent_bindings agent_bindings.cpp)
+target_link_libraries(agent_bindings PRIVATE nlm_core nlm_agent)
+target_include_directories(agent_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+pybind11_add_module(world_bindings world_bindings.cpp)
+target_link_libraries(world_bindings PRIVATE nlm_core nlm_world)
+target_include_directories(world_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Installation
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Install modular bindings for advanced users
+install(TARGETS brain_bindings agent_bindings world_bindings
+    LIBRARY DESTINATION pynlm/modules
+    ARCHIVE DESTINATION pynlm/modules
+    RUNTIME DESTINATION pynlm/modules
+)
+
+# Create Python package structure
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/pynlm.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/brain_bindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/agent_bindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/world_bindings.cpp
+    DESTINATION pynlm
+)
+
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/brain_bindings.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/agent_bindings.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/world_bindings.hpp
+    DESTINATION pynlm/include
+)
+
+# Create a Python package metadata file
+file(WRITE
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm/__init__.py
+    "# NLM Python Package Initialization\n\n__version__ = '0.1.0'\n\nfrom .pynlm import *\n\n__all__ = [
+    # Core classes
+    'Config', 'Brain', 'AgentBrain', 'SimpleWorld',
+    'Action', 'AgentBody', 'SensoryPercept',
+    'WorldObject', 'ActionResult',
+    # Type enumerations
+    'NeuronType', 'SynapseType', 'DevelopmentalStage',
+    'FiringState', 'ActionType', 'MotorCommand',
+    'WorldObjectType',
+    # Identifier types
+    'NeuronId', 'SynapseId', 'RegionId', 'PopulationId',
+    # Factory functions
+    'createDefaultConfig', 'createBrain', 'createAgentBrain',
+    'createSimpleWorld', 'createAgentSystem',
+    'createWorldObject',
+    # Convenience functions
+    'runEpisode', 'runLearningExperiment',
+    'getSystemInfo', 'collectStats',
+    'createBrainWithDefaults', 'createWorldWithDefaults',
+    'createCompleteAgent',
+    # System utilities
+    'brainStatus', 'worldStatus', 'agentStatus', 'systemStatus',
+    'validateSystem', 'resetSystem',
+    'saveSystemState', 'loadSystemState',
+    'getPerformanceStats', 'debugMode'
+]\n"
+)
+
+# Install the Python package
+install(DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm
+    DESTINATION pynlm
 )

@@ -322,7 +322,7 @@ void SimpleWorld::generateVision() {
             float py = agent_.y + dy * t;
             
             // Check wall collision
-            if (!isValidPosition(px, py)) {
+            if (!this->isValidPosition(px, py)) {
                 vision[i] = t / maxRange;
                 break;
             }

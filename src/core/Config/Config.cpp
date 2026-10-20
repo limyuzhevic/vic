@@ -212,4 +212,46 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Configuration loading from environment variables
+bool Config::loadFromEnvVars(const std::string& prefix) {
+    bool success = true;
+    
+    // Environment variables for simple key-value pairs
+    const char* home = std::getenv("HOME");
+    if (home) {
+        std::string configPath = std::string(home) + "/.nlm/config.env";
+        if (loadFromFile(configPath)) {
+            // Successfully loaded from user config file
+            return true;
+        }
+    }
+    
+    // Try to load from system-wide config
+    if (loadFromFile("/etc/nlm/config.env")) {
+        return true;
+    }
+    
+    // Try to load from application directory
+    std::string appHome = std::getenv("NLM_HOME");
+    if (!appHome.empty()) {
+        std::string configPath = appHome + "/config.env";
+        if (loadFromFile(configPath)) {
+            return true;
+        }
+    }
+    
+    return success;
+}
+
+// Explicit template instantiations for vector types
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
+
+// Template instantiations for getOr with vector types
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
+
 } // namespace nlm
+
