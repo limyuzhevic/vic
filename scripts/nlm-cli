@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+# NLM CLI - Advanced commands for NLM users
+
+# Display help for CLI commands
+cli_help() {
+    echo "=== NLM Command Line Interface ==="
+    echo ""
+    echo "Available commands:"
+    echo "  nlm-cli create-brain [options]    Create and configure a brain"
+    echo "  nlm-cli run-simulation [options]  Run a simulation with agent"
+    echo "  nlm-cli train [options]          Train a brain with learning"
+    echo "  nlm-cli analyze [options]         Analyze brain performance"
+    echo "  nlm-cli save-config [file]       Save current config to file"
+    echo "  nlm-cli load-config [file]       Load config from file"
+    echo "  nlm-cli explore [options]        Explore and experiment"
+    echo "  nlm-cli benchmark                Run performance benchmarks"
+    echo "  nlm-cli help                     Show this help"
+    echo ""
+    echo "For detailed help on a specific command, use: nlm-cli help <command>"
+}
+
+# Create a configurable brain
+cli_create_brain() {
+    echo "=== NLM Brain Creation ==="
+    
+    # Default configuration
+    NEURON_COUNT=1000
+    REGION_COUNT=2
+    CONNECTION_PROBABILITY=0.1
+    SYNAPTIC_STRENGTH=0.5
+    TIMESTEP=0.001
+    MAX_STEPS=10000
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --neurons)
+                NEURON_COUNT="$2"
+                shift 2
+                ;;
+            --regions)
+                REGION_COUNT="$2"
+                shift 2
+                ;;
+            --connections)
+                CONNECTION_PROBABILITY="$2"
+                shift 2
+                ;;
+            --strength)
+                SYNAPTIC_STRENGTH="$2"
+                shift 2
+                ;;
+            --timestep)
+                TIMESTEP="$2"
+                shift 2
+                ;;
+            --steps)
+                MAX_STEPS="$2"
+                shift 2
+                ;;
+            --save)
+                SAVE_FILE="$2"
+                shift 2
+                ;;
+            --help)
+                echo "Create brain options:"
+                echo "  --neurons <N>           Number of neurons (default: $NEURON_COUNT)"
+                echo "  --regions <N>           Number of regions (default: $REGION_COUNT)"
+                echo "  --connections <P>       Connection probability (0-1, default: $CONNECTION_PROBABILITY)"
+                echo "  --strength <S>          Initial synaptic strength (default: $SYNAPTIC_STRENGTH)"
+                echo "  --timestep <T>          Simulation timestep (default: $TIMESTEP)"
+                echo "  --steps <N>             Maximum simulation steps (default: $MAX_STEPS)"
+                echo "  --save <file>           Save configuration to file"
+                return
+                ;;
+            *)
+                echo "Unknown option: $1"
+                cli_create_brain --help
+                return
+                ;;
+        esac
+    done
+    
+    # Check if build directory exists
+    if [[ ! -d "build" ]]; then
+        echo "Building NLM..."
+        mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc) || {
+            echo "Build failed! Please run './scripts/build.sh' first"
+            return 1
+        }
+        cd .. || return 1
+    fi
+    
+    # Run the brain creation
+    echo "Creating NLM brain with $NEURON_COUNT neurons, $REGION_COUNT regions..."
+    
+    # Generate config content
+    cat > brain_config.cfg << EOF
+# Advanced brain configuration
+random_seed = $((RANDOM + RANDOM * 1000))
+simulation_timestep = $TIMESTEP
+neuron_count = $NEURON_COUNT
+region_count = $REGION_COUNT
+connection_probability = $CONNECTION_PROBABILITY
+brain_initial_weight_mean = $SYNAPTIC_STRENGTH
+brain_initial_weight_std = 0.1
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+log_level = INFO
+max_simulation_steps = $MAX_STEPS
+EOF
+    
+    # Save config if requested
+    if [[ -n "$SAVE_FILE" ]]; then
+        cp brain_config.cfg "$SAVE_FILE"
+        echo "Configuration saved to $SAVE_FILE"
+    fi
+    
+    echo "Configuration created successfully in brain_config.cfg"
+    echo "Next steps: nlm-cli run-simulation --config brain_config.cfg"
+}
+
+# Run a simulation with agent
+cli_run_simulation() {
+    echo "=== NLM Simulation Runner ==="
+    
+    CONFIG_FILE=""
+    STEPS=1000
+    VERBOSE=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --steps)
+                STEPS="$2"
+                shift 2
+                ;;
+            --verbose|-v)
+                VERBOSE=true
+                shift
+                ;;
+            --help)
+                echo "Run simulation options:"
+                echo "  --config <file>          Configuration file (default: brain_config.cfg)"
+                echo "  --steps <N>              Number of simulation steps (default: $STEPS)"
+                echo "  --verbose, -v            Enable verbose output"
+                return
+                ;;
+            *)
+                echo "Unknown option: $1"
+                cli_run_simulation --help
+                return
+                ;;
+        esac
+    done
+    
+    CONFIG_FILE="${CONFIG_FILE:-brain_config.cfg}"
+    
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        echo "Configuration file $CONFIG_FILE not found!"
+        echo "Run: nlm-cli create-brain --save $CONFIG_FILE"
+        return 1
+    fi
+    
+    echo "Starting NLM simulation with $STEPS steps..."
+    
+    if [[ "$VERBOSE" == true ]]; then
+        echo "Using config: $CONFIG_FILE"
+        echo "Starting simulation..."
+    fi
+    
+    # Build and run the simulation
+    if [[ -f "build/nlm" ]]; then
+        ./build/nlm --config "$CONFIG_FILE"
+        echo "Simulation completed"
+    else
+        echo "NLM executable not found. Building..."
+        ./scripts/build.sh || {
+            echo "Build failed. Please check your setup."
+            return 1
+        }
+        ./build/nlm --config "$CONFIG_FILE"
+    fi
+}
+
+# Training with learning
+cli_train() {
+    echo "=== NLM Training with Learning ==="
+    
+    CONFIG_FILE=""
+    EPISODES=100
+    LEARNING_RATE=0.01
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --episodes)
+                EPISODES="$2"
+                shift 2
+                ;;
+            --lr)
+                LEARNING_RATE="$2"
+                shift 2
+                ;;
+            --help)
+                echo "Training options:"
+                echo "  --config <file>          Configuration file (default: brain_config.cfg)"
+                echo "  --episodes <N>           Number of training episodes (default: $EPISODES)"
+                echo "  --lr <R>                 Learning rate (default: $LEARNING_RATE)"
+                return
+                ;;
+            *)
+                echo "Unknown option: $1"
+                cli_train --help
+                return
+                ;;
+        esac
+    done
+    
+    CONFIG_FILE="${CONFIG_FILE:-brain_config.cfg}"
+    
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        echo "Configuration file $CONFIG_FILE not found!"
+        return 1
+    fi
+    
+    echo "Starting NLM training for $EPISODES episodes with learning rate $LEARNING_RATE"
+    echo "This will enable STDP, Hebbian learning, and neuromodulation..."
+    
+    # Create training script
+    cat > train_simulation.sh << EOF
+#!/bin/bash
+
+echo "=== NLM Advanced Training ==="
+echo "Training brain with episodes: $EPISODES"
+echo "Learning rate: $LEARNING_RATE"
+
+echo "Starting training simulation..."
+./build/nlm --config "$CONFIG_FILE" --training --episodes $EPISODES --learning-rate $LEARNING_RATE
+
+if [[ -f "build/nlm" ]]; then
+    ./build/nlm --config "$CONFIG_FILE" --training --episodes $EPISODES --learning-rate $LEARNING_RATE
+else
+    echo "Building NLM..."
+    ./scripts/build.sh
+    ./build/nlm --config "$CONFIG_FILE" --training --episodes $EPISODES --learning-rate $LEARNING_RATE
+fi
+
+echo "Training completed"
+EOF
+    
+    chmod +x train_simulation.sh
+    echo "Training script created: train_simulation.sh"
+    echo "Run with: ./train_simulation.sh"
+}
+
+# Analyze brain performance
+cli_analyze() {
+    echo "=== NLM Brain Analysis ==="
+    
+    BRAIN_FILE="brain_state.bin"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --file)
+                BRAIN_FILE="$2"
+                shift 2
+                ;;
+            --help)
+                echo "Analysis options:"
+                echo "  --file <file>            Brain state file (default: brain_state.bin)"
+                return
+                ;;
+            *)
+                echo "Unknown option: $1"
+                cli_analyze --help
+                return
+                ;;
+        esac
+    done
+    
+    if [[ ! -f "$BRAIN_FILE" ]]; then
+        echo "Brain state file $BRAIN_FILE not found!"
+        echo "Run a simulation first to create a brain state file."
+        return 1
+    fi
+    
+    echo "Analyzing brain state from $BRAIN_FILE"
+    echo "Computing metrics..."
+    
+    # Load brain and compute statistics
+    if [[ -f "build/nlm" ]]; then
+        ./build/nlm --analyze "$BRAIN_FILE"
+    else
+        echo "Building NLM..."
+        ./scripts/build.sh
+        ./build/nlm --analyze "$BRAIN_FILE"
+    fi
+    
+    echo "Analysis complete. Check output above for detailed metrics."
+}
+
+# Main command dispatcher
+if [[ $# -eq 0 ]]; then
+    cli_help
+    exit 0
+fi
+
+case $1 in
+    create-brain)
+        shift
+        cli_create_brain "$@"
+        ;;
+    run-simulation)
+        shift
+        cli_run_simulation "$@"
+        ;;
+    train)
+        shift
+        cli_train "$@"
+        ;;
+    analyze)
+        shift
+        cli_analyze "$@"
+        ;;
+    help)
+        if [[ -n "$2" ]]; then
+            case $2 in
+                create-brain) cli_create_brain --help ;;
+                run-simulation) cli_run_simulation --help ;;
+                train) cli_train --help ;;
+                analyze) cli_analyze --help ;;
+                *) echo "Unknown command: help $2" ;;
+            esac
+        else
+            cli_help
+        fi
+        ;;
+    *)
+        echo "Unknown command: $1"
+        cli_help
+        exit 1
+        ;;
+esac

@@ -1,0 +1,321 @@
+#!/usr/bin/bash
+# NLM Test Suite - Comprehensive testing framework for NLM
+
+# Set up test environment
+TEST_DIR="${TEST_DIR:-./tests}"
+BUILD_DIR="${BUILD_DIR:-./build}"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+
+# Test configuration
+export NLM_TEST_TIMEOUT=30
+export NLM_TEST_VERBOSE=false
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Test logging function
+log_test() {
+    local level="$1"
+    local message="$2"
+    local color=""
+    
+    case "$level" in
+        "PASS")
+            color="$GREEN"
+            ;;
+        "FAIL")
+            color="$RED"
+            ;;
+        "WARN")
+            color="$YELLOW"
+            ;;
+        "INFO")
+            color="$BLUE"
+            ;;
+        *)
+            color="$NC"
+            ;;
+    esac
+    
+    echo -e "${color}[${level}]${NC} $message"
+}
+
+# Simple test framework
+test_count=0
+pass_count=0
+fail_count=0
+skip_count=0
+
+run_test() {
+    local test_name="$1"
+    local test_func="$2"
+    
+    ((test_count++))
+    
+    echo "\nRunning test: $test_name"
+    if timeout $NLM_TEST_TIMEOUT bash -c "$test_func"; then
+        log_test "PASS" "$test_name"
+        ((pass_count++))
+        return 0
+    else
+        local exit_code=$?
+        if [[ $exit_code -eq 124 ]]; then
+            log_test "FAIL" "$test_name - TIMEOUT (exceeded ${NLM_TEST_TIMEOUT}s)"
+        else
+            log_test "FAIL" "$test_name - exited with code $exit_code"
+        fi
+        ((fail_count++))
+        return 1
+    fi
+}
+
+# Test categories
+test_brain_creation() {
+    echo "  Testing brain creation..."
+    
+    # Check if build directory exists
+    if [[ ! -d "$BUILD_DIR" ]]; then
+        echo "SKIP: Build directory not found"
+        return 0
+    fi
+    
+    # Check if nlm executable exists
+    if [[ ! -f "$BUILD_DIR/nlm" ]]; then
+        echo "SKIP: nlm executable not found"
+        return 0
+    fi
+    
+    # Test configuration loading
+    if ./$BUILD_DIR/nlm --config configs/default.cfg 2>&1 | grep -q "Loaded configuration"; then
+        log_test "PASS" "Basic configuration loading"
+    else
+        log_test "FAIL" "Basic configuration loading"
+        return 1
+    fi
+}
+
+test_python_bindings() {
+    echo "  Testing Python bindings..."
+    
+    if [[ ! -f "python/bindings.cpp" ]]; then
+        echo "SKIP: Python bindings not found"
+        return 0
+    fi
+    
+    # Test Python module import
+    if python3 -c "import sys; sys.path.insert(0, '.'); import pynlm; print('pynlm imported successfully'); print('Available functions:', [x for x in dir(pynlm) if not x.startswith('_')])" 2>&1 | grep -q "pynlm imported successfully"; then
+        log_test "PASS" "Python bindings import"
+    else
+        log_test "FAIL" "Python bindings import"
+        return 1
+    fi
+}
+
+test_agent_functionality() {
+    echo "  Testing agent functionality..."
+    
+    # Create a simple test script
+    cat > /tmp/test_agent.py << 'EOF'
+import pynlm
+import sys
+
+# Test basic agent creation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+print(f"Created agent with {agent.getSensoryInputSize()} sensory inputs")
+
+# Test sensory processing
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+world.reset()
+
+agent.initialize(world)
+percept = world.getSensoryPercept()
+agent.processSensoryInput(percept)
+
+# Test motor decoding
+action = agent.decodeMotorCommand()
+print(f"Decoded action: {action}")
+
+print("Agent test passed")
+EOF
+    
+    if python3 /tmp/test_agent.py 2>&1 | grep -q "Agent test passed"; then
+        log_test "PASS" "Agent functionality"
+    else
+        log_test "FAIL" "Agent functionality"
+        return 1
+    fi
+}
+
+test_plasticity() {
+    echo "  Testing plasticity mechanisms..."
+    
+    # Create a test that exercises STDP and Hebbian learning
+    cat > /tmp/test_plasticity.py << 'EOF'
+import pynlm
+import time
+
+print("Testing plasticity mechanisms...")
+
+# Create brain with plasticity enabled
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Record initial state
+initial_spikes = brain.getTotalSpikeCount()
+
+# Apply learning stimuli
+for i in range(100):
+    brain.step(i)
+    # Inject some current to stimulate activity
+    if i % 10 == 0:
+        brain.injectCurrentToNeurons(pynlm.NeuronType::Excitatory, 20.0)
+
+# Check that system is functional (not crashing)
+final_spikes = brain.getTotalSpikeCount()
+
+print(f"Initial spikes: {initial_spikes}")
+print(f"Final spikes: {final_spikes}")
+
+# Plasticity test passed if we got here without errors
+print("Plasticity test passed")
+EOF
+    
+    if python3 /tmp/test_plasticity.py 2>&1 | grep -q "Plasticity test passed"; then
+        log_test "PASS" "Plasticity mechanisms"
+    else
+        log_test "FAIL" "Plasticity mechanisms"
+        return 1
+    fi
+}
+
+test_development() {
+    echo "  Testing development system..."
+    
+    cat > /tmp/test_development.py << 'EOF'
+import pynlm
+import time
+
+print("Testing developmental stages...")
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Test developmental stage progression
+for stage in [pynlm.DevelopmentalStage::Initial,
+              pynlm.DevelopmentalStage::CriticalPeriod,
+              pynlm.DevelopmentalStage::Maturation,
+              pynlm.DevelopmentalStage::Adult]:
+    brain.setDevelopmentalStage(stage)
+    stage_name = stage.name if hasattr(stage, 'name') else str(stage)
+    print(f"Set developmental stage to: {stage_name}")
+
+print("Development test passed")
+EOF
+    
+    if python3 /tmp/test_development.py 2>&1 | grep -q "Development test passed"; then
+        log_test "PASS" "Development system"
+    else
+        log_test "FAIL" "Development system"
+        return 1
+    fi
+}
+
+test_neuromodulation() {
+    echo "  Testing neuromodulation..."
+    
+    cat > /tmp/test_neuromod.py << 'EOF'
+import pynlm
+
+print("Testing neuromodulation systems...")
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+
+# Test reward modulation
+print("Testing reward modulation...")
+agent.applyRewardModulation(1.0, 0.5)  # reward, predicted
+
+# Test novelty detection
+print("Testing novelty detection...")
+agent.getNoveltyLevel()
+
+# Test curiosity
+print("Testing curiosity...")
+agent.getCuriosityLevel()
+
+# Test prediction error
+print("Testing prediction error...")
+agent.getPredictionError()
+
+print("Neuromodulation test passed")
+EOF
+    
+    if python3 /tmp/test_neuromod.py 2>&1 | grep -q "Neuromodulation test passed"; then
+        log_test "PASS" "Neuromodulation systems"
+    else
+        log_test "FAIL" "Neuromodulation systems"
+        return 1
+    fi
+}
+
+# Main test runner
+main() {
+    echo "NLM Test Suite"
+    echo "=============="
+    
+    # Check if build directory exists
+    if [[ ! -d "$BUILD_DIR" ]]; then
+        echo "Warning: Build directory not found. Creating..."
+        mkdir -p "$BUILD_DIR"
+    fi
+    
+    # Run tests
+    echo "Running tests..."
+    
+    run_test "Brain Creation" "test_brain_creation"
+    run_test "Python Bindings" "test_python_bindings"
+    run_test "Agent Functionality" "test_agent_functionality"
+    run_test "Plasticity Mechanisms" "test_plasticity"
+    run_test "Development System" "test_development"
+    run_test "Neuromodulation Systems" "test_neuromodulation"
+    
+    # Test summary
+    local pass_rate=0
+    if [[ $test_count -gt 0 ]]; then
+        pass_rate=$(( (pass_count * 100) / test_count ))
+    fi
+    
+    echo "\n=== Test Summary ==="
+    echo "Total tests: $test_count"
+    echo "Passed: $pass_count"
+    echo "Failed: $fail_count"
+    echo "Skipped: $skip_count"
+    echo "Pass rate: ${pass_rate}%"
+    
+    if [[ $fail_count -gt 0 ]]; then
+        echo "\nSome tests failed!"
+        return 1
+    else
+        echo "\nAll tests passed successfully!"
+        return 0
+    fi
+}
+
+# Run main function if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

@@ -2,6 +2,9 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <functional>
+#include <numeric>
 
 namespace nlm {
 
@@ -334,17 +337,248 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::setDevelopmentStage(DevelopmentalStage stage) {
+    if (brain_) {
+        brain_->setDevelopmentalStage(stage);
+    }
+}
+
+void AgentBrain::setPlasticityModifier(float modifier) {
+    plasticityModifier_ = std::clamp(modifier, 0.1f, 2.0f);
+}
+
+void AgentBrain::setTargetFiringRate(float rate) {
+    // Apply to all neurons in all regions
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (Neuron* n : pop->getNeurons()) {
+                // Set target firing rate (implementation depends on neuron type)
+                n->setTargetFiringRate(rate);
+            }
+        }
+    }
+}
+
+void AgentBrain::setLearningRate(float learningRate) {
+    // Update plasticity rules
+    auto* stdp = brain_->getSTDP();
+    auto* hebbian = brain_->getHebbian();
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    if (stdp) {
+        stdp->setLTPWeight(learningRate * 0.01f);
+        stdp->setLTDWeight(learningRate * 0.012f);
+    }
+    
+    if (hebbian) {
+        hebbian->setLearningRate(learningRate);
+    }
+}
+
+void AgentBrain::setCuriosityThreshold(float threshold) {
+    curiosityThreshold_ = std::clamp(threshold, 0.0f, 1.0f);
+}
+
+bool AgentBrain::runEpisode(std::shared_ptr<SimpleWorld> world, size_t maxSteps) {
+    if (!brain_ || !world) return false;
+    
+    world->reset();
+    reset();
+    
+    bool success = true;
+    for (size_t step = 0; step < maxSteps; ++step) {
+        // Update world
+        world->update(0.1);
+        
+        // Get sensory input
+        auto percept = world->getSensoryPercept();
+        
+        // Process sensory input
+        processSensoryInput(percept);
+        
+        // Brain thinks
+        brain_->step(step);
+        
+        // Decode motor command
+        auto action = decodeMotorCommand();
+        
+        // Apply action to world
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Check for termination condition
+        if (percept.getInternal()[0] < 0.0f) { // Negative internal signal indicates failure
+            success = false;
+            break;
+        }
+    }
+    
+    return success;
+}
+
+bool AgentBrain::trainWithRewards(std::shared_ptr<SimpleWorld> world, size_t numEpisodes, std::function<float(const std::vector<float>&)> rewardFn) {
+    if (!brain_ || !world) return false;
+    
+    float totalReward = 0.0f;
+    
+    for (size_t episode = 0; episode < numEpisodes; ++episode) {
+        world->reset();
+        reset();
+        
+        // Run episode to collect experience
+        bool episodeSuccess = true;
+        for (size_t step = 0; step < 1000; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            
+            processSensoryInput(percept);
+            brain_->step(step);
+            
+            auto action = decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Calculate reward using reward function
+            float reward = rewardFn(percept.getAllSignals());
+            applyRewardModulation(reward, 0.0f); // Apply reward
+            
+            totalReward += reward;
+        }
+        
+        if (!episodeSuccess) break;
+        
+        // Log progress every 10 episodes
+        if ((episode + 1) % 10 == 0) {
+            NLM_LOG_INFO("Episode " + std::to_string(episode + 1) + "/" + std::to_string(numEpisodes) + 
+                        " | Total Reward: " + std::to_string(totalReward) + 
+                        " | Firing Neurons: " + std::to_string(brain_->getFiringNeuronCount()));
+        }
+    }
+    
+    NLM_LOG_INFO("Training complete! Total reward over " + std::to_string(numEpisodes) + " episodes: " + std::to_string(totalReward));
+    return true;
+}
+
+std::map<std::string, float> AgentBrain::getNetworkStats() const {
+    std::map<std::string, float> stats;
+    
+    if (!brain_) return stats;
+    
+    stats["total_neurons"] = static_cast<float>(brain_->getTotalNeuronCount());
+    stats["total_synapses"] = static_cast<float>(brain_->getTotalSynapseCount());
+    stats["firing_neurons"] = static_cast<float>(brain_->getFiringNeuronCount());
+    stats["active_neurons"] = static_cast<float>(brain_->getActiveNeuronCount());
+    stats["average_firing_rate"] = brain_->getAverageFiringRate();
+    stats["excitatory_inhibition_ratio"] = brain_->getExcitationInhibitionRatio();
+    stats["total_spikes"] = static_cast<float>(brain_->getTotalSpikeCount());
+    stats["dopamine_level"] = dopamineLevel_;
+    stats["curiosity_level"] = curiosityLevel_;
+    stats["novelty_level"] = noveltyLevel_;
+    stats["prediction_error"] = predictionError_;
+    stats["developmental_age"] = static_cast<float>(developmentalAge_);
+    stats["plasticity_modifier"] = plasticityModifier_;
+    
+    return stats;
+}
+
+std::vector<float> AgentBrain::getActivityProfile(size_t timeWindow) const {
+    std::vector<float> profile;
+    // Implementation would track activity over time window
+    // For now, return a simplified version
+    for (size_t i = 0; i < timeWindow; ++i) {
+        profile.push_back(0.5f); // Placeholder
+    }
+    return profile;
+}
+
+std::map<std::string, float> AgentBrain::getMemoryStats() const {
+    std::map<std::string, float> stats;
+    // Implementation would query memory systems
+    stats["working_memory_size"] = 0.0f;
+    stats["episodic_memory_size"] = 0.0f;
+    stats["associative_memory_size"] = 0.0f;
+    return stats;
+}
+
+std::map<std::string, float> AgentBrain::getPredictionStats() const {
+    std::map<std::string, float> stats;
+    // Implementation would query prediction system
+    stats["prediction_accuracy"] = 0.0f;
+    stats["prediction_confidence"] = 0.0f;
+    stats["prediction_error"] = predictionError_;
+    return stats;
+}
+
+void AgentBrain::setSensoryWeight(SensoryInputType inputType, float weight) {
+    // Implementation would set sensory input weights
+    // This is a placeholder for now
+    NLM_LOG_INFO("Setting sensory weight for input type " + std::to_string(static_cast<int>(inputType)) + 
+                " to " + std::to_string(weight));
+}
+
+float AgentBrain::getSensoryWeight(SensoryInputType inputType) const {
+    // Implementation would get sensory input weights
+    // This is a placeholder for now
+    return 1.0f;
+}
+
+bool AgentBrain::importConfig(const std::string& filepath) {
+    // Implementation would import configuration from file
+    // This is a placeholder for now
+    NLM_LOG_INFO("Importing configuration from " + filepath);
+    return true;
+}
+
+bool AgentBrain::exportConfig(const std::string& filepath) const {
+    // Implementation would export configuration to file
+    // This is a placeholder for now
+    NLM_LOG_INFO("Exporting configuration to " + filepath);
+    return true;
+}
+
+bool AgentBrain::validateConfig() const {
+    // Implementation would validate configuration
+    // This is a placeholder for now
+    NLM_LOG_INFO("Validating configuration...");
+    return true;
+}
+
+void AgentBrain::setDevelopmentalStage(DevelopmentalStage stage) {
+    if (brain_) {
+        brain_->setDevelopmentalStage(stage);
+    }
+}
+
+void AgentBrain::setPlasticityModifier(float modifier) {
+    plasticityModifier_ = std::clamp(modifier, 0.1f, 2.0f);
+}
+
+void AgentBrain::setTargetFiringRate(float rate) {
+    // Apply to all neurons in all regions
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (Neuron* n : pop->getNeurons()) {
+                // Set target firing rate (implementation depends on neuron type)
+                n->setTargetFiringRate(rate);
+            }
+        }
+    }
+}
+
+void AgentBrain::setLearningRate(float learningRate) {
+    // Update plasticity rules
+    auto* stdp = brain_->getSTDP();
+    auto* hebbian = brain_->getHebbian();
+    
+    if (stdp) {
+        stdp->setLTPWeight(learningRate * 0.01f);
+        stdp->setLTDWeight(learningRate * 0.012f);
+    }
+    
+    if (hebbian) {
+        hebbian->setLearningRate(learningRate);
+    }
+}
+
+void AgentBrain::setCuriosityThreshold(float threshold) {
+    curiosityThreshold_ = std::clamp(threshold, 0.0f, 1.0f);
 }
 
 } // namespace nlm

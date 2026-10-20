@@ -398,7 +398,61 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced brain manipulation methods
+        .def("setDevelopmentStage", &AgentBrain::setDevelopmentStage,
+             py::arg("stage"),
+             "Set developmental stage directly")
+        .def("setPlasticityModifier", &AgentBrain::setPlasticityModifier,
+             py::arg("modifier"),
+             "Set plasticity modifier (0.0-2.0)")
+        .def("setTargetFiringRate", &AgentBrain::setTargetFiringRate,
+             py::arg("rate"),
+             "Set target firing rate for neurons")
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("learningRate"),
+             "Set learning rate for plasticity rules")
+        .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+             py::arg("threshold"),
+             "Set curiosity threshold for exploration")
+        
+        // Simulation control methods
+        .def("runEpisode", &AgentBrain::runEpisode,
+             py::arg("world"), py::arg("maxSteps"),
+             "Run a complete episode with world interaction")
+        .def("trainWithRewards", &AgentBrain::trainWithRewards,
+             py::arg("world"), py::arg("numEpisodes"), py::arg("rewardFn"),
+             "Train brain using reward function")
+        
+        // Statistical analysis methods
+        .def("getNetworkStats", &AgentBrain::getNetworkStats,
+             "Get comprehensive network statistics")
+        .def("getActivityProfile", &AgentBrain::getActivityProfile,
+             py::arg("timeWindow"),
+             "Get activity profile over time window")
+        .def("getMemoryStats", &AgentBrain::getMemoryStats,
+             "Get memory system statistics")
+        .def("getPredictionStats", &AgentBrain::getPredictionStats,
+             "Get prediction system statistics")
+        
+        // Advanced sensory processing
+        .def("setSensoryWeight", &AgentBrain::setSensoryWeight,
+             py::arg("inputType"), py::arg("weight"),
+             "Set sensory input weighting")
+        .def("getSensoryWeight", &AgentBrain::getSensoryWeight,
+             py::arg("inputType"),
+             "Get current sensory input weighting")
+        
+        // Configuration management
+        .def("importConfig", &AgentBrain::importConfig,
+             py::arg("filepath"),
+             "Import configuration from file")
+        .def("exportConfig", &AgentBrain::exportConfig,
+             py::arg("filepath"),
+             "Export configuration to file")
+        .def("validateConfig", &AgentBrain::validateConfig,
+             "Validate current configuration")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
