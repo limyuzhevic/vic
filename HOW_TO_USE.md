@@ -416,41 +416,159 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+### Advanced Configuration Options
 
-### Brain Configuration
+This section documents the advanced configuration options available for expert users who want to fine-tune the NLM simulation behavior.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
+#### Advanced Neural Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| `advanced.neural_network_size` | int | 1000 | Size of neural network for advanced experiments |
+| `advanced.simulation_duration` | int | 1000 | Default simulation duration |
+| `advanced.performance_monitoring` | bool | false | Enable performance monitoring |
+| `advanced.profiling_interval` | int | 100 | Steps between performance samples |
+| `advanced.export_format` | string | "json" | Default export format (json/yaml) |
+| `advanced.visualization_export` | bool | false | Export data for visualization tools |
+| `advanced.ml_integration` | bool | false | Enable machine learning integration |
+| `advanced.real_time_monitoring` | bool | false | Enable real-time monitoring thread |
+| `advanced.reproducible_research` | bool | true | Enable reproducible research mode |
 
-### Neuromodulation Configuration
+#### Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `neuromod.curiosity.exploration_bonus` | float | 0.1 | Bonus for novel experiences |
+| `neuromod.novelty.sensitivity` | float | 1.0 | Sensitivity to novel stimuli |
+
+#### Memory System Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memory.working_memory.capacity` | int | 100 | Working memory capacity |
+| `memory.episodic_memory.max_episodes` | int | 1000 | Maximum episodic memory episodes |
+
+#### Development Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.initial_plasticity` | float | 1.0 | Initial plasticity factor |
+| `development.plasticity_decay_rate` | float | 0.95 | Rate of plasticity decay over time |
+
+#### Advanced Usage Examples
+
+```python
+import pynlm
+
+# Example 1: Create an advanced configuration for complex experiments
+def create_advanced_config():
+    config = pynlm.createDefaultConfig()
+    
+    # Advanced neural parameters
+    config.set("advanced.neural_network_size", 5000, pynlm.ConfigSource.Runtime)
+    config.set("advanced.performance_monitoring", True, pynlm.ConfigSource.Runtime)
+    config.set("advanced.profiling_interval", 50, pynlm.ConfigSource.Runtime)
+    config.set("advanced.visualization_export", True, pynlm.ConfigSource.Runtime)
+    
+    # Enhanced neuromodulation
+    config.set("neuromod.dopamine.scale", 1.5, pynlm.ConfigSource.Runtime)
+    config.set("neuromod.curiosity.exploration_bonus", 0.2, pynlm.ConfigSource.Runtime)
+    config.set("neuromod.novelty.sensitivity", 1.2, pynlm.ConfigSource.Runtime)
+    
+    # Advanced memory systems
+    config.set("memory.working_memory.capacity", 500, pynlm.ConfigSource.Runtime)
+    config.set("memory.episodic_memory.max_episodes", 5000, pynlm.ConfigSource.Runtime)
+    
+    # Development settings
+    config.set("development.initial_plasticity", 1.2, pynlm.ConfigSource.Runtime)
+    config.set("development.plasticity_decay_rate", 0.9, pynlm.ConfigSource.Runtime)
+    
+    return config
+
+# Example 2: Run advanced simulation with monitoring
+def run_advanced_simulation(brain, world, agent, num_steps=10000):
+    """Run simulation with advanced monitoring and analysis."""
+    
+    performance_data = []
+    neural_patterns = []
+    
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Process sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Run brain step with advanced features
+        brain.step(step)
+        
+        # Collect performance metrics
+        if step % 100 == 0:
+            perf = {
+                'step': step,
+                'spike_count': brain.getTotalSpikeCount(),
+                'firing_rate': brain.getAverageFiringRate(),
+                'curiosity': agent.getCuriosityLevel(),
+                'novelty': agent.getNoveltyLevel(),
+                'prediction_error': agent.getPredictionError(),
+                'action_type': agent.decodeMotorCommand().getType()
+            }
+            performance_data.append(perf)
+            
+            # Advanced neural analysis
+            if step % 500 == 0:
+                pattern = {
+                    'step': step,
+                    'neural_activity': brain.advanced_get_neural_activity_matrix(),
+                    'network_metrics': brain.advanced_compute_network_metrics(),
+                    'connection_weights': brain.advanced_get_connection_weights()
+                }
+                neural_patterns.append(pattern)
+    
+    return performance_data, neural_patterns
+
+# Example 3: Machine learning integration
+def ml_integrated_simulation(brain, world, agent, training_steps=5000):
+    """Run simulation with machine learning integration."""
+    
+    import numpy as np
+    from sklearn.cluster import KMeans
+    
+    # Collect training data
+    X = []
+    y = []
+    
+    for step in range(training_steps):
+        # Environment interaction
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Extract features
+        features = extract_neural_features(brain)
+        reward = get_environment_reward(world)
+        
+        X.append(features)
+        y.append(reward)
+        
+        # Apply neuromodulation
+        agent.applyRewardModulation(reward, 0.0)
+        agent.updateDevelopment(0.1)
+    
+    # Convert to numpy arrays
+    X = np.array(X)
+    y = np.array(y)
+    
+    # Machine learning analysis
+    kmeans = KMeans(n_clusters=5, random_state=42)
+    clusters = kmeans.fit_predict(X)
+    
+    return X, y, clusters
+```
 
 ---
 

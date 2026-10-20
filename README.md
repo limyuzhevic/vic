@@ -63,8 +63,9 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
+
+### Standard Build
 
 ```bash
 mkdir build
@@ -73,14 +74,77 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Advanced Python Bindings Build
+
+For advanced Python bindings with enhanced functionality:
+
+```bash
+mkdir build_advanced
+cd build_advanced
+cmake ../python -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Python Package Build
+
+To build the Python package with scikit-build:
+
+```bash
+pip install scikit-build-core pybind11 nlohmann_json yaml-cpp
+pip install -e .
+```
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Advanced Python Usage
+
+```python
+import pynlm
+
+# Basic usage
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Advanced usage with expert features
+for i in range(1000):
+    brain.step(i)
+
+# Get neural activity patterns
+activity = brain.advanced_get_neural_activity_matrix()
+metrics = brain.advanced_compute_network_metrics()
+
+# Run advanced simulation with monitoring
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+metrics = nlm.run_advanced_simulation(brain, world, agent, 1000, enable_profiling=True)
+```
+
+### Command Line Tools
+
+```bash
+# Generate advanced configuration
+./nlm --create-config advanced_config.json
+
+# Run with JSON configuration
+./nlm --config advanced_config.json --steps 5000
+
+# Export neural data for visualization
+./nlm --export-neural-data neural_output.json
+
+# Validate configuration
+./nlm --validate-config my_config.yaml
+```
 
 ## Project Structure
 

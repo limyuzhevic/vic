@@ -1,0 +1,100 @@
+# Advanced NLM Configuration
+# Configuration for expert neural learning machine experiments
+
+metadata:
+  name: "Advanced NLM Configuration"
+  version: "2.0.0-advanced"
+  description: "Configuration for advanced neural learning machine experiments"
+  created: "2026-10-20T09:41:00Z"
+  author: "NLM Research Team"
+
+brain:
+  neuron_count: 3000
+  region_count: 3
+  connection_probability: 0.15
+  initial_weight_mean: 0.5
+  initial_weight_std: 0.1
+  v_thresh: -50.0
+  v_rest: -70.0
+  v_reset: -75.0
+  tau_mem: 20.0
+  tau_ref: 2.0
+
+plasticity:
+  stdp:
+    enable: true
+    learning_rate: 0.002
+    tau_plus: 20.0
+    tau_minus: 20.0
+    weight_range: [-0.5, 0.5]
+  hebbian:
+    enable: true
+    threshold: 0.5
+    strength: 0.01
+  structural:
+    enable: true
+    synaptogenesis_rate: 0.00005
+    pruning_rate: 0.00001
+    max_synapses_per_neuron: 50
+
+neuromodulation:
+  dopamine:
+    scale: 1.5
+    baseline: 0.1
+    burst_response: 2.0
+  curiosity:
+    enable: true
+    exploration_bonus: 0.2
+    novelty_sensitivity: 1.2
+    intrinsic_motivation: 0.3
+  novelty:
+    enable: true
+    sensitivity: 1.5
+    adaptation_rate: 0.9
+    threshold: 0.1
+  prediction_error:
+    enabled: true
+    learning_rate: 0.01
+    confidence_threshold: 0.8
+
+development:
+  enable: true
+  initial_plasticity: 1.2
+  plasticity_decay_rate: 0.9
+  critical_period_length: 100
+  maturation_rate: 0.05
+  senescence_rate: 0.001
+
+memory_systems:
+  working_memory:
+    capacity: 500
+    decay_rate: 0.95
+    competition_strength: 1.0
+  episodic_memory:
+    max_episodes: 5000
+    consolidation_interval: 100
+    replay_probability: 0.3
+  associative_memory:
+    max_associations: 10000
+    association_strength: 0.8
+    forgetting_rate: 0.99
+
+advanced_features:
+  neural_network_size: 5000
+  simulation_duration: 10000
+  performance_monitoring: true
+  profiling_interval: 50
+  visualization_export: true
+  ml_integration: true
+  real_time_monitoring: false
+  reproducible_research: true
+  checkpoint_frequency: 1000
+  export_format: "json"
+
+experiment_parameters:
+  random_seed: 42
+  simulation_timestep: 0.001
+  save_checkpoints: true
+  checkpoint_compression: "balanced"
+  verbose_logging: true
+  log_level: "info"
