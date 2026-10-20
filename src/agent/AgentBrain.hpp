@@ -69,6 +69,37 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Custom Behavior Patterns
+    void customBehaviorPattern(const std::string& name, 
+                               const std::vector<std::pair<NeuronId, float>>& neuralMapping,
+                               const std::vector<std::string>& rules);
+    
+    void behaviorPolicy(const std::vector<std::string>& rules, 
+                       const std::vector<float>& priorityLevels);
+    
+    void adaptiveBehaviorController(const std::string& targetBehavior);
+    
+    // Advanced Neuromodulation Controls
+    void neuromodulationNetwork(const std::vector<float>& neuromodulators,
+                               const std::vector<std::pair<size_t, size_t>>& connections);
+    
+    void targetedDopamineRelease(const std::vector<NeuronType>& neuronTypes, float strength);
+    
+    void setModulationSource(const std::string& sourceType, float strength, double duration);
+    
+    // Curiosity-Driven Exploration
+    void intrinsicMotivationGenerator(float baseCuriosity);
+    
+    void uncertaintyBasedExploration(float uncertaintyThreshold);
+    
+    void noveltyWeightedSampling(const std::vector<std::pair<float, std::string>>& weightedFunctions);
+    
+    // Custom Learning Rules
+    void customLearningRule(const std::string& name, 
+                           const std::function<void(Synapse*, float, float)>& updateFunction);
+    
+    void learningRuleComposition(const std::vector<std::string>& rules);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

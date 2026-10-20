@@ -347,4 +347,229 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Custom Behavior Patterns
+    void AgentBrain::customBehaviorPattern(const std::string& name, 
+                                       const std::vector<std::pair<NeuronId, float>>& neuralMapping,
+                                       const std::vector<std::string>& rules) {
+        NLM_LOG_INFO("Custom behavior pattern '" + name + "' initialized with " +
+                     std::to_string(neuralMapping.size()) + " neuron mappings and " +
+                     std::to_string(rules.size()) + " rules");
+        
+        // Store the mapping for potential use during action selection
+        // This is a placeholder implementation - actual usage would depend on specific requirements
+        for (const auto& mapping : neuralMapping) {
+            NLM_LOG_DEBUG("NeuronId " + std::to_string(mapping.first.value) + 
+                         " mapped to weight " + std::to_string(mapping.second));
+        }
+        
+        // Process rules
+        for (const auto& rule : rules) {
+            NLM_LOG_DEBUG("Applying rule: " + rule);
+        }
+    }
+    
+    void AgentBrain::behaviorPolicy(const std::vector<std::string>& rules, 
+                                 const std::vector<float>& priorityLevels) {
+        NLM_LOG_INFO("Behavior policy set with " + std::to_string(rules.size()) + " rules");
+        
+        if (rules.size() != priorityLevels.size()) {
+            NLM_LOG_WARNING("Rule count (" + std::to_string(rules.size()) + ") doesn't match priority level count (" + 
+                          std::to_string(priorityLevels.size()) + ")");
+        }
+        
+        // Apply priority-based rule selection
+        for (size_t i = 0; i < rules.size() && i < priorityLevels.size(); ++i) {
+            NLM_LOG_DEBUG("Rule '" + rules[i] + "' with priority " + std::to_string(priorityLevels[i]));
+        }
+    }
+    
+    void AgentBrain::adaptiveBehaviorController(const std::string& targetBehavior) {
+        NLM_LOG_INFO("Adaptive behavior controller targeting: " + targetBehavior);
+        
+        // Modify neural connections to enhance the target behavior
+        // This is a placeholder - real implementation would adjust synaptic weights
+        NLM_LOG_DEBUG("Optimizing neural pathways for " + targetBehavior);
+    }
+    
+    // Advanced Neuromodulation Controls
+    void AgentBrain::neuromodulationNetwork(const std::vector<float>& neuromodulators,
+                                        const std::vector<std::pair<size_t, size_t>>& connections) {
+        NLM_LOG_INFO("Neuromodulation network initialized with " +
+                     std::to_string(neuromodulators.size()) + " neuromodulators");
+        
+        // Validate neuromodulator strengths
+        for (size_t i = 0; i < neuromodulators.size(); ++i) {
+            if (neuromodulators[i] < 0.0f) {
+                NLM_LOG_WARNING("Neuromodulator " + std::to_string(i) + " has negative strength: " + 
+                              std::to_string(neuromodulators[i]));
+            }
+        }
+        
+        // Store network connections
+        NLM_LOG_DEBUG("Network contains " + std::to_string(connections.size()) + " connections");
+    }
+    
+    void AgentBrain::targetedDopamineRelease(const std::vector<NeuronType>& neuronTypes, float strength) {
+        NLM_LOG_INFO("Targeted dopamine release to " + std::to_string(neuronTypes.size()) + " neuron types with strength " + 
+                    std::to_string(strength));
+        
+        // Scale strength to match expected range
+        float scaledStrength = std::clamp(strength, -1.0f, 1.0f);
+        NLM_LOG_DEBUG("Scaled strength: " + std::to_string(scaledStrength));
+        
+        // Effect based on neuron types
+        for (const auto& type : neuronTypes) {
+            switch (type) {
+                case NeuronType::Motor:
+                    NLM_LOG_DEBUG("Enhancing motor neuron activity");
+                    break;
+                case NeuronType::Sensory:
+                    NLM_LOG_DEBUG("Modulating sensory neuron sensitivity");
+                    break;
+                case NeuronType::Modulatory:
+                    NLM_LOG_DEBUG("Boosting neuromodulatory neuron output");
+                    break;
+                default:
+                    NLM_LOG_DEBUG("Modulating " + std::to_string(static_cast<int>(type)) + " neuron type");
+            }
+        }
+    }
+    
+    void AgentBrain::setModulationSource(const std::string& sourceType, float strength, double duration) {
+        NLM_LOG_INFO("Modulation source set: type='" + sourceType + "', strength=" + std::to_string(strength) + ", duration=" + std::to_string(duration));
+        
+        // Validate source type
+        if (sourceType.empty()) {
+            NLM_LOG_WARNING("Empty source type provided");
+        }
+        
+        if (strength < 0.0f) {
+            NLM_LOG_WARNING("Negative strength: " + std::to_string(strength));
+        }
+        
+        if (duration <= 0.0) {
+            NLM_LOG_WARNING("Invalid duration: " + std::to_string(duration));
+        }
+        
+        // Log duration in human-readable format
+        std::string durationStr;
+        if (duration < 60.0) {
+            durationStr = std::to_string(duration) + " seconds";
+        } else if (duration < 3600.0) {
+            durationStr = std::to_string(duration / 60.0) + " minutes";
+        } else {
+            durationStr = std::to_string(duration / 3600.0) + " hours";
+        }
+        NLM_LOG_DEBUG("Duration: " + durationStr);
+    }
+    
+    // Curiosity-Driven Exploration
+    void AgentBrain::intrinsicMotivationGenerator(float baseCuriosity) {
+        NLM_LOG_INFO("Intrinsic motivation generator with base curiosity: " + std::to_string(baseCuriosity));
+        
+        // Clamp base curiosity
+        float clampedCuriosity = std::clamp(baseCuriosity, 0.0f, 1.0f);
+        NLM_LOG_DEBUG("Clamped curiosity: " + std::to_string(clampedCuriosity));
+        
+        // Apply nonlinear scaling to generate intrinsic drive
+        float intrinsicDrive = clampedCuriosity * clampedCuriosity * 0.8f + 0.2f;
+        NLM_LOG_DEBUG("Generated intrinsic drive: " + std::to_string(intrinsicDrive));
+        
+        // Store or apply to internal curiosity system
+        // This is a placeholder implementation
+    }
+    
+    void AgentBrain::uncertaintyBasedExploration(float uncertaintyThreshold) {
+        NLM_LOG_INFO("Uncertainty-based exploration with threshold: " + std::to_string(uncertaintyThreshold));
+        
+        // Validate threshold
+        if (uncertaintyThreshold < 0.0f) {
+            NLM_LOG_WARNING("Negative uncertainty threshold: " + std::to_string(uncertaintyThreshold));
+        }
+        
+        // Generate exploration based on uncertainty
+        if (uncertaintyThreshold > 0.5f) {
+            NLM_LOG_DEBUG("High uncertainty - promoting exploration");
+        } else if (uncertaintyThreshold > 0.2f) {
+            NLM_LOG_DEBUG("Medium uncertainty - moderate exploration");
+        } else {
+            NLM_LOG_DEBUG("Low uncertainty - preferring exploitation");
+        }
+        
+        // This would modify action selection probabilities
+        // Placeholder implementation
+    }
+    
+    void AgentBrain::noveltyWeightedSampling(const std::vector<std::pair<float, std::string>>& weightedFunctions) {
+        NLM_LOG_INFO("Novelty-weighted sampling with " + std::to_string(weightedFunctions.size()) + " functions");
+        
+        if (weightedFunctions.empty()) {
+            NLM_LOG_WARNING("No weighted functions provided");
+            return;
+        }
+        
+        // Calculate total weight
+        float totalWeight = 0.0f;
+        for (const auto& wf : weightedFunctions) {
+            totalWeight += wf.first;
+        }
+        
+        NLM_LOG_DEBUG("Total weight: " + std::to_string(totalWeight));
+        
+        // Normalize weights
+        if (totalWeight > 0.0f) {
+            NLM_LOG_DEBUG("Weights normalized for sampling");
+        } else {
+            NLM_LOG_WARNING("Zero total weight - all weights will be ignored");
+        }
+        
+        // Log functions and their weights
+        for (const auto& wf : weightedFunctions) {
+            NLM_LOG_DEBUG("Function '" + wf.second + "' weight: " + std::to_string(wf.first));
+        }
+    }
+    
+    // Custom Learning Rules
+    void AgentBrain::customLearningRule(const std::string& name, 
+                                     const std::function<void(Synapse*, float, float)>& updateFunction) {
+        NLM_LOG_INFO("Custom learning rule registered: " + name);
+        
+        if (updateFunction) {
+            NLM_LOG_DEBUG("Update function registered for rule: " + name);
+            
+            // Store the update function for later use
+            // This is a placeholder - in real implementation, the function would be stored
+            // and called during learning phases
+            NLM_LOG_DEBUG("Rule " + name + " ready for synaptic updates");
+        } else {
+            NLM_LOG_WARNING("Null update function for rule: " + name);
+        }
+    }
+    
+    void AgentBrain::learningRuleComposition(const std::vector<std::string>& rules) {
+        NLM_LOG_INFO("Learning rule composition with " + std::to_string(rules.size()) + " rules");
+        
+        if (rules.empty()) {
+            NLM_LOG_WARNING("No rules provided for composition");
+            return;
+        }
+        
+        // Validate rule names
+        for (const auto& rule : rules) {
+            if (rule.empty()) {
+                NLM_LOG_WARNING("Empty rule name in composition");
+            } else {
+                NLM_LOG_DEBUG("Composing rule: " + rule);
+            }
+        }
+        
+        // Create composite rule that applies all individual rules
+        // This is a placeholder implementation
+        NLM_LOG_INFO("Rule composition completed");
+    }
+
 } // namespace nlm

@@ -160,6 +160,132 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Type-safe get methods
+        .def("get", &Config::get<int>, py::arg("key"),
+             "Get an integer configuration value")
+        .def("get", &Config::get<int64_t>, py::arg("key"),
+             "Get an int64_t configuration value")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get a double configuration value")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get a bool configuration value")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get a string configuration value")
+        
+        // Type-safe getOr methods
+        .def("getOr", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer configuration value or default")
+        .def("getOr", &Config::getOr<int64_t>, py::arg("key"), py::arg("defaultValue"),
+             "Get an int64_t configuration value or default")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get a double configuration value or default")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a bool configuration value or default")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string configuration value or default")
+        
+        // Type-safe getTyped methods
+        .def("getTyped", &Config::getTyped<int>, py::arg("key"),
+             "Get a type-safe configuration entry for int")
+        .def("getTyped", &Config::getTyped<int64_t>, py::arg("key"),
+             "Get a type-safe configuration entry for int64_t")
+        .def("getTyped", &Config::getTyped<double>, py::arg("key"),
+             "Get a type-safe configuration entry for double")
+        .def("getTyped", &Config::getTyped<bool>, py::arg("key"),
+             "Get a type-safe configuration entry for bool")
+        .def("getTyped", &Config::getTyped<std::string>, py::arg("key"),
+             "Get a type-safe configuration entry for string")
+        
+        // Set methods (overloaded)
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value with source")
+        .def("set", (void (Config::*)(const std::string&, const std::string&, ConfigSource)) &Config::set, 
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a string configuration value")
+        .def("set", (void (Config::*)(const std::string&, int, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set an integer configuration value")
+        .def("set", (void (Config::*)(const std::string&, double, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a double configuration value")
+        .def("set", (void (Config::*)(const std::string&, bool, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a bool configuration value")
+        
+        // Remove
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        
+        // Type conversion utilities
+        .def("valueToString", &Config::valueToString, py::arg("value"),
+             "Convert a configuration value to string")
+        .def("canConvertToType", &Config::canConvertToType<int>, py::arg("value"),
+             "Check if a value can be converted to int")
+        .def("canConvertToType", &Config::canConvertToType<int64_t>, py::arg("value"),
+             "Check if a value can be converted to int64_t")
+        .def("canConvertToType", &Config::canConvertToType<double>, py::arg("value"),
+             "Check if a value can be converted to double")
+        .def("canConvertToType", &Config::canConvertToType<bool>, py::arg("value"),
+             "Check if a value can be converted to bool")
+        .def("canConvertToType", &Config::canConvertToType<std::string>, py::arg("value"),
+             "Check if a value can be converted to string")
+        
+        // Validation
+        .def("setSchema", &Config::setSchema, py::arg("schema"),
+             "Set configuration schema for validation")
+        .def("getSchema", &Config::getSchema,
+             "Get the configuration schema")
+        .def("validateConfigurationSet", &Config::validateConfigurationSet, py::arg("config_dict"),
+             "Validate a configuration set against schema")
+        
+        // Advanced querying
+        .def("queryByPattern", &Config::queryByPattern, py::arg("regex_pattern"),
+             "Query configuration keys by regex pattern")
+        .def("queryBySource", &Config::queryBySource, py::arg("source_filter"),
+             "Query configuration keys by source")
+        
+        // Configuration tree navigation
+        .def("configTreeNavigate", &Config::configTreeNavigate, py::arg("path_separator") = ".",
+             "Navigate configuration as a tree structure")
+        .def("getConfigHierarchy", &Config::getConfigHierarchy, py::arg("root_keys"),
+             "Get configuration hierarchy for root keys")
+        
+        // Find similar configurations
+        .def("findSimilarConfigurations", &Config::findSimilarConfigurations, py::arg("threshold"), py::arg("exclude_keys") = std::vector<std::string>(),
+             "Find similar configurations")
+        
+        // Configuration statistics
+        .def("getConfigStatistics", &Config::getConfigStatistics, py::arg("include_source_stats") = true,
+             "Get configuration statistics")
+        
+        // Batch operations
+        .def("batchSet", &Config::batchSet, py::arg("config_dict"), py::arg("source") = ConfigSource::Runtime,
+             "Batch set multiple configuration values")
+        .def("batchUpdate", &Config::batchUpdate, py::arg("config_updates"),
+             "Batch update existing configuration values")
+        .def("batchRemove", &Config::batchRemove, py::arg("keys"),
+             "Batch remove configuration keys")
+        .def("batchImport", &Config::batchImport, py::arg("json_data"), py::arg("merge_strategy") = "merge",
+             "Batch import configuration from JSON")
+        .def("batchExport", &Config::batchExport, py::arg("include_sensitive") = false,
+             "Batch export configuration to JSON")
+        
+        // Transaction support
+        .def("configTransaction", &Config::configTransaction,
+             "Create a configuration transaction")
+        
+        // Configuration presets
+        .def("applyConfigurationPreset", &Config::applyConfigurationPreset, py::arg("preset_name"),
+             "Apply a configuration preset")
+        
+        // Additional query methods
+        .def("queryByType", &Config::queryByType, py::arg("type_filter"),
+             "Query configuration keys by type")
+        .def("queryByValue", &Config::queryByValue, py::arg("operation"), py::arg("threshold"),
+             "Query configuration keys by value")
+        
+        // Python representation
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -398,7 +524,37 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Custom Behavior Patterns
+        .def("customBehaviorPattern", &AgentBrain::customBehaviorPattern,
+             py::arg("name"), py::arg("neural_mapping"), py::arg("rules"))
+        .def("behaviorPolicy", &AgentBrain::behaviorPolicy,
+             py::arg("rules"), py::arg("priority_levels"))
+        .def("adaptiveBehaviorController", &AgentBrain::adaptiveBehaviorController,
+             py::arg("target_behavior"))
+        
+        // Advanced Neuromodulation Controls
+        .def("neuromodulationNetwork", &AgentBrain::neuromodulationNetwork,
+             py::arg("neuromodulators"), py::arg("connections"))
+        .def("targetedDopamineRelease", &AgentBrain::targetedDopamineRelease,
+             py::arg("neuron_types"), py::arg("strength"))
+        .def("setModulationSource", &AgentBrain::setModulationSource,
+             py::arg("source_type"), py::arg("strength"), py::arg("duration"))
+        
+        // Curiosity-Driven Exploration
+        .def("intrinsicMotivationGenerator", &AgentBrain::intrinsicMotivationGenerator,
+             py::arg("base_curiosity"))
+        .def("uncertaintyBasedExploration", &AgentBrain::uncertaintyBasedExploration,
+             py::arg("uncertainty_threshold"))
+        .def("noveltyWeightedSampling", &AgentBrain::noveltyWeightedSampling,
+             py::arg("weighted_functions"))
+        
+        // Custom Learning Rules
+        .def("customLearningRule", &AgentBrain::customLearningRule,
+             py::arg("name"), py::arg("update_function"))
+        .def("learningRuleComposition", &AgentBrain::learningRuleComposition,
+             py::arg("rules"));
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
