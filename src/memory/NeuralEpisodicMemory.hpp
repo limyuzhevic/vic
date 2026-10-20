@@ -30,6 +30,9 @@ struct EpisodicMemoryItem {
     float energy;
     float novelty;
     
+    // Prediction error (difference between predicted and actual outcome)
+    float predictionError;
+    
     // Consequence of action
     std::vector<float> resultingSensoryState;
     float resultingReward;
@@ -45,20 +48,9 @@ struct EpisodicMemoryItem {
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
+        , predictionError(0)
         , resultingReward(0), age(0) {}
 };
-
-// NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
-// NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
-//
-// Key mechanisms:
-// - Episodes stored as neural activity patterns
-// - Retrieval via pattern completion (Hopfield-like)
-// - Temporal ordering through timestamps
-// - Relevance-weighted recall
-// - Replay during offline periods
-
-class NeuralEpisodicMemory {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();

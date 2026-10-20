@@ -128,6 +128,13 @@ public:
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
+    // Update concept with new instance
+    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
+                      const std::vector<float>& features, float reward);
+
+    // Update concept from an episodic memory item
+    void updateConceptFromEpisode(const EpisodicMemoryItem& episode);
+
     // Clear all concepts
     void clear();
 

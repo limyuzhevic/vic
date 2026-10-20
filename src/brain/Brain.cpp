@@ -509,12 +509,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state
+        std::vector<float> currentSensoryState;
+        if (getCurrentSensoryState(currentSensoryState) && !currentSensoryState.empty()) {
+            // Generate prediction for next state
+            auto predicted = pImpl->predictionSystem->predictNextState(currentSensoryState, pImpl->currentStep);
+            
+            // Update with actual observation to compute error
+            float predictionError = pImpl->predictionSystem->updateWithObservation(
+                currentSensoryState, pImpl->currentStep);
+            
+            // Integrate prediction error with neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->recordError(predictionError, pImpl->currentStep);
+                
+                // Apply prediction error modulation to neural excitability
+                float modulationSignal = pImpl->predictionError->getModulationSignal();
+                applyPredictionErrorModulation(modulationSignal);
+            }
+            
+            // Record sensory state for temporal prediction
+            pImpl->predictionSystem->recordSensoryState(currentSensoryState, pImpl->currentStep);
+            
+            // Learn prediction sequences
+            if (pImpl->currentStep > 10) {
+                auto previousState = pImpl->predictionSystem->getRecentSensoryState(pImpl->currentStep - 10);
+                if (previousState && !previousState->empty()) {
+                    pImpl->predictionSystem->learnSequence(
+                        *previousState, currentSensoryState, pImpl->currentStep);
+                }
+            }
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -524,12 +553,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Integrate attention with concept formation if available
+        if (pImpl->conceptFormation && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get working memory winners to attend to
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (!competitors.empty()) {
+                // Apply concept-based attention bias
+                for (const auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (pImpl->conceptFormation) {
+                            // Get concept relevance for this neuron
+                            size_t conceptId = pImpl->conceptFormation->findConceptForPattern(neuron->getState());
+                            if (conceptId > 0) {
+                                float conceptRelevance = pImpl->conceptFormation->getConceptStability(conceptId);
+                                pImpl->attention->applyTopDownBias(neuron->getId(), conceptRelevance * 2.0f);
+                            }
+                        }
+                    }
+                }
+                
+                // Process competition with concept-enhanced attention
+                auto winners = pImpl->attention->processCompetition(competitors);
+                pImpl->workingMemory->runCompetitionWithWinners(winners);
+            }
+        }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current sensory state for concept learning
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        if (getCurrentSensoryState(currentPattern) && !currentPattern.empty()) {
+            // Convert to features using simple heuristics
+            currentFeatures = convertSensoryToFeatures(currentPattern);
+            
+            // Present to concept formation system
+            pImpl->conceptFormation->presentExperience(
+                currentPattern, currentFeatures, currentReward, pImpl->currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,15 +602,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+// ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
+            // Replay episode
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Connect to working memory for consolidation
+            if (pImpl->workingMemory) {
+                // Update working memory with replayed patterns
+                for (const auto& neuronId : episode->activeNeurons) {
+                    float activation = getNeuronActivationFromEpisode(episode, neuronId);
+                    pImpl->workingMemory->storeToNeuron(neuronId, activation);
+                    
+                    // Apply attention during replay
+                    if (pImpl->attention) {
+                        pImpl->attention->applyBottomUpSalience(neuronId, activation * 2.0f);
+                    }
+                }
+            }
+            
+            // Learn concepts from replayed experiences
+            if (pImpl->conceptFormation) {
+                std::vector<float> pattern = episode->sensoryState;
+                std::vector<float> features = convertSensoryToFeatures(pattern);
+                float reward = episode->reward;
+                
+                if (!pattern.empty()) {
+                    pImpl->conceptFormation->presentExperience(
+                        pattern, features, reward, episode->timestamp);
+                }
+            }
+        }
+        
+        // Replay prediction errors for learning
+        if (pImpl->predictionSystem) {
+            for (const auto* episode : episodesToReplay) {
+                if (!episode->predictionError.empty()) {
+                    pImpl->predictionSystem->updatePredictionsWithEpisode(episode);
+                }
+            }
         }
     }
-    
+
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
@@ -575,11 +676,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Get consolidation candidates
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(100);
+        
+        // Consolidate based on concept stability
+        for (const auto* episode : recentEpisodes) {
+            // Get related concepts
+            if (pImpl->conceptFormation) {
+                std::vector<float> pattern = episode->sensoryState;
+                size_t conceptId = pImpl->conceptFormation->findConceptForPattern(pattern);
+                
+                if (conceptId > 0) {
+                    float conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+                    
+                    // Only consolidate stable concepts
+                    if (conceptStability > 0.7f) {
+                        pImpl->episodicMemory->consolidateEpisode(*episode, conceptStability);
+                    }
+                }
+            }
+        }
+        
+        // Update concept instances from consolidated episodes
+        if (pImpl->conceptFormation) {
+            for (const auto* episode : recentEpisodes) {
+                std::vector<float> pattern = episode->sensoryState;
+                std::vector<float> features = convertSensoryToFeatures(pattern);
+                pImpl->conceptFormation->updateConceptFromEpisode(pattern, features, episode->reward);
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -1061,20 +1189,90 @@ Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+float Brain::getCurrentReward() const {
+    if (pImpl->dopamine) {
+        return pImpl->dopamine->getLevel();
+    }
+    return 0.0f;
 }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+float Brain::getNeuronActivationFromEpisode(const EpisodicMemoryItem* episode, NeuronId neuron) const {
+    auto it = std::find(episode->activeNeurons.begin(), 
+                       episode->activeNeurons.end(), neuron);
+    if (it != episode->activeNeurons.end()) {
+        size_t idx = std::distance(episode->activeNeurons.begin(), it);
+        if (idx < episode->neuronActivations.size()) {
+            return episode->neuronActivations[idx];
+        }
+    }
+    return 0.1f; // Default low activation
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+void Brain::applyPredictionErrorModulation(float modulationSignal) {
+    // Apply prediction error to neural excitability
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Prediction error modulates neural gain
+                float gainMod = 1.0f + modulationSignal * 0.5f;
+                neuron->injectCurrent((gainMod - 1.0f) * 2.0f);
+            }
+        }
+    }
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+// ========== INTEGRATION HELPERS ==========
+
+bool Brain::getCurrentSensoryState(std::vector<float>& state) const {
+    // Collect from all sensory neurons
+    state.clear();
+    for (auto* neuron : pImpl->sensoryNeurons) {
+        if (neuron) {
+            state.push_back(std::abs(neuron->getState().membranePotential - 
+                                   neuron->getState().restingPotential));
+        }
+    }
+    return !state.empty();
+}
+
+void Brain::processWorkingMemoryWithConcept(const ConceptFormation* conceptFormation) {
+    if (!conceptFormation || !pImpl->workingMemory) return;
+    
+    // Process working memory winners with concept formation
+    auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+    if (!memoryNeurons.empty()) {
+        // Apply concept-based attention and learning
+        for (const auto& neuronId : memoryNeurons) {
+            // Find concepts related to this neuron's pattern
+            for (const auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        // Present to concept formation
+                        auto currentState = neuron->getState();
+                        std::vector<float> pattern = {currentState.membranePotential - currentState.restingPotential};
+                        std::vector<float> features = convertSensoryToFeatures(pattern);
+                        float reward = getCurrentReward();
+                        
+                        conceptFormation->presentExperience(pattern, features, reward, pImpl->currentStep);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Brain::updateConceptInstancesFromEpisodic(const NeuralEpisodicMemory* episodicMemory) {
+    if (!episodicMemory || !pImpl->conceptFormation) return;
+    
+    // Get recent episodes and update concept instances
+    auto recentEpisodes = episodicMemory->getRecentEpisodes(50);
+    
+    for (const auto* episode : recentEpisodes) {
+        std::vector<float> pattern = episode->sensoryState;
+        std::vector<float> features = convertSensoryToFeatures(pattern);
+        pImpl->conceptFormation->updateConceptFromEpisode(pattern, features, episode->reward);
+    }
 }
 
 void Brain::logStatus() const {

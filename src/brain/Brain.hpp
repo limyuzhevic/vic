@@ -106,6 +106,19 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // ========== INTEGRATION HELPERS ==========
+    
+    // Integration helpers
+    bool getCurrentSensoryState(std::vector<float>& state) const;
+    std::vector<float> convertSensoryToFeatures(const std::vector<float>& sensory) const;
+    float getCurrentReward() const;
+    float getNeuronActivationFromEpisode(const class EpisodicMemoryItem* episode, NeuronId neuron) const;
+    void applyPredictionErrorModulation(float modulationSignal);
+    
+    // Concept formation helpers
+    void processWorkingMemoryWithConcept(const class ConceptFormation* conceptFormation);
+    void updateConceptInstancesFromEpisodic(const class NeuralEpisodicMemory* episodicMemory);
+    
     // Reset brain state
     void reset();
     

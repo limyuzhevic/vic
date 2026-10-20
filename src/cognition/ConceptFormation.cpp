@@ -296,6 +296,55 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
+// Update concept from an episodic memory item
+void ConceptFormation::updateConceptFromEpisode(const EpisodicMemoryItem& episode) {
+    if (episode.sensoryState.empty()) return;
+    
+    // Convert episodic memory to concept format
+    std::vector<float> features;
+    
+    // Extract features from sensory state
+    if (episode.sensoryState.size() >= 5) {
+        // Simple feature extraction: mean, variance, min, max
+        float sum = 0.0f;
+        for (float v : episode.sensoryState) sum += v;
+        float mean = sum / episode.sensoryState.size();
+        
+        float variance = 0.0f;
+        for (float v : episode.sensoryState) {
+            float diff = v - mean;
+            variance += diff * diff;
+        }
+        variance /= episode.sensoryState.size();
+        
+        features = {
+            mean,                           // Mean activation
+            variance,                       // Variance
+            episode.sensoryState.front(),   // Min
+            episode.sensoryState.back(),    // Max
+            episode.reward                  // Reward
+        };
+    }
+    
+    // Find existing concept or create new one
+    size_t conceptId = findConceptForPattern(episode.sensoryState);
+    
+    if (conceptId > 0) {
+        // Update existing concept
+        updateConcept(conceptId, episode.sensoryState, features, episode.reward);
+        NLM_LOG_INFO("ConceptFormation: Updated existing concept " + std::to_string(conceptId) +
+                     " from episode (reward: " + std::to_string(episode.reward) + ")");
+    } else {
+        // Create new concept from episode
+        conceptId = createConcept(episode.sensoryState, features, episode.reward);
+        
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: Created new concept " + std::to_string(conceptId) +
+                         " from episode (reward: " + std::to_string(episode.reward) + ")");
+        }
+    }
+}
+
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;

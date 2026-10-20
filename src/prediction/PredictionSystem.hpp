@@ -34,6 +34,15 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Integration methods for brain loop
+    float updateWithObservation(const std::vector<float>& sensoryState, SimulationStep currentStep);
+    void recordSensoryState(const std::vector<float>& state, SimulationStep step);
+    std::unique_ptr<std::vector<float>> getRecentSensoryState(SimulationStep stepsAgo) const;
+    void learnSequence(const std::vector<float>& fromState, 
+                       const std::vector<float>& toState, 
+                       SimulationStep currentStep);
+    void updatePredictionsWithEpisode(const class EpisodicMemoryItem& episode);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
