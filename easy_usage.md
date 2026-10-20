@@ -295,3 +295,92 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+---
+
+## NEW - Phase 6 Integration
+
+For advanced users interested in the complete integrated brain system:
+
+### Python Usage (Phase 6)
+```python
+import pynlm
+
+# Create default configuration with Phase 6 features
+config = pynlm.createDefaultConfig()
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent with integrated systems
+agent = pynlm.createAgentBrain(brain)
+
+# Create and configure world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Initialize agent with world
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run Phase 6 simulation for 100 steps
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    # Get action and apply to world
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print progress
+    if step % 20 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Phase 6 integration complete!")
+```
+
+### C++ Command-Line Usage (Phase 6)
+```bash
+# Quick integration test
+./nlm --quick
+
+# Full integration experiment
+./nlm --full
+
+# Comprehensive testing
+./nlm --test-all --no-checkpoint
+
+# Advanced usage
+./nlm --full --neuron=500 --checkpoint=./my_checkpoint.bin --enable-curiosity
+```
+
+The Phase 6 system includes:
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty, prediction error
+- **Cognition**: Planning, attention, concept formation
+- **Development**: Plasticity modulation over time
+- **Replay**: Memory consolidation and replay
+- **Checkpointing**: State persistence and recovery
+- **Performance**: Built-in benchmarking and optimization
+
+For more information about Phase 6 improvements, see `PHASE6_IMPROVEMENTS.md`.

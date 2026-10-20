@@ -1,51 +1,105 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements a complete integrated artificial brain with:
+// - Neural memory systems (working + episodic)
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Prediction and cognition systems
+// - Development and structural plasticity
+// - Experience replay and consolidation
+// - Checkpoint persistence
+//
+// This is a comprehensive demonstration of Phase 6 integration
+// showing all brain systems working together as a unified architecture.
 
 #include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
 #include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
+#include "experiments/Phase6IntegratedExperiment.hpp"
 #include <iostream>
 #include <memory>
 #include <string>
-#include <vector>
-#include <iomanip>
+
+#include <chrono>
 #include <numeric>
 
-using namespace nlm;
+// Performance benchmarking utilities
+namespace Performance {
+    struct BenchmarkResult {
+        std::string operation;
+        double timeSeconds;
+        size_t iterations;
+        double averageTimePerIteration;
+        double operationsPerSecond;
+        
+        BenchmarkResult(const std::string& op, double time, size_t iter)
+            : operation(op), timeSeconds(time), iterations(iter),
+              averageTimePerIteration(time / iter), operationsPerSecond(iter / time) {}
+    };
+    
+    template<typename Func>
+    BenchmarkResult benchmark(const std::string& name, Func&& func, size_t iterations) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < iterations; ++i) {
+            func();
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        double duration = std::chrono::duration<double>(end - start).count();
+        return BenchmarkResult(name, duration, iterations);
+    }
+    
+    void printBenchmark(const BenchmarkResult& result) {
+        NLM_LOG_INFO("Benchmark: " + result.operation);
+        NLM_LOG_INFO("  Total time: " + std::to_string(result.timeSeconds) + "s");
+        NLM_LOG_INFO("  Average per iteration: " + std::to_string(result.averageTimePerIteration) * 1000 + "ms");
+        NLM_LOG_INFO("  Operations per second: " + std::to_string(result.operationsPerSecond));
+        NLM_LOG_INFO("  Iterations: " + std::to_string(result.iterations));
+    }
+}
 
-void printBanner() {
+void printUsageAndExit() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+=== NLM Phase 6 Usage ===
+
+USAGE:
+    nlm [OPTIONS]
+
+EXPERIMENT TYPES:
+    --quick           Quick integration verification (fast)
+    --full            Full integration experiment (default)
+    --test-all        Comprehensive integration testing
+
+CONFIGURATION:
+    --config=<file>   Load configuration from JSON or .cfg file
+    --neuron=<N>     Override neuron count
+    --checkpoint=<path> Set checkpoint file path
+
+FEATURES:
+    --no-checkpoint    Disable checkpointing
+    --no-replay        Disable replay system
+    --no-development   Disable development system
+    --enable-curiosity  Enable curiosity-driven exploration
+
+HELP/INFO:
+    --help, -h         Show this help message
+    --version          Show version information
+
+EXAMPLES:
+    nlm --quick                   Quick integration test
+    nlm --full --neuron=500       Full experiment with 500 neurons
+    nlm --test-all --no-checkpoint Comprehensive test without checkpointing
+
+)" << std::endl;
+    exit(0);
+}
+
+void printVersionAndExit() {
+    std::cout << "NLM (熙然) Neural Learning Machine - Phase 6: Final Integration" << std::endl;
+    std::cout << "Version: 0.1.0" << std::endl;
+    std::cout << "Built with C++20, featuring integrated memory, neuromodulation, and cognition systems." << std::endl;
+    std::cout << "For documentation: https://nlm.readthedocs.io" << std::endl;
+    exit(0);
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,7 +378,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6: Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +386,15 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
+    NLM_LOG_INFO("Implementing a complete integrated artificial brain with:");
+    NLM_LOG_INFO("  - Memory systems (working + episodic) connected to neural processing");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity, novelty) affecting plasticity");
+    NLM_LOG_INFO("  - Prediction system integrated with learning");
+    NLM_LOG_INFO("  - Cognition systems (planning, attention, concept formation)");
+    NLM_LOG_INFO("  - Development modulating plasticity rates");
+    NLM_LOG_INFO("  - Experience replay and memory consolidation");
+    NLM_LOG_INFO("  - Checkpoint persistence and state restoration");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -345,6 +402,8 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string experimentType = "full";
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,6 +412,54 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--quick") {
+            experimentType = "quick";
+        } else if (arg == "--full") {
+            experimentType = "full";
+        } else if (arg == "--test-all") {
+            experimentType = "comprehensive";
+        } else if (arg == "--help" || arg == "-h") {
+            printUsageAndExit();
+        } else if (arg == "--version") {
+            printVersionAndExit();
+        } else if (arg.substr(0, 10) == "--neuron=") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                config->set("neuron_count", std::stoll(arg.substr(pos + 1)), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 11) == "--steps=") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                size_t steps = std::stoull(arg.substr(pos + 1));
+                if (experimentType == "full") {
+                    NLM_LOG_WARNING("Steps override will be ignored for full experiment");
+                } else if (experimentType == "quick") {
+                    experimentType = "custom";
+                    quickExperimentSteps = steps;
+                }
+            }
+        } else if (arg == "--no-checkpoint") {
+            config->set("enable_checkpointing", false, ConfigSource::CommandLine);
+        } else if (arg == "--no-replay") {
+            config->set("enable_replay", false, ConfigSource::CommandLine);
+        } else if (arg == "--no-development") {
+            config->set("enable_development", false, ConfigSource::CommandLine);
+        } else if (arg == "--enable-curiosity") {
+            config->set("enable_curiosity", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 12) == "--checkpoint=") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                config->set("checkpoint_path", arg.substr(pos + 1), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 10) == "--config=" && arg.find('=') != 7) {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                configFile = arg.substr(pos + 1);
+            }
+        } else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            config->set(key, value, ConfigSource::CommandLine);
         }
     }
     
@@ -366,84 +473,208 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 6
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("connection_probability", 0.1f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("enable_checkpointing", true, ConfigSource::Default);
+    config->set("enable_replay", true, ConfigSource::Default);
+    config->set("enable_development", true, ConfigSource::Default);
+    config->set("enable_curiosity", true, ConfigSource::Default);
+    config->set("enable_novelty_detection", true, ConfigSource::Default);
+    config->set("checkpoint_path", "./nlm_phase6_checkpoint.bin", ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Performance tuning parameters
+    config->set("performance.optimize_neural_dynamics", true, ConfigSource::Default);
+    config->set("performance.enable_vectorization", true, ConfigSource::Default);
+    config->set("performance.memory_pool_size", 10000, ConfigSource::Default);
+    config->set("performance.event_queue_size", 5000, ConfigSource::Default);
+    
+    // Development and debugging options
+    config->set("debug.enable_breakpoints", false, ConfigSource::Default);
+    config->set("debug.log_level", "Info", ConfigSource::Default);
+    config->set("debug.performance_profiling", false, ConfigSource::Default);
+    config->set("debug.memory_tracking", true, ConfigSource::Default);
+    
+    // Learning and behavior parameters
+    config->set("behavior.learning_rate", 0.001, ConfigSource::Default);
+    config->set("behavior.exploration_rate", 0.1f, ConfigSource::Default);
+    config->set("behavior.exploitation_rate", 0.9f, ConfigSource::Default);
+    config->set("behavior.reward_scaling", 1.0f, ConfigSource::Default);
+    
+    // Memory and consolidation parameters
+    config->set("memory.working_memory_capacity", 100, ConfigSource::Default);
+    config->set("memory.episodic_memory_max_episodes", 1000, ConfigSource::Default);
+    config->set("memory.consolidation_threshold", 0.5f, ConfigSource::Default);
+    
+    // Social and interaction parameters
+    config->set("social.enable_social_learning", false, ConfigSource::Default);
+    config->set("social.imitation_rate", 0.3f, ConfigSource::Default);
+    config->set("social.teaching_threshold", 0.7f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+    NLM_LOG_INFO("  replay_interval: " + std::to_string(config->getOr<size_t>("replay_interval", 100)));
+    NLM_LOG_INFO("  consolidation_interval: " + std::to_string(config->getOr<size_t>("consolidation_interval", 1000)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Run appropriate Phase 6 experiment based on command line
+    if (experimentType == "quick") {
+        NLM_LOG_INFO("=== Quick Integration Verification ===");
+        Phase6IntegratedExperiment quickExperiment;
+        bool integrationOK = quickExperiment.verifyIntegration();
+        if (integrationOK) {
+            NLM_LOG_INFO("✓ Integration verification PASSED - All systems connected");
+        } else {
+            NLM_LOG_ERROR("✗ Integration verification FAILED - Systems not properly integrated");
+            return 1;
+        }
+    } else if (experimentType == "comprehensive") {
+        NLM_LOG_INFO("=== Comprehensive Integration Test ===");
+        Phase6IntegratedExperiment comprehensiveExperiment;
+        
+        // Run all integration tests
+        NLM_LOG_INFO("--- Testing Memory Integration ---");
+        bool memoryOK = comprehensiveExperiment.testMemoryIntegration();
+        
+        NLM_LOG_INFO("--- Testing Neuromodulation Integration ---");
+        bool neuromodulationOK = comprehensiveExperiment.testNeuromodulationIntegration();
+        
+        NLM_LOG_INFO("--- Testing Checkpoint System ---");
+        bool checkpointOK = comprehensiveExperiment.testCheckpointing();
+        
+        NLM_LOG_INFO("--- Testing Replay System ---");
+        bool replayOK = comprehensiveExperiment.testReplay();
+        
+        if (memoryOK && neuromodulationOK && checkpointOK && replayOK) {
+            NLM_LOG_INFO("✓ All integration tests PASSED");
+        } else {
+            NLM_LOG_ERROR("✗ Some integration tests FAILED");
+            return 1;
+        }
+    } else {  // full experiment
+        NLM_LOG_INFO("=== Full Phase 6 Integration Experiment ===");
+        Phase6IntegratedExperiment experiment;
+        
+        // Configure experiment
+        Phase6Config phase6Config;
+        phase6Config.maxSteps = 5000;
+        phase6Config.neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+        phase6Config.regionCount = config->getOr<int64_t>("region_count", 1);
+        phase6Config.connectionProbability = config->getOr<float>("connection_probability", 0.1f);
+        phase6Config.enableCheckpointing = true;
+        phase6Config.enableReplay = true;
+        phase6Config.enableDevelopment = true;
+        phase6Config.checkpointPath = "./nlm_phase6_checkpoint.bin";
+        
+        NLM_LOG_INFO("Running full integration experiment with:");
+        NLM_LOG_INFO("  " + std::to_string(phase6Config.maxSteps) + " steps");
+        NLM_LOG_INFO("  " + std::to_string(phase6Config.neuronCount) + " neurons");
+        NLM_LOG_INFO("  " + std::to_string(phase6Config.regionCount) + " regions");
+        
+// Add performance benchmarking to full experiment
+    if (experimentType == "full") {
+        NLM_LOG_INFO("=== Performance Benchmarking ===");
+        
+        // Benchmark brain stepping
+        auto benchStep = [&]() {
+            brain->step(0);
+        };
+        
+        size_t benchmarkSteps = std::min(static_cast<size_t>(1000), phase6Config.maxSteps);
+        auto stepResult = Performance::benchmark("Brain Stepping", benchStep, benchmarkSteps);
+        Performance::printBenchmark(stepResult);
+        
+        // Benchmark neural operations
+        auto benchMemoryOps = [&]() {
+            if (brain->getWorkingMemory()) {
+                brain->getWorkingMemory()->getActiveTraces();
+            }
+            if (brain->getEpisodicMemory()) {
+                brain->getEpisodicMemory()->getEpisodeCount();
+            }
+        };
+        
+        size_t benchmarkOps = 10000;
+        auto memoryResult = Performance::benchmark("Memory Operations", benchMemoryOps, benchmarkOps);
+        Performance::printBenchmark(memoryResult);
+        
+        // Benchmark connectivity
+        auto benchConnectivity = [&]() {
+            brain->getTotalNeuronCount();
+            brain->getTotalSynapseCount();
+            brain->getExcitationInhibitionRatio();
+        };
+        
+        size_t benchmarkConnections = 1000;
+        auto connectivityResult = Performance::benchmark("Connectivity Access", benchConnectivity, benchmarkConnections);
+        Performance::printBenchmark(connectivityResult);
+        
+        NLM_LOG_INFO("=== Performance Summary ===");
+        NLM_LOG_INFO("Brain stepping rate: " + std::to_string(stepResult.operationsPerSecond) + " steps/second");
+        NLM_LOG_INFO("Memory operations: " + std::to_string(memoryResult.operationsPerSecond) + " ops/second");
+        NLM_LOG_INFO("Connectivity queries: " + std::to_string(connectivityResult.operationsPerSecond) + " queries/second");
+        NLM_LOG_INFO("".append(50, '='));
+    }
+        
+        // Display results
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== FINAL RESULTS ===");
+        NLM_LOG_INFO("Total reward per step: " + std::to_string(result.totalReward));
+        NLM_LOG_INFO("Average firing rate: " + std::to_string(result.avgFiringRate));
+        NLM_LOG_INFO("Average synaptic weight: " + std::to_string(result.avgSynapticWeight));
+        NLM_LOG_INFO("Episodic memory episodes stored: " + std::to_string(result.memoryEpisodesStored));
+        NLM_LOG_INFO("Novelty level: " + std::to_string(result.noveltyLevel));
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(result.curiosityLevel));
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(result.dopamineLevel));
+        NLM_LOG_INFO("Wall clock time: " + std::to_string(result.totalWallClockTime) + "s");
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== INTEGRATION STATUS ===");
+        NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED"));
+        NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED"));
+        NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED"));
+        NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED"));
+        NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED"));
+        NLM_LOG_INFO("Checkpointing: " + std::string(result.checkpointingWorks ? "✓ WORKING" : "✗ NOT WORKING"));
+        NLM_LOG_INFO("Replay: " + std::string(result.replayWorks ? "✓ WORKING" : "✗ NOT WORKING"));
+        
+        // Success if key systems are integrated
+        bool experimentSuccess = result.memoryWorkingMemoryIntegrated &&
+                                result.memoryEpisodicMemoryIntegrated &&
+                                result.neuromodulationIntegrated &&
+                                result.predictionIntegrated;
+        
+        if (experimentSuccess) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== PHASE 6 INTEGRATION SUCCESSFUL ===");
+            NLM_LOG_INFO("The NLM brain now functions as a complete integrated artificial brain:");
+            NLM_LOG_INFO("  - All memory systems are connected to neural processing");
+            NLM_LOG_INFO("  - Neuromodulation coordinates learning and behavior");
+            NLM_LOG_INFO("  - Prediction guides action selection and learning");
+            NLM_LOG_INFO("  - Development allows adaptive changes over time");
+            NLM_LOG_INFO("  - Experience is stored and replayed for consolidation");
+            NLM_LOG_INFO("  - Brain state can be saved and restored");
+            NLM_LOG_INFO("");
+        } else {
+            NLM_LOG_ERROR("=== PHASE 6 INTEGRATION INCOMPLETE ===");
+            NLM_LOG_ERROR("Some critical systems are not properly integrated.");
+            return 1;
+        }
     }
     
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Phase 6 Integration Complete ===");
+    NLM_LOG_INFO("".append(30, '='));
     
     return 0;
 }

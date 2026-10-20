@@ -19,40 +19,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced file loading with format detection
+    namespace fs = std::filesystem;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    if (!fs::exists(filepath)) {
+        NLM_LOG_WARNING("Configuration file does not exist: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Check file extension for format hint
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     }
     
-    return true;
+    try {
+        if (extension == "json") {
+            return loadFromJSON(filepath);
+        } else if (extension == "yaml" || extension == "yml") {
+            NLM_LOG_WARNING("YAML support not yet implemented, using simple format");
+            return loadFromSimpleFormat(filepath);
+        } else {
+            // Try simple format first (most common), then JSON
+            return loadFromSimpleFormat(filepath) || loadFromJSON(filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to load configuration file " + filepath + ": " + e.what());
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +75,29 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    namespace fs = std::filesystem;
+    
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    }
+    
+    try {
+        if (extension == "json") {
+            return saveToJSON(filepath);
+        } else if (extension == "yaml" || extension == "yml") {
+            NLM_LOG_WARNING("YAML save not yet implemented, using simple format");
+            return saveToSimpleFormat(filepath);
+        } else {
+            // Default to simple format for unknown extensions
+            return saveToSimpleFormat(filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save configuration file " + filepath + ": " + e.what());
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -111,18 +119,37 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    
+    // Log warning when using default value
+    if (has(key)) {
+        NLM_LOG_DEBUG("Using default value for configuration key: " + key);
+    }
+    
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key format
+    if (key.empty() || key.find('.') == std::string::npos) {
+        NLM_LOG_WARNING("Configuration key should use dot notation: " + key);
+    }
+    
+    // Log the setting
+    NLM_LOG_DEBUG("Setting configuration: " + key + " = " + valueToString(value) + " (source: " + std::to_string(static_cast<int>(source)) + ")");
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_DEBUG("Updated existing configuration: " + key);
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_DEBUG("Added new configuration: " + key);
     }
 }
 
@@ -142,17 +169,63 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+std::string Config::valueToString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << std::fixed << std::setprecision(6) << arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << std::fixed << std::setprecision(6) << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            oss << "[complex type]";
+        }
+    }, value);
+    return oss.str();
+}
+
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto removed = std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (removed != pImpl->entries.end()) {
+        NLM_LOG_INFO("Removed configuration: " + key);
+    }
+    
+    pImpl->entries.erase(removed, pImpl->entries.end());
+    pImpl->descriptions.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
