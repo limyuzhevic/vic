@@ -213,11 +213,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Pre-calculate constants to avoid repeated division
+    const float invTau = 1.0f / tau;
+    const float invC = 1.0f / C;
+    
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = pImpl->synapticInput * invC;
     
     // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    float leakContribution = (V_rest - V) * invTau;
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
@@ -225,11 +229,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Use lookup table or constant for decay rate
+        const float adaptationDecay = 0.95f;
+        pImpl->state.adaptationVariable *= adaptationDecay;
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    if (V < -100.0f) {
+        V = -100.0f;
+    } else if (V > 50.0f) {
+        V = 50.0f;
+    }
     
     // Check for spike
     if (V >= threshold) {

@@ -8,10 +8,13 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_advanced.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
+    test_neuron_advanced.cpp
     test_synapse.cpp
+    test_synapse_advanced.cpp
     test_stdp.cpp
     test_brain.cpp
 )

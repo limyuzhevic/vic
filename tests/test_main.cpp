@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_advanced {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -25,7 +29,15 @@ namespace test_neuron {
     void runAll();
 }
 
+namespace test_neuron_advanced {
+    void runAll();
+}
+
 namespace test_synapse {
+    void runAll();
+}
+
+namespace test_synapse_advanced {
     void runAll();
 }
 
@@ -101,6 +113,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Advanced Synapse tests..." << std::endl;
+    try {
+        test_synapse_advanced::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
@@ -113,6 +134,24 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Advanced Neuron tests..." << std::endl;
+    try {
+        test_neuron_advanced::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Advanced Config tests..." << std::endl;
+    try {
+        test_config_advanced::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

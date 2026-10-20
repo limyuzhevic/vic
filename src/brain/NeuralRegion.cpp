@@ -50,6 +50,11 @@ void NeuralRegion::setName(const std::string& name) {
 }
 
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
+    if (size == 0) {
+        NLM_LOG_WARNING("Cannot add population with size 0");
+        return INVALID_POPULATION_ID;
+    }
+    
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
@@ -58,16 +63,32 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() == 0) {
+        NLM_LOG_ERROR("Invalid population ID: index 0 is reserved");
         return nullptr;
     }
+    
+    if (id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Population ID " + std::to_string(id.index()) + " out of range (max: " + 
+                     std::to_string(pImpl->populations.size()) + ")");
+        return nullptr;
+    }
+    
     return pImpl->populations[id.index() - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() == 0) {
+        NLM_LOG_ERROR("Invalid population ID: index 0 is reserved");
         return nullptr;
     }
+    
+    if (id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Population ID " + std::to_string(id.index()) + " out of range (max: " + 
+                     std::to_string(pImpl->populations.size()) + ")");
+        return nullptr;
+    }
+    
     return pImpl->populations[id.index() - 1].get();
 }
 

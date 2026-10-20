@@ -8,9 +8,6 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
 // Configuration value types
 using ConfigValue = std::variant<
     int,
@@ -41,6 +38,88 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration key for better organization
+class ConfigKey {
+public:
+    enum class Category {
+        Neural,           // Neural network parameters
+        Simulation,       // Simulation parameters
+        Plasticity,       // Plasticity parameters
+        Memory,           // Memory system parameters
+        Neuromodulation,  // Neuromodulation parameters
+        Development,      // Developmental parameters
+        System,           // System-level parameters
+        Debug             // Debug and testing parameters
+    };
+    
+    ConfigKey(const std::string& key, Category category = Category::System, 
+              const std::string& description = "")
+        : key_(key), category_(category), description_(description) {}
+    
+    const std::string& getKey() const { return key_; }
+    Category getCategory() const { return category_; }
+    const std::string& getDescription() const { return description_; }
+    
+    bool operator<(const ConfigKey& other) const { return key_ < other.key_; }
+    bool operator==(const ConfigKey& other) const { return key_ == other.key_; }
+    
+private:
+    std::string key_;
+    Category category_;
+    std::string description_;
+};
+
+// Typed configuration value wrapper for better type safety
+class TypedConfigValue {
+public:
+    enum class Type {
+        Integer,
+        Int64,
+        Double,
+        Bool,
+        String,
+        IntVector,
+        DoubleVector,
+        StringVector
+    };
+    
+    TypedConfigValue() : type_(Type::String), string_value_("") {}
+    
+    template<typename T>
+    static TypedConfigValue from(const T& value);
+    
+    template<typename T>
+    T get() const;
+    
+    template<typename T>
+    bool has() const;
+    
+    Type getType() const { return type_; }
+    const std::string& getKey() const { return key_; }
+    void setKey(const std::string& key) { key_ = key; }
+    
+    // Serialization and validation
+    virtual bool validate() const { return true; }
+    virtual std::string toString() const { return "";
+    virtual bool equals(const TypedConfigValue& other) const { return false; }
+    
+protected:
+    Type type_;
+    std::string key_;
+    
+    // Type-specific storage
+    union {
+        int int_val;
+        int64_t int64_val;
+        double double_val;
+        bool bool_val;
+        std::string string_val;
+        std::vector<int> int_vec_val;
+        std::vector<double> double_vec_val;
+        std::vector<std::string> string_vec_val;
+    };
 };
 
 // Main configuration class
