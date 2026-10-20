@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance monitoring
+    src/performance/PerformanceMonitor.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
