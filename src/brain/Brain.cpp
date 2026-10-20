@@ -765,6 +765,17 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Validate filepath
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Invalid filepath: empty string");
+            return false;
+        }
+        
+        // Check if we have any regions to save
+        if (pImpl->regions.empty()) {
+            NLM_LOG_WARNING("No regions found to save");
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -845,6 +856,12 @@ bool Brain::save(const std::string& filepath) const {
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Invalid filepath: empty string");
+        return false;
+    }
     
     try {
         CheckpointReader reader;

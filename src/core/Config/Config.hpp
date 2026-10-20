@@ -31,16 +31,33 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration value types
+    using ConfigValue = std::variant<
+        int,
+        int64_t,
+        double,
+        bool,
+        std::string,
+        std::vector<int>,
+        std::vector<double>,
+        std::vector<std::string>
+    >;
+
+// Validation callback for configuration values
+using ValidationCallback = std::function<bool(const std::string&, const ConfigValue&)>;
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    ValidationCallback validator;  // Optional validation callback
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), validator() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "",
+                const ValidationCallback& val = nullptr)
+        : key(k), value(v), source(s), description(desc), validator(val) {}
 };
 
 // Main configuration class
@@ -90,8 +107,17 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate all configuration values
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Add validation for specific key
+    void addValidator(const std::string& key, const ValidationCallback& validator);
+    
+    // Register default configuration
+    void registerDefaults();
     
 private:
     struct Impl;

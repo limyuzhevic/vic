@@ -25,6 +25,19 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        NLM is an experimental artificial developmental brain that implements:
+        - Leaky Integrate-and-Fire (LIF) neuron dynamics
+        - Event-driven spike propagation with synaptic delays
+        - STDP and Hebbian plasticity rules
+        - Structural plasticity (synaptogenesis/pruning)
+        - Working memory, episodic memory, and associative memory
+        - Neuromodulation (dopamine, curiosity, novelty detection)
+        - Prediction systems and cognitive planning
+        - Developmental stages and learning
+        
+        The system is designed to simulate brain-like behavior through spiking neural networks,
+        with a focus on biologically plausible learning mechanisms and developmental processes.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,7 +155,26 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)
+        
+        The Config class manages configuration parameters for the NLM brain.
+        It provides methods to set, get, and validate configuration values.
+        Configuration values are organized in a hierarchical namespace structure
+        (e.g., "brain.neuron_count", "plasticity.stdp.learning_rate").
+        
+        Configuration sources (from highest to lowest priority):
+        1. Command line arguments
+        2. Configuration file
+        3. Default values
+        4. Programmatically set values
+        
+        Example:
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 1000)
+            config.set("plasticity.stdp.learning_rate", 0.001)
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+    )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -263,7 +295,60 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)
+        
+        The SimpleWorld class provides a 2D environment for NLM agents to interact with.
+        It implements a grid-based world with physics simulation, object interaction,
+        and sensory perception through vision, touch, and internal signal sensors.
+        
+        Key Features:
+        - 2D grid world with configurable dimensions
+        - Vision system with raycasting-based perception
+        - Touch sensors for proximity detection
+        - Internal signal sensors (energy, health, movement state)
+        - Physics simulation (position, velocity, orientation)
+        - Interactive objects (resources, hazards, walls)
+        - Energy and health systems with decay and regeneration
+        - Boundary collision detection
+        
+        Configuration:
+            world = pynlm.createSimpleWorld()
+            world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+            
+            # Set agent starting position
+            world.setAgentStart(10.0, 10.0)
+            
+            # Configure energy and physics parameters
+            world.setMaxEnergy(100.0)
+            world.setEnergyDecayRate(0.01)
+            
+            # Set random seed for reproducible simulations
+            world.setRandomSeed(42)
+        
+        Simulation Loop:
+            world.reset()           # Initialize world with random objects
+            world.update(timestep)  # Update physics and generate percepts
+            
+            # Get sensory percept for agent
+            percept = world.getSensoryPercept()
+            
+            # Access agent state
+            body = world.getAgentBody()
+            
+            # Apply actions from agent
+            result = world.applyMotorCommand(motor_cmd, current_time)
+            
+            # Check if action was successful
+            if result.success:
+                print(f"Reward: {result.reward}")
+                if result.message:
+                    print(f"Message: {result.message}")
+        
+        The world automatically generates sensory percepts at each timestep,
+        providing the agent with a representation of its current environment
+        through vision (what it can see), touch (what it's near), and internal
+        signals (its current state).
+    )pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
              py::arg("visionWidth"), py::arg("visionHeight"))
@@ -289,7 +374,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)
+        
+        The Brain class represents the core neural simulation system in NLM.
+        It implements spiking neural networks using Leaky Integrate-and-Fire (LIF) neurons
+        with event-driven dynamics, synaptic plasticity, and integrated memory systems.
+        
+        Key Features:
+        - Real LIF neuron dynamics with refractory periods
+        - Event-driven spike propagation with synaptic delays
+        - Multiple plasticity mechanisms (STDP, Hebbian, reward-modulated)
+        - Structural plasticity (synaptogenesis, pruning)
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty detection)
+        - Prediction systems and cognitive planning
+        - Developmental stages with changing plasticity rates
+        
+        Usage:
+            # Create and initialize a brain
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Run simulation
+            for step in range(1000):
+                brain.step(step)
+                # Access brain state and statistics
+                firing_rate = brain.getAverageFiringRate()
+                e_i_ratio = brain.getExcitationInhibitionRatio()
+        
+        The brain can be connected to a world environment through the AgentBrain interface,
+        enabling embodied cognition and learning through interaction.
+    )pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -353,7 +469,69 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)
+        
+        The AgentBrain class serves as the bridge between the neural brain and the external
+        environment (world). It handles sensory transduction (converting world percepts
+        to neural signals) and motor decoding (converting neural activity to actions).
+        
+        Key Features:
+        - Sensory processing and input injection
+        - Motor command decoding from neural activity
+        - Neuromodulation based on rewards and prediction errors
+        - Development system integration
+        - Curiosity-driven exploration
+        - Novelty detection and processing
+        
+        Usage with SimpleWorld:
+            # Create brain and agent
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            agent = pynlm.createAgentBrain(brain)
+            
+            # Create and configure world
+            world = pynlm.createSimpleWorld()
+            world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+            world.reset()
+            agent.initialize(world)
+            
+            # Enable learning features
+            agent.enableRewardModulation(True)
+            agent.enableCuriosity(True)
+            agent.enableDevelopment(True)
+            
+            # Run simulation loop
+            for step in range(1000):
+                # Update world state
+                world.update(timestep=0.1)
+                
+                # Get sensory input from world
+                percept = world.getSensoryPercept()
+                
+                # Process sensory input in brain
+                agent.processSensoryInput(percept)
+                
+                # Run brain simulation
+                brain.step(step)
+                
+                # Get motor command from brain
+                action = agent.decodeMotorCommand()
+                
+                # Apply action to world
+                result = world.applyMotorCommand(action, world.getSimulationTime())
+                
+                # Apply reward modulation
+                reward = result.reward if result.success else 0.0
+                agent.applyRewardModulation(reward, 0.0)
+                
+                # Update development
+                agent.updateDevelopment(0.1)
+        
+        The agent continuously learns from its interactions with the environment,
+        adjusting its neural connections based on rewards, prediction errors, and
+        novelty detection signals.
+    )pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -416,6 +594,25 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Example function for configuration summary
+    m.def("config_summary", [](std::shared_ptr<Config> config) {
+        std::stringstream ss;
+        ss << "NLM Configuration Summary:" << std::endl;
+        if (config->has("brain.neuron_count")) {
+            ss << "  Neuron count: " << config->getOr<int64_t>("brain.neuron_count", 1000) << std::endl;
+        }
+        if (config->has("brain.connection_probability")) {
+            ss << "  Connection probability: " << config->getOr<float>("brain.connection_probability", 0.1f) << std::endl;
+        }
+        if (config->has("simulation_timestep")) {
+            ss << "  Simulation timestep: " << config->getOr<double>("simulation_timestep", 0.001) << "s" << std::endl;
+        }
+        if (config->has("random_seed")) {
+            ss << "  Random seed: " << config->getOr<int64_t>("random_seed", 42) << std::endl;
+        }
+        return ss.str();
+    }, py::arg("config"), "Create a human-readable summary of configuration.");
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

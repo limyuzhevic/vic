@@ -371,7 +371,12 @@ void Phase5IntegratedExperiment::generateVisualizations(
     const std::string& outputDir
 ) {
     NLM_LOG_INFO("Generating visualizations to: " + outputDir);
-    // Placeholder for visualization generation
+    
+    // Use the new visualization interface
+    DebugVisualization::saveBrainGraph(*result.brain, outputDir + "/brain_graph.txt");
+    DebugVisualization::generateSpikeTrainPlot(*result.brain, outputDir + "/spike_trains.txt");
+    DebugVisualization::createNetworkGraph(*result.brain, outputDir + "/network_graph.txt");
+    DebugVisualization::generateDebugReport(*result.brain, outputDir + "/debug_report.txt");
 }
 
 std::string Phase5IntegratedExperiment::generateReport(

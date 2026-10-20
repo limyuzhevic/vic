@@ -6,6 +6,8 @@
 
 namespace nlm {
 
+class Brain;
+
 // Visualization interface for debugging and analysis
 // PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
@@ -48,5 +50,25 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
+
+// File-based visualization functions for debugging and analysis
+namespace DebugVisualization {
+    
+    // Save brain state as a graph file
+    void saveBrainGraph(const Brain& brain, const std::string& filename);
+    
+    // Generate spike train visualization
+    void generateSpikeTrainPlot(const Brain& brain, const std::string& filename);
+    
+    // Create network graph representation
+    void createNetworkGraph(const Brain& brain, const std::string& filename);
+    
+    // Generate comprehensive debug report
+    void generateDebugReport(const Brain& brain, const std::string& filename);
+    
+    // Get current timestamp as string
+    std::string getCurrentTimestamp();
+    
+} // namespace DebugVisualization
 
 } // namespace nlm

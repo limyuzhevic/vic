@@ -10,13 +10,131 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Initialize the configuration with default values
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    registerDefaults();
+}
 
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
+
+// Register default configuration values
+void Config::registerDefaults() {
+    // Brain parameters
+    set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    set("brain.synapse_density", 0.1f, ConfigSource::Default);
+    set("brain.connection_probability", 0.1f, ConfigSource::Default);
+    set("brain.initial_weight_mean", 0.5f, ConfigSource::Default);
+    set("brain.initial_weight_std", 0.1f, ConfigSource::Default);
+    set("brain.v_thresh", -50.0f, ConfigSource::Default);
+    set("brain.v_rest", -70.0f, ConfigSource::Default);
+    set("brain.v_reset", -75.0f, ConfigSource::Default);
+    set("brain.tau_mem", 20.0f, ConfigSource::Default);
+    set("brain.tau_ref", 2.0f, ConfigSource::Default);
+    
+    // Plasticity parameters
+    set("plasticity.stdp.enable", true, ConfigSource::Default);
+    set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+    set("plasticity.stdp.tau_plus", 20.0f, ConfigSource::Default);
+    set("plasticity.stdp.tau_minus", 20.0f, ConfigSource::Default);
+    set("plasticity.hebbian.enable", true, ConfigSource::Default);
+    set("plasticity.structural.enable", true, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+    set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    set("neuromod.novelty.enable", true, ConfigSource::Default);
+    
+    // Reward parameters
+    set("reward.discount_factor", 0.99f, ConfigSource::Default);
+    
+    // Development parameters
+    set("development.synaptogenesis_rate", 0.001f, ConfigSource::Default);
+    set("development.pruning_rate", 0.0001f, ConfigSource::Default);
+    
+    // Environment parameters
+    set("environment.name", "GridWorld", ConfigSource::Default);
+    set("environment.width", 10.0f, ConfigSource::Default);
+    set("environment.height", 10.0f, ConfigSource::Default);
+    
+    // Simulation parameters
+    set("simulation.timestep", 0.001f, ConfigSource::Default);
+    set("simulation.max_steps", 10000, ConfigSource::Default);
+    
+    // Logging parameters
+    set("logging.level", "INFO", ConfigSource::Default);
+    set("logging.to_file", false, ConfigSource::Default);
+    set("logging.filename", "nlm.log", ConfigSource::Default);
+    
+    // Visualization parameters
+    set("visualization.enabled", false, ConfigSource::Default);
+    set("visualization.update_rate", 30.0f, ConfigSource::Default);
+}
+
+// Validate all configuration values
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    if (!errors.empty()) {
+        for (const auto& error : errors) {
+            // NLM_LOG_ERROR("Configuration validation error: " + error);
+        }
+        return false;
+    }
+    return true;
+}
+
+// Get validation errors
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Check for required configuration
+    if (!has("brain.neuron_count")) {
+        errors.push_back("Missing required configuration: brain.neuron_count");
+    }
+    
+    if (!has("simulation.timestep")) {
+        errors.push_back("Missing required configuration: simulation.timestep");
+    }
+    
+    // Validate numeric ranges
+    if (has("brain.neuron_count")) {
+        int64_t neurons = getOr<int64_t>("brain.neuron_count", 1000);
+        if (neurons < 10) {
+            errors.push_back("brain.neuron_count must be at least 10");
+        } else if (neurons > 1000000) {
+            errors.push_back("brain.neuron_count must not exceed 1,000,000");
+        }
+    }
+    
+    if (has("brain.connection_probability")) {
+        float prob = getOr<float>("brain.connection_probability", 0.1f);
+        if (prob < 0.0f || prob > 1.0f) {
+            errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    if (has("simulation.timestep")) {
+        float dt = getOr<float>("simulation.timestep", 0.001f);
+        if (dt <= 0.0f) {
+            errors.push_back("simulation.timestep must be positive");
+        } else if (dt > 1.0f) {
+            errors.push_back("simulation.timestep must not exceed 1.0 second");
+        }
+    }
+    
+    return errors;
+}
+
+// Add validation for specific key
+void Config::addValidator(const std::string& key, const ValidationCallback& validator) {
+    // This would require modifying the ConfigEntry structure to include validators
+    // For now, we'll add basic validation in getValidationErrors()
+    (void)key;
+    (void)validator;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser

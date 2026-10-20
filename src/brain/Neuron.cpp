@@ -84,7 +84,12 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    if (conductance < 0.0f) {
+        NLM_LOG_WARNING("Invalid leak conductance: " + std::to_string(conductance) + ". Clamping to 0.0f");
+        pImpl->state.leakConductance = 0.0f;
+    } else {
+        pImpl->state.leakConductance = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
@@ -100,6 +105,10 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential range
+    if (potential < -100.0f || potential > 0.0f) {
+        NLM_LOG_WARNING("Unusual resting potential: " + std::to_string(potential) + " mV. Typical range is -100 to 0 mV");
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +117,11 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Reset potential should typically be close to resting potential
+    if (std::abs(potential - pImpl->state.restingPotential) > 20.0f) {
+        NLM_LOG_WARNING("Reset potential differs significantly from resting potential: " + 
+                       std::to_string(potential) + " vs " + std::to_string(pImpl->state.restingPotential) + " mV");
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -219,8 +233,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
+    // Check for potential numerical instability
+    float totalContribution = static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    if (std::abs(totalContribution) > 100.0f) {
+        NLM_LOG_WARNING("Large membrane potential change: " + std::to_string(totalContribution) + " mV in " + 
+                       std::to_string(dt * 1000.0f) + " ms. Possible numerical instability.");
+    }
+    
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + totalContribution;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {

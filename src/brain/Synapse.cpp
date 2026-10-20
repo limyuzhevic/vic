@@ -94,7 +94,11 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    if (std::abs(weight) > Impl::MAX_WEIGHT * 1.1f) {  // Allow 10% above max
+        NLM_LOG_WARNING("Unusually large synapse weight: " + std::to_string(weight) + ". Clamping to " + 
+                       std::to_string(Impl::MAX_WEIGHT * (weight > 0 ? 1.0f : -1.0f)));
+    }
+    pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
