@@ -39,6 +39,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
+${NLM_SOURCE_DIR}/neuromodulation/Dopamine.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
@@ -62,6 +63,7 @@ set(NLM_CORE_SOURCES
 
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+${NLM_SOURCE_DIR}/cognition/AttentionalSelection.cpp
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
 

@@ -73,225 +73,452 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## NEW! Advanced Brain Systems (Phase 6 Integration)
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+The NLM framework now includes **Phase 6: Complete Integration** of all brain systems! You can now access:
 
----
+### 🧠 **Memory Systems**
 
-## The Simplest Possible Example
+NLM now has three sophisticated memory systems:
+
+#### 1. NeuralWorkingMemory
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access working memory
+working_memory = pynlm.getWorkingMemoryFromBrain(brain)
+
+# Store patterns in working memory
+working_memory.store([0.1, 0.2, 0.3, 0.4, 0.5], 0.8)
+
+# Retrieve patterns
+pattern = working_memory.retrieve()
+print("Retrieved pattern:", pattern)
+
+# Get memory statistics
+print("Capacity:", working_memory.getCapacity())
+print("Active traces:", working_memory.getActiveTraces())
+print("Memory activity:", working_memory.getMemoryActivity())
+```
+
+#### 2. NeuralEpisodicMemory
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access episodic memory
+episodic_memory = pynlm.getEpisodicMemoryFromBrain(brain)
+
+# Create and store an episode
+episode = pynlm.EpisodicMemoryItem()
+episode.action = pynlm.ActionType.MoveForward
+episode.reward = 0.8
+episode.energy = 0.9
+
+episodic_memory.storeEpisode(episode)
+
+# Retrieve recent episodes
+recent = episodic_memory.getRecentEpisodes(5)
+print(f"Retrieved {len(recent)} recent episodes")
+
+# Get statistics
+print("Episode count:", episodic_memory.getEpisodeCount())
+print("Average reward:", episodic_memory.getAverageReward())
+```
+
+#### 3. NeuralAssociativeMemory
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access associative memory
+associative_memory = pynlm.getAssociativeMemoryFromBrain(brain)
+
+# Create associations between patterns
+pattern_a = [0.1, 0.2, 0.3, 0.4, 0.5]
+pattern_b = [0.6, 0.7, 0.8, 0.9, 1.0]
+
+associative_memory.associate(pattern_a, pattern_b, 0.7)
+
+# Retrieve associated patterns
+associated = associative_memory.retrieve(pattern_a, 3)
+print(f"Found {len(associated)} associated patterns")
+
+# Get association strength
+strength = associative_memory.getAssociationStrength(pattern_a, pattern_b)
+print(f"Association strength: {strength}")
+```
+
+### 🧠 **Cognition Systems**
+
+NLM now has three advanced cognition systems:
+
+#### 4. NeuralPlanner
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access neural planner
+neural_planner = pynlm.getNeuralPlannerFromBrain(brain)
+
+# Set planning goal
+neural_planner.setCurrentGoal([0.1, 0.2, 0.3, 0.4, 0.5])
+
+# Make plans
+action = neural_planner.planAction([0.2, 0.4, 0.6, 0.8, 1.0])
+print(f"Planned action: {action}")
+
+# Get planning statistics
+print(f"Planning depth: {neural_planner.getPlanningDepth()}")
+print(f"Planning confidence: {neural_planner.getPlanningConfidence()}")
+```
+
+#### 5. ConceptFormation
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access concept formation
+concept_formation = pynlm.getConceptFormationFromBrain(brain)
+
+# Learn concepts
+pattern = [0.5, 0.6, 0.7, 0.8, 0.9]
+features = [1.0, 1.2, 1.5, 2.0]
+concept_id = concept_formation.learnConcept(pattern, features, 0.8, 100)
+
+print(f"Learned concept ID: {concept_id}")
+
+# Classify new patterns
+new_pattern = [0.4, 0.5, 0.6]
+classified_id = concept_formation.classify(new_pattern)
+print(f"Classified as concept ID: {classified_id}")
+
+print(f"Total concepts learned: {concept_formation.getConceptCount()}")
+```
+
+#### 6. AttentionalSelection
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access attentional selection
+attention = pynlm.getAttentionalSelectionFromBrain(brain)
+
+# Set attention parameters
+attention.setInhibitionStrength(0.5)
+attention.setExcitationStrength(1.5)
+attention.setCompetitionThreshold(0.3)
+
+# Process competing inputs
+competitors = [0.1, 0.5, 0.3, 0.8, 0.2]
+attention_value = attention.process_competition(competitors, 0.2)
+print(f"Attention value: {attention_value}")
+
+# Focus on a region
+attention.focus_on_region("cortex")
+print("Focused on cortex region")
+
+print(f"Winners: {attention.get_winners()}")
+```
+
+### 🧠 **Development System**
+
+NLM now has a complete development system:
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Access development system
+development = pynlm.getDevelopmentSystemFromBrain(brain)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Get developmental stage
+print(f"Current stage: {development.getStage()}")
+print(f"Stage name: {development.getStageName()}")
+
+# Get developmental age
+print(f"Developmental age: {development.getDevelopmentalAge()}")
+print(f"Plasticity modifier: {development.getPlasticityModifier()}")
+
+# Set development
+development.setDevelopmentalAge(10.5)
+development.advanceStage()
+```
+
+### 🧠 **Neuromodulation Systems**
+
+NLM now has three neuromodulation systems:
+
+#### 7. Dopamine
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access dopamine system
+dopamine = pynlm.getDopamineFromBrain(brain)
+
+# Control dopamine
+dopamine.setLevel(0.5)
+print(f"Dopamine level: {dopamine.getLevel()}")
+print(f"Plasticity factor: {dopamine.getPlasticityFactor()}")
+
+# Signal reward and prediction error
+dopamine.signalReward(0.8)
+dopamine.signalRewardPredictionError(-0.3)
+```
+
+#### 8. Novelty
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access novelty system
+novelty = pynlm.getNoveltyFromBrain(brain)
+
+# Control novelty
+novelty.setLevel(0.3)
+print(f"Novelty level: {novelty.getLevel()}")
+
+# Novelty detection happens automatically based on input patterns
+```
+
+#### 9. PredictionError
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access prediction error system
+prediction_error = pynlm.getPredictionErrorFromBrain(brain)
+
+# Control prediction error
+prediction_error.setLevel(-0.5)
+print(f"Prediction error level: {prediction_error.getLevel()}")
+print(f"Prediction error sign: {prediction_error.getSign()}")
+
+# Update based on prediction
+prediction_error.update(0.1, 1.0, 1.2)
 ```
 
 ---
 
-## Common Patterns
+## 🔧 **New Convenience Functions**
 
-### Pattern 1: Run a Simulation
+### System Factory Functions
+```python
+import pynlm
+
+# Create individual systems directly
+system_config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(system_config)
+
+# Create system-specific configurations
+wm_config = pynlm.createWorkingMemoryConfig()
+pred_config = pynlm.createPredictionConfig()
+cog_config = pynlm.createCognitionConfig()
+neuro_config = pynlm.createNeuromodulationConfig()
+dev_config = pynlm.createDevelopmentConfig()
+
+# Create system instances directly
+working_memory = pynlm.createWorkingMemory()
+episodic_memory = pynlm.createEpisodicMemory()
+associative_memory = pynlm.createAssociativeMemory()
+prediction_system = pynlm.createPredictionSystem()
+neural_planner = pynlm.createNeuralPlanner()
+concept_formation = pynlm.createConceptFormation()
+attentional_selection = pynlm.createAttentionalSelection()
+development_system = pynlm.createDevelopmentSystem()
+dopamine = pynlm.createDopamine()
+novelty = pynlm.createNovelty()
+prediction_error = pynlm.createPredictionError()
+```
+
+### Type Conversion Helpers
+```python
+import pynlm
+
+# Convert between types
+neuron_id = pynlm.neuron_id_from_index(42)
+index = pynlm.neuron_id_to_index(neuron_id)
+
+region_id = pynlm.region_id_from_name("hippocampus")
+
+action_type = pynlm.action_type_from_string("MoveForward")
+string_name = pynlm.action_string_from_type(action_type)
+```
+
+---
+
+## 🧪 **Integration Example: Complete Brain System**
+
+Here's a complete example using all the new systems:
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
+import pynlm
+
+def run_advanced_simulation(steps=1000):
+    """Run a comprehensive simulation using all NLM systems"""
+    
+    # 1. Create brain with advanced configuration
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create agent and world
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # 3. Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 4. Run simulation with system monitoring
+    for step in range(steps):
+        # Update world
         world.update(0.1)
         
-        # 2. Get what the agent sees
+        # Get sensory input
         percept = world.getSensoryPercept()
         
-        # 3. Tell the brain
+        # Process sensory input
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # Run brain step
         brain.step(step)
         
-        # 5. Get action from brain
+        # Get action from brain
         action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
         world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+        
+        # Apply reward modulation
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print system status every 100 steps
+        if step % 100 == 0:
+            print(f"\nStep {step}:")
+            print(f"  Neural Activity: {brain.getFiringNeuronCount()} neurons firing")
+            print(f"  Working Memory: {brain.getWorkingMemory().getActiveTraces()} traces")
+            print(f"  Curiosity Level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty Level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Prediction Error: {agent.getPredictionError():.3f}")
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
+    print("\nSimulation complete!")
+    return brain, agent, world
 
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
+# Run the simulation
+brain, agent, world = run_advanced_simulation(1000)
 ```
 
 ---
 
-## Quick Reference
+## 📊 **Quick Reference - New Methods**
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### Memory Systems
+| System | Methods | Description |
+|--------|---------|-------------|
+| NeuralWorkingMemory | `store()`, `retrieve()`, `update()`, `getActiveTraces()` | Short-term storage with persistence |
+| NeuralEpisodicMemory | `storeEpisode()`, `retrieveSimilar()`, `getRecentEpisodes()` | Long-term experience storage |
+| NeuralAssociativeMemory | `associate()`, `retrieve()`, `getAssociationStrength()` | Pattern association learning |
+
+### Cognition Systems
+| System | Methods | Description |
+|--------|---------|-------------|
+| NeuralPlanner | `planAction()`, `evaluateSequence()`, `setCurrentGoal()` | Action planning and decision making |
+| ConceptFormation | `learnConcept()`, `classify()`, `getConceptCount()` | Pattern discovery and categorization |
+| AttentionalSelection | `process_competition()`, `focus_on_region()` | Neural attention and focus |
+
+### Development System
+| System | Methods | Description |
+|--------|---------|-------------|
+| DevelopmentSystem | `get_stage()`, `set_stage()`, `advanceStage()`, `getDevelopmentalAge()` | Brain maturation and development |
+
+### Neuromodulation Systems
+| System | Methods | Description |
+|--------|---------|-------------|
+| Dopamine | `getLevel()`, `setLevel()`, `signalReward()` | Reward and reinforcement learning |
+| Novelty | `getLevel()`, `setLevel()` | Novelty detection and exploration drive |
+| PredictionError | `getLevel()`, `setLevel()`, `update()` | Prediction error signaling |
+
+### Helper Functions
+| Function | Description |
+|----------|-------------|
+| `getWorkingMemoryFromBrain()` | Get working memory from brain |
+| `getEpisodicMemoryFromBrain()` | Get episodic memory from brain |
+| `getAssociativeMemoryFromBrain()` | Get associative memory from brain |
+| `createWorkingMemoryConfig()` | Create working memory configuration |
+| `createPredictionConfig()` | Create prediction system configuration |
 
 ---
 
-## Troubleshooting
+## 🚀 **Getting Started**
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+1. **Install the package**: `pip install pynlm`
+2. **Run the test script**: `python3 test_bindings.py`
+3. **Try the examples**: Copy and modify the examples above
+4. **Explore further**: Read `HOW_TO_USE.md` for more details
 
 ---
 
-## Next Steps
+## 🆘 **Troubleshooting**
+
+**"My advanced brain systems aren't working"**
+- Did you call `brain.initialize()` before accessing the systems?
+- Check that all helper functions have proper error handling
+- Use the test script to verify all bindings are working
+
+**"Memory systems are showing 0"**
+- Store some patterns in the memory systems before retrieving
+- Check that memory systems are properly initialized
+- Use the convenience methods like `initializeAllSystems()`
+
+**"Cognition systems returning default values"**
+- Set goals and targets for planning systems
+- Use the `setCurrentGoal()` method for neural planner
+- Test systems individually with simple patterns
+
+---
+
+## 📚 **Next Steps**
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for comprehensive documentation
+2. **Read `docs/ARCHITECTURE.md`** to understand system integration
+3. **Experiment with different configurations** using the convenience functions
+4. **Use the test script** `test_bindings.py` to verify your setup
+5. **Create your own simulation** using all the new systems
+
+
+That's it! You're now ready to use the **complete NLM Python bindings** with all Phase 6 integrated systems. The new convenience functions and helper methods make it easy to work with the sophisticated brain systems while maintaining the simplicity of the original API.
+
+The Python bindings now provide access to all the advanced cognitive and neuromodulatory systems that make NLM a truly integrated artificial brain!

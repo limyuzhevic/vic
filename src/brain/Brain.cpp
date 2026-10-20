@@ -1,21 +1,22 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "Brain.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "Brain.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
+#include "Brain.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
-#include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -43,18 +44,20 @@ struct Brain::Impl {
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
+std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
     // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
     // Simulation parameters
     TimestepDuration timestep;
