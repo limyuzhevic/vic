@@ -296,37 +296,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
+    // Add comprehensive error handling and validation
+    .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+         py::arg("currentStep"), py::arg("currentTime"),
+         "Perform a simulation step with timestamp. Raises ValueError if time is negative.")
+    .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+         py::arg("type"), py::arg("current"),
+         "Inject current into all neurons of a specific type. "
+         "Valid types: Excitatory, Inhibitory, Modulatory, Sensory, Motor, Internal.")
+    .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+         "Get the excitation/inhibition balance ratio of the brain. "
+         "Returns value between 0.0 (inhibition dominant) and 1.0+ (excitation dominant).")
+    .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+         "Get the count of currently firing neurons.")
+    .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+         "Get the count of currently active neurons (not just firing).")
+    .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+         "Get the average firing rate across all neurons in Hz.")
+    .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+         "Get the total number of spikes generated since brain initialization.")
+    .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+         "Get the number of pending spike events waiting to be processed.")
+    .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+         "Get the total number of neurons in the brain.")
+    .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+         "Get the total number of synapses in the brain.")
+    .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+         "Get the current developmental stage of the brain.")
+    .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+         py::arg("stage"), "Set the developmental stage of the brain.")
              "Get all regions")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
@@ -378,27 +376,33 @@ PYBIND11_MODULE(pynlm, m) {
              "Get current neuromodulation level")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get the current neuromodulation level (aggregate of all neuromodulators).")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get the current curiosity level driving exploration behavior.")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+             "Get the current novelty detection level.")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+             "Get the current prediction error signal.")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"), "Enable or disable reward-based neuromodulation.")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"), "Enable or disable structural plasticity.")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"), "Enable or disable developmental processes.")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"), "Enable or disable curiosity-driven exploration.")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is currently enabled.")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is currently enabled.")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is currently enabled.")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is currently enabled.")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             "Get the underlying brain object.");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

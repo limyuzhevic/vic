@@ -19,16 +19,24 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first (preferred)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                         std::istreambuf_iterator<char>());
+    
+    // Try JSON parsing first (if json library available)
+    if (loadFromJSON(content)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -53,6 +61,95 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& jsonContent) {
+    // Simple JSON parsing for basic object structures
+    // This is a basic implementation that handles key-value pairs
+    // Full JSON parsing with libraries would be better for production
+    
+    size_t pos = 0;
+    while (pos < jsonContent.size()) {
+        // Find next { or }
+        size_t bracePos = jsonContent.find('{', pos);
+        size_t closeBracePos = jsonContent.find('}', pos);
+        
+        if (bracePos == std::string::npos || (closeBracePos != std::string::npos && closeBracePos < bracePos)) {
+            // No more objects found
+            break;
+        }
+        
+        // Extract content inside braces
+        size_t contentStart = bracePos + 1;
+        size_t contentEnd = closeBracePos;
+        std::string content = jsonContent.substr(contentStart, contentEnd - contentStart);
+        
+        // Parse key-value pairs in the object
+        size_t keyPos = 0;
+        while (keyPos < content.size()) {
+            // Find next : 
+            size_t colonPos = content.find(':', keyPos);
+            if (colonPos == std::string::npos) break;
+            
+            // Find key (between " or before :)
+            size_t keyStart = keyPos;
+            size_t keyEnd = content.find('"', keyStart);
+            if (keyEnd == std::string::npos) {
+                // No quotes, try simple key
+                keyEnd = colonPos;
+                std::string key = trim(content.substr(keyStart, keyEnd - keyStart));
+                
+                // Find value (after colon)
+                size_t valueStart = colonPos + 1;
+                while (valueStart < content.size() && (std::isspace(content[valueStart]) || content[valueStart] == ',')) {
+                    valueStart++;
+                }
+                
+                // Find end of value (comma, brace, or end)
+                size_t valueEnd = content.find(',', valueStart);
+                if (valueEnd == std::string::npos || valueEnd > content.find('}', valueStart)) {
+                    valueEnd = content.find('}', valueStart);
+                }
+                
+                if (valueEnd != std::string::npos) {
+                    std::string value = trim(content.substr(valueStart, valueEnd - valueStart));
+                    set(key, value, ConfigSource::File);
+                    keyPos = valueEnd + 1;
+                    continue;
+                }
+            } else {
+                // Quoted key
+                size_t quoteEnd = content.find('"', keyEnd + 1);
+                if (quoteEnd == std::string::npos) break;
+                
+                std::string key = trim(content.substr(keyEnd + 1, quoteEnd - keyEnd - 1));
+                
+                // Find value (after colon)
+                size_t valueStart = colonPos + 1;
+                while (valueStart < content.size() && (std::isspace(content[valueStart]) || content[valueStart] == ',')) {
+                    valueStart++;
+                }
+                
+                // Find end of value (comma, brace, or end)
+                size_t valueEnd = content.find(',', valueStart);
+                if (valueEnd == std::string::npos || valueEnd > content.find('}', valueStart)) {
+                    valueEnd = content.find('}', valueStart);
+                }
+                
+                if (valueEnd != std::string::npos) {
+                    std::string value = trim(content.substr(valueStart, valueEnd - valueStart));
+                    set(key, value, ConfigSource::File);
+                    keyPos = valueEnd + 1;
+                    continue;
+                }
+            }
+            break;
+        }
+        
+        pos = closeBracePos + 1;
+    }
+    
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

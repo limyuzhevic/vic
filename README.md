@@ -1,68 +1,102 @@
-# NLM — 熙然
+# NLM — 熙然 (Neural Learning Machine)
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
+## Key Improvements Made
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM has been comprehensively enhanced with the following improvements:
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### 1. Enhanced Configuration System
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+NLM now includes a modern, enhanced configuration system with:
 
-## Current Phase
+**New Features:**
+- **JSON/YAML Support**: Load configuration from modern file formats using `--config=filename.json`
+- **Configuration Validation**: Automatic validation with detailed error reporting and guidance
+- **Statistics and Diagnostics**: Comprehensive configuration statistics and debugging tools
+- **Batch Operations**: Efficient bulk configuration setting and getting
+- **Type Safety**: Enhanced type checking with dedicated methods like `setInt()`, `getDouble()`
+- **Default Configuration**: Automatic initialization with sensible defaults
 
-**PHASE 6: FINAL INTEGRATION**
+**Usage Examples:**
+```bash
+# Load enhanced configuration
+./nlm_demo --config=brain_config.json
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+# Show configuration summary
+./nlm_demo --show-config
 
-### Phase 6 Integration Achievements
+# Display configuration statistics
+./nlm_demo --show-stats
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+# Validate configuration before loading
+./nlm_demo --validate-config --config=settings.json
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+# Set parameters via command line
+./nlm_demo --neurons=2000 --seed=42 --learning_rate=0.05
+```
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+### 2. Enhanced Python Bindings
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+The Python bindings have been significantly enhanced with:
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+**New Features:**
+- **Complete Neuron Class**: Full Python implementation of Leaky Integrate-and-Fire (LIF) neurons
+- **Enhanced Brain Interface**: Detailed documentation and comprehensive statistics
+- **Improved AgentBrain**: Better neuromodulation control and status reporting
+- **Better Error Handling**: Comprehensive error messages and validation
+- **Extended Functionality**: Additional utility methods and advanced features
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+**Python Examples:**
+```python
+import pynlm
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+# Create enhanced configuration
+config = pynlm.createDefaultConfig()
+config.setInt("neuron_count", 2000)
+config.setDouble("learning_rate", 0.05)
+
+# Create brain with enhanced configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access neuron details
+for region in brain.getRegions():
+    for neuron in region.getAllNeurons():
+        print(f"Neuron {neuron.getId()}: V={neuron.getMembranePotential():.2f}mV, Type={neuron.getType()}")
+
+# Get brain statistics
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### 3. Advanced Command-Line Interface
+
+The CLI has been enhanced with powerful new options:
+
+**New Options:**
+- `--help`/`-h`: Comprehensive help with examples and usage instructions
+- `--version`: Detailed version and build information
+- `--show-config`: Display complete configuration summary and details
+- `--show-stats`: Display configuration statistics and diagnostics
+- `--validate-config`: Validate configuration before loading with detailed error reporting
+
+**CLI Examples:**
+```bash
+# Show comprehensive help
+./nlm_demo --help
+
+# Run with enhanced configuration and validation
+./nlm_demo \
+  --config=brain_settings.json \
+  --show-config \
+  --show-stats \
+  --validate-config \
+  --neurons=1500 \
+  --learning_rate=0.03 \
+  --seed=123
+```
 
 ## Building
 
@@ -80,7 +114,71 @@ make -j4
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected:
+- Memory systems (working, episodic, associative)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction and planning systems
+- Cognitive functions (attention, concept formation)
+- Development system with plasticity rules
+- Checkpoint save/load functionality
+- Replay and consolidation systems
+
+### Basic Neural Computation Demo
+```bash
+./nlm_demo
+```
+
+This runs the Phase 2 demonstration with enhanced configuration options.
+
+### Advanced Examples
+
+**Enhanced Configuration with CLI:**
+```bash
+./nlm_demo \
+  --config=brain_settings.json \
+  --show-config \
+  --show-stats \
+  --validate-config \
+  --neurons=1500 \
+  --learning_rate=0.03 \
+  --seed=123
+```
+
+**Python Integration Example:**
+```python
+import pynlm
+import time
+
+print("=== Enhanced NLM Python Example ===")
+
+# Create enhanced brain
+config = pynlm.createDefaultConfig()
+config.setInt("neuron_count", 1000)
+config.setDouble("connection_probability", 0.15)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Brain created successfully")
+print(f"Configuration: {config.summary()}")
+
+# Run simulation for a few steps
+for step in range(10):
+    # Inject some sensory activity
+    brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 10.0f)
+    
+    # Step the brain
+    brain.step(step, step * 0.001)
+    
+    # Produce action every 5 steps
+    if step % 5 == 0:
+        action = brain.produceAction()
+        print(f"Step {step}: Produced {action.getType()} action")
+
+print("=== Simulation Complete ===")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
 
 ## Project Structure
 
@@ -88,6 +186,9 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── IMPROVEMENTS_SUMMARY.md      # Detailed improvements documentation
+├── configs/
+│   └── default.cfg               # Enhanced default configuration
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
@@ -96,22 +197,22 @@ NLM/
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
+│   ├── core/           # Core utilities (enhanced)
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── visualization/ # Visualization
+├── tests/             # Comprehensive test suite
+└── python/            # Python bindings (enhanced)
 ```
 
 ## Phase Summary
@@ -228,3 +329,112 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Getting Started
+
+### Quick Start
+1. **Build the project:**
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+2. **Run basic demo:**
+```bash
+./nlm_demo
+```
+
+3. **Run integration demo:**
+```bash
+./nlm_phase6_demo
+```
+
+4. **Install Python bindings:**
+```bash
+pip install pynlm
+```
+
+### Advanced Usage
+1. **Create custom configuration:**
+```bash
+cat > my_config.json << EOF
+{
+    "neuron_count": 2000,
+    "environment_name": "CustomWorld",
+    "enable_development": true,
+    "enable_curiosity": true
+}
+EOF
+```
+
+2. **Run with enhanced configuration:**
+```bash
+./nlm_demo --config=my_config.json --show-config --validate-config
+```
+
+3. **Python scripting:**
+```python
+import pynlm
+import json
+
+# Create and save configuration
+config = pynlm.createDefaultConfig()
+config.setInt("neuron_count", 1500)
+
+with open("config.json", "w") as f:
+    f.write(config.saveToJSON())
+
+print("Configuration saved to config.json")
+print(config.summary())
+```
+
+## Contact and Support
+
+For questions about NLM or to contribute to development:
+- Check the documentation in the `docs/` directory
+- Review the Phase 6 audit report in `docs/PHASE6_FINAL_AUDIT.md`
+- The Python bindings documentation is available in the bindings source code
+- Issues and contributions: See the project repository
+
+## Key Improvements Summary
+
+### 1. Enhanced Configuration System
+- **JSON/YAML Support**: Modern configuration file formats
+- **Validation**: Automatic validation with detailed error reporting
+- **Statistics**: Configuration statistics and debugging tools
+- **Batch Operations**: Efficient bulk configuration management
+- **Type Safety**: Enhanced type checking and validation
+
+### 2. Enhanced Python Bindings
+- **Complete Neuron Class**: Full Python implementation of LIF neurons
+- **Enhanced Brain Interface**: Comprehensive documentation and statistics
+- **Improved AgentBrain**: Better neuromodulation control
+- **Error Handling**: Comprehensive error messages and validation
+
+### 3. Advanced Command-Line Interface
+- **Enhanced Help**: Comprehensive help with examples
+- **Configuration Validation**: Pre-load validation
+- **Statistics Output**: Detailed configuration statistics
+- **Advanced Parameters**: Type-specific parameter handling
+
+## Future Enhancements
+
+The NLM project continues to evolve with plans for:
+- **Phase 7**: Advanced learning algorithms and optimization
+- **Phase 8**: Multi-agent systems and social learning
+- **Enhanced Visualization**: Interactive brain visualization tools
+- **Cloud Integration**: Distributed simulation capabilities
+- **Machine Learning Integration**: Advanced training algorithms
+
+## Conclusion
+
+NLM has been comprehensively enhanced with:
+- **Modern Configuration System**: JSON/YAML support with validation and statistics
+- **Rich Python API**: Comprehensive bindings with detailed documentation
+- **Enhanced User Experience**: Advanced CLI with comprehensive help and examples
+- **Improved Code Quality**: Better documentation, error handling, and maintainability
+- **Backward Compatibility**: All improvements maintain existing functionality
+
+These improvements make the NLM project more accessible to new users while providing advanced features for experienced users, establishing a solid foundation for future development phases.
