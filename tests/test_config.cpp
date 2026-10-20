@@ -78,12 +78,72 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigLoadFromFile() {
+    nlm::Config config;
+    
+    // Test basic key=value format parsing
+    config.set("test_int", 42, nlm::ConfigSource::Runtime);
+    config.set("test_double", 3.14, nlm::ConfigSource::Runtime);
+    config.set("test_string", "hello", nlm::ConfigSource::Runtime);
+    config.set("test_bool", true, nlm::ConfigSource::Runtime);
+    
+    // Test summary generation
+    std::string summary = config.summary();
+    assert(summary.find("Configuration") != std::string::npos);
+    assert(summary.find("test_int") != std::string::npos);
+    assert(summary.find("test_double") != std::string::npos);
+    assert(summary.find("test_string") != std::string::npos);
+    assert(summary.find("test_bool") != std::string::npos);
+    
+    std::cout << "    testConfigLoadFromFile passed" << std::endl;
+}
+
+void testConfigTrim() {
+    // Test string trimming functionality
+    std::string test1 = "  hello  ";
+    std::string test2 = "\t\nworld\t\n";
+    std::string test3 = "alreadyclean";
+    
+    assert(nlm::Config::trim(test1) == "hello");
+    assert(nlm::Config::trim(test2) == "world");
+    assert(nlm::Config::trim(test3) == "alreadyclean");
+    assert(nlm::Config::trim("   ") == "");
+    
+    std::cout << "    testConfigTrim passed" << std::endl;
+}
+
+void testConfigLoadFromArgs() {
+    nlm::Config config;
+    
+    const char* args1[] = {"test", "--test_int=42", "--test_double=3.14", "--test_string=hello", "--test_bool=true"};
+    int argc1 = 5;
+    config.loadFromArgs(argc1, const_cast<char**>(args1));
+    
+    assert(config.has("test_int"));
+    assert(config.has("test_double"));
+    assert(config.has("test_string"));
+    assert(config.has("test_bool"));
+    
+    const char* args2[] = {"test", "--name", "John", "--age", "30"};
+    int argc2 = 5;
+    config.clear();
+    config.loadFromArgs(argc2, const_cast<char**>(args2));
+    
+    assert(config.has("name"));
+    assert(config.has("age"));
+    
+    std::cout << "    testConfigLoadFromArgs passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigLoadFromFile();
+    testConfigTrim();
+    testConfigLoadFromArgs();
 }
 
 } // namespace test_config

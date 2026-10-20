@@ -19,16 +19,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,22 +39,72 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": " + line);
+            hasErrors = true;
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key in configuration line " + std::to_string(lineNumber));
+            hasErrors = true;
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Handle different value types
+        if (value == "true" || value == "false") {
+            bool boolVal = (value == "true");
+            set(key, boolVal, ConfigSource::File);
+        } else if (value.find('.') != std::string::npos) {
+            // Try to parse as double
+            try {
+                size_t posEnd;
+                double doubleVal = std::stod(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                } else {
+                    // Fall back to string
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse numeric value for key '" + key + "': " + e.what());
+                set(key, value, ConfigSource::File);
             }
-            
-            set(key, value, ConfigSource::File);
+        } else {
+            // Try to parse as integer
+            try {
+                size_t posEnd;
+                int64_t intVal = std::stoll(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                } else {
+                    // Fall back to string
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (const std::exception& e) {
+                // Fall back to string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
-    return true;
+    if (hasErrors) {
+        NLM_LOG_WARNING("Configuration file parsing completed with errors");
+    } else {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
+    }
+    
+    return !hasErrors;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +133,51 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << __DATE__ << " " << __TIME__ << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 
