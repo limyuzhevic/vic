@@ -66,9 +66,12 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history efficiently if needed
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Remove enough elements to get below maxHistorySize
+            size_t excess = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                                     pImpl->spikeHistory.begin() + excess);
         }
         
         // Call handlers
@@ -178,6 +181,8 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    pImpl->handlers.clear();
+    pImpl->delayedHandlers.clear();
 }
 
 } // namespace nlm

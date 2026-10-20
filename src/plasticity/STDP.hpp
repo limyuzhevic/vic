@@ -30,6 +30,20 @@ public:
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
+    // Synaptic scaling (homeostatic plasticity) - maintains overall network stability
+    // Applies scaling factor to keep average synaptic weight around target
+    void applySynapticScaling(float targetAverage, float currentAverage, 
+                           float totalSynapticWeight, float totalNeuronCount);
+    
+    // Metaplasticity (sliding threshold) - prevents runaway potentiation/depression
+    // Adapts plasticity thresholds based on recent history
+    void applyMetaplasticity(float recentPotentiation, float recentDepression,
+                           float timeWindowSeconds);
+    
+    // Get synaptic scaling and metaplasticity parameters
+    float getSynapticScalingFactor(float targetAverage, float currentAverage) const;
+    float getMetaplasticityAdjustment(float history, float maxHistory) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
