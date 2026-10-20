@@ -1,6 +1,18 @@
 #include "ExperimentRunner.hpp"
+#include <chrono>
+#include <iomanip>
+#include <ctime>
+#include <sstream>
 
 namespace nlm {
+
+std::string getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
 
 struct ExperimentRunner::Impl {
     std::vector<std::shared_ptr<Experiment>> experiments;
@@ -113,8 +125,48 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+        return false;
+    }
+    
+    // Write results in a structured format
+    file << "NLM Experiment Results" << std::endl;
+    file << "=======================" << std::endl;
+    file << "Generated: " << getCurrentTimestamp() << std::endl;
+    file << std::endl;
+    
+    // Write experiment information
+    file << "Experiments: " << pImpl->experiments.size() << std::endl;
+    file << std::endl;
+    
+    // Write each experiment
+    for (const auto& exp : pImpl->experiments) {
+        file << "Experiment: " << exp->getName() << std::endl;
+        file << "  Seed: " << exp->getSeed() << std::endl;
+        file << "  Start Step: " << exp->getStartStep() << std::endl;
+        file << "  End Step: " << exp->getEndStep() << std::endl;
+        file << "  Metrics:" << std::endl;
+        
+        const auto& metrics = exp->getMetrics();
+        for (const auto& metric : metrics) {
+            file << "    " << metric.first << ": " << metric.second << std::endl;
+        }
+        
+        file << "  Notes:" << std::endl;
+        const auto& notes = exp->getNotes();
+        for (const auto& note : notes) {
+            file << "    - " << note << std::endl;
+        }
+        
+        file << std::endl;
+    }
+    
+    file << "Global Seed: " << pImpl->globalSeed << std::endl;
+    
+    NLM_LOG_INFO("Results saved to: " + filepath);
+    return true;
 }
 
 } // namespace nlm

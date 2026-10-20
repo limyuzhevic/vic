@@ -20,39 +20,153 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Now implementing JSON parser for Phase 6
+    return loadFromJSONFile(filepath);
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+    // Simple JSON parsing - in production, use nlohmann::json
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Remove whitespace and comments
+    std::string cleanContent;
+    bool inString = false;
+    char quoteChar = '\0';
+    
+    for (size_t i = 0; i < content.size(); ++i) {
+        char c = content[i];
+        
+        if (!inString && (c == '/' && i + 1 < content.size() && content[i + 1] == '/')) {
+            // Skip line comment
+            while (i + 1 < content.size() && content[i + 1] != '\n') {
+                i++;
+            }
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (!inString && c == '/' && i + 1 < content.size() && content[i + 1] == '*') {
+            // Skip block comment
+            i += 2;
+            while (i + 1 < content.size() && !(content[i] == '*' && content[i + 1] == '/')) {
+                i++;
             }
-            
-            set(key, value, ConfigSource::File);
+            continue;
+        }
+        
+        if (c == '\"' || c == '\'') {
+            inString = !inString;
+            quoteChar = c;
+            cleanContent += c;
+        } else if (!inString && (c == ' ' || c == '\n' || c == '\r' || c == '\t')) {
+            // Keep whitespace inside objects
+            cleanContent += c;
+        } else {
+            cleanContent += c;
+        }
+    }
+    
+    // Parse JSON objects
+    return parseJSONObject(cleanContent);
+}
+
+bool Config::parseJSONObject(const std::string& json) {
+    size_t pos = 0;
+    while (pos < json.size()) {
+        // Skip whitespace
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t')) {
+            pos++;
+        }
+        
+        if (pos >= json.size()) break;
+        
+        // Parse key
+        size_t keyStart = pos;
+        while (pos < json.size() && json[pos] != ':' && json[pos] != '{' && json[pos] != '}') {
+            pos++;
+        }
+        
+        if (pos >= json.size() || json[pos] != ':') {
+            break; // Malformed JSON
+        }
+        
+        std::string key = trim(json.substr(keyStart, pos - keyStart));
+        pos++; // Skip colon
+        
+        // Skip whitespace
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Parse value
+        std::string value;
+        bool isString = false;
+        if (pos < json.size() && (json[pos] == '\"' || json[pos] == '\'')) {
+            isString = true;
+            char quoteChar = json[pos];
+            pos++;
+            size_t valueStart = pos;
+            while (pos < json.size() && json[pos] != quoteChar) {
+                if (json[pos] == '\\' && pos + 1 < json.size()) {
+                    pos += 2; // Skip escaped character
+                }
+                pos++;
+            }
+            value = json.substr(valueStart, pos - valueStart);
+            pos++; // Skip closing quote
+        } else if (pos < json.size() && json[pos] == '{') {
+            // Object - for now, treat as string
+            value = json.substr(pos, 1);
+            pos++;
+        } else if (pos < json.size() && json[pos] == '[') {
+            // Array - for now, treat as string
+            size_t arrayEnd = json.find(']', pos);
+            if (arrayEnd != std::string::npos) {
+                value = json.substr(pos, arrayEnd - pos + 1);
+                pos = arrayEnd + 1;
+            }
+        } else if (pos < json.size() && (json[pos] == '-' || isdigit(json[pos]))) {
+            // Number
+            size_t valueStart = pos;
+            while (pos < json.size() && (isdigit(json[pos]) || json[pos] == '-' || json[pos] == '.' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+')) {
+                pos++;
+            }
+            value = json.substr(valueStart, pos - valueStart);
+        } else if (pos < json.size() && (json[pos] == 't' || json[pos] == 'f')) {
+            // Boolean
+            if (json.substr(pos, 4) == "true" || json.substr(pos, 5) == "false") {
+                value = json.substr(pos, json.substr(pos, 4) == "true" ? 4 : 5);
+                pos += value.size();
+            }
+        } else {
+            // Null or empty
+            value = "null";
+        }
+        
+        // Set configuration value
+        set(key, value);
+        
+        // Skip whitespace
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t' || json[pos] == ',' || json[pos] == ';')) {
+            pos++;
         }
     }
     
     return true;
+}
+
+// Helper function to trim whitespace
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\n\r\v\f");
+    if (start == std::string::npos) {
+        return "";
+    }
+    size_t end = str.find_last_not_of(" \t\n\r\v\f");
+    return str.substr(start, end - start + 1);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
