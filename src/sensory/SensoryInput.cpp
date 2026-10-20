@@ -21,10 +21,10 @@ struct Vision::Impl {
     Impl(size_t w, size_t h, size_t c) : width(w), height(h), channels(c), data(w * h * c, 0.0f) {}
 };
 
-Vision::Vision() : pImpl(new Impl(0, 0, 0)) {}
+Vision::Vision() : pImpl(std::make_unique<Impl>(0, 0, 0)) {}
 
 Vision::Vision(size_t width, size_t height, size_t channels) 
-    : pImpl(new Impl(width, height, channels)) {}
+    : pImpl(std::make_unique<Impl>(width, height, channels)) {}
 
 Vision::~Vision() = default;
 
@@ -70,10 +70,9 @@ struct Audio::Impl {
     Impl(size_t rate, size_t samples) : sampleRate(rate), numSamples(samples), data(samples, 0.0f) {}
 };
 
-Audio::Audio() : pImpl(new Impl(0, 0)) {}
+Audio::Audio() : pImpl(std::make_unique<Impl>(0, 0)) {}
 
-Audio::Audio(size_t sampleRate, size_t numSamples) 
-    : pImpl(new Impl(sampleRate, numSamples)) {}
+Audio::Audio(size_t sampleRate, size_t numSamples) : pImpl(std::make_unique<Impl>(sampleRate, numSamples)) {}
 
 Audio::~Audio() = default;
 
@@ -114,7 +113,7 @@ struct InternalSignals::Impl {
     Impl() = default;
 };
 
-InternalSignals::InternalSignals() : pImpl(new Impl) {}
+InternalSignals::InternalSignals() : pImpl(std::make_unique<Impl>()) {}
 
 InternalSignals::~InternalSignals() = default;
 

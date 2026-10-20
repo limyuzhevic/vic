@@ -9,7 +9,7 @@ struct VisionProcessor::Impl {
     Impl() : featureDimensions(0) {}
 };
 
-VisionProcessor::VisionProcessor() : pImpl(new Impl) {}
+VisionProcessor::VisionProcessor() : pImpl(std::make_unique<Impl>()) {}
 
 VisionProcessor::~VisionProcessor() = default;
 

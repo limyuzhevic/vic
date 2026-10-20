@@ -14,7 +14,7 @@ struct SimulationClock::Impl {
         : step(0), time(0.0), timestep(dt), realStartSet(false) {}
 };
 
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
+SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(std::make_unique<Impl>(timestep)) {}
 
 SimulationClock::~SimulationClock() = default;
 

@@ -1,8 +1,4 @@
-#pragma once
-
-#include <cstdint>
-#include <random>
-#include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -88,7 +84,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations
