@@ -55,8 +55,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and key=value formats)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from key=value format (backward compatibility)
+    bool loadFromKeyValue(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -71,7 +80,8 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
+    bool setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +103,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validate() const;
+    std::string getValidationError() const;
+    
+    // Configuration management
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +119,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string parseJSONValue(const std::string& jsonStr);
+    static std::string parseJSONArray(const std::string& jsonArray);
+    static std::vector<std::pair<std::string, std::string>> parseJSONObject(const std::string& jsonObj);
 };
 
 } // namespace nlm
