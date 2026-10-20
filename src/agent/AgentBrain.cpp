@@ -68,10 +68,37 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Integrate with brain memory systems for proper episode tracking
+    if (brain_ && brain_->getEpisodicMemory()) {
+        brain_->getEpisodicMemory()->setMaxEpisodes(10000);
+        brain_->getEpisodicMemory()->setConsolidationInterval(100);
+    }
+    
+    // Initialize working memory capacity based on brain size
+    if (brain_ && brain_->getWorkingMemory()) {
+        brain_->getWorkingMemory()->setCapacity(brain_->getTotalNeuronCount() / 20);
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Log integrated systems status
+    NLM_LOG_INFO("Integrated Systems:");
+    NLM_LOG_INFO("  Working Memory: " + std::string(brain_->getWorkingMemory() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Episodic Memory: " + std::string(brain_->getEpisodicMemory() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Episodic Episodes: " + std::to_string(brain_->getEpisodicMemory() ? brain_->getEpisodicMemory()->getEpisodeCount() : 0));
+    NLM_LOG_INFO("  Associative Memory: " + std::string(brain_->getAssociativeMemory() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Prediction System: " + std::string(brain_->getPredictionSystem() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Planner: " + std::string(brain_->getPlanner() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Concept Formation: " + std::string(brain_->getConceptFormation() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Attention System: " + std::string(brain_->getAttention() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Development System: " + std::string(brain_->getDevelopmentSystem() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Dopamine: " + std::string(brain_->getDopamine() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Curiosity: " + std::string(brain_->getCuriosity() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Novelty: " + std::string(brain_->getNovelty() ? "YES" : "NO"));
+    NLM_LOG_INFO("  Prediction Error: " + std::string(brain_->getPredictionErrorSignal() ? "YES" : "NO"));
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -142,10 +169,90 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity and engage integrated systems
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Engage concept formation if novel input
+        if (brain_->getConceptFormation() && noveltyLevel_ > 0.1f) {
+            // Concept formation processes patterns from current sensory input
+            // This helps the agent identify new patterns and generalize
+            brain_->getConceptFormation()->update(this, *brain_->getRandomGenerator());
+        }
+        
+        // Engage attention system
+        if (brain_->getAttention()) {
+            // Attention selects important sensory features for processing
+            brain_->getAttention()->update(brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f));
+            
+            // Apply attention to working memory
+            if (brain_->getWorkingMemory() && !brain_->getWorkingMemory()->getMemoryNeurons().empty()) {
+                std::vector<NeuronId> competitors = brain_->getWorkingMemory()->getMemoryNeurons();
+                brain_->getAttention()->processCompetition(competitors);
+            }
+        }
+    }
+    
+    // Store current sensory state in working memory
+    if (brain_->getWorkingMemory() && !vision.empty()) {
+        // Create a sensory pattern representation
+        for (size_t i = 0; i < vision.size() && i < sensoryVision_.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Store visual feature in working memory
+                brain_->getWorkingMemory()->storeToNeuron(
+                    sensoryVision_[i]->getId(), 
+                    vision[i]
+                );
+            }
+        }
+    }
+    
+    // Store episode in episodic memory
+    if (brain_->getEpisodicMemory() && developmentalAge_ > 100.0) {  // Store every 100 steps
+        // Create an episodic memory entry
+        EpisodicMemoryItem episode;
+        episode.timestamp = developmentalAge_;
+        episode.reward = dopamineLevel_;
+        
+        // Store active neurons (firing during this step)
+        for (auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store reward in episode
+        episode.reward = dopamineLevel_;
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // Update prediction system if available
+    if (brain_->getPredictionSystem()) {
+        // Prediction system would process temporal sequences
+        // For now, just track prediction error
+        float prediction = 0.0f;  // Would be computed from learned patterns
+        predictionError_ = std::abs(prediction - noveltyLevel_);
+    }
+    
+    // Update attention with current competition
+    if (brain_->getAttention() && !sensoryVision_.empty()) {
+        // Create a simple competition based on sensory neuron activity
+        std::vector<NeuronId> activeNeurons;
+        for (Neuron* neuron : sensoryVision_) {
+            if (neuron && neuron->isFiring()) {
+                activeNeurons.push_back(neuron->getId());
+            }
+        }
+        brain_->getAttention()->processCompetition(activeNeurons);
     }
 }
 
@@ -277,6 +384,24 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Integrate with working memory
+    if (brain_->getWorkingMemory() && predictionError_ != 0.0f) {
+        // Store prediction error in working memory for learning
+        // This creates a teaching signal for memory consolidation
+        brain_->getWorkingMemory()->storePredictionError(predictionError_);
+    }
+    
+    // Update episodic memory with reward
+    if (brain_->getEpisodicMemory() && predictedReward_ != 0.0f) {
+        // Create an error-based memory trace
+        EpisodicMemoryItem rewardEpisode;
+        rewardEpisode.timestamp = developmentalAge_;
+        rewardEpisode.reward = predictionError_;
+        
+        // Store reward prediction error in memory
+        brain_->getEpisodicMemory()->storeEpisode(rewardEpisode);
+    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -289,15 +414,41 @@ void AgentBrain::updateDevelopment(double timestep) {
     if (developmentalAge_ < 60.0) {  // ~1 minute
         plasticityModifier_ = 1.0f;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+        
+        // Synaptogenesis during early development
+        if (brain_->getStructuralPlasticity()) {
+            brain_->getStructuralPlasticity()->setSynaptogenesisRate(0.0002f);
+        }
+        
     } else if (developmentalAge_ < 300.0) {  // ~5 minutes
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+        
+        // Maturation continues
+        if (brain_->getStructuralPlasticity()) {
+            brain_->getStructuralPlasticity()->setSynaptogenesisRate(0.0001f);
+            brain_->getStructuralPlasticity()->setPruningRate(0.00001f);
+        }
+        
     } else if (developmentalAge_ < 900.0) {  // ~15 minutes
         plasticityModifier_ = 0.5f;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+        
+        // Pruning continues, synaptogenesis slows
+        if (brain_->getStructuralPlasticity()) {
+            brain_->getStructuralPlasticity()->setSynaptogenesisRate(0.00005f);
+            brain_->getStructuralPlasticity()->setPruningRate(0.00002f);
+        }
+        
     } else {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+        
+        // Pruning continues at low rates
+        if (brain_->getStructuralPlasticity()) {
+            brain_->getStructuralPlasticity()->setSynaptogenesisRate(0.00001f);
+            brain_->getStructuralPlasticity()->setPruningRate(0.000005f);
+        }
     }
     
     // Structural plasticity changes with development
@@ -310,6 +461,18 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
         }
+    }
+    
+    // Update prediction system with developmental stage
+    if (brain_->getPredictionSystem() && developmentalAge_ > 60.0) {
+        // Prediction system can learn temporal patterns over time
+        brain_->getPredictionSystem()->update(brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f));
+    }
+    
+    // Update concept formation
+    if (brain_->getConceptFormation() && developmentalAge_ > 120.0) {
+        // Concept formation refines learned patterns over time
+        brain_->getConceptFormation()->update(this, *brain_->getRandomGenerator());
     }
 }
 
@@ -345,6 +508,24 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset brain and all integrated systems
+    if (brain_) {
+        brain_->reset();
+        
+        // Clear memory systems
+        if (brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->clear();
+        }
+        
+        if (brain_->getEpisodicMemory()) {
+            brain_->getEpisodicMemory()->clear();
+        }
+        
+        if (brain_->getAssociativeMemory()) {
+            brain_->getAssociativeMemory()->clear();
+        }
+    }
 }
 
 } // namespace nlm

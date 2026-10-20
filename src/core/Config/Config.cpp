@@ -19,40 +19,136 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Check file extension to determine parser
+    std::string ext = "";
+    size_t dot_pos = filepath.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        ext = filepath.substr(dot_pos + 1);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Try JSON parser first (most common)
+    if (ext == "json" || ext.empty()) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        try {
+            nlohmann::json j;
+            file >> j;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Clear existing entries
+            pImpl->entries.clear();
+            
+            // Recursively parse JSON object
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value;
+                
+                // Convert JSON value to ConfigValue
+                if (it->is_string()) {
+                    value = it->get<std::string>();
+                } else if (it->is_boolean()) {
+                    value = it->get<bool>();
+                } else if (it->is_number_integer()) {
+                    // Try to infer between int and int64_t
+                    if (it->get<int64_t>() <= std::numeric_limits<int>::max() &&
+                        it->get<int64_t>() >= std::numeric_limits<int>::min()) {
+                        value = it->get<int>();
+                    } else {
+                        value = it->get<int64_t>();
+                    }
+                } else if (it->is_number_float()) {
+                    value = it->get<double>();
+                } else if (it->is_array()) {
+                    // Convert array to vector
+                    std::vector<double> vec;
+                    for (const auto& item : *it) {
+                        vec.push_back(item.get<double>());
+                    }
+                    value = vec;
+                } else {
+                    // For complex types, log warning and skip
+                    continue;
+                }
+                
+                set(key, value, ConfigSource::File);
             }
             
-            set(key, value, ConfigSource::File);
+            return true;
+            
+        } catch (const nlohmann::json::parse_error& e) {
+            return false;
+        } catch (const std::exception& e) {
+            return false;
         }
     }
-    
-    return true;
+#ifdef HAVE_YAML
+    else if (ext == "yaml" || ext == "yml") {
+        try {
+            YAML::Loader loader(filepath);
+            YAML::Node doc = loader.GetRoot();
+            
+            // Clear existing entries
+            pImpl->entries.clear();
+            
+            // Recursively parse YAML node
+            std::function<void(const YAML::Node&, std::string)> parseNode = 
+                [&](const YAML::Node& node, std::string prefix) {
+                    if (node.IsMap()) {
+                        for (const auto& pair : node) {
+                            std::string key = prefix.empty() ? pair.first.as<std::string>() : 
+                                (prefix + "." + pair.first.as<std::string>());
+                            parseNode(pair.second, key);
+                        }
+                    } else if (node.IsSequence()) {
+                        // Convert sequence to vector<string> for now
+                        std::vector<std::string> vec;
+                        for (size_t i = 0; i < node.size(); ++i) {
+                            vec.push_back(node[i].as<std::string>());
+                        }
+                        set(prefix, vec, ConfigSource::File);
+                    } else {
+                        // Scalar value
+                        ConfigValue value;
+                        if (node.IsScalar()) {
+                            std::string str_val = node.as<std::string>();
+                            // Try to infer type
+                            if (str_val == "true" || str_val == "false") {
+                                value = str_val == "true";
+                            } else {
+                                try {
+                                    size_t pos;
+                                    double double_val = std::stod(str_val, &pos);
+                                    if (pos == str_val.length()) {
+                                        value = double_val;
+                                    } else {
+                                        value = str_val;
+                                    }
+                                } catch (...) {
+                                    value = str_val;
+                                }
+                            }
+                        } else {
+                            // Fallback to string
+                            value = node.as<std::string>();
+                        }
+                        set(prefix, value, ConfigSource::File);
+                    }
+                };
+            
+            parseNode(doc, "");
+            return true;
+            
+        } catch (const std::exception& e) {
+            return false;
+        }
+    }
+#endif
+    else {
+        // Fallback to simple key=value format
+        return loadFromFileSimple(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
