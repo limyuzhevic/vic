@@ -8,6 +8,19 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>  // For NeuralAssociativeMemory
+
+// Forward declarations for new component architecture
+namespace nlm {
+class NeuralComputationEngine;
+class MemoryIntegrationManager;
+class PredictionCoordinator;
+class CognitiveOrchestrator;
+class NeuromodulationController;
+class PlasticityManager;
+class DevelopmentManager;
+class SensoryMotorInterface;
+}
 
 namespace nlm {
 
@@ -28,6 +41,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Neuromodulator;
+class CheckpointManager;
+class CheckpointWriter;
+class CheckpointReader;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -66,8 +83,6 @@ public:
     
     // Main simulation step
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
@@ -184,6 +199,40 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== NEW MODULAR COMPONENT ACCESSORS ==========
+    
+    // Neural computation
+    NeuralComputationEngine* getNeuralComputation();
+    const NeuralComputationEngine* getNeuralComputation() const;
+    
+    // Memory integration
+    MemoryIntegrationManager* getMemoryIntegration();
+    const MemoryIntegrationManager* getMemoryIntegration() const;
+    
+    // Prediction coordination
+    PredictionCoordinator* getPredictionCoordinator();
+    const PredictionCoordinator* getPredictionCoordinator() const;
+    
+    // Cognitive orchestration
+    CognitiveOrchestrator* getCognitiveOrchestrator();
+    const CognitiveOrchestrator* getCognitiveOrchestrator() const;
+    
+    // Neuromodulation controller
+    NeuromodulationController* getNeuromodulationController();
+    const NeuromodulationController* getNeuromodulationController() const;
+    
+    // Plasticity manager
+    PlasticityManager* getPlasticityManager();
+    const PlasticityManager* getPlasticityManager() const;
+    
+    // Development manager
+    DevelopmentManager* getDevelopmentManager();
+    const DevelopmentManager* getDevelopmentManager() const;
+    
+    // Sensory-motor interface
+    SensoryMotorInterface* getSensoryMotorInterface();
+    const SensoryMotorInterface* getSensoryMotorInterface() const;
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
@@ -192,6 +241,9 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Internal helper method
+    SimulationStep getCurrentStep() const { return currentStep; }
     
 private:
     struct Impl;

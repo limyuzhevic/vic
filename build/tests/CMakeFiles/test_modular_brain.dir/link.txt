@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/test_modular_brain.dir/link.d CMakeFiles/test_modular_brain.dir/test_modular_brain/test_modular_brain.cpp.o -o test_modular_brain  ../libnlm_core.a

@@ -1,0 +1,995 @@
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <random>
+#include <iomanip>
+#include <cctype>
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+// Helper to check if file exists
+static bool fileExists(const std::string& filepath) {
+    return std::filesystem::exists(filepath);
+}
+
+// Parse environment variable references in a string
+std::string Config::substituteEnvVars(const std::string& value) {
+    std::string result;
+    result.reserve(value.size());
+    
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '$' && i + 1 < value.size()) {
+            if (value[i + 1] == '{') {
+                // ${VAR} format
+                size_t endPos = value.find('}', i + 2);
+                if (endPos != std::string::npos) {
+                    std::string varName = value.substr(i + 2, endPos - i - 2);
+                    const char* envValue = std::getenv(varName.c_str());
+                    if (envValue) {
+                        result += envValue;
+                    }
+                    i = endPos;
+                    continue;
+                }
+            } else {
+                // $VAR format
+                size_t endPos = i + 1;
+                while (endPos < value.size() && std::isalnum(value[endPos])) {
+                    endPos++;
+                }
+                std::string varName = value.substr(i + 1, endPos - i - 1);
+                const char* envValue = std::getenv(varName.c_str());
+                if (envValue) {
+                    result += envValue;
+                }
+                i = endPos - 1;
+                continue;
+            }
+        }
+        result += value[i];
+    }
+    
+    return result;
+}
+
+// Convert ConfigValue to string
+std::string Config::valueToString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << '"' << arg << '"';
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << '[';
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ', ';
+                oss << arg[i];
+            }
+            oss << ']';
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << '[';
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ', ';
+                oss << arg[i];
+            }
+            oss << ']';
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << '[';
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ', ';
+                oss << '"' << arg[i] << '"';
+            }
+            oss << ']';
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+// Parse string to ConfigValue
+std::optional<Config::ConfigValue> Config::parseValue(const std::string& str, const std::string& key) {
+    std::string trimmed = trim(str);
+    
+    // Try parsing as boolean
+    if (trimmed == "true" || trimmed == "false") {
+        return trimmed == "true";
+    }
+    
+    // Try parsing as integer
+    try {
+        if (trimmed.find('.') == std::string::npos) {
+            size_t pos;
+            long long_val = std::stoll(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                return long_val;
+            }
+        }
+    } catch (...) {}
+    
+    // Try parsing as double
+    try {
+        size_t pos;
+        double double_val = std::stod(trimmed, &pos);
+        if (pos == trimmed.size()) {
+            return double_val;
+        }
+    } catch (...) {}
+    
+    // Check for quoted string
+    if ((trimmed.front() == '"' && trimmed.back() == '"') ||
+        (trimmed.front() == '\'' && trimmed.back() == '\'')) {
+        std::string unquoted = trimmed.substr(1, trimmed.size() - 2);
+        return unquoted;
+    }
+    
+    // Return as string
+    return trimmed;
+}
+
+// Apply a single validation rule
+bool Config::applyValidationRule(const ValidationRule& rule, const ConfigValue& value, std::string& error) const {
+    using namespace std;
+    
+    switch (rule.type) {
+        case ValidationRuleType::None:
+            return true;
+            
+        case ValidationRuleType::Range: {
+            if (!std::holds_alternative<double>(value) && !std::holds_alternative<int>(value) && 
+                !std::holds_alternative<int64_t>(value)) {
+                error = "Value must be a number for range validation";
+                return false;
+            }
+            double val = std::visit([](auto&& arg) { return static_cast<double>(arg); }, value);
+            auto params = std::get<std::pair<double, double>>(rule.parameters);
+            if (val < params.first || val > params.second) {
+                error = "Value " + std::to_string(val) + " is not in range [" + 
+                        std::to_string(params.first) + ", " + std::to_string(params.second) + "]";
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::Pattern: {
+            if (!std::holds_alternative<std::string>(value)) {
+                error = "Value must be a string for pattern validation";
+                return false;
+            }
+            std::string str = std::get<std::string>(value);
+            std::regex pattern(std::get<std::string>(rule.parameters));
+            if (!std::regex_match(str, pattern)) {
+                error = "Value '" + str + "' does not match pattern '" + std::get<std::string>(rule.parameters) + "'";
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::Length: {
+            bool isString = std::holds_alternative<std::string>(value);
+            bool isIntVec = std::holds_alternative<std::vector<int>>(value);
+            bool isDoubleVec = std::holds_alternative<std::vector<double>>(value);
+            bool isStringVec = std::holds_alternative<std::vector<std::string>>(value);
+            
+            if (!isString && !isIntVec && !isDoubleVec && !isStringVec) {
+                error = "Value must be a string or array for length validation";
+                return false;
+            }
+            
+            size_t length = std::visit([](auto&& arg) { return arg.size(); }, value);
+            size_t expectedLength = std::get<size_t>(rule.parameters);
+            if (length != expectedLength) {
+                error = "Value length " + std::to_string(length) + " does not match expected length " + std::to_string(expectedLength);
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::InList: {
+            if (!std::holds_alternative<std::string>(value)) {
+                error = "Value must be a string for in-list validation";
+                return false;
+            }
+            std::string str = std::get<std::string>(value);
+            auto allowedValues = std::get<std::unordered_set<std::string>>(rule.parameters);
+            if (allowedValues.find(str) == allowedValues.end()) {
+                error = "Value '" + str + "' is not in allowed list";
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::Positive:
+        case ValidationRuleType::Negative: {
+            if (!std::holds_alternative<double>(value) && !std::holds_alternative<int>(value) && 
+                !std::holds_alternative<int64_t>(value)) {
+                error = "Value must be a number for " + 
+                       (rule.type == ValidationRuleType::Positive ? "positive" : "negative") + 
+                       " validation";
+                return false;
+            }
+            double val = std::visit([](auto&& arg) { return static_cast<double>(arg); }, value);
+            if ((rule.type == ValidationRuleType::Positive && val <= 0) ||
+                (rule.type == ValidationRuleType::Negative && val >= 0)) {
+                error = "Value " + std::to_string(val) + " is not " + 
+                       (rule.type == ValidationRuleType::Positive ? "positive" : "negative");
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::MultipleOf: {
+            if (!std::holds_alternative<double>(value) && !std::holds_alternative<int>(value) && 
+                !std::holds_alternative<int64_t>(value)) {
+                error = "Value must be a number for multiple-of validation";
+                return false;
+            }
+            double val = std::visit([](auto&& arg) { return static_cast<double>(arg); }, value);
+            double divisor = std::get<double>(rule.parameters);
+            if (std::abs(val) > std::numeric_limits<double>::epsilon()) {
+                double remainder = std::fmod(val, divisor);
+                if (remainder > std::numeric_limits<double>::epsilon() && 
+                    remainder < divisor - std::numeric_limits<double>::epsilon()) {
+                    error = "Value " + std::to_string(val) + " is not a multiple of " + std::to_string(divisor);
+                    return false;
+                }
+            }
+            break;
+        }
+        
+        case ValidationRuleType::FileExists: {
+            if (!std::holds_alternative<std::string>(value)) {
+                error = "Value must be a string path for file-exists validation";
+                return false;
+            }
+            std::string path = std::get<std::string>(value);
+            if (!fileExists(path)) {
+                error = "File does not exist: " + path;
+                return false;
+            }
+            break;
+        }
+        
+        case ValidationRuleType::NonEmpty: {
+            if (std::holds_alternative<std::string>(value)) {
+                if (std::get<std::string>(value).empty()) {
+                    error = "Value cannot be empty";
+                    return false;
+                }
+            } else if (std::holds_alternative<std::vector<int>>(value) ||
+                       std::holds_alternative<std::vector<double>>(value) ||
+                       std::holds_alternative<std::vector<std::string>>(value)) {
+                if (std::get<std::vector<std::string>>(value).empty()) {
+                    error = "Array cannot be empty";
+                    return false;
+                }
+            }
+            break;
+        }
+        
+        case ValidationRuleType::Custom:
+            if (rule.parameters.index() != 3) { // std::function
+                error = "Custom validation rule missing function";
+                return false;
+            }
+            auto validator = std::get<std::function<bool(const ConfigValue&)>>(rule.parameters);
+            return validator(value);
+            
+        default:
+            error = "Unknown validation rule type";
+            return false;
+    }
+    
+    return true;
+}
+
+// JSON parsing implementation
+static void parseJsonToConfig(const nlohmann::json& json, Config& config) {
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        std::string key = it.key();
+        
+        ConfigValue value;
+        const nlohmann::json& jsonValue = *it;
+        
+        if (jsonValue.is_string()) {
+            value = jsonValue.get<std::string>();
+        } else if (jsonValue.is_number_integer()) {
+            value = jsonValue.get<int64_t>();
+        } else if (jsonValue.is_number_float()) {
+            value = jsonValue.get<double>();
+        } else if (jsonValue.is_boolean()) {
+            value = jsonValue.get<bool>();
+        } else if (jsonValue.is_array()) {
+            // Determine array type
+            if (!jsonValue.empty()) {
+                if (jsonValue[0].is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : jsonValue) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    value = intArray;
+                } else if (jsonValue[0].is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : jsonValue) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    value = doubleArray;
+                } else if (jsonValue[0].is_string()) {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : jsonValue) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    value = stringArray;
+                } else {
+                    // Default to string array
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : jsonValue) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    value = stringArray;
+                }
+            } else {
+                value = std::vector<std::string>{};
+            }
+        } else {
+            // Try to get as string
+            try {
+                value = jsonValue.get<std::string>();
+            } catch (...) {
+                // If not possible, skip this entry
+                continue;
+            }
+        }
+        
+        config.set(key, value, ConfigSource::File);
+    }
+}
+
+// YAML parsing implementation
+static void parseYamlToConfig(const YAML::Node& yaml, Config& config) {
+    for (const auto& it : yaml) {
+        std::string key = it.first.as<std::string>();
+        
+        ConfigValue value;
+        const YAML::Node& yamlValue = it.second;
+        
+        if (yamlValue.IsScalar()) {
+            std::string strValue = yamlValue.as<std::string>();
+            
+            // Try to parse as boolean
+            if (strValue == "true" || strValue == "false") {
+                value = (strValue == "true");
+            } else if (strValue.find('.') != std::string::npos || 
+                       strValue.find('e') != std::string::npos || 
+                       strValue.find('E') != std::string::npos) {
+                // Try as double
+                try {
+                    value = std::stod(strValue);
+                } catch (...) {
+                    value = strValue;
+                }
+            } else {
+                // Try as integer
+                try {
+                    value = std::stoll(strValue);
+                } catch (...) {
+                    value = strValue;
+                }
+            }
+        } else if (yamlValue.IsSequence()) {
+            // Determine array type
+            if (!yamlValue.empty()) {
+                if (yamlValue[0].IsScalar()) {
+                    std::string first = yamlValue[0].as<std::string>();
+                    if (first == "true" || first == "false") {
+                        std::vector<bool> boolArray;
+                        for (const auto& item : yamlValue) {
+                            boolArray.push_back(item.as<bool>());
+                        }
+                        value = boolArray;
+                    } else if (first.find('.') != std::string::npos || 
+                               first.find('e') != std::string::npos || 
+                               first.find('E') != std::string::npos) {
+                        std::vector<double> doubleArray;
+                        for (const auto& item : yamlValue) {
+                            doubleArray.push_back(item.as<double>());
+                        }
+                        value = doubleArray;
+                    } else {
+                        std::vector<std::string> stringArray;
+                        for (const auto& item : yamlValue) {
+                            stringArray.push_back(item.as<std::string>());
+                        }
+                        value = stringArray;
+                    }
+                }
+            } else {
+                value = std::vector<std::string>{};
+            }
+        } else {
+            value = yamlValue.as<std::string>();
+        }
+        
+        config.set(key, value, ConfigSource::File);
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Try to parse as JSON first
+    try {
+        auto json = nlohmann::json::parse(content);
+        parseJsonToConfig(json, *this);
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // JSON parsing failed, try YAML
+    }
+    
+    // Try to parse as YAML
+    try {
+        auto yaml = YAML::Load(content);
+        parseYamlToConfig(yaml, *this);
+        return true;
+    } catch (const YAML::ParserException& e) {
+        // YAML parsing failed, fall back to simple key=value parsing
+    }
+    
+    // Fall back to simple key=value parsing for backward compatibility
+    file.open(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write YAML format (human-readable)
+    YAML::Emitter yaml;
+    yaml << YAML::BeginDoc;
+    yaml << YAML::BeginMap;
+    
+    for (const auto& entry : pImpl->entries) {
+        yaml << YAML::Key << entry.key;
+        
+        // Convert value to YAML representation
+        std::visit([&yaml](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                yaml << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                yaml << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                yaml << YAML::Value << static_cast<int64_t>(arg);
+            } else if constexpr (std::is_same_v<T, double>) {
+                yaml << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                yaml << YAML::Value << YAML::BeginSeq;
+                for (const auto& item : arg) {
+                    yaml << static_cast<int64_t>(item);
+                }
+                yaml << YAML::EndSeq;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                yaml << YAML::Value << YAML::BeginSeq;
+                for (const auto& item : arg) {
+                    yaml << item;
+                }
+                yaml << YAML::EndSeq;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                yaml << YAML::Value << YAML::BeginSeq;
+                for (const auto& item : arg) {
+                    yaml << item;
+                }
+                yaml << YAML::EndSeq;
+            }
+        }, entry.value);
+    }
+    
+    yaml << YAML::EndMap;
+    yaml << YAML::EndDoc;
+    
+    file << yaml.c_str();
+    return true;
+}
+
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<T>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    ConfigValue oldValue;
+    bool hasOldValue = false;
+    
+    if (it != pImpl->entries.end()) {
+        oldValue = it->value;
+        hasOldValue = true;
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+    
+    // Record change if value changed
+    if (hasOldValue && oldValue != value) {
+        changeHistory.emplace_back(key, oldValue, value, source, "Direct assignment");
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+bool Config::has(const std::string& key) const {
+    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+}
+
+void Config::remove(const std::string& key) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        ConfigValue oldValue = it->value;
+        pImpl->entries.erase(it);
+        
+        // Record removal as a change
+        changeHistory.emplace_back(key, oldValue, ConfigValue(""), ConfigSource::Runtime, "Removed");
+    }
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+void Config::clear() {
+    // Record removals before clearing
+    for (const auto& entry : pImpl->entries) {
+        changeHistory.emplace_back(entry.key, entry.value, ConfigValue(""), ConfigSource::Runtime, "Cleared all");
+    }
+    
+    pImpl->entries.clear();
+}
+
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Implementation of new methods
+ValidationResult Config::validate(const std::vector<ValidationRule>& rules) const {
+    ValidationResult result;
+    result.timestamp = std::chrono::system_clock::now();
+    
+    for (const auto& rule : rules) {
+        for (const auto& entry : pImpl->entries) {
+            std::string error;
+            if (!applyValidationRule(rule, entry.value, error)) {
+                std::string fullError = rule.name + ": " + entry.key + " - " + error;
+                result.errors.push_back(fullError);
+                validationErrors.push_back(ValidationRuleException(fullError));
+            }
+        }
+    }
+    
+    result.valid = result.errors.empty();
+    return result;
+}
+
+ValidationResult Config::validateSchema(const ConfigSchema& schema) const {
+    ValidationResult result;
+    result.timestamp = std::chrono::system_clock::now();
+    
+    for (const auto& entry : pImpl->entries) {
+        // Check if key exists in schema
+        if (schema.requiredAll && schema.rules.find(entry.key) == schema.rules.end()) {
+            result.errors.push_back("Required key missing in schema: " + entry.key);
+            validationErrors.push_back(SchemaValidationException("Missing required key: " + entry.key));
+        }
+        
+        // Validate against schema rules if present
+        if (schema.rules.find(entry.key) != schema.rules.end()) {
+            const auto& rule = schema.rules.at(entry.key);
+            std::string error;
+            if (!applyValidationRule(rule, entry.value, error)) {
+                std::string fullError = "Schema rule " + rule.name + " failed for key " + entry.key + ": " + error;
+                result.errors.push_back(fullError);
+                validationErrors.push_back(SchemaValidationException(fullError));
+            }
+        }
+    }
+    
+    // Check for missing required keys in schema
+    if (!schema.requiredAll) {
+        for (const auto& rule : schema.rules) {
+            if (rule.second.type != ValidationRuleType::None && rule.first != "type_hint") {
+                // If it's a required rule (not None), check if key exists
+                bool hasKey = std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+                    [&rule](const ConfigEntry& e) { return e.key == rule.first; });
+                
+                if (!hasKey) {
+                    result.errors.push_back("Missing required schema key: " + rule.first);
+                    validationErrors.push_back(SchemaValidationException("Missing required schema key: " + rule.first));
+                }
+            }
+        }
+    }
+    
+    result.valid = result.errors.empty();
+    return result;
+}
+
+void Config::merge(const Config& other, bool overwrite) {
+    for (const auto& entry : other.pImpl->entries) {
+        if (!has(entry.key) || overwrite) {
+            ConfigValue oldValue;
+            bool hasOldValue = false;
+            
+            if (has(entry.key)) {
+                hasOldValue = true;
+                oldValue = get<ConfigValue>(entry.key).value();
+            }
+            
+            set(entry.key, entry.value, entry.source);
+            
+            if (hasOldValue && oldValue != entry.value) {
+                changeHistory.emplace_back(entry.key, oldValue, entry.value, entry.source, "Merged from another config");
+            }
+        }
+    }
+}
+
+std::vector<ConfigChange> Config::compare(const Config& other) const {
+    std::vector<ConfigChange> diff;
+    
+    // Find keys in this config but not in other
+    for (const auto& entry : pImpl->entries) {
+        if (!other.has(entry.key)) {
+            diff.emplace_back(entry.key, entry.value, ConfigValue(""), entry.source, "Key removed in other config");
+        }
+    }
+    
+    // Find keys in other config but not in this
+    for (const auto& entry : other.pImpl->entries) {
+        if (!has(entry.key)) {
+            diff.emplace_back(entry.key, ConfigValue(""), entry.value, entry.source, "Key added in other config");
+        }
+    }
+    
+    // Find changed keys
+    for (const auto& entry : pImpl->entries) {
+        if (other.has(entry.key)) {
+            ConfigValue otherValue = other.get<ConfigValue>(entry.key).value();
+            if (entry.value != otherValue) {
+                diff.emplace_back(entry.key, entry.value, otherValue, entry.source, "Value changed");
+            }
+        }
+    }
+    
+    return diff;
+}
+
+std::string Config::generateTemplate(const ConfigSchema& schema) const {
+    std::ostringstream oss;
+    oss << "# Configuration Template Generated from Schema: " << schema.name << "\n";
+    oss << "# Version: " << schema.version << "\n\n";
+    
+    // Add schema description if available
+    if (!schema.name.empty()) {
+        oss << "# " << schema.name << " Configuration Template\n\n";
+    }
+    
+    // Add header
+    oss << "# Please fill in the following values:\n\n";
+    
+    // Generate entries for keys in schema
+    for (const auto& rule : schema.rules) {
+        oss << "# " << rule.first << ": ";
+        
+        // Get type hint if available
+        auto typeIt = schema.typeHints.find(rule.first);
+        if (typeIt != schema.typeHints.end()) {
+            oss << "[" << typeIt->second << "] ";
+        }
+        
+        oss << "# " << rule.second.description << "\n";
+        
+        // Add example based on rule type
+        if (rule.second.type == ValidationRuleType::Range) {
+            auto range = std::get<std::pair<double, double>>(rule.second.parameters);
+            oss << rule.first << " = 0.0  # Example: range [" << range.first << ", " << range.second << "]\n\n";
+        } else if (rule.second.type == ValidationRuleType::Pattern) {
+            std::string pattern = std::get<std::string>(rule.second.parameters);
+            oss << rule.first << " = \"pattern\"  # Example: matches regex '" << pattern << "'\n\n";
+        } else if (rule.second.type == ValidationRuleType::InList) {
+            auto values = std::get<std::unordered_set<std::string>>(rule.second.parameters);
+            if (!values.empty()) {
+                auto it = values.begin();
+                oss << rule.first << " = " << *it << "  # Allowed values:";
+                for (auto val = std::next(it); val != values.end(); ++val) {
+                    oss << " " << *val;
+                }
+                oss << "\n\n";
+            }
+        } else if (rule.second.type == ValidationRuleType::Positive) {
+            oss << rule.first << " = 1.0  # Must be positive\n\n";
+        } else if (rule.second.type == ValidationRuleType::MultipleOf) {
+            double divisor = std::get<double>(rule.second.parameters);
+            oss << rule.first << " = " << divisor << "  # Multiple of " << divisor << "\n\n";
+        } else if (rule.second.type == ValidationRuleType::FileExists) {
+            oss << rule.first << " = /path/to/file  # File must exist\n\n";
+        } else if (rule.second.type == ValidationRuleType::NonEmpty) {
+            if (schema.typeHints.find(rule.first) != schema.typeHints.end() && 
+                schema.typeHints.at(rule.first) == "string") {
+                oss << rule.first << " = \"example\"  # Cannot be empty\n\n";
+            } else {
+                oss << rule.first << " = [1, 2, 3]  # Cannot be empty\n\n";
+            }
+        } else {
+            // Default placeholder
+            oss << rule.first << " = \"value\"\n\n";
+        }
+    }
+    
+    return oss.str();
+}
+
+bool Config::backup(const std::string& filepath) const {
+    try {
+        // Create backup directory if it doesn't exist
+        std::filesystem::path backupPath(filepath);
+        if (backupPath.has_parent_path()) {
+            std::filesystem::create_directories(backupPath.parent_path());
+        }
+        
+        // Save to backup file
+        if (saveToFile(filepath)) {
+            // Update metadata
+            metadata.filename = filepath;
+            metadata.modified = std::chrono::system_clock::now();
+            
+            // Record backup in change history
+            changeHistory.emplace_back("backup", ConfigValue(""), ConfigValue(filepath), ConfigSource::File, "Configuration backup created");
+            
+            return true;
+        }
+    } catch (const std::exception& e) {
+        // Record backup error
+        validationErrors.push_back(ValidationException(std::string("Backup failed: ") + e.what()));
+    }
+    
+    return false;
+}
+
+bool Config::restore(const std::string& filepath) {
+    try {
+        if (!fileExists(filepath)) {
+            validationErrors.push_back(ValidationException("Backup file does not exist: " + filepath));
+            return false;
+        }
+        
+        // Save current config as backup
+        std::string tempBackup = filepath + ".temp_backup";
+        backup(tempBackup);
+        
+        // Load from backup
+        if (loadFromFile(filepath)) {
+            // Update metadata
+            metadata.filename = filepath;
+            metadata.modified = std::chrono::system_clock::now();
+            
+            // Record restore in change history
+            changeHistory.emplace_back("restore", ConfigValue(""), ConfigValue(filepath), ConfigSource::File, "Configuration restored from backup");
+            
+            // Clean up temp backup
+            std::filesystem::remove(tempBackup);
+            
+            return true;
+        }
+    } catch (const std::exception& e) {
+        validationErrors.push_back(ValidationException(std::string("Restore failed: ") + e.what()));
+    }
+    
+    return false;
+}
+
+void Config::substituteEnvironmentVariables() {
+    for (auto& entry : pImpl->entries) {
+        std::string originalValue;
+        bool isString = std::holds_alternative<std::string>(entry.value);
+        
+        if (isString) {
+            originalValue = std::get<std::string>(entry.value);
+            std::string substitutedValue = substituteEnvVars(originalValue);
+            
+            if (substitutedValue != originalValue) {
+                ConfigValue oldValue = entry.value;
+                entry.value = substitutedValue;
+                
+                // Record the substitution
+                changeHistory.emplace_back(entry.key, oldValue, substitutedValue, entry.source, "Environment variable substitution");
+            }
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            std::vector<std::string>& strArray = std::get<std::vector<std::string>>(entry.value);
+            for (size_t i = 0; i < strArray.size(); ++i) {
+                std::string substitutedValue = substituteEnvVars(strArray[i]);
+                if (substitutedValue != strArray[i]) {
+                    ConfigValue oldValue = entry.value;
+                    strArray[i] = substitutedValue;
+                    entry.value = strArray;
+                    
+                    // Record the substitution
+                    changeHistory.emplace_back(entry.key, oldValue, entry.value, entry.source, "Environment variable substitution");
+                    break; // Only record once per entry
+                }
+            }
+        }
+    }
+}
+
+std::optional<Config::ConfigValue> Config::getAny(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    return it->value;
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+} // namespace nlm
+" > src/core/Config/Config.cpp
+
