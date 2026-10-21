@@ -404,17 +404,120 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    m.def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+          py::arg("enable"), "Enable/disable reward-based neuromodulation");
+    m.def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+          py::arg("enable"), "Enable/disable structural plasticity");
+    m.def("enableDevelopment", &AgentBrain::enableDevelopment,
+          py::arg("enable"), "Enable/disable developmental changes");
+    m.def("enableCuriosity", &AgentBrain::enableCuriosity,
+          py::arg("enable"), "Enable/disable curiosity-driven exploration");
+    m.def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+          "Check if reward modulation is enabled");
+    m.def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+          "Check if structural plasticity is enabled");
+    m.def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+          "Check if development is enabled");
+    m.def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+          "Check if curiosity is enabled");
+
+    // Enhanced configuration factory functions with common presets
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Predefined configuration presets
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Apply reasonable defaults for typical usage
+        config->set("neuron_count", static_cast<int64_t>(500));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.15f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Enhanced world creation with configuration
+    m.def("createSimpleWorld", [](size_t width, size_t height, 
+                                 size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 10, py::arg("height") = 10, 
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create a simple world with specified dimensions and vision");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 8, 8); // Default size
+        return world;
+    }, "Create a simple world with default dimensions and vision");
+
+    // Agent factory with common configuration
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain,
+                                std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), 
+       "Create and initialize an agent brain with a world");
+
+    // Configuration utilities
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("loadConfigFromJSON", [](const std::string& jsonStr) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Try to parse as JSON
+        if (config->loadFromJSON(jsonStr)) {
+            return config;
+        }
+        // If JSON parsing fails, try key=value format
+        std::istringstream stream(jsonStr);
+        std::string line;
+        while (std::getline(stream, line)) {
+            config->loadFromLine(line);
+        }
+        return config;
+    }, py::arg("jsonStr"), "Create a configuration from JSON or key=value string");
+
+    // Utility functions for common NLM operations
+    m.def("runSimpleSimulation", [](size_t numSteps) {
+        // Create brain, world, and agent with simple setup
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        // Run simulation
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            SensoryPercept percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.1);
+            Action action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return SimulationResult{
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            world->getAgentBody().energy,
+            world->getAgentBody().health,
+            agent->getNoveltyLevel(),
+            agent->getCuriosityLevel()
+        };
+    }, py::arg("numSteps") = 100,
+       "Run a simple simulation with default settings");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

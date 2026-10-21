@@ -58,6 +58,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
+    
+    // Load from single line (key=value format)
+    bool loadFromLine(const std::string& line);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     

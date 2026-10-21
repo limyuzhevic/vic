@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -204,12 +203,14 @@ bool Brain::initialize() {
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
+                const auto& sensoryNeurons = sensoryPop->getNeurons();
+                for (auto* neuron : sensoryNeurons) {
                     pImpl->sensoryNeurons.push_back(neuron);
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
+                const auto& motorNeurons = motorPop->getNeurons();
+                for (auto* neuron : motorNeurons) {
                     pImpl->motorNeurons.push_back(neuron);
                 }
             }
@@ -491,7 +492,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+                    const auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -503,8 +505,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
@@ -618,7 +618,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
+        const auto& neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
@@ -632,7 +632,8 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+                const auto& neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
                     neuron->injectCurrent(current);
                 }
             }
