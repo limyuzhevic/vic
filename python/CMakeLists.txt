@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -9,12 +10,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Enhanced Python configuration for better development experience
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
+# Core NLM libraries
+add_library(nlm_core STATIC
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
@@ -60,43 +63,81 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
-)
-
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
-)
-
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
 )
+
 target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+)
+
+# Agent system
+add_library(nlm_agent STATIC
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+)
+
+target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# World simulation
+add_library(nlm_world STATIC
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+)
+
+target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_world PUBLIC nlm_core)
+
+# Enhanced Python bindings module
+pybind11_add_module(pynlm bindings.cpp)
+
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Enhanced compiler options for Python module
+target_compile_options(pynlm PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
-
-pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
+# Enable Python optimizations for better performance
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(pynlm PRIVATE -O3 -DNDEBUG)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(pynlm PRIVATE -g -O0 -DDEBUG)
 endif()
 
+# Installation
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Python-specific installation
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm.py
+    DESTINATION pynlm
+    OPTIONAL
+)
+
+# Export configuration for Python package management
+export(EXPORT pynlmTargets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/pynlmConfig.cmake
+)
+
+# Generate version file
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/pynlm_version.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm_version.hpp
+    @ONLY
+)
+
+# Add custom target for installing Python package
+add_custom_target(pynlm_install_python
+    COMMAND ${Python_EXECUTABLE} -m pip install -e ${CMAKE_CURRENT_SOURCE_DIR}/../python
+    COMMENT "Installing pynlm Python package in development mode"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../python
 )
