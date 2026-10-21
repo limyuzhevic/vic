@@ -1,8 +1,5 @@
 #include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../memory/Memory.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -35,15 +32,10 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+// ========== OLD/STUB MEMORY SYSTEMS ==========
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
@@ -136,14 +128,9 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Initialize prediction system with simple configuration
+        pImpl->predictionSystem->train(SensoryInput(std::vector<float>(50, 0.0f)));  // Initial training
+        NLM_LOG_INFO("Prediction system initialized");
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
@@ -235,12 +222,11 @@ bool Brain::initialize() {
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // Initialize semantic memory (old/simple system)
+    pImpl->semanticMemory->initialize();
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize procedural memory (old/simple system)
+    pImpl->proceduralMemory->initialize();
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -510,9 +496,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Create sensory prediction based on current working memory
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Create sensory prediction based on current working memory
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Make prediction for next sensory state
+            // The prediction system should use neural patterns to predict
+            std::unique_ptr<SensoryInput> prediction = pImpl->predictionSystem->predictNextState(
+                SensoryInput(sensoryPattern)
+            );
+            
+            if (prediction) {
+                // Apply prediction to attention system
+                // Predictions guide attention to likely sensory inputs
+                pImpl->attention->applyTopDownBias(0, 0.1f);
+                
+                // Track prediction error if we have actual sensory input
+                // Update the prediction system with prediction error
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                pImpl->predictionSystem->train(SensoryInput(sensoryPattern));
+                
+                // Use prediction error to modulate neuromodulation
+                // This connects prediction to the brain loop
+            }
+        }
+    }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1017,8 +1037,6 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
@@ -1037,10 +1055,12 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
 
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
