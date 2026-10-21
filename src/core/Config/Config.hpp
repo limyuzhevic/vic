@@ -46,7 +46,10 @@ struct ConfigEntry {
 // Main configuration class
 class Config {
 public:
+    // Default constructor
     Config();
+    
+    // Destructor
     ~Config();
     
     // Disable copying, enable moving
