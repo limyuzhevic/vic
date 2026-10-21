@@ -18,6 +18,83 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Helper function to convert string to ConfigValue
+ConfigValue Config::stringToConfigValue(const std::string& str) {
+    // Try to parse as boolean
+    if (str == "true") return true;
+    if (str == "false") return false;
+    
+    // Try to parse as integer
+    try {
+        if (str.find('.') == std::string::npos) {
+            size_t pos;
+            int val = std::stoi(str, &pos);
+            if (pos == str.size()) return val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double val = std::stod(str, &pos);
+        if (pos == str.size()) return val;
+    } catch (...) {}
+    
+    // Try to parse as vector (simple format: [1,2,3])
+    if (str.front() == '[' && str.back() == ']') {
+        std::string content = str.substr(1, str.size() - 2);
+        std::vector<int> intVec;
+        std::vector<double> doubleVec;
+        
+        size_t pos = 0;
+        bool hasDouble = false;
+        
+        try {
+            while (pos < content.size()) {
+                size_t comma = content.find(',', pos);
+                if (comma == std::string::npos) {
+                    comma = content.size();
+                }
+                
+                std::string numStr = trim(content.substr(pos, comma - pos));
+                
+                // Try to parse as int first
+                try {
+                    size_t endpos;
+                    int val = std::stoi(numStr, &endpos);
+                    if (endpos == numStr.size()) {
+                        intVec.push_back(val);
+                    } else {
+                        double val = std::stod(numStr, &endpos);
+                        if (endpos == numStr.size()) {
+                            doubleVec.push_back(val);
+                            hasDouble = true;
+                        }
+                    }
+                } catch (...) {
+                    double val = std::stod(numStr);
+                    doubleVec.push_back(val);
+                    hasDouble = true;
+                }
+                
+                pos = comma + 1;
+                if (pos < content.size() && content[pos] == ' ') {
+                    ++pos;
+                }
+            }
+            
+            if (hasDouble) {
+                return doubleVec;
+            } else if (!intVec.empty()) {
+                return intVec;
+            }
+        } catch (...) {}
+    }
+    
+    // Default to string
+    return str;
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
@@ -48,7 +125,7 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, stringToConfigValue(value), ConfigSource::File);
         }
     }
     
@@ -65,14 +142,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                set(key, stringToConfigValue(value), ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            set(key, stringToConfigValue(value), ConfigSource::CommandLine);
         }
     }
     return true;
@@ -86,10 +163,83 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& value) -> std::string {
+            std::stringstream ss;
+            std::visit([&ss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    ss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) ss << ", ";
+                        ss << arg[i];
+                    }
+                    ss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) ss << ", ";
+                        ss << arg[i];
+                    }
+                    ss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) ss << ", ";
+                        ss << "\"" << arg[i] << "\"";
+                    }
+                    ss << "]";
+                } else {
+                    ss << arg;
+                }
+            }, entry.value);
+            return ss.str();
+        };
+        
+        file << entry.key << " = " << valueToString(entry.value) << "\n";
     }
     
     return true;
+}
+
+// Safe get method with better type checking and error handling
+// This provides better error messages and validation
+template<typename T>
+std::optional<T> Config::safeGet(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    // Check if value type matches requested type
+    if constexpr (std::is_same_v<T, int>) {
+        if (std::holds_alternative<int>(it->value)) {
+            return std::get<int>(it->value);
+        }
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        if (std::holds_alternative<int64_t>(it->value)) {
+            return std::get<int64_t>(it->value);
+        }
+    } else if constexpr (std::is_same_v<T, double>) {
+        if (std::holds_alternative<double>(it->value)) {
+            return std::get<double>(it->value);
+        }
+    } else if constexpr (std::is_same_v<T, bool>) {
+        if (std::holds_alternative<bool>(it->value)) {
+            return std::get<bool>(it->value);
+        }
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        if (std::holds_alternative<std::string>(it->value)) {
+            return std::get<std::string>(it->value);
+        }
+    }
+    
+    return std::nullopt;
 }
 
 template<typename T>
@@ -200,6 +350,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+// These need to match the definitions in the header
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

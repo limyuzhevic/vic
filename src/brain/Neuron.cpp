@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Utils.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -228,8 +229,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+        // Use utility function for clamping
+        V = Math::clamp(V, -100.0f, 50.0f);
     
     // Check for spike
     if (V >= threshold) {

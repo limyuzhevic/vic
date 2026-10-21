@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <set>
 
 namespace nlm {
 
@@ -26,6 +28,44 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    // Default constructor for backward compatibility
+    LogEntry() : level(LogLevel::Info), message(), file(), line(0), function(), timestamp() {}
+    
+    LogEntry(LogLevel lvl, const std::string& msg, 
+             const std::string& file = "", int line = 0, 
+             const std::string& function = "")
+        : level(lvl), message(msg), file(file), line(line), function(function), 
+          timestamp(std::chrono::system_clock::now()) {}
+};
+
+// Log filter interface
+class ILogFilter {
+public:
+    virtual ~ILogFilter() = default;
+    virtual bool shouldLog(const LogEntry& entry) const = 0;
+};
+
+// Simple filter that checks log level
+class LevelFilter : public ILogFilter {
+public:
+    explicit LevelFilter(LogLevel minLevel) : minLevel(minLevel) {}
+    bool shouldLog(const LogEntry& entry) const override {
+        return entry.level >= minLevel;
+    }
+private:
+    LogLevel minLevel;
+};
+
+// Filter based on file pattern
+class FilePatternFilter : public ILogFilter {
+public:
+    explicit FilePatternFilter(const std::string& pattern) : pattern(pattern) {}
+    bool shouldLog(const LogEntry& entry) const override {
+        return entry.file.find(pattern) != std::string::npos;
+    }
+private:
+    std::string pattern;
 };
 
 // Logger interface
@@ -35,6 +75,12 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Add filter
+    virtual void addFilter(std::shared_ptr<ILogFilter> filter) {}
+    
+    // Remove all filters
+    virtual void clearFilters() {}
 };
 
 // Console logger implementation
@@ -56,12 +102,17 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Filter management
+    void addFilter(std::shared_ptr<ILogFilter> filter) override;
+    void clearFilters() override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    bool shouldLog(const LogEntry& entry) const;
 };
 
 // Main Logger class
@@ -83,7 +134,13 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
+    // Add filter to global logger
+    void addFilter(std::shared_ptr<ILogFilter> filter);
+    
+    // Remove all filters from global logger
+    void clearFilters();
+    
+    // Log an entry
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
@@ -125,6 +182,12 @@ public:
     template<typename T>
     LogStream& operator<<(const T& value) {
         oss_ << value;
+        return *this;
+    }
+    
+    // Allow stringstream-style operations
+    LogStream& operator<<(std::ostream& (*manip)(std::ostream&)) {
+        oss_ << manip;
         return *this;
     }
     

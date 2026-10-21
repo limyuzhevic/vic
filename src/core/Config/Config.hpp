@@ -64,7 +64,11 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Safe get method with better type checking and error handling
+    template<typename T>
+    std::optional<T> safeGet(const std::string& key) const;
+    
+    // Get values with type checking and fallback
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
@@ -100,6 +104,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static ConfigValue stringToConfigValue(const std::string& str);  // NEW: Helper to parse strings to ConfigValue
 };
 
 } // namespace nlm

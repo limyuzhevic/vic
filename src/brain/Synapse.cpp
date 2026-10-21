@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Utils.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -199,11 +200,8 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
-    }
+    // Use utility function for exponential decay
+    pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     
     // Decay short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {

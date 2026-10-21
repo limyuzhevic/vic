@@ -3,6 +3,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Utils.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"

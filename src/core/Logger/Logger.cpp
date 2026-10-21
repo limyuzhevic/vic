@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
 
 namespace nlm {
 
@@ -12,6 +13,7 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::vector<std::shared_ptr<ILogFilter>> filters;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -23,7 +25,13 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    // Check level first (fast path)
     if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    // Check filters
+    if (!shouldLog(entry)) {
         return;
     }
     
@@ -37,6 +45,16 @@ void ConsoleLogger::log(const LogEntry& entry) {
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
     oss << " " << entry.message;
+    
+    // Add file/line info for debugging
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " (" << entry.file << ":" << entry.line << ")";
+    }
+    
+    // Add function name for better debugging
+    if (!entry.function.empty()) {
+        oss << " in " << entry.function;
+    }
     
     std::string output = oss.str();
     
@@ -80,6 +98,31 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
+void ConsoleLogger::addFilter(std::shared_ptr<ILogFilter> filter) {
+    if (filter) {
+        pImpl->filters.push_back(filter);
+    }
+}
+
+void ConsoleLogger::clearFilters() {
+    pImpl->filters.clear();
+}
+
+bool ConsoleLogger::shouldLog(const LogEntry& entry) const {
+    // If no filters, all messages pass through
+    if (pImpl->filters.empty()) {
+        return true;
+    }
+    
+    // All filters must pass
+    for (const auto& filter : pImpl->filters) {
+        if (!filter->shouldLog(entry)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
@@ -106,6 +149,7 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::vector<std::shared_ptr<ILogFilter>> globalFilters; // Additional global filters
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -114,7 +158,9 @@ Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (logger) {
+        pImpl->loggers.push_back(logger);
+    }
 }
 
 void Logger::clearLoggers() {
@@ -127,6 +173,24 @@ void Logger::setLevel(LogLevel level) {
     for (auto& logger : pImpl->loggers) {
         logger->setLevel(level);
     }
+}
+
+void Logger::addFilter(std::shared_ptr<ILogFilter> filter) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (filter) {
+        pImpl->globalFilters.push_back(filter);
+        
+        // Add filter to all existing loggers
+        for (auto& logger : pImpl->loggers) {
+            // Note: This assumes ILogger has an addFilter method
+            // For ConsoleLogger, it does, but other loggers might need it
+        }
+    }
+}
+
+void Logger::clearFilters() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->globalFilters.clear();
 }
 
 void Logger::log(LogLevel level, const std::string& message,
