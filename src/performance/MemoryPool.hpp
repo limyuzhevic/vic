@@ -73,17 +73,17 @@ public:
     /**
      * Check if pool is empty
      */
-    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
+    bool empty() const { return freeList_.load(std::memory_order_acquire) == nullptr; }
     
     /**
      * Get number of allocated objects
      */
-    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
+    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_acquire); }
     
     /**
      * Get number of available objects
      */
-    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
+    size_t availableCount() const { return availableCount_.load(std::memory_order_acquire); }
     
     /**
      * Total memory used by pool (bytes)
@@ -175,23 +175,41 @@ template<typename T>
 void MemoryPool<T>::addBlock() {
     auto block = std::make_unique<Block>(slabSize_, blockSize_);
     
-    // Chain existing blocks
-    Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
-        // Another thread already added a block, add to chain
-        block->nextBlock = expected;
-    } else {
-        block.release();
+    // Add to blocks_ with proper synchronization
+    {
+        Block* blockPtr = block.get();
+        Block* expected = nullptr;
+        if (!currentBlock_.compare_exchange_strong(expected, blockPtr, 
+                                                     std::memory_order_release, 
+                                                     std::memory_order_relaxed)) {
+            // Another thread already added a block, add to chain
+            block->nextBlock = expected;
+        } else {
+            block.release();
+        }
     }
     
-    // Initialize free list for this block
-    Block* b = block.get();
-    for (size_t i = 0; i < blockSize_; ++i) {
-        T* obj = b->getObject(i, slabSize_);
-        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        freeList_.store(node, std::memory_order_relaxed);
-        availableCount_.fetch_add(1, std::memory_order_relaxed);
+    // Initialize free list for this block with proper synchronization
+    {
+        Block* b = blocks_.back().get();
+        for (size_t i = 0; i < blockSize_; ++i) {
+            T* obj = b->getObject(i, slabSize_);
+            MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+            
+            // Initialize next pointer
+            node->next.store(nullptr, std::memory_order_relaxed);
+            
+            // Add to free list with release semantics for visibility
+            do {
+                node->next.store(freeList_.load(std::memory_order_acquire), 
+                                std::memory_order_relaxed);
+            } while (!freeList_.compare_exchange_weak(freeList_.load(std::memory_order_acquire), 
+                                                     node, 
+                                                     std::memory_order_release, 
+                                                     std::memory_order_acquire));
+            
+            availableCount_.fetch_add(1, std::memory_order_release);
+        }
     }
     
     blocks_.push_back(std::move(block));
@@ -203,15 +221,16 @@ T* MemoryPool<T>::allocate() {
     MemPoolNode* node = freeList_.load(std::memory_order_acquire);
     
     while (node != nullptr) {
-        MemPoolNode* next = node->next.load(std::memory_order_relaxed);
+        MemPoolNode* next = node->next.load(std::memory_order_acquire);
         if (freeList_.compare_exchange_weak(node, next, 
                                              std::memory_order_release, 
-                                             std::memory_order_relaxed)) {
-            allocatedCount_.fetch_add(1, std::memory_order_relaxed);
-            availableCount_.fetch_sub(1, std::memory_order_relaxed);
+                                             std::memory_order_acquire)) {
+            allocatedCount_.fetch_add(1, std::memory_order_release);
+            availableCount_.fetch_sub(1, std::memory_order_release);
             return reinterpret_cast<T*>(node);
         }
         // node was updated by CAS, reload next
+        node = freeList_.load(std::memory_order_acquire);
     }
     
     // Free list empty, add a new block
@@ -227,21 +246,22 @@ void MemoryPool<T>::deallocate(T* obj) {
     
     MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
     
-    // Lock-free push to free list
-    MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
+    // Lock-free push to free list with proper memory ordering
+    MemPoolNode* current = freeList_.load(std::memory_order_acquire);
     do {
         node->next.store(current, std::memory_order_relaxed);
     } while (!freeList_.compare_exchange_weak(current, node,
                                              std::memory_order_release,
-                                             std::memory_order_relaxed));
+                                             std::memory_order_acquire));
     
-    allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
-    availableCount_.fetch_add(1, std::memory_order_relaxed);
+    allocatedCount_.fetch_sub(1, std::memory_order_release);
+    availableCount_.fetch_add(1, std::memory_order_release);
 }
 
 template<typename T>
 size_t MemoryPool<T>::memoryUsage() const {
     size_t total = 0;
+    // Acquire load to ensure visibility of blocks_
     for (const auto& block : blocks_) {
         total += block->data.capacity() * sizeof(uint8_t);
     }
@@ -250,7 +270,7 @@ size_t MemoryPool<T>::memoryUsage() const {
 
 template<typename T>
 void MemoryPool<T>::reserve(size_t count) {
-    while (availableCount_.load(std::memory_order_relaxed) < count) {
+    while (availableCount_.load(std::memory_order_acquire) < count) {
         addBlock();
     }
 }

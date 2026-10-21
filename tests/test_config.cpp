@@ -1,71 +1,68 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "TestFramework.hpp"
 #include <cassert>
 #include <iostream>
 
-namespace test_config {
-
-void testConfigCreation() {
+// Register tests with the test framework
+RUN_TEST_CATEGORY(testConfigCreation, "Configuration")
+{
     nlm::Config config;
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigCreation passed" << std::endl;
+    nlm::test::assert::isFalse(config.has("test"));
 }
 
-void testConfigSetAndGet() {
+RUN_TEST_CATEGORY(testConfigSetAndGet, "Configuration")
+{
     nlm::Config config;
     
     config.set("int_value", 42, nlm::ConfigSource::Runtime);
-    assert(config.has("int_value"));
+    nlm::test::assert::isTrue(config.has("int_value"));
     
     auto intVal = config.get<int>("int_value");
-    assert(intVal.has_value());
-    assert(*intVal == 42);
+    nlm::test::assert::isTrue(intVal.has_value());
+    nlm::test::assert::equal(*intVal, 42);
     
     config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
     auto doubleVal = config.get<double>("double_value");
-    assert(doubleVal.has_value());
-    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
+    nlm::test::assert::isTrue(doubleVal.has_value());
+    nlm::test::assert::equal(*doubleVal, 3.14, "double value approximation");
     
     config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
     auto stringVal = config.get<std::string>("string_value");
-    assert(stringVal.has_value());
-    assert(*stringVal == "hello");
+    nlm::test::assert::isTrue(stringVal.has_value());
+    nlm::test::assert::equal(*stringVal, "hello");
     
     config.set("bool_value", true, nlm::ConfigSource::Runtime);
     auto boolVal = config.get<bool>("bool_value");
-    assert(boolVal.has_value());
-    assert(*boolVal == true);
-    
-    std::cout << "    testConfigSetAndGet passed" << std::endl;
+    nlm::test::assert::isTrue(boolVal.has_value());
+    nlm::test::assert::equal(*boolVal, true);
 }
 
-void testConfigGetOr() {
+RUN_TEST_CATEGORY(testConfigGetOr, "Configuration")
+{
     nlm::Config config;
     
     int val = config.getOr<int>("missing", 100);
-    assert(val == 100);
+    nlm::test::assert::equal(val, 100);
     
     config.set("existing", 50, nlm::ConfigSource::Runtime);
     val = config.getOr<int>("existing", 100);
-    assert(val == 50);
-    
-    std::cout << "    testConfigGetOr passed" << std::endl;
+    nlm::test::assert::equal(val, 50);
 }
 
-void testConfigRemove() {
+RUN_TEST_CATEGORY(testConfigRemove, "Configuration")
+{
     nlm::Config config;
     
     config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
+    nlm::test::assert::isTrue(config.has("test"));
     
     config.remove("test");
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigRemove passed" << std::endl;
+    nlm::test::assert::isFalse(config.has("test"));
 }
 
-void testConfigKeys() {
+RUN_TEST_CATEGORY(testConfigKeys, "Configuration")
+{
     nlm::Config config;
     
     config.set("key1", 1, nlm::ConfigSource::Runtime);
@@ -73,11 +70,10 @@ void testConfigKeys() {
     config.set("key3", 3, nlm::ConfigSource::Runtime);
     
     auto keys = config.getKeys();
-    assert(keys.size() == 3);
-    
-    std::cout << "    testConfigKeys passed" << std::endl;
+    nlm::test::assert::equal(keys.size(), 3);
 }
 
+// Legacy test runner for backward compatibility
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
@@ -85,5 +81,3 @@ void runAll() {
     testConfigRemove();
     testConfigKeys();
 }
-
-} // namespace test_config
