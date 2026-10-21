@@ -46,6 +46,7 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float norepinephrineLevel;
     
     // Timestamps
     time_t startTime;
@@ -64,10 +65,11 @@ struct Phase6IntegrationResult {
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
         , memoryEpisodesStored(0.0f)
-        , noveltyLevel(0.0f)
-        , curiosityLevel(0.0f)
-        , dopamineLevel(0.0f)
-        , startTime(0)
+    , noveltyLevel(0.0f)
+    , curiosityLevel(0.0f)
+    , dopamineLevel(0.0f)
+    , norepinephrineLevel(0.0f)
+    , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
 };

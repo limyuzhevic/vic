@@ -42,7 +42,10 @@ public:
     
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
-    
+
+    // Get norepinephrine level
+    float getNorepinephrineLevel() const;
+
     // Get curiosity level
     float getCuriosityLevel() const;
     

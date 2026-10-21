@@ -33,83 +33,243 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
+/**
+ * @brief Stores a pattern in working memory by encoding it as neural activity
+ * 
+ * This method implements the core working memory storage mechanism. It takes
+ * an input pattern and encodes it using a subset of available neurons,
+ * maintaining the activation levels and creating recurrent connections for
+ * memory persistence.
+ * 
+ * @param pattern Input pattern to store (normalized float values)
+ * @param strength Multiplicative factor for pattern encoding strength
+ * @post Pattern is stored with neural activations in the brain's neuron pool
+ * @pre Brain must be initialized and pattern must not be empty
+ * 
+ * @complexity O(N_pattern + N_connections) where N is pattern length and
+ *            current number of memory neurons
+ */
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_) {
+        return;
+    }
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Calculate how many neurons we need for this pattern
+    const size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
+    // Encode each element of the pattern using available neurons
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
+        const NeuronId targetNeuron = memoryNeurons_[i % memoryNeurons_.size()];
+        const float patternValue = pattern[i];
+        const float activation = patternValue * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Set neuron activation through current injection
+        injectPatternActivation(targetNeuron, activation);
+        
+        // Update stored activation values
+        updateMemoryActivation(i, activation, targetNeuron);
+    }
+    
+    // Create recurrent connections between consecutive neurons for maintenance
+    establishMaintenanceConnections(strength);
+}
+
+/**
+ * @brief Injects current into a specific neuron to achieve target activation
+ * 
+ * @param neuron Target neuron for activation
+ * @param activation Target activation level to achieve
+ */
+void NeuralWorkingMemory::injectPatternActivation(NeuronId neuron, float activation) {
+    // Get all neurons in the neuron's region
+    if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+        if (auto* allNeurons = region->getAllNeurons()) {
+            // Find and activate the target neuron
+            for (auto* currentNeuron : *allNeurons) {
+                if (currentNeuron->getId() == neuron) {
+                    currentNeuron->injectCurrent(activation * 5.0f);
+                    return;  // Found and activated, exit
                 }
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
-    }
-    
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
+/**
+ * @brief Updates memory activation storage for a specific neuron
+ * 
+ * @param index Index of the memory slot
+ * @param activation New activation value
+ * @param neuron Neuron associated with this memory slot
+ */
+void NeuralWorkingMemory::updateMemoryActivation(size_t index, float activation, 
+                                                 const NeuronId& neuron) {
+    if (index < memoryActivations_.size()) {
+        // Update existing activation
+        memoryActivations_[index] = activation;
+    } else {
+        // Create new memory entry
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        memoryNeurons_.push_back(neuron);
+    }
+}
+
+/**
+ * @brief Creates recurrent connections between neurons for memory maintenance
+ * 
+ * Establishes feedforward recurrent connections between consecutive neurons
+ * in the memory sequence to create persistent activity patterns.
+ * 
+ * @param strength Base connection strength for recurrent synapses
+ */
+void NeuralWorkingMemory::establishMaintenanceConnections(float strength) {
+    // Create connections between consecutive neurons
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        const NeuronId fromNeuron = memoryNeurons_[i-1];
+        const NeuronId toNeuron = memoryNeurons_[i];
+        const float connectionStrength = strength * 0.5f;
+        
+        createRecurrentConnection(fromNeuron, toNeuron, connectionStrength);
+    }
+}
+
+/**
+ * @brief Stores specific neuron activation in working memory
+ * 
+ * This method allows direct storage of neuron activations without pattern encoding,
+ * useful for incorporating specific neural states into working memory.
+ * 
+ * @param neuron Neuron ID to store
+ * @param activation Activation level to store
+ * @post Neuron is added to or updated in working memory with given activation
+ * @pre Brain must be initialized
+ * 
+ * @complexity O(N_memory_neutrons) for search operation
+ */
+void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Search for existing neuron in memory
+    auto memoryIt = findMemoryNeuron(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (memoryIt != memoryNeurons_.end()) {
+        // Update existing memory entry
+        const size_t memoryIndex = getMemoryIndex(memoryIt);
+        updateMemoryEntry(memoryIndex, activation);
+    } else if (memoryNeurons_.size() < capacity_) {
+        // Add new memory entry if capacity allows
+        addNewMemoryEntry(neuron, activation);
     }
     
-    // Inject current to maintain activation
+    // Maintain activation through current injection
+    maintainMemoryActivation(neuron, activation);
+}
+
+/**
+ * @brief Finds a neuron in the memory neuron list using iterative search
+ * 
+ * @param begin Iterator to start of memory neuron list
+ * @param end Iterator to end of memory neuron list
+ * @param neuron Target neuron to find
+ * @return Iterator to found neuron or end if not found
+ */
+template<typename Iterator>
+Iterator NeuralWorkingMemory::findMemoryNeuron(Iterator begin, Iterator end, const NeuronId& neuron) {
+    return std::find(begin, end, neuron);
+}
+
+/**
+ * @brief Gets index of neuron in memory from iterator
+ * 
+ * @param iterator Iterator to neuron in memory list
+ * @return Index position of neuron in memory lists
+ */
+size_t NeuralWorkingMemory::getMemoryIndex(std::vector<NeuronId>::iterator iterator) {
+    return std::distance(memoryNeurons_.begin(), iterator);
+}
+
+/**
+ * @brief Updates activation of existing memory entry
+ * 
+ * @param index Index of memory entry to update
+ * @param activation New activation value
+ */
+void NeuralWorkingMemory::updateMemoryEntry(size_t index, float activation) {
+    memoryActivations_[index] = activation;
+    memoryTimestamps_[index] = 0;  // Reset timestamp for fresh activation
+}
+
+/**
+ * @brief Adds new neuron activation to working memory
+ * 
+ * @param neuron Neuron to add
+ * @param activation Activation level to store
+ */
+void NeuralWorkingMemory::addNewMemoryEntry(NeuronId neuron, float activation) {
+    memoryNeurons_.push_back(neuron);
+    memoryActivations_.push_back(activation);
+    memoryTimestamps_.push_back(0);
+}
+
+/**
+ * @brief Maintains neuron activation through current injection
+ * 
+ * @param neuron Neuron to maintain
+ * @param activation Current activation level
+ */
+void NeuralWorkingMemory::maintainMemoryActivation(NeuronId neuron, float activation) {
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
 }
 
+/**
+ * @brief Retrieves all current memory activations
+ * 
+ * @return Vector of all memory activation levels, in order of storage
+ * @post Returns current state of working memory without modification
+ * 
+ * @complexity O(N_memory_entries) - linear with number of stored memories
+ */
 std::vector<float> NeuralWorkingMemory::retrieve() const {
-    std::vector<float> result;
-    result.reserve(memoryActivations_.size());
+    std::vector<float> memoryState;
+    memoryState.reserve(memoryActivations_.size());
     
-    for (float activation : memoryActivations_) {
-        result.push_back(activation);
+    // Copy all activation values
+    for (const float activation : memoryActivations_) {
+        memoryState.push_back(activation);
     }
     
-    return result;
+    return memoryState;
 }
 
+/**
+ * @brief Checks if a specific neuron is currently stored in working memory
+ * 
+ * @param neuron Neuron ID to check for
+ * @return true if neuron is in working memory, false otherwise
+ * 
+ * @complexity O(N_memory_neutrons) for search operation
+ */
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+    return findMemoryNeuron(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
 }
 
+/**
+ * @brief Gets activation level of specific neuron in working memory
+ * 
+ * @param neuron Neuron ID to query
+ * @return Activation level if neuron in memory, 0.0f otherwise
+ * 
+ * @complexity O(N_memory_neutrons) for search operation
+ */
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
+    auto memoryIt = findMemoryNeuron(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (memoryIt != memoryNeurons_.end()) {
+        const size_t memoryIndex = getMemoryIndex(memoryIt);
+        return memoryActivations_[memoryIndex];
     }
+    
     return 0.0f;
 }
 

@@ -9,6 +9,7 @@ namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
 // PLACEHOLDER - Phase 2 will implement population-level dynamics
+// Using flat array optimization for better cache locality
 
 class NeuralPopulation {
 public:
@@ -33,9 +34,6 @@ public:
     // Neuron access
     Neuron* getNeuron(NeuronIndex index);
     const Neuron* getNeuron(NeuronIndex index) const;
-    
-    // Add neuron to population
-    void addNeuron(Neuron* neuron);
     
     // Get all neurons
     const std::vector<Neuron*>& getNeurons() const;

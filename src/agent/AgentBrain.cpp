@@ -8,6 +8,7 @@ namespace nlm {
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -322,6 +323,10 @@ float AgentBrain::getNeuromodulationLevel() const {
     return dopamineLevel_;
 }
 
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
 float AgentBrain::getCuriosityLevel() const {
     return curiosityLevel_;
 }
@@ -336,6 +341,7 @@ float AgentBrain::getPredictionError() const {
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;

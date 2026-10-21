@@ -1,0 +1,19 @@
+Start testing: Oct 21 06:52 UTC
+----------------------------------------------------------
+Unable to find executable: /workspace/app/build/tests/nlm_test
+1/1 Testing: nlm_test
+1/1 Test: nlm_test
+Command: ""
+Directory: /workspace/app/build/tests
+"nlm_test" start time: 
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"nlm_test" end time: Oct 21 06:52 UTC
+"nlm_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 21 06:52 UTC
