@@ -29,11 +29,12 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain refactoring (Phase 6 architecture)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
+    src/brain/BrainRefactor.cpp
     src/brain/Brain.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp

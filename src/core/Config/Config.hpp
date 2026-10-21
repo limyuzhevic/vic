@@ -10,6 +10,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class Logger;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -98,8 +99,9 @@ private:
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    bool validateConfigKey(const std::string& key, const std::string& value) const;
+    std::string trim(const std::string& str) const;
+    std::string toLower(const std::string& str) const;
 };
 
 } // namespace nlm
