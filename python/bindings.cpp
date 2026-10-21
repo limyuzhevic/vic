@@ -4,7 +4,6 @@
 #include <pybind11/chrono.h>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -16,15 +15,43 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Include all core system headers
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/performance/Performance.hpp"
+#include "../src/experiments/Phase5Experiment.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        -----------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This comprehensive API exposes the full NLM neural simulation system, including:
+        - Neural computation with spiking neurons
+        - Multiple memory systems (working, episodic, associative)
+        - Predictive coding and forward models
+        - Motor planning and action selection
+        - Neuromodulation for motivation and learning
+        - Developmental plasticity and maturation
+        - Performance monitoring and optimization
+        - Experiment systems for validation and benchmarking
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -149,7 +176,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -289,6 +316,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // ========== BRAIN CLASS ==========
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +380,221 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // System access methods
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error system")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update all plasticity rules")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes");
+
+    // ========== MEMORY SYSTEMS BINDINGS ==========
+
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory",
+        R"pbdoc(Working memory system for transient active information)pbdoc")
+        .def("activatePattern", &NeuralWorkingMemory::activatePattern,
+             py::arg("pattern"), "Activate a memory pattern")
+        .def("getActivePatterns", &NeuralWorkingMemory::getActivePatterns,
+             "Get currently active patterns")
+        .def("decayActivePatterns", &NeuralWorkingMemory::decayActivePatterns,
+             "Decay active patterns based on time")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear all active patterns");
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory",
+        R"pbdoc(Episodic memory system for experience storage and recall)pbdoc")
+        .def("storeExperience", &NeuralEpisodicMemory::storeExperience,
+             py::arg("timestamp"), py::arg("input"), py::arg("action"), py::arg("reward"),
+             "Store a new episodic memory")
+        .def("recallExperience", &NeuralEpisodicMemory::recallExperience,
+             py::arg("pattern"), py::arg("timeWindow"), "Recall episodic memories")
+        .def("getRecentExperiences", &NeuralEpisodicMemory::getRecentExperiences,
+             "Get recent experiences for replay")
+        .def("replay", &NeuralEpisodicMemory::replay, "Replay stored experiences");
+
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory",
+        R"pbdoc(Associative memory system for pattern associations)pbdoc")
+        .def("learnAssociation", &NeuralAssociativeMemory::learnAssociation,
+             py::arg("pattern1"), py::arg("pattern2"), py::arg("strength"),
+             "Learn an association between two patterns")
+        .def("recallAssociation", &NeuralAssociativeMemory::recallAssociation,
+             py::arg("pattern"), "Recall associated patterns")
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength,
+             py::arg("pattern1"), py::arg("pattern2"), "Get association strength")
+        .def("getAssociates", &NeuralAssociativeMemory::getAssociates,
+             py::arg("pattern"), "Get all associated patterns");
+
+    // ========== PREDICTION SYSTEM BINDINGS ==========
+
+    py::class_<PredictionSystem>(m, "PredictionSystem",
+        R"pbdoc(Prediction system implementing forward models and predictive coding)pbdoc")
+        .def("predict", &PredictionSystem::predict,
+             py::arg("sensoryInput"), "Generate prediction for sensory input")
+        .def("computeError", &PredictionSystem::computeError,
+             py::arg("expected"), py::arg("actual"), "Compute prediction error")
+        .def("getPrediction", &PredictionSystem::getPrediction,
+             "Get current prediction")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error signal")
+        .def("update", &PredictionSystem::update,
+             "Update prediction system with new information");
+
+    // ========== COGNITION SYSTEM BINDINGS ==========
+
+    py::class_<NeuralPlanner>(m, "NeuralPlanner",
+        R"pbdoc(Neural planner for action planning and decision making)pbdoc")
+        .def("planAction", &NeuralPlanner::planAction,
+             py::arg("context"), "Plan an action based on context")
+        .def("getActionOptions", &NeuralPlanner::getActionOptions,
+             "Get available action options")
+        .def("evaluateAction", &NeuralPlanner::evaluateAction,
+             py::arg("action"), py::arg("context"), "Evaluate an action")
+        .def("setGoal", &NeuralPlanner::setGoal,
+             py::arg("goal"), "Set planning goal");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation",
+        R"pbdoc(Concept formation system for pattern discovery and categorization)pbdoc")
+        .def("extractFeatures", &ConceptFormation::extractFeatures,
+             py::arg("input"), "Extract features from input")
+        .def("formConcept", &ConceptFormation::formConcept,
+             py::arg("features"), "Form a new concept from features")
+        .def("matchConcept", &ConceptFormation::matchConcept,
+             py::arg("input"), "Match input to existing concept")
+        .def("getConcepts", &ConceptFormation::getConcepts,
+             "Get all learned concepts");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection",
+        R"pbdoc(Attentional selection system for focus and resource allocation)pbdoc")
+        .def("selectFocus", &AttentionalSelection::selectFocus,
+             py::arg("input"), "Select focus for processing")
+        .def("getAttentionAllocation", &AttentionalSelection::getAttentionAllocation,
+             "Get current attention allocation")
+        .def("updateAttention", &AttentionalSelection::updateAttention,
+             "Update attention based on context");
+
+    // ========== DEVELOPMENT SYSTEM BINDINGS ==========
+
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem",
+        R"pbdoc(Development system managing age-dependent plasticity and maturation)pbdoc")
+        .def("update", &DevelopmentSystem::update,
+             py::arg("timestep"), "Update development system")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("enableCriticalPeriod", &DevelopmentSystem::enableCriticalPeriod,
+             "Enable critical period plasticity")
+        .def("isCriticalPeriodActive", &DevelopmentSystem::isCriticalPeriodActive,
+             "Check if critical period is active");
+
+    // ========== NEUROMODULATION SYSTEM BINDINGS ==========
+
+    py::class_<Dopamine>(m, "Dopamine",
+        R"pbdoc(Dopamine neuromodulator system for reward and reinforcement learning)pbdoc")
+        .def("update", &Dopamine::update,
+             py::arg("reward"), py::arg("predictionError"), "Update dopamine level")
+        .def("getLevel", &Dopamine::getLevel, "Get current dopamine level")
+        .def("setBaseline", &Dopamine::setBaseline, py::arg("baseline"), "Set dopamine baseline")
+        .def("getBaseline", &Dopamine::getBaseline, "Get dopamine baseline");
+
+    py::class_<Curiosity>(m, "Curiosity",
+        R"pbdoc(Curiosity neuromodulator system for exploration motivation)pbdoc")
+        .def("update", &Curiosity::update,
+             py::arg("novelty"), py::arg("surprise"), "Update curiosity level")
+        .def("getLevel", &Curiosity::getLevel, "Get current curiosity level")
+        .def("setBaseline", &Curiosity::setBaseline, py::arg("baseline"), "Set curiosity baseline")
+        .def("getBaseline", &Curiosity::getBaseline, "Get curiosity baseline");
+
+    py::class_<Novelty>(m, "Novelty",
+        R"pbdoc(Neuromodulator system for novelty detection and surprise)pbdoc")
+        .def("detectNovelty", &Novelty::detectNovelty,
+             py::arg("input"), "Detect novelty in input")
+        .def("getLevel", &Novelty::getLevel, "Get current novelty level")
+        .def("setThreshold", &Novelty::setThreshold, py::arg("threshold"), "Set novelty threshold");
+
+    py::class_<PredictionError>(m, "PredictionError",
+        R"pbdoc(Prediction error signal neuromodulator for learning)pbdoc")
+        .def("compute", &PredictionError::compute,
+             py::arg("prediction"), py::arg("actual"), "Compute prediction error")
+        .def("getLevel", &PredictionError::getLevel, "Get current prediction error level")
+        .def("getSign", &PredictionError::getSign, "Get sign of prediction error");
+
+    // ========== PERFORMANCE SYSTEM BINDINGS ==========
+
+    py::class_<Performance>(m, "Performance",
+        R"pbdoc(Performance monitoring and optimization system)pbdoc")
+        .def("getPerformanceMetrics", &Performance::getPerformanceMetrics,
+             "Get current performance metrics")
+        .def("getPeakMemoryUsage", &Performance::getPeakMemoryUsage,
+             "Get peak memory usage")
+        .def("getCurrentMemoryUsage", &Performance::getCurrentMemoryUsage,
+             "Get current memory usage")
+        .def("getAverageFiringRate", &Performance::getAverageFiringRate,
+             "Get average firing rate");
+
+    // ========== EXPERIMENT SYSTEM BINDINGS ==========
+
+    py::class_<Phase5Experiment>(m, "Phase5Experiment",
+        R"pbdoc(Phase 5 integration experiment for performance optimization)pbdoc")
+        .def("run", &Phase5Experiment::run, "Run performance optimization experiment")
+        .def("getResults", &Phase5Experiment::getResults,
+             "Get experiment results and metrics");
+
+    py::class_<Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment",
+        R"pbdoc(Phase 6 integrated experiment demonstrating complete brain integration)pbdoc")
+        .def("run", &Phase6IntegratedExperiment::run, "Run integrated brain experiment")
+        .def("getIntegrationResults", &Phase6IntegratedExperiment::getIntegrationResults,
+             "Get integration results and validation metrics");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
