@@ -1,57 +1,142 @@
+# pyproject.toml for NLM Python bindings
+# Modern Python packaging with scikit-build-core
+
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+requires = ["scikit-build-core", "pybind11>=2.11.0", "numpy>=1.19"]
+build-backend = "scikit_build_core.building.api"
 
 [project]
-name = "pynlm"
+name = "nlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "NLM - Neural Learning Machine - Python bindings for brain simulation"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
+license = {text = "MIT"}
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Research Team", email = "research@nlm.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+maintainers = [
+    {name = "NLM Research Team", email = "research@nlm.org"}
+]
+keywords = ["neuroscience", "neural-networks", "brain", "simulation", "AI"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.19,<2.0",
+    "scikit-build-core>=0.1.0",
+]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest>=6.0",
+    "pytest-cov>=2.12",
+    "black>=21.0",
+    "flake8>=3.8",
+    "mypy>=0.910",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=0.5",
 ]
 
 [project.urls]
-Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
-Repository = "https://github.com/nlm-project/nlm.git"
+Homepage = "https://github.com/nlm-org/nlm"
+Documentation = "https://docs.nlm.org"
+Repository = "https://github.com/nlm-org/nlm"
+"Issue tracker" = "https://github.com/nlm-org/nlm/issues"
+"Research papers" = "https://github.com/nlm-org/nlm/wiki/Publications"
 
 [tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
-]
+build-type = "Release"
+minimum-version = "0.1.0"
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+[tool.scikit-build.cmake]
+minimum-version = "3.16"
+args = ["-DCMAKE_BUILD_TYPE=Release"]
 
+# Package data and inclusion
+[tool.scikit-build.metadata]
+name = "nlm"
+version = "0.1.0"
+description = "NLM - Neural Learning Machine Python bindings"
+
+[tool.scikit-build.content]
+scripts = []
+include-package-data = true
+
+# Type stubs for better IDE support
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+# Linting configuration
+[tool.flake8]
+max-line-length = 100
+ignore = ["E203", "W503", "E501"]
+per-file-ignores = {"__init__.py" = ["E402"]}
+
+[tool.black]
+line-length = 100
+target-version = ["py38"]
+include = "pyproject.toml|setup.py|*.py"
+extend-exclude = """
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations
+  | node_modules
+  | __pycache__
+)/"""
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I"]
+ignore = ["E203", "W503"]
+
+# Entry points for CLI tools
+[project.scripts]
+nlm-config = "nlm.__main__:main"
+nlm-demo = "nlm.demo:main"
+nlm-experiment = "nlm.experiment:main"
+
+# Console scripts
+[project.entry-points.nlm]
+"config-tool" = "nlm.cli.config_tool:main"
+"demo-tool" = "nlm.cli.demo_tool:main"
+"experiment-tool" = "nlm.cli.experiment_tool:main"
+
+# Pytest configuration
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["tests/"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=nlm",
+    "--cov-report=term-missing",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
