@@ -152,10 +152,10 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    // Next region ID is now initialized in the Impl constructor
 };
+
+// Fix: Remove duplicate field declarations that were already initialized in Impl constructor
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
