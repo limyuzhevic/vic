@@ -5,6 +5,14 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
+#include <set>
+
+// Forward declarations for JSON library
+namespace Json {
+    class Value;
+    class CharReaderBuilder;
+}
 
 namespace nlm {
 
@@ -100,6 +108,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    void convertJsonToConfig(const Json::Value& json, ConfigSource source);
+    static std::string escapeJsonString(const std::string& str);
 };
 
 } // namespace nlm

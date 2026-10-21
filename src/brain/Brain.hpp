@@ -136,6 +136,7 @@ public:
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
+    float getAverageSynapticWeight() const;  // Add this missing method
     
     // ========== MEMORY SYSTEMS ==========
     

@@ -1003,6 +1003,32 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
+float Brain::getAverageSynapticWeight() const {
+    float totalWeight = 0.0f;
+    size_t totalSynapses = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        // Calculate total weight from synapses in this region
+        float regionTotalWeight = 0.0f;
+        for (const auto& syn : region->getSynapses()) {
+            regionTotalWeight += syn->getWeight();
+        }
+        totalWeight += regionTotalWeight;
+        totalSynapses += region->getSynapseCount();
+    }
+    
+    // Add inter-region connections
+    for (const auto& conn : pImpl->interRegionConnections) {
+        totalWeight += conn.weight;
+        totalSynapses++;
+    }
+    
+    if (totalSynapses == 0) return 0.0f;
+    return totalWeight / static_cast<float>(totalSynapses);
+}
+
+// ========== MEMORY SYSTEM ACCESSORS ==========
+
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
