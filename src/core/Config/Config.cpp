@@ -19,62 +19,113 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
+    bool hasContent = false;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNum;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        hasContent = true;
+        
+        // Parse simple key=value pairs with error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": missing '=' in: " + line);
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": empty key in: " + line);
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
+    if (!hasContent) {
+        NLM_LOG_WARNING("Config file appears empty or contains only comments: " + filepath);
+    }
+    
+    NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true;  // No arguments provided
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            continue;  // Skip null pointer
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 3 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Empty config key in command line argument: " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format (missing '='): " + arg);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        else if (arg.size() > 1 && arg[0] == '-') {
+            if (i + 1 < argc && argv[i + 1]) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Empty config key in command line argument: -" + value);
+                    continue;
+                }
+                
+                set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Missing value for config key: " + arg);
+            }
+        } else {
+            NLM_LOG_WARNING("Ignoring unrecognized command line argument: " + arg);
         }
     }
+    
+    if (has("brain.neuron_count")) {
+        NLM_LOG_INFO("Config loaded from command line");
+    }
+    
     return true;
 }
 

@@ -400,21 +400,50 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Improved config factory with presets
+    m.def("createConfigWithPreset", [](const std::string& preset) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (preset == "minimal") {
+            config->set("brain.neuron_count", 100);
+        } else if (preset == "standard") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1f);
+        } else if (preset == "research") {
+            config->set("brain.neuron_count", 10000);
+            config->set("brain.synapse_density", 0.05f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+        } else {
+            config->set("brain.neuron_count", 1000);
+        }
+        return config;
+    }, py::arg("preset"), "Create configuration with preset settings (minimal, standard, research)");
+    
+    // Advanced brain factory with preset configurations
+    m.def("createBrainWithPreset", [](const std::string& preset) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (preset == "minimal") {
+            config->set("brain.neuron_count", 100);
+            config->set("brain.region_count", 1);
+        } else if (preset == "standard") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.region_count", 2);
+            config->set("brain.synapse_density", 0.1f);
+        } else if (preset == "research") {
+            config->set("brain.neuron_count", 10000);
+            config->set("brain.region_count", 4);
+            config->set("brain.synapse_density", 0.05f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.5f);
+        } else {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.region_count", 1);
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("preset"), "Create brain with preset configuration (minimal, standard, research)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

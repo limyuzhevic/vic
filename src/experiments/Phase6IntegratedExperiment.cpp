@@ -42,12 +42,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Create simple world
-    SimpleWorld world;
-    world.initialize(16, 16);
+    auto world = std::make_unique<SimpleWorld>();
+    world->initialize(16, 16);
     
     // Create agent
     AgentBrain agent(brain);
-    agent.initialize(world);
+    agent.initialize(*world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);

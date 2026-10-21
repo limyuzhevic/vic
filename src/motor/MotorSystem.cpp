@@ -27,10 +27,20 @@ MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
     // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
+    // PLACEHOLDER: Returns random action with better error handling
+    
+    if (motorRegion.getTotalNeuronCount() == 0) {
+        NLM_LOG_WARNING("Motor region has no neurons for action selection");
+    }
+    
     if (!pImpl->availableActions.empty()) {
+        NLM_LOG_DEBUG("Selecting action from available actions: " + 
+                     std::to_string(pImpl->availableActions.size()) + " options");
+        
         return std::make_unique<Action>(pImpl->availableActions[0]);
     }
+    
+    NLM_LOG_WARNING("No available actions, returning wait action");
     return std::make_unique<Action>(ActionType::Wait);
 }
 
