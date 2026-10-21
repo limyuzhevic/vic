@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # CLI
+    src/cli/CLI.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -121,7 +123,7 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable - Enhanced CLI version
 add_executable(nlm
     src/main.cpp
 )
