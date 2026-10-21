@@ -2,9 +2,16 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/functional.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <chrono>
+#include <optional>
+#include <variant>
+#include <fstream>
+#include <filesystem>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,16 +26,57 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper exception classes for better error handling
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigurationError : public NLMError {
+public:
+    explicit ConfigurationError(const std::string& msg) : NLMError("Configuration Error: " + msg) {}
+};
+
+class SimulationError : public NLMError {
+public:
+    explicit SimulationError(const std::string& msg) : NLMError("Simulation Error: " + msg) {}
+};
+
+class InitializationError : public NLMError {
+public:
+    explicit InitializationError(const std::string& msg) : NLMError("Initialization Error: " + msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Event-driven neural simulation with LIF neurons
+        - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Memory systems (working, episodic, semantic, procedural)
+        - Prediction and cognitive systems
+        - Development and maturation
+        - Reward-based learning
+        - Agent-world interaction
+        
+        Installation:
+        pip install pynlm
+        
+        Basic usage:
+        import pynlm
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        brain.step(0)
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Basic neuron and synapse types
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -421,5 +469,3 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
