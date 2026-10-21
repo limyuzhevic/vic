@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal JSON parsing (for files ending with .json)
+    void parseJSON(const nlohmann::json& jsonData);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

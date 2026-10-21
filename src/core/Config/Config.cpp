@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,36 +20,52 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Parse JSON format (preferred) or fallback to simple key=value
+    bool isJSON = false;
+    if (std::filesystem::path(filepath).extension() == ".json") {
+        try {
+            nlohmann::json jsonData;
+            std::ifstream file(filepath);
+            if (file.is_open()) {
+                file >> jsonData;
+                parseJSON(jsonData);
+                isJSON = true;
+            }
+        } catch (const std::exception&) {
+            // Fall back to simple format
+        }
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (!isJSON) {
+        // Parse simple key=value pairs (legacy format)
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,10 +101,18 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        jsonData[entry.key] = entry.value;
     }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << jsonData.dump(4); // Pretty print with indentation
     
     return true;
 }
@@ -199,17 +224,49 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+void Config::parseJSON(const nlohmann::json& jsonData) {
+    for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+        std::string key = it.key();
+        
+        // Handle different JSON value types
+        if (it->is_string()) {
+            set(key, it->get<std::string>(), ConfigSource::File);
+        } else if (it->is_number_integer()) {
+            set(key, it->get<int64_t>(), ConfigSource::File);
+        } else if (it->is_number_float()) {
+            set(key, it->get<double>(), ConfigSource::File);
+        } else if (it->is_boolean()) {
+            set(key, it->get<bool>(), ConfigSource::File);
+        } else if (it->is_array()) {
+            // Handle arrays (int, double, string arrays)
+            const auto& arr = *it;
+            if (!arr.empty()) {
+                if (arr[0].is_number_integer()) {
+                    std::vector<int> intArray;
+                    intArray.reserve(arr.size());
+                    for (const auto& item : arr) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    set(key, intArray, ConfigSource::File);
+                } else if (arr[0].is_number_float()) {
+                    std::vector<double> doubleArray;
+                    doubleArray.reserve(arr.size());
+                    for (const auto& item : arr) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    set(key, doubleArray, ConfigSource::File);
+                } else if (arr[0].is_string()) {
+                    std::vector<std::string> stringArray;
+                    stringArray.reserve(arr.size());
+                    for (const auto& item : arr) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    set(key, stringArray, ConfigSource::File);
+                }
+            }
+        }
+    }
+}

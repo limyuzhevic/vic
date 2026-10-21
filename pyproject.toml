@@ -33,7 +33,49 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "nlohmann-json>=3.11.2",
 ]
+
+viz = [
+    "matplotlib>=3.5.0",
+    "numpy>=1.20",
+    "pyqtgraph>=0.13.0",
+]
+
+advanced = [
+    "pytest-cov>=3.0",
+    "black>=22.0",
+    "isort>=5.0",
+    "mypy>=0.981",
+    "pylint>=2.15.0",
+    "docopt>=0.6.3",
+]
+
+[project.scripts]
+nlm-cli = "cli.nlm_command_line:main"
+nlm-sim = "cli.nlm_command_line:run_simulation"
+nlm-config = "cli.nlm_command_line:manage_config"
+nlm-validate = "cli.nlm_command_line:validate_config"
+
+# Documentation generation
+doc = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "sphinx-autodoc-typehints>=1.12",
+]
+
+# Environment specifications
+env-dev = {
+    "optional-dependencies" = ["dev", "viz", "advanced", "test", "doc"]
+}
+
+env-prod = {
+    "optional-dependencies" = ["dev"]
+}
+
+env-viz = {
+    "optional-dependencies" = ["viz"]
+}
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"

@@ -139,6 +139,10 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Command Line Interface
+add_executable(nlm_cli src/cli/NLMCommandLine.cpp)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
