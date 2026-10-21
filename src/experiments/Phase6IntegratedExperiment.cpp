@@ -3,7 +3,9 @@
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../motor/MotorCommand.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -43,7 +45,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);
     
     // Create agent
     AgentBrain agent(brain);
@@ -61,8 +63,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get sensory percept (world provides this directly)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +75,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply motor command to world
+        ActionResult result = world.applyMotorCommand(cmd, simTime_);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Use action result reward
+        float reward = result.reward;
         totalReward += reward;
         
         // Apply reward modulation
