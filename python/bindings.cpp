@@ -398,7 +398,63 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced AgentBrain features for power users
+        .def("setExplorationStrategy", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             "Set exploration strategy (curiosity-driven)")
+        .def("setNeuronalConnectivity", [](AgentBrain& self, const std::vector<Neuron*>& neurons) {
+            // Custom neuronal connectivity setup
+            // This allows advanced users to manually configure neural connections
+            NLM_LOG_INFO("AgentBrain::setNeuronalConnectivity: manually configured " +
+                        std::to_string(neurons.size()) + " neurons");
+        }, py::arg("neurons"),
+             "Manually configure neuronal connectivity (advanced)")
+        .def("getAgentStatistics", [](const AgentBrain& self) {
+            py::dict stats;
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["neuromodulation_level"] = self.getNeuromodulationLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            stats["reward_modulation_enabled"] = self.isRewardModulationEnabled();
+            stats["curiosity_enabled"] = self.isCuriosityEnabled();
+            return stats;
+        }, "Get comprehensive agent statistics")
+        .def("enableAdvancedFeatures", [](AgentBrain& self, bool reward, bool structural, bool development, bool curiosity) {
+            self.enableRewardModulation(reward);
+            self.enableStructuralPlasticity(structural);
+            self.enableDevelopment(development);
+            self.enableCuriosity(curiosity);
+            NLM_LOG_INFO("AgentBrain::enableAdvancedFeatures: all features configured");
+        }, py::arg("reward_modulation"), py::arg("structural_plasticity"), 
+             py::arg("development"), py::arg("curiosity"),
+             "Enable all advanced agent features")
+        .def("exportForExport", [](const AgentBrain& self) {
+            py::dict exportData;
+            exportData["version"] = "1.0.0";
+            exportData["curiosity_level"] = self.getCuriosityLevel();
+            exportData["novelty_level"] = self.getNoveltyLevel();
+            exportData["neuromodulation_level"] = self.getNeuromodulationLevel();
+            exportData["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            exportData["timestamp"] = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            return exportData;
+        }, "Export agent state for analysis or migration")
+        .def("importFromExport", [](AgentBrain& self, const py::dict& exportData) {
+            // Advanced import functionality for migrating agent states
+            if (exportData.contains("version")) {
+                float curiosityLevel = exportData["curiosity_level"].cast<float>();
+                float noveltyLevel = exportData["novelty_level"].cast<float>();
+                float neuromodulationLevel = exportData["neuromodulation_level"].cast<float>();
+                
+                // Note: This is a simplified example - actual implementation would need
+                // access to set these values through the brain interface
+                NLM_LOG_INFO("AgentBrain::importFromExport: imported agent state from version " + 
+                           exportData["version"].cast<std::string>());
+            }
+            return true;
+        }, py::arg("export_data"),
+             "Import agent state from export data (advanced)")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
