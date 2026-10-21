@@ -1,85 +1,156 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
+#include "Phase6Demo.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../agent/AgentBrain.hpp"
+#include <chrono>
+#include <cmath>
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
-#include <iostream>
+namespace nlm {
 
-using namespace nlm;
+Phase6Demo::Phase6Demo() : logger_(Logger::getInstance()) {}
 
-int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+Phase6Demo::~Phase6Demo() = default;
+
+Phase6DemoResult Phase6Demo::run(const Phase6DemoConfig& config) {
+    Phase6DemoResult result;
+    auto startWall = std::chrono::high_resolution_clock::now();
     
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    logger_.setLevel(Logger::Level::Info);
     
-    // Create experiment
-    Phase6IntegratedExperiment experiment;
+    // Create configuration
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", config.neuronCount);
+    cfg->set("region_count", config.regionCount);
+    cfg->set("connection_probability", config.connectionProbability);
+    cfg->set("stdp_ltp_weight", 0.01f);
+    cfg->set("stdp_ltd_weight", 0.012f);
+    cfg->set("synaptogenesis_rate", 0.0001f);
+    cfg->set("pruning_rate", 0.00001f);
     
-    // First, run the quick integration verification
-    std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
-    
-    std::cout << std::endl;
-    
-    if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
-        return 1;
+    // Create brain
+    auto brain = std::make_shared<Brain>(cfg);
+    if (!brain->initialize()) {
+        logger_.logError("Failed to initialize brain");
+        return result;
     }
     
-    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    // Create simple world
+    SimpleWorld world;
+    world.initialize(config.worldWidth, config.worldHeight);
     
-    // Test individual systems
-    std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
-    std::cout << std::endl;
+    // Create agent
+    AgentBrain agent(brain);
+    agent.initialize(world);
+    agent.enableRewardModulation(true);
+    agent.enableStructuralPlasticity(config.enableDevelopment);
+    agent.enableDevelopment(config.enableDevelopment);
+    agent.enableCuriosity(true);
     
-    std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
-    std::cout << std::endl;
+    logger_.logInfo("Brain and agent initialized successfully");
     
-    std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
-    std::cout << std::endl;
+    // Run simulation
+    float totalReward = 0.0f;
+    float totalFiringRate = 0.0f;
+    size_t firingCount = 0;
     
-    std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
-    std::cout << std::endl;
+    for (uint64_t step = 0; step < config.maxSteps; ++step) {
+        // Get observation
+        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        
+        // Process sensory input
+        agent.processSensoryInput(percept);
+        
+        // Brain step
+        brain->step(step, step * 0.001);
+        
+        // Get motor command
+        MotorCommand cmd = agent.decodeMotorCommand();
+        
+        // Apply action to world
+        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        
+        // Compute reward
+        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        totalReward += reward;
+        
+        // Apply reward modulation
+        agent.applyRewardModulation(reward, 0.0f);
+        
+        // Update development
+        if (config.enableDevelopment) {
+            agent.updateDevelopment(0.001);
+        }
+        
+        // Collect metrics
+        totalFiringRate += brain->getAverageFiringRate();
+        if (brain->getFiringNeuronCount() > 0) firingCount++;
+        
+        // Periodic status
+        if (step % 1000 == 0) {
+            logger_.logInfo("Step " + std::to_string(step) + 
+                           " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                           " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                           " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                               brain->getWorkingMemory()->getActiveTraces() : 0));
+        }
+    }
     
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    // Collect final metrics
+    result.totalReward = totalReward / config.maxSteps;
+    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
+        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+    result.noveltyLevel = agent.getNoveltyLevel();
+    result.curiosityLevel = agent.getCuriosityLevel();
+    result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    auto result = experiment.run(config);
+    // Test checkpointing
+    if (config.enableCheckpointing) {
+        logger_.logInfo("Testing checkpoint save/load...");
+        std::string path = "/tmp/nlm_checkpoint_test.bin";
+        if (brain->save(path)) {
+            logger_.logInfo("Checkpoint saved successfully");
+            
+            // Create new brain and load
+            auto brain2 = std::make_shared<Brain>(cfg);
+            brain2->initialize();
+            
+            if (brain2->load(path)) {
+                logger_.logInfo("Checkpoint loaded successfully");
+                result.checkpointWorks = true;
+            } else {
+                logger_.logError("Failed to load checkpoint");
+            }
+        } else {
+            logger_.logError("Failed to save checkpoint");
+        }
+    }
     
-    std::cout << std::endl;
-    std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
-    std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
-    std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
-    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
-    std::cout << std::endl;
+    // Test replay
+    if (config.enableReplay) {
+        logger_.logInfo("Testing replay system...");
+        if (brain->getEpisodicMemory() && brain->getEpisodicMemory()->getEpisodeCount() > 0) {
+            auto episodes = brain->getEpisodicMemory()->getEpisodesForReplay(3);
+            if (!episodes.empty()) {
+                result.replayWorks = true;
+                logger_.logInfo("[PASS] Replay system works");
+            }
+        }
+    }
     
-    std::cout << "=== INTEGRATION STATUS ===" << std::endl;
-    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
-    std::cout << std::endl;
+    auto endWall = std::chrono::high_resolution_clock::now();
+    result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
-    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    // Verify integration
+    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
+    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
+    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
+    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
+    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
-    return 0;
+    return result;
 }
+
+} // namespace nlm
