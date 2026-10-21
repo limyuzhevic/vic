@@ -177,6 +177,18 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot initialize");
+        return false;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure config is valid
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("CRITICAL: Brain config is null - cannot initialize");
+        return false;
+    }
+    
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
@@ -185,110 +197,180 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be positive.");
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be positive.");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProbability) + ". Must be between 0.0 and 1.0.");
+        return false;
+    }
+    
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
+    }
+    
+    // CRITICAL NULL CHECK: Ensure regions were created
+    if (pImpl->regions.empty()) {
+        NLM_LOG_ERROR("CRITICAL: Failed to create any regions - brain cannot function");
+        return false;
     }
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
+        if (!region) {
+            NLM_LOG_ERROR("CRITICAL: Failed to get region " + std::to_string(i + 1) + " - brain cannot function");
+            return false;
+        }
+        
+        // Add populations
+        auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+        auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+        auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        
+        // CRITICAL NULL CHECK: Ensure populations were created
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                if (neuron) {  // CRITICAL NULL CHECK
                     pImpl->sensoryNeurons.push_back(neuron);
                 }
             }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
+        }
+        
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                if (neuron) {  // CRITICAL NULL CHECK
                     pImpl->motorNeurons.push_back(neuron);
                 }
             }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                    ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                    std::to_string(region->getTotalNeuronCount()) + " neurons");
+    }
+    
+    // CRITICAL NULL CHECK: Ensure neurons were created
+    if (pImpl->sensoryNeurons.empty() || pImpl->motorNeurons.empty()) {
+        NLM_LOG_ERROR("CRITICAL: Failed to create sensory or motor neurons - brain cannot function");
+        return false;
     }
     
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        if (!region) {
+            NLM_LOG_ERROR("CRITICAL: Failed to get region " + std::to_string(i + 1) + " during connectivity setup");
+            return false;
         }
+        
+        // CRITICAL NULL CHECK: Ensure random generator exists
+        if (!pImpl->rng) {
+            NLM_LOG_ERROR("CRITICAL: Random generator is null - cannot initialize connectivity");
+            return false;
+        }
+        
+        // Initialize random connectivity and synapse weights
+        region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // CRITICAL NULL CHECKS: Ensure all integrated systems can be initialized
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    } else {
+        NLM_LOG_WARNING("Working memory not available");
+    }
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        // (PredictionSystem doesn't have initialize method currently)
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // CRITICAL NULL CHECK: Ensure cognition systems exist before initializing
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // CRITICAL NULL CHECK: Ensure we can find destination neuron
+            for (auto& region : pImpl->regions) {
+                if (!region) continue;  // CRITICAL NULL CHECK
+                
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (!neuron) continue;  // CRITICAL NULL CHECK
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    }
     
     // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    if (pImpl->checkpointManager) {
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -325,17 +407,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot step");
+        return;
+    }
+    
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // CRITICAL NULL CHECK: Ensure spike system exists
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("CRITICAL: Spike system is null - cannot simulate");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure random generator exists
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("CRITICAL: Random generator is null - cannot simulate");
+        return;
+    }
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;  // CRITICAL NULL CHECK
+            
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;  // CRITICAL NULL CHECK
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -343,8 +448,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;  // CRITICAL NULL CHECK
+            
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;  // CRITICAL NULL CHECK
+                
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -359,12 +470,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
+                        if (!syn) continue;  // CRITICAL NULL CHECK
                         syn->recordPostSpike(currentTime);
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;  // CRITICAL NULL CHECK
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -399,7 +513,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -426,8 +542,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
+            if (!region) continue;  // CRITICAL NULL CHECK
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;  // CRITICAL NULL CHECK
+                
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;  // CRITICAL NULL CHECK
+                    
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
                     float excitabilityMod = dopamineLevel * 0.5f;
@@ -447,7 +569,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         for (auto& syn : region->getSynapses()) {
+            if (!syn) continue;  // CRITICAL NULL CHECK
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -490,8 +616,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
+                if (!region) continue;  // CRITICAL NULL CHECK
+                
                 for (auto& pop : region->getPopulations()) {
+                    if (!pop) continue;  // CRITICAL NULL CHECK
+                    
                     for (auto* neuron : pop->getNeurons()) {
+                        if (!neuron) continue;  // CRITICAL NULL CHECK
+                        
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -534,7 +666,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -548,31 +682,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
@@ -589,6 +725,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot receive sensory input");
+        return;
+    }
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -596,10 +738,31 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("No sensory neurons available - cannot process input");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure sensory neurons array is valid
+    if (!pImpl->sensoryNeurons.data()) {
+        NLM_LOG_ERROR("CRITICAL: Sensory neurons array is null - cannot process input");
+        return;
+    }
+    
+    // Validate input data size
+    if (values.size() < numSensory) {
+        NLM_LOG_WARNING("Input data size (" + std::to_string(values.size()) + ") < sensory neuron count (" + 
+                       std::to_string(numSensory) + "). Using available data only.");
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
+        // CRITICAL NULL CHECK: Ensure each neuron pointer is valid
+        if (!pImpl->sensoryNeurons[i]) {
+            NLM_LOG_ERROR("CRITICAL: Sensory neuron at index " + std::to_string(i) + " is null");
+            continue;
+        }
+        
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
@@ -617,28 +780,166 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot inject current");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure random generator exists
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("CRITICAL: Random generator is null - cannot inject current");
+        return;
+    }
+    
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
+            if (!n) continue;  // CRITICAL NULL CHECK
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
         }
     }
+    
+    NLM_LOG_WARNING("Neuron " + std::to_string(neuron.index()) + " not found - current not injected");
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot inject current to neurons");
+        return;
+    }
+    
+    // Validate current value
+    if (std::isnan(current) || std::isinf(current)) {
+        NLM_LOG_ERROR("Invalid current value: " + std::to_string(current));
+        return;
+    }
+    
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;  // CRITICAL NULL CHECK
+            
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;  // CRITICAL NULL CHECK
                     neuron->injectCurrent(current);
                 }
             }
         }
     }
 }
+
+SpikeSystem* Brain::getSpikeSystem() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get spike system");
+        return nullptr;
+    }
+    return pImpl->spikeSystem.get();
+}
+
+const SpikeSystem* Brain::getSpikeSystem() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get spike system (const)");
+        return nullptr;
+    }
+    return pImpl->spikeSystem.get();
+}
+
+STDP* Brain::getSTDP() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get STDP");
+        return nullptr;
+    }
+    return pImpl->stdp.get();
+}
+
+Hebbian* Brain::getHebbian() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get Hebbian");
+        return nullptr;
+    }
+    return pImpl->hebbian.get();
+}
+
+StructuralPlasticity* Brain::getStructuralPlasticity() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get structural plasticity");
+        return nullptr;
+    }
+    return pImpl->structuralPlasticity.get();
+}
+
+float Brain::getExcitationInhibitionRatio() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get E/I ratio");
+        return 0.0f;
+    }
+    
+    float totalExcitatory = 0.0f;
+    float totalInhibitory = 0.0f;
+    
+    for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
+        for (const auto& syn : region->getSynapses()) {
+            if (!syn) continue;  // CRITICAL NULL CHECK
+            
+            float weight = syn->getWeight();
+            if (weight > 0) {
+                totalExcitatory += weight;
+            } else {
+                totalInhibitory += std::abs(weight);
+            }
+        }
+    }
+    
+    if (totalInhibitory > 0.0f) {
+        return totalExcitatory / totalInhibitory;
+    }
+    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+}
+
+size_t Brain::getTotalSpikeCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get total spike count");
+        return 0;
+    }
+    
+    return pImpl->totalSpikesTotal;
+}
+
+size_t Brain::getPendingSpikeEventCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get pending spike count");
+        return 0;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure spike system exists
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("CRITICAL: Spike system is null - cannot get pending spike count");
+        return 0;
+    }
+    
+    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
+}
+
+// ========== SPIKE SYSTEM AND PLASTICITY ACCESSORS ==========
 
 SpikeSystem* Brain::getSpikeSystem() {
     return pImpl->spikeSystem.get();
@@ -660,47 +961,37 @@ StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
 }
 
-float Brain::getExcitationInhibitionRatio() const {
-    float totalExcitatory = 0.0f;
-    float totalInhibitory = 0.0f;
-    
-    for (const auto& region : pImpl->regions) {
-        for (const auto& syn : region->getSynapses()) {
-            float weight = syn->getWeight();
-            if (weight > 0) {
-                totalExcitatory += weight;
-            } else {
-                totalInhibitory += std::abs(weight);
-            }
-        }
-    }
-    
-    if (totalInhibitory > 0.0f) {
-        return totalExcitatory / totalInhibitory;
-    }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
-}
-
-size_t Brain::getTotalSpikeCount() const {
-    return pImpl->totalSpikesTotal;
-}
-
-size_t Brain::getPendingSpikeEventCount() const {
-    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
-}
-
 std::unique_ptr<class Action> Brain::produceAction() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot produce action");
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("No motor neurons available - cannot produce action");
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    // CRITICAL NULL CHECK: Ensure motor neurons array is valid
+    if (!pImpl->motorNeurons.data()) {
+        NLM_LOG_ERROR("CRITICAL: Motor neurons array is null - cannot produce action");
         return std::make_unique<Action>(ActionType::Wait);
     }
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+    for (size_t i = 0; i < pImpl->motorNeurons.size(); ++i) {
+        // CRITICAL NULL CHECK: Ensure each neuron pointer is valid
+        if (!pImpl->motorNeurons[i]) {
+            NLM_LOG_ERROR("CRITICAL: Motor neuron at index " + std::to_string(i) + " is null");
+            continue;
+        }
+        
+        if (pImpl->motorNeurons[i]->isFiring()) {
             ++firingMotor;
         }
     }
@@ -717,8 +1008,25 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot apply neuromodulation");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure plasticity system exists
+    if (!pImpl->stdp) {
+        NLM_LOG_ERROR("CRITICAL: STDP system is null - cannot apply neuromodulation");
+        return;
+    }
+    
     float modulation = signal.getLevel();
+    
+    // Validate modulation value
+    if (std::isnan(modulation) || std::isinf(modulation)) {
+        NLM_LOG_ERROR("Invalid neuromodulation level: " + std::to_string(modulation));
+        return;
+    }
     
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
@@ -731,12 +1039,36 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot develop");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure structural plasticity system exists
+    if (!pImpl->structuralPlasticity) {
+        NLM_LOG_ERROR("CRITICAL: Structural plasticity system is null - cannot develop");
+        return;
+    }
+    
+    // CRITICAL NULL CHECK: Ensure random generator exists
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("CRITICAL: Random generator is null - cannot develop");
+        return;
+    }
+    
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
+    
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot reset");
+        return;
+    }
     
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
@@ -746,10 +1078,13 @@ void Brain::reset() {
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -765,6 +1100,12 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // CRITICAL NULL CHECK: Ensure pImpl is valid
+        if (!pImpl) {
+            NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot save");
+            return false;
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -789,8 +1130,14 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
+            if (!region) continue;  // CRITICAL NULL CHECK
+            
             for (const auto& pop : region->getPopulations()) {
+                if (!pop) continue;  // CRITICAL NULL CHECK
+                
                 for (const auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;  // CRITICAL NULL CHECK
+                    
                     const auto& state = neuron->getState();
                     neuronData.membranePotential.push_back(state.membranePotential);
                     neuronData.restingPotential.push_back(state.restingPotential);
@@ -813,7 +1160,11 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
+            if (!region) continue;  // CRITICAL NULL CHECK
+            
             for (const auto* syn : region->getSynapses()) {
+                if (!syn) continue;  // CRITICAL NULL CHECK
+                
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -847,6 +1198,12 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // CRITICAL NULL CHECK: Ensure pImpl is valid
+        if (!pImpl) {
+            NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot load");
+            return false;
+        }
+        
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -868,8 +1225,14 @@ bool Brain::load(const std::string& filepath) {
         // Apply neuron states
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
+            if (!region) continue;  // CRITICAL NULL CHECK
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;  // CRITICAL NULL CHECK
+                
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;  // CRITICAL NULL CHECK
+                    
                     if (idx < neuronData.membranePotential.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
@@ -909,14 +1272,32 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot add region");
+        return RegionId(0);
+    }
+    
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
+    if (!region) {
+        NLM_LOG_ERROR("CRITICAL: Failed to create neural region - memory allocation failed");
+        return RegionId(0);
+    }
+    
     pImpl->regions.push_back(std::move(region));
     return id;
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get region");
+        return nullptr;
+    }
+    
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         if (region->getId() == id) {
             return region.get();
         }
@@ -925,7 +1306,14 @@ NeuralRegion* Brain::getRegion(RegionId id) {
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get region (const)");
+        return nullptr;
+    }
+    
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         if (region->getId() == id) {
             return region.get();
         }
@@ -934,27 +1322,68 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
 }
 
 size_t Brain::getRegionCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get region count");
+        return 0;
+    }
     return pImpl->regions.size();
 }
 
 std::vector<RegionId> Brain::getRegionIds() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get region IDs");
+        return std::vector<RegionId>();
+    }
+    
     std::vector<RegionId> ids;
     ids.reserve(pImpl->regions.size());
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         ids.push_back(region->getId());
     }
     return ids;
 }
 
 const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get regions");
+        static const std::vector<std::unique_ptr<NeuralRegion>> empty;
+        return empty;
+    }
     return pImpl->regions;
 }
 
 void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot add inter-region connection");
+        return;
+    }
+    
+    // Validate parameters
+    if (std::isnan(weight) || std::isinf(weight)) {
+        NLM_LOG_ERROR("Invalid weight value: " + std::to_string(weight));
+        return;
+    }
+    
+    if (delay < 0) {
+        NLM_LOG_ERROR("Invalid delay value: " + std::to_string(delay));
+        return;
+    }
+    
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
 }
 
 void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot remove inter-region connection");
+        return;
+    }
+    
     pImpl->interRegionConnections.erase(
         std::remove_if(pImpl->interRegionConnections.begin(),
                       pImpl->interRegionConnections.end(),
@@ -966,16 +1395,30 @@ void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
 }
 
 size_t Brain::getTotalNeuronCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get total neuron count");
+        return 0;
+    }
+    
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         total += region->getTotalNeuronCount();
     }
     return total;
 }
 
 size_t Brain::getTotalSynapseCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get total synapse count");
+        return 0;
+    }
+    
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         total += region->getSynapseCount();
     }
     total += pImpl->interRegionConnections.size();
@@ -983,21 +1426,41 @@ size_t Brain::getTotalSynapseCount() const {
 }
 
 size_t Brain::getActiveNeuronCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get active neuron count");
+        return 0;
+    }
+    
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         total += region->getActiveNeuronCount();
     }
     return total;
 }
 
 size_t Brain::getFiringNeuronCount() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get firing neuron count");
+        return 0;
+    }
+    
     return pImpl->totalSpikesThisStep;
 }
 
 float Brain::getAverageFiringRate() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get average firing rate");
+        return 0.0f;
+    }
+    
     if (pImpl->regions.empty()) return 0.0f;
     float sum = 0.0f;
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
         sum += region->getAverageFiringRate();
     }
     return sum / static_cast<float>(pImpl->regions.size());
@@ -1006,78 +1469,164 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get working memory");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get episodic memory");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get associative memory");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get prediction system");
+        return nullptr;
+    }
     return pImpl->predictionSystem.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get planner");
+        return nullptr;
+    }
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get concept formation");
+        return nullptr;
+    }
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get attention");
+        return nullptr;
+    }
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get development system");
+        return nullptr;
+    }
     return pImpl->developmentSystem.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get developmental stage");
+        return DevelopmentalStage::Initial;
+    }
     return pImpl->developmentalStage;
 }
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot set developmental stage");
+        return;
+    }
     pImpl->developmentalStage = stage;
 }
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get dopamine");
+        return nullptr;
+    }
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get curiosity");
+        return nullptr;
+    }
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get novelty");
+        return nullptr;
+    }
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get prediction error signal");
+        return nullptr;
+    }
     return pImpl->predictionError.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get config");
+        return nullptr;
+    }
     return pImpl->config;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot get random generator");
+        return nullptr;
+    }
     return pImpl->rng.get();
 }
 
 void Brain::logStatus() const {
+    // CRITICAL NULL CHECK: Ensure pImpl is valid
+    if (!pImpl) {
+        NLM_LOG_ERROR("CRITICAL: Brain pImpl is null - cannot log status");
+        return;
+    }
+    
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -1106,6 +1655,8 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // CRITICAL NULL CHECK
+        
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +

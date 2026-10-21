@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Find nlohmann_json for JSON parsing
+find_package(nlohmann_json 3.11.2 REQUIRED)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
