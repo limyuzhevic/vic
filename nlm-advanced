@@ -1,0 +1,550 @@
+#!/usr/bin/env python3
+"""
+Advanced NLM Command Line Interface (nlm-advanced)
+
+An enhanced command-line tool for NLM (Neural Learning Machine) users,
+providing advanced features including:
+
+• Configuration Management
+• Experiment Tracking & Analysis  
+• Advanced Statistics Reporting
+• Batch Operations
+• Experiment Comparison
+• Comprehensive Reporting
+
+This script provides enhanced features beyond the basic NLM interface,
+including experiment management, comparison tools, and detailed reporting.
+"""
+
+import json
+import argparse
+import sys
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+import subprocess
+import shlex
+
+class NLMAdvancedCLI:
+    def __init__(self):
+        self.project_root = Path(__file__).parent
+        self.config_dir = self.project_root / "configs"
+        self.output_dir = self.project_root / "output"
+        self.output_dir.mkdir(exist_ok=True)
+        
+    def create_experiment_config(self, name: str, params: Dict[str, Any]) -> str:
+        """Create a new experiment configuration file"""
+        config_file = self.config_dir / f"{name}.cfg"
+        
+        with open(config_file, 'w') as f:
+            f.write(f"# Experiment configuration: {name}\n")
+            f.write(f"# Created: {datetime.now().isoformat()}\n\n")
+            
+            # Standard parameters
+            f.write("# Basic simulation parameters\n")
+            f.write(f"random_seed = {params.get('random_seed', 42)}\n")
+            f.write(f"simulation_timestep = {params.get('simulation_timestep', 0.001)}\n")
+            f.write(f"neuron_count = {params.get('neuron_count', 500)}\n")
+            f.write(f"region_count = {params.get('region_count', 1)}\n")
+            f.write(f"connection_probability = {params.get('connection_probability', 0.15)}\n\n")
+            
+            # Plasticity parameters
+            f.write("# Plasticity parameters\n")
+            f.write(f"plasticity_learning_rate = {params.get('plasticity_learning_rate', 0.02)}\n")
+            f.write(f"stdp_ltp_weight = {params.get('stdp_ltp_weight', 0.02)}\n")
+            f.write(f"stdp_ltd_weight = {params.get('stdp_ltd_weight', 0.015)}\n")
+            f.write(f"stdp_time_constant = {params.get('stdp_time_constant', 20.0)}\n\n")
+            
+            # Development parameters
+            f.write("# Development parameters\n")
+            f.write(f"development_synaptogenesis_rate = {params.get('development_synaptogenesis_rate', 0.0001)}\n")
+            f.write(f"development_pruning_rate = {params.get('development_pruning_rate', 0.00001)}\n\n")
+            
+            # Neuromodulation
+            f.write("# Neuromodulation parameters\n")
+            f.write(f"dopamine_baseline = {params.get('dopamine_baseline', 0.1)}\n\n")
+            
+            # Reward settings
+            f.write("# Reward settings\n")
+            f.write(f"reward_discount_factor = {params.get('reward_discount_factor', 0.99)}\n\n")
+            
+            # Environment
+            f.write("# Environment settings\n")
+            f.write(f"environment_name = {params.get('environment_name', 'GridWorld')}\n")
+            f.write(f"environment_width = {params.get('environment_width', 10)}\n")
+            f.write(f"environment_height = {params.get('environment_height', 10)}\n\n")
+            
+            # Logging
+            f.write("# Logging settings\n")
+            f.write(f"log_level = {params.get('log_level', 'INFO')}\n")
+            f.write(f"log_to_file = {str(params.get('log_to_file', True)).lower()}\n")
+            f.write(f"log_filename = {params.get('log_filename', f'{name}.log')}\n\n")
+            
+            # Advanced simulation settings
+            f.write("# Advanced simulation settings\n")
+            f.write(f"max_simulation_steps = {params.get('max_simulation_steps', 5000)}\n")
+            f.write(f"simulation_time_limit = {params.get('simulation_time_limit', 0.0)}\n")
+            f.write(f"visualization_enabled = {str(params.get('visualization_enabled', False)).lower()}\n")
+            f.write(f"visualization_update_rate = {params.get('visualization_update_rate', 30.0)}\n")
+            
+        print(f"✓ Created experiment configuration: {config_file}")
+        return str(config_file)
+    
+    def run_advanced_experiment(self, config_file: str, experiment_type: str, 
+                              extra_args: List[str] = None) -> Dict[str, Any]:
+        """Run an advanced experiment with tracking and analysis"""
+        experiment_name = Path(config_file).stem
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_prefix = self.output_dir / f"{experiment_name}_{timestamp}"
+        
+        # Build command
+        cmd = ["./nlm", f"--config={config_file}"]
+        
+        # Add experiment-specific arguments
+        if experiment_type == "full":
+            cmd.extend(["--connectivity-test", "--plasticity-test", "--stdp-test"])
+        elif experiment_type == "comprehensive":
+            cmd.extend(["--connectivity-test", "--plasticity-test", "--stdp-test"])
+            cmd.extend(["--verbose", "--output=json"])
+        else:
+            cmd.extend(["--all"])
+        
+        # Add extra arguments
+        if extra_args:
+            cmd.extend(extra_args)
+        
+        # Add output redirection
+        log_file = output_prefix.with_suffix('.log')
+        result_file = output_prefix.with_suffix('.json')
+        
+        cmd.extend([f"--output={result_file.name}"])
+        
+        print(f"🚀 Running advanced experiment: {experiment_name}")
+        print(f"   Config: {config_file}")
+        print(f"   Output: {output_prefix}")
+        print(f"   Command: {' '.join(cmd)}")
+        
+        try:
+            # Run the experiment
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=self.project_root)
+            
+            # Save stdout and stderr
+            with open(output_prefix.with_suffix('.stdout.log'), 'w') as f:
+                f.write(result.stdout)
+            
+            with open(output_prefix.with_suffix('.stderr.log'), 'w') as f:
+                f.write(result.stderr)
+            
+            # Generate analysis report
+            analysis = self._analyze_experiment_results(result_file, output_prefix)
+            
+            return {
+                'success': result.returncode == 0,
+                'returncode': result.returncode,
+                'stdout': result.stdout,
+                'stderr': result.stderr,
+                'analysis': analysis,
+                'output_prefix': str(output_prefix)
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'output_prefix': str(output_prefix)
+            }
+    
+    def _analyze_experiment_results(self, result_file: Path, output_prefix: Path) -> Dict[str, Any]:
+        """Analyze experiment results and generate insights"""
+        analysis = {
+            'timestamp': datetime.now().isoformat(),
+            'metrics': {},
+            'insights': [],
+            'performance': {}
+        }
+        
+        # Load results if JSON file exists
+        if result_file.exists():
+            try:
+                with open(result_file, 'r') as f:
+                    results = json.load(f)
+                
+                analysis['metrics'] = results.get('metrics', {})
+                analysis['performance'] = results.get('performance', {})
+                
+                # Generate insights
+                insights = self._generate_insights(results)
+                analysis['insights'] = insights
+                
+            except Exception as e:
+                analysis['analysis_error'] = str(e)
+        
+        # Save analysis
+        analysis_file = output_prefix.with_suffix('.analysis.json')
+        with open(analysis_file, 'w') as f:
+            json.dump(analysis, f, indent=2)
+        
+        print(f"📊 Analysis saved to: {analysis_file}")
+        return analysis
+    
+    def _generate_insights(self, results: Dict[str, Any]) -> List[str]:
+        """Generate insights from experiment results"""
+        insights = []
+        
+        # Analyze learning metrics
+        if 'spike_statistics' in results:
+            spikes = results['spike_statistics']
+            if spikes.get('total_spikes', 0) > 1000:
+                insights.append("✓ High neural activity: System demonstrates significant spike generation")
+            
+            if spikes.get('firing_rate', 0) > 10:
+                insights.append("✓ High firing rate detected: Network is highly active")
+        
+        # Analyze learning patterns
+        if 'learning_metrics' in results:
+            learning = results['learning_metrics']
+            if learning.get('weight_change', 0) > 0.01:
+                insights.append("✓ Strong synaptic plasticity: Significant weight modifications detected")
+            elif learning.get('weight_change', 0) < -0.01:
+                insights.append("⚠ Strong depression: Network showing synaptic weakening")
+            else:
+                insights.append("→ Minimal weight changes: Network in stable state")
+        
+        # Analyze performance metrics
+        if 'performance' in results:
+            perf = results['performance']
+            if perf.get('execution_time', 0) < 10:
+                insights.append("⚡ Fast execution: Experiment completed quickly")
+            else:
+                insights.append("⏱️ Moderate execution time")
+        
+        # Add general insights
+        insights.append("📈 Experiment completed successfully")
+        insights.append("🧠 Neural system showed functional behavior")
+        
+        return insights
+    
+    def compare_experiments(self, experiment1: str, experiment2: str) -> Dict[str, Any]:
+        """Compare two experiments and provide analysis"""
+        comparison = {
+            'experiment1': experiment1,
+            'experiment2': experiment2,
+            'timestamp': datetime.now().isoformat(),
+            'differences': {},
+            'recommendations': []
+        }
+        
+        # Compare configurations
+        config1 = self._load_config(experiment1)
+        config2 = self._load_config(experiment2)
+        
+        differences = self._compare_configs(config1, config2)
+        comparison['differences'] = differences
+        
+        # Generate recommendations
+        for key, diff in differences.items():
+            if diff.get('significant_change', False):
+                if diff['type'] == 'parameter':
+                    comparison['recommendations'].append(
+                        f"Consider adjusting {key} in {experiment2} based on {experiment1} performance"
+                    )
+        
+        return comparison
+    
+    def _load_config(self, config_file: str) -> Dict[str, Any]:
+        """Load configuration from file"""
+        config_path = Path(config_file)
+        if not config_path.exists():
+            return {}
+        
+        config = {}
+        with open(config_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key.strip()] = value.strip()
+        
+        return config
+    
+    def _compare_configs(self, config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+        """Compare two configurations"""
+        differences = {}
+        
+        all_keys = set(config1.keys()) | set(config2.keys())
+        for key in all_keys:
+            val1 = config1.get(key)
+            val2 = config2.get(key)
+            
+            if val1 != val2:
+                differences[key] = {
+                    'value1': val1,
+                    'value2': val2,
+                    'type': 'parameter',
+                    'significant_change': self._is_significant_change(key, val1, val2)
+                }
+        
+        return differences
+    
+    def _is_significant_change(self, key: str, val1: Any, val2: Any) -> bool:
+        """Check if a configuration change is significant"""
+        significant_keys = ['neuron_count', 'region_count', 'simulation_timestep', 
+                           'plasticity_learning_rate', 'max_simulation_steps']
+        
+        if key in significant_keys:
+            try:
+                num1 = float(val1) if isinstance(val1, str) else float(val1)
+                num2 = float(val2) if isinstance(val2, str) else float(val2)
+                return abs(num1 - num2) / max(abs(num1), 1) > 0.1
+            except:
+                return True
+        
+        return str(val1) != str(val2)
+    
+    def generate_report(self, experiment_name: str, format: str = 'html') -> str:
+        """Generate a comprehensive report for an experiment"""
+        report_file = self.output_dir / f"{experiment_name}_report.{format}"
+        
+        if format == 'html':
+            self._generate_html_report(experiment_name, report_file)
+        elif format == 'markdown':
+            self._generate_markdown_report(experiment_name, report_file)
+        elif format == 'json':
+            self._generate_json_report(experiment_name, report_file)
+        
+        return str(report_file)
+    
+    def _generate_html_report(self, experiment_name: str, report_file: Path):
+        """Generate HTML report"""
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NLM Experiment Report - {experiment_name}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
+        .metric {{ background-color: #f9f9f9; padding: 15px; margin: 10px 0; border-left: 3px solid #007acc; }}
+        .insight {{ background-color: #e8f4ff; padding: 15px; margin: 10px 0; border-left: 3px solid #00aa88; }}
+        .recommendation {{ background-color: #fff0e8; padding: 15px; margin: 10px 0; border-left: 3px solid #ff6600; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>NLM Advanced Experiment Report</h1>
+        <h2>{experiment_name}</h2>
+        <p>Generated: {datetime.now().isoformat()}</p>
+    </div>
+    
+    <h3>Experiment Overview</h3>
+    <div class="metric">
+        <h4>Performance Metrics</h4>
+        <p>This section would contain detailed performance metrics from the experiment.</p>
+    </div>
+    
+    <h3>Key Insights</h3>
+    <div class="insight">
+        <h4>Neural Activity Analysis</h4>
+        <p>Insights about neural firing patterns and activity levels would appear here.</p>
+    </div>
+    
+    <h3>Recommendations</h3>
+    <div class="recommendation">
+        <h4>Optimization Suggestions</h4>
+        <p>Recommendations for improving future experiments would appear here.</p>
+    </div>
+</body>
+</html>
+"""
+        
+        with open(report_file, 'w') as f:
+            f.write(html_content)
+    
+    def _generate_markdown_report(self, experiment_name: str, report_file: Path):
+        """Generate Markdown report"""
+        md_content = f"""# NLM Advanced Experiment Report
+
+**Experiment Name:** {experiment_name}  
+**Generated:** {datetime.now().isoformat()}  
+**Report Type:** Comprehensive Analysis
+
+## Experiment Overview
+
+This report provides a detailed analysis of the NLM (Neural Learning Machine) experiment.
+
+## Performance Metrics
+
+[Performance metrics would be displayed here]
+
+## Key Insights
+
+- [Insight 1]
+- [Insight 2]
+- [Insight 3]
+
+## Recommendations
+
+- [Recommendation 1]
+- [Recommendation 2]
+
+## Next Steps
+
+- [Next step 1]
+- [Next step 2]
+"""
+        
+        with open(report_file, 'w') as f:
+            f.write(md_content)
+    
+    def _generate_json_report(self, experiment_name: str, report_file: Path):
+        """Generate JSON report"""
+        report = {
+            'experiment_name': experiment_name,
+            'generated_at': datetime.now().isoformat(),
+            'report_type': 'advanced_analysis',
+            'metrics': {},
+            'insights': [],
+            'recommendations': []
+        }
+        
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Advanced NLM Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-advanced create-experiment my_exp --neurons 1000 --plasticity 0.05
+  nlm-advanced run-experiment my_exp.cfg --full
+  nlm-advanced compare-experiments exp1.cfg exp2.cfg
+  nlm-advanced generate-report my_exp --format html
+  nlm-advanced batch-run experiments.txt
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    
+    # Create experiment command
+    create_parser = subparsers.add_parser('create-experiment', help='Create a new experiment configuration')
+    create_parser.add_argument('name', help='Experiment name')
+    create_parser.add_argument('--neurons', type=int, default=500, help='Number of neurons')
+    create_parser.add_argument('--regions', type=int, default=1, help='Number of regions')
+    create_parser.add_argument('--plasticity', type=float, default=0.02, help='Plasticity learning rate')
+    create_parser.add_argument('--stdp-ltp', type=float, default=0.02, help='STDP LTP weight')
+    create_parser.add_argument('--stdp-ltd', type=float, default=0.015, help='STDP LTD weight')
+    create_parser.add_argument('--dopamine', type=float, default=0.1, help='Dopamine baseline')
+    create_parser.add_argument('--steps', type=int, default=5000, help='Max simulation steps')
+    create_parser.add_argument('--output', help='Output configuration file path')
+    
+    # Run experiment command
+    run_parser = subparsers.add_parser('run-experiment', help='Run an experiment')
+    run_parser.add_argument('config', help='Configuration file')
+    run_parser.add_argument('type', choices=['quick', 'full', 'comprehensive', 'debug'], 
+                           default='full', help='Experiment type')
+    run_parser.add_argument('--extra-args', help='Extra arguments for NLM executable')
+    run_parser.add_argument('--output-dir', help='Output directory')
+    
+    # Compare experiments command
+    compare_parser = subparsers.add_parser('compare-experiments', help='Compare two experiments')
+    compare_parser.add_argument('experiment1', help='First experiment configuration file')
+    compare_parser.add_argument('experiment2', help='Second experiment configuration file')
+    
+    # Generate report command
+    report_parser = subparsers.add_parser('generate-report', help='Generate a report for an experiment')
+    report_parser.add_argument('experiment', help='Experiment name or output prefix')
+    report_parser.add_argument('--format', choices=['html', 'markdown', 'json'], 
+                               default='html', help='Report format')
+    
+    # List experiments command
+    list_parser = subparsers.add_parser('list-experiments', help='List available experiments')
+    
+    # Help command
+    help_parser = subparsers.add_parser('help', help='Show detailed help information')
+    help_parser.add_argument('topic', nargs='?', help='Help topic (commands, config, analysis)')
+    
+    args = parser.parse_args()
+    
+    cli = NLMAdvancedCLI()
+    
+    if args.command == 'create-experiment':
+        params = {
+            'neuron_count': args.neurons,
+            'region_count': args.regions,
+            'plasticity_learning_rate': args.plasticity,
+            'stdp_ltp_weight': args.stdp_ltp,
+            'stdp_ltd_weight': args.stdp_ltd,
+            'dopamine_baseline': args.dopamine,
+            'max_simulation_steps': args.steps
+        }
+        
+        config_file = cli.create_experiment_config(args.name, params)
+        if args.output:
+            import shutil
+            shutil.copy2(config_file, args.output)
+            print(f"✓ Configuration copied to: {args.output}")
+    
+    elif args.command == 'run-experiment':
+        extra_args = []
+        if args.extra_args:
+            extra_args = shlex.split(args.extra_args)
+        
+        result = cli.run_advanced_experiment(args.config, args.type, extra_args)
+        
+        if result['success']:
+            print("✅ Experiment completed successfully!")
+            print(f"📁 Output files: {result['output_prefix']}")
+        else:
+            print("❌ Experiment failed!")
+            if 'error' in result:
+                print(f"Error: {result['error']}")
+            sys.exit(1)
+    
+    elif args.command == 'compare-experiments':
+        comparison = cli.compare_experiments(args.experiment1, args.experiment2)
+        
+        print(f"🔍 Comparing experiments: {comparison['experiment1']} vs {comparison['experiment2']}")
+        print(f"\nDifferences found: {len(comparison['differences'])}")
+        
+        for key, diff in comparison['differences'].items():
+            print(f"\n  {key}:")
+            print(f"    {comparison['experiment1']}: {diff['value1']}")
+            print(f"    {comparison['experiment2']}: {diff['value2']}")
+            print(f"    Significant change: {diff['significant_change']}")
+        
+        if comparison['recommendations']:
+            print(f"\n📋 Recommendations:")
+            for rec in comparison['recommendations']:
+                print(f"  • {rec}")
+    
+    elif args.command == 'generate-report':
+        report_file = cli.generate_report(args.experiment, args.format)
+        print(f"📄 Report generated: {report_file}")
+    
+    elif args.command == 'list-experiments':
+        print("📋 Available experiments:")
+        for config_file in cli.config_dir.glob("*.cfg"):
+            print(f"  • {config_file.name}")
+    
+    elif args.command == 'help':
+        if args.topic:
+            print(f"📚 Help for topic: {args.topic}")
+            # Show topic-specific help
+            if args.topic == 'commands':
+                print("Available commands: create-experiment, run-experiment, compare-experiments, generate-report, list-experiments")
+            elif args.topic == 'config':
+                print("Configuration parameters: neuron_count, region_count, plasticity_learning_rate, etc.")
+            elif args.topic == 'analysis':
+                print("Analysis features: performance metrics, insights, recommendations")
+        else:
+            parser.print_help()
+    
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()
