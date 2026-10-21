@@ -882,6 +882,12 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        if (idx < neuronData.refractoryPeriod.size()) {
+                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                        }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
+                        }
                     }
                     idx++;
                 }
@@ -895,9 +901,50 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match by source/destination neuron IDs
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Find source neuron
+            NeuronId sourceNeuron(synapseData.sourceNeuron[i]);
+            // Find destination neuron
+            NeuronId destNeuron(synapseData.destinationNeuron[i]);
+            
+            // Find the actual synapse in the brain
+            for (auto& region : pImpl->regions) {
+                // Search for source and destination neurons in the same region
+                auto neurons = region->getAllNeurons();
+                Neuron* srcNeuron = nullptr;
+                Neuron* destNeuronPtr = nullptr;
+                
+                for (auto* n : neurons) {
+                    if (n->getId() == sourceNeuron) {
+                        srcNeuron = n;
+                    }
+                    if (n->getId() == destNeuron) {
+                        destNeuronPtr = n;
+                    }
+                    if (srcNeuron && destNeuronPtr) break;
+                }
+                
+                if (srcNeuron && destNeuronPtr) {
+                    // Find existing synapse between these neurons
+                    auto synapses = region->getSynapsesFrom(sourceNeuron);
+                    for (Synapse* syn : synapses) {
+                        if (syn->getDestinationNeuron() == destNeuron) {
+                            // Update synapse state
+                            syn->setWeight(synapseData.weight[i]);
+                            syn->setDelay(synapseData.delay[i]);
+                            syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Restore other simulation state
+        pImpl->currentStep = pImpl->config->getOr<size_t>("current_step", 0);
+        pImpl->currentTime = pImpl->config->getOr<double>("current_time", 0.0);
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

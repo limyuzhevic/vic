@@ -4,6 +4,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 namespace nlm {
 
@@ -40,18 +41,34 @@ public:
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
+    // Utility methods
+    void clearAll();  // Clear all sensory data
+    float getTotalSignalCount() const;  // Total number of signal channels
+    float getMaxSignalValue() const;    // Maximum absolute value across all signals
+    
     // Timestamp
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
     
 private:
+    // Vision
     std::vector<float> vision_;
     size_t visionWidth_;
     size_t visionHeight_;
+    
+    // Touch/proximity (8 channels)
     std::vector<float> touch_;
+    
+    // Internal state (4 channels)
     std::vector<float> internal_;
+    
+    // Proprioception (6 channels)
     std::vector<float> proprioception_;
+    
+    // Audio (variable length)
     std::vector<float> audio_;
+    
+    // Timestamp
     double timestamp_;
 };
 

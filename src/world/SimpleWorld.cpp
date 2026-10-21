@@ -257,11 +257,10 @@ ActionResult SimpleWorld::interact() {
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
-    if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
-        return false;
-    }
-    return true;
+    // Check world boundaries with proper floating point comparison
+    // Allow for small floating point errors (1e-6)
+    return (x >= -1e-6f && x < width_ - 1e-6f && 
+            y >= -1e-6f && y < height_ - 1e-6f);
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
@@ -321,7 +320,7 @@ void SimpleWorld::generateVision() {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
-            // Check wall collision
+            // Check wall collision with boundary
             if (!isValidPosition(px, py)) {
                 vision[i] = t / maxRange;
                 break;
@@ -397,6 +396,10 @@ void SimpleWorld::checkCollisions() {
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
+        if (agent_.health <= 0.0f) {
+            agent_.health = 0.0f;
+            // Agent could die here, but for now just stop
+        }
     }
 }
 
