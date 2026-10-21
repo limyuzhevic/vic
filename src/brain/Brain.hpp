@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <map>
 
 namespace nlm {
 
@@ -193,9 +195,29 @@ public:
     // Logging
     void logStatus() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Advanced batch operations for power users
+    void injectCurrentToRegion(RegionId regionId, MembranePotential current);
+    void injectCurrentToNeuronsByType(const std::vector<NeuronType>& types, MembranePotential current);
+    std::unique_ptr<Action> produceActionFromPattern(ActionType pattern);
+    
+    // Memory and state management
+    void saveCheckpoint(const std::string& baseFilename, int maxCheckpoints = 10);
+    bool loadLatestCheckpoint(const std::string& baseFilename);
+    
+    // Advanced plasticity control
+    void enableAllPlasticity(bool enable);
+    void setPlasticityFlags(RegionId regionId, PlasticityFlags flags);
+    PlasticityFlags getPlasticityFlags(RegionId regionId) const;
+    
+    // Statistical analysis methods
+    std::map<std::string, float> computeNetworkStatistics() const;
+    std::vector<NeuronId> getTopActiveNeurons(size_t count) const;
+    float getConnectionDensity() const;
+    
+    // Development and maturation
+    void accelerateDevelopment();
+    void simulateAging();
+    DevelopmentalStage estimateDevelopmentalStage() const;
 };
 
 } // namespace nlm

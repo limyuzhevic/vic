@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <map>
 
 namespace nlm {
 
@@ -69,6 +70,53 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced methods for power users
+    // Batch processing for efficiency
+    void processBatchSensoryInputs(const std::vector<SensoryPercept>& percepts);
+    std::vector<MotorCommand> decodeBatchMotorCommands(size_t count);
+    
+    // Advanced neuromodulation
+    void applyCustomModulation(const std::map<std::string, float>& customSignals);
+    std::map<std::string, float> getModulationState() const;
+    
+    // Development and maturation control
+    void setDevelopmentSpeed(float speed);  // 1.0 = normal, <1.0 = slowed, >1.0 = accelerated
+    void pauseDevelopment(bool pause);
+    double getDevelopmentalAge() const;
+    
+    // Novelty and exploration control
+    void setCuriosityThreshold(float threshold);
+    void setExplorationRate(float rate);
+    float getExplorationRate() const;
+    
+    // Learning and memory control
+    void enableAllLearning(bool enable);
+    void resetAllMemories();
+    size_t getMemoryStats() const;  // Get statistics from all memory systems
+    
+    // Performance monitoring
+    double getProcessingTimePerStep() const;
+    size_t getPerformanceStats() const;  // Get performance metrics
+    void resetPerformanceStats();
+    
+    // Advanced world interaction
+    void setCustomWorldInterface(const std::shared_ptr<void>& interface);
+    bool isWorldInterfaceActive() const;
+    
+    // Safety and limits
+    void setActionLimits(const std::map<ActionType, float>& limits);
+    void setEnergyLimits(float maxEnergy, float minEnergy);
+    bool checkSafetyConstraints() const;
+    
+    // Serialization and persistence
+    std::string exportState() const;
+    bool importState(const std::string& state);
+    
+    // Calibration and tuning
+    void calibrateMotorMapping(const std::map<ActionType, std::vector<float>>& mapping);
+    void calibrateSensoryScaling(const std::map<SensoryType, float>& scaling);
+    void autoTuneParameters();  // Automated parameter tuning
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +160,24 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced state for power user features
+    float curiosityThreshold_;
+    float explorationRate_;
+    double developmentSpeed_;
+    size_t processingStepCount_;
+    double processingTimePerStep_;
+    size_t performanceStepCount_;
+    
+    float maxEnergy_;
+    float minEnergy_;
+    float energy_;
+    
+    std::map<ActionType, float> actionLimits_;
+    std::map<SensoryType, float> sensoryScaling_;
+    std::map<ActionType, std::vector<float>> motorMapping_;
+    std::shared_ptr<void> customWorldInterface_;
+    bool worldInterfaceActive_;
 };
 
 } // namespace nlm
