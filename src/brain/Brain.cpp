@@ -797,7 +797,7 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.threshold.push_back(state.threshold);
                     neuronData.resetPotential.push_back(state.resetPotential);
                     neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+            neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
@@ -805,6 +805,14 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        // Safety check: Ensure data integrity
+        if (neuronData.membranePotential.size() != getTotalNeuronCount()) {
+            NLM_LOG_WARN("Neuron checkpoint data size mismatch: expected " + 
+                        std::to_string(getTotalNeuronCount()) + 
+                        " neurons, but recorded " + 
+                        std::to_string(neuronData.membranePotential.size()) + " neurons");
+        }
+
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
@@ -888,6 +896,20 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
+        // Ensure all neurons were processed and we have complete data
+        if (idx < neuronData.membranePotential.size()) {
+            NLM_LOG_WARN("Neuron loading incomplete: processed " + std::to_string(idx) + 
+                        " neurons but checkpoint contained " + 
+                        std::to_string(neuronData.membranePotential.size()) + " neuron states");
+        }
+        
+        if (idx < neuronData.lastSpikeTime.size()) {
+            // We can't apply the last spike times for neurons beyond what we processed
+            // But we should at least log the discrepancy
+            size_t remaining = neuronData.lastSpikeTime.size() - idx;
+            NLM_LOG_DEBUG("Skipping " + std::to_string(remaining) + " unused spike time entries from checkpoint");
+        }
+
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
