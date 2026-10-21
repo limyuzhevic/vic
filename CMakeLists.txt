@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLIHandler.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -139,9 +140,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Benchmarks
+add_library(nlm_benchmarks STATIC
+    src/benchmarks/ComprehensiveBenchmarks.cpp
+)
+target_include_directories(nlm_benchmarks PUBLIC src/benchmarks)
+target_link_libraries(nlm_benchmarks PUBLIC nlm_core)
+
+# Export tools
+add_library(nlm_export STATIC
+    src/export/ResultsExporter.cpp
+)
+target_include_directories(nlm_export PUBLIC src/export)
+target_link_libraries(nlm_export PUBLIC nlm_core)
+
+# Results exporter executable
+add_executable(nlm_export_tool
+    test_cli.cpp
+)
+target_link_libraries(nlm_export_tool PUBLIC nlm_core nlm_benchmarks nlm_export)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
