@@ -1,13 +1,6 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../event/EventSystem.hpp"
 
 namespace nlm {
 
@@ -24,9 +17,9 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
@@ -184,18 +177,50 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Serotonin
+    Serotonin* getSerotonin();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get random generator
+    RandomGenerator* getRandomGenerator();
+    
+    // Event system integration
+    std::shared_ptr<EventSystem> getEventSystem() const { return eventSystem_; }
+    void setEventSystem(std::shared_ptr<EventSystem> eventSystem) { eventSystem_ = eventSystem; }
+    
+    // Event publishing
+    void publishEvent(const Event& event);
+    void publishNeuronSpikeEvent(NeuronId neuronId, float activity, const std::string& source = "brain");
+    void publishSynapticChangeEvent(SynapseId synapseId, float oldWeight, float newWeight, const std::string& source = "brain");
+    void publishMemoryEvent(const std::string& eventType, const std::string& source = "brain");
+    void publishNeuromodulationEvent(const std::string& modulatorType, float level, const std::string& source = "brain");
+    
+    // Event subscription (for debugging/monitoring)
+    void subscribeToEvent(EventType eventType, std::shared_ptr<EventListener> listener);
+    
+    // Simulation statistics
+    size_t getEventCount() const { return eventSystem_ ? eventSystem_->getEventCount() : 0; }
+    std::vector<std::string> getRegisteredEventListeners() const { 
+        return eventSystem_ ? eventSystem_->getRegisteredListeners() : std::vector<std::string>(); 
+    }
+    
     // Logging
     void logStatus() const;
+    
+    // Internal event processing
+    void processEvents();
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Event system integration
+    std::shared_ptr<EventSystem> eventSystem_;
 };
 
 } // namespace nlm

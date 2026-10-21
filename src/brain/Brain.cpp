@@ -1,24 +1,4 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../event/EventSystem.hpp"
 
 namespace nlm {
 
@@ -50,6 +30,11 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // NEW NEUROMODULATORS (Phase 6 enhancements)
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -75,10 +60,10 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Event system integration
+    std::shared_ptr<EventSystem> eventSystem;
     
-    Impl(std::shared_ptr<Config> cfg)
+    // Simulation parameters
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
@@ -92,6 +77,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , eventSystem(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -129,6 +115,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // INITIALIZE NEW NEUROMODULATORS
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -255,9 +246,24 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Create and configure event system
+    pImpl->eventSystem = std::make_shared<EventSystem>();
+    
+    // Add brain event listeners
+    auto brainListener = std::make_shared<BrainEventListener>(shared_from_this());
+    pImpl->eventSystem->addGlobalListener(brainListener);
+    
+    auto memoryListener = std::make_shared<MemoryEventListener>(pImpl->workingMemory, pImpl->episodicMemory);
+    pImpl->eventSystem->subscribe(EventType::MEMORY_STORE, memoryListener);
+    pImpl->eventSystem->subscribe(EventType::EPISODE_CREATED, memoryListener);
+    
+    auto neuromodulationListener = std::make_shared<NeuromodulationEventListener>(shared_from_this());
+    pImpl->eventSystem->subscribe(EventType::DOPAMINE_RELEASE, neuromodulationListener);
+    pImpl->eventSystem->subscribe(EventType::ACETYLCHOLINE_RELEASE, neuromodulationListener);
+    pImpl->eventSystem->subscribe(EventType::NOREPINEPHRINE_RELEASE, neuromodulationListener);
+    pImpl->eventSystem->subscribe(EventType::SEROTONIN_RELEASE, neuromodulationListener);
+    
+    NLM_LOG_INFO("Event system initialized with listeners");
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -1061,6 +1067,32 @@ Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
 
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+// NEW NEUROMODULATORS - Phase 6 Enhancements
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
@@ -1105,13 +1137,97 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+
+// ========== EVENT SYSTEM ==========
+
+void Brain::publishEvent(const Event& event) {
+    if (pImpl->eventSystem) {
+        pImpl->eventSystem->publishEvent(event);
     }
 }
 
-} // namespace nlm
+void Brain::publishNeuronSpikeEvent(NeuronId neuronId, float activity, const std::string& source) {
+    if (pImpl->eventSystem) {
+        Event event;
+        event.type = EventType::NEURON_SPIKE;
+        event.timestamp = static_cast<uint64_t>(pImpl->currentTime * 1000.0); // Convert to milliseconds
+        event.simulationStep = pImpl->currentStep;
+        event.source = source;
+        event.neuronId = neuronId;
+        event.value = activity;
+        event.setData("activity", activity);
+        
+        pImpl->eventSystem->publishEvent(event);
+    }
+}
+
+void Brain::publishSynapticChangeEvent(SynapseId synapseId, float oldWeight, float newWeight, const std::string& source) {
+    if (pImpl->eventSystem) {
+        Event event;
+        event.type = EventType::SYNAPSE_WEIGHT_CHANGE;
+        event.timestamp = static_cast<uint64_t>(pImpl->currentTime * 1000.0);
+        event.simulationStep = pImpl->currentStep;
+        event.source = source;
+        event.synapseId = synapseId;
+        event.setData("old_weight", oldWeight);
+        event.setData("new_weight", newWeight);
+        event.setData("weight_change", newWeight - oldWeight);
+        
+        pImpl->eventSystem->publishEvent(event);
+    }
+}
+
+void Brain::publishMemoryEvent(const std::string& eventType, const std::string& source) {
+    if (pImpl->eventSystem) {
+        Event event;
+        event.type = EventType::MEMORY_STORE;
+        event.timestamp = static_cast<uint64_t>(pImpl->currentTime * 1000.0);
+        event.simulationStep = pImpl->currentStep;
+        event.source = source;
+        event.setData("event_type", eventType);
+        
+        pImpl->eventSystem->publishEvent(event);
+    }
+}
+
+void Brain::publishNeuromodulationEvent(const std::string& modulatorType, float level, const std::string& source) {
+    if (pImpl->eventSystem) {
+        Event event;
+        
+        // Map modulator type to event type
+        if (modulatorType == "dopamine") {
+            event.type = EventType::DOPAMINE_RELEASE;
+        } else if (modulatorType == "acetylcholine") {
+            event.type = EventType::ACETYLCHOLINE_RELEASE;
+        } else if (modulatorType == "norepinephrine") {
+            event.type = EventType::NOREPINEPHRINE_RELEASE;
+        } else if (modulatorType == "serotonin") {
+            event.type = EventType::SEROTONIN_RELEASE;
+        } else {
+            // Default to generic neuromodulation event
+            event.type = EventType::DOPAMINE_RELEASE;
+        }
+        
+        event.timestamp = static_cast<uint64_t>(pImpl->currentTime * 1000.0);
+        event.simulationStep = pImpl->currentStep;
+        event.source = source;
+        event.value = level;
+        event.setData("modulator_type", modulatorType);
+        event.setData("level", level);
+        
+        pImpl->eventSystem->publishEvent(event);
+    }
+}
+
+void Brain::subscribeToEvent(EventType eventType, std::shared_ptr<EventListener> listener) {
+    if (pImpl->eventSystem) {
+        pImpl->eventSystem->subscribe(eventType, listener);
+    }
+}
+
+void Brain::processEvents() {
+    if (pImpl->eventSystem) {
+        pImpl->eventSystem->processEvents();
+    }
+}
