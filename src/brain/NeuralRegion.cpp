@@ -1,3 +1,5 @@
+#pragma once
+
 #include "NeuralRegion.hpp"
 #include <algorithm>
 #include <stdexcept>

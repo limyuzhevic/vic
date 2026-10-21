@@ -1,3 +1,5 @@
+#pragma once
+
 #include "SimulationClock.hpp"
 #include <chrono>
 

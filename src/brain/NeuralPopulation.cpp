@@ -1,3 +1,5 @@
+#pragma once
+
 #include "NeuralPopulation.hpp"
 #include <algorithm>
 #include <numeric>

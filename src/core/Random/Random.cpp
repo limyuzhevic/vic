@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Random.hpp"
 #include <stdexcept>
 
