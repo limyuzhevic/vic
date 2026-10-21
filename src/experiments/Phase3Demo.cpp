@@ -5,6 +5,7 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/CLI/CLI.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -244,15 +245,33 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    // Use enhanced CLI parser
+    std::string programName = "nlm_phase3_demo";
+    std::string version = "0.1.0";
+    std::string description = "NLM Phase 3 World Interaction Demo - Demonstrates experience-based learning";
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    nlm::ArgumentParser parser(programName, version, description);
+    
+    // Add Phase 3 specific arguments
+    parser.addArgument('', 'episodes', "Number of episodes to run (1-1000)", "5",
+                      true, "positive-int");
+    parser.addArgument('', 'steps', "Steps per episode (1-100000)", "200",
+                      true, "positive-int");
+    
+    parser.parse(argc, argv);
+    
+    // Check for help/version
+    if (parser.hasArgument("help")) {
+        parser.printHelp();
+        return 0;
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    if (parser.hasArgument("version")) {
+        parser.printVersion();
+        return 0;
     }
+    
+    int numEpisodes = parser.getInt("episodes");
+    int stepsPerEpisode = parser.getInt("steps");
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);

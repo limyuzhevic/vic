@@ -7,18 +7,60 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/CLI/CLI.hpp"
 #include <iostream>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    std::string programName = "nlm_phase6_demo";
+    std::string version = "0.1.0";
+    std::string description = "NLM Phase 6 Integration Demo - Full brain system integration test";
+    
+    nlm::ArgumentParser parser(programName, version, description);
+    
+    // Add Phase 6 specific arguments
+    parser.addArgument('', 'neurons', "Number of neurons (100-10000)", "500",
+                      true, "positive-int");
+    parser.addArgument('', 'steps', "Maximum simulation steps (100-100000)", "2000",
+                      true, "positive-int");
+    parser.addArgument('', 'enable-checkpoint', "Enable checkpointing", "",
+                      false, "");
+    parser.addArgument('', 'enable-replay', "Enable replay capabilities", "",
+                      false, "");
+    parser.addArgument('', 'enable-development', "Enable developmental processes", "",
+                      false, "");
+    
+    parser.parse(argc, argv);
+    
+    // Check for help/version
+    if (parser.hasArgument("help")) {
+        parser.printHelp();
+        return 0;
+    }
+    if (parser.hasArgument("version")) {
+        parser.printVersion();
+        return 0;
+    }
+    
+    // Use logger controller if log-level is set
+    std::string logLevel = parser.getValue("log-level");
+    std::string logFile = parser.getValue("log-file");
+    std::string logColors = !parser.hasArgument("no-colors") ? "true" : "false";
+    
+    if (!logLevel.empty()) {
+        bool enableColors = (logColors == "true");
+        nlm::LoggerController loggerController;
+        loggerController.configure(logLevel, logFile, enableColors);
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
+    // Create experiment with CLI-configured settings
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
@@ -51,14 +93,14 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with CLI-configured settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = parser.getInt("neurons");
+    config.maxSteps = parser.getInt("steps");
+    config.enableCheckpointing = parser.hasArgument("enable-checkpoint");
+    config.enableReplay = parser.hasArgument("enable-replay");
+    config.enableDevelopment = parser.hasArgument("enable-development");
     
     auto result = experiment.run(config);
     
