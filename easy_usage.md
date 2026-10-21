@@ -181,117 +181,317 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
+## Advanced Configuration and Helper Functions
 
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
+### Configuration Presets
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
+# Create brain with configuration preset
 config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+config.apply_preset("debug")  # Smaller brain for debugging
+config.apply_preset("high_performance")  # Larger brain for performance testing
+config.apply_preset("default")  # Standard configuration
+
+# Get all configuration as dictionary
+config_dict = config.get_all_as_dict()
+print("Configuration:", config_dict)
+```
+
+### Brain Configuration Helpers
+
+```python
+# Create specialized configurations
+brain_config = pynlm.create_brain_config()
+agent_config = pynlm.create_agent_config()
+world_config = pynlm.create_world_config()
+
+# Merge configurations
+combined_config = pynlm.merge_configs([brain_config, agent_config, world_config])
+```
+
+## Performance Monitoring and Debugging
+
+### Performance Monitoring
+
+```python
+import pynlm
+
+# Create performance monitor
+monitor = pynlm.createPerformanceMonitor()
+monitor.start()
+
+# Run simulation with monitoring
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
+
+for step in range(1000):
+    brain.step(step)
+    # Monitor would record step timing, spikes, etc.
+
+monitor.stop()
+
+# Get performance metrics
+metrics = monitor.getCurrentMetrics()
+print(f"Performance: {metrics.avgStepTimeMs:.2f} ms/step, "
+      f"{metrics.totalMemoryMB} MB memory")
+```
+
+### Memory Profiling
+
+```python
+# Create memory profiler
+profiler = pynlm.createMemoryProfiler()
+
+# Run simulation while profiling
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Take memory snapshots
+for step in range(100):
+    brain.step(step)
+    profiler.record()  # Record memory usage
+
+print(f"Peak memory usage: {profiler.getPeakMemoryMB()} MB")
+print(f"Current memory usage: {profiler.getCurrentMemoryMB()} MB")
+
+# Get detailed breakdown
+breakdown = profiler.getBreakdown()
+print(f"Neuron memory: {breakdown.neuronsMB} MB")
+print(f"Synapse memory: {breakdown.synapsesMB} MB")
+```
+
+### Metrics Collection
+
+```python
+# Create metrics collector
+metrics_collector = pynlm.createMetricsCollector()
+
+# Record performance metrics
+metrics_collector.record("neuronsPerSecond", 1000.0)
+metrics_collector.record("spikesPerSecond", 50000.0)
+metrics_collector.record("stepTimeMs", 0.5)
+
+# Get statistics
+print(f"Average neurons/sec: {metrics_collector.getMean('neuronsPerSecond'):.2f}")
+print(f"Min step time: {metrics_collector.getMin('stepTimeMs'):.3f} ms")
+print(f"Max step time: {metrics_collector.getMax('stepTimeMs'):.3f} ms")
+
+# Get all recorded metrics
+metric_names = metrics_collector.getMetricNames()
+for name in metric_names:
+    values = metrics_collector.getValues(name)
+    print(f"{name}: {len(values)} samples")
+```
+
+## Enhanced Brain API
+
+### Pythonic Brain Operations
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Make brain think
+for i in range(100):
+    brain.step(i)
+
+# Get brain statistics as a dictionary (NEW!)
+stats = brain.get_stats()
+print(f"Total neurons: {stats['total_neurons']}")
+print(f"Firing rate: {stats['average_firing_rate']:.2f} Hz")
+print(f"Memory usage: {stats['development_stage']}")
+
+# Check if brain is initialized
+if brain.is_initialized():
+    print("Brain is ready for simulation!")
+
+# Brain status (convenience method)
+brain.status()  # Prints brain status
+
+# Save/load with convenience methods
+brain.save_as_json("brain_state.json")
+brain.load_from_json("brain_state.json")
+
+# Reset with new configuration
+brain = brain.reset_with_config(new_config)
+```
+
+### Advanced Visualization
+
+```python
+import pynlm
+
+# Create visualization interface
+viz = pynlm.createVisualization()
+viz.initialize()
+viz.setUpdateRate(30.0)  # 30 Hz update rate
+
+# Run simulation with visualization
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for step in range(500):
+    brain.step(step)
+    viz.update()  # Update visualization data
+    viz.render()  # Render current state
+
+# Save visualization data
+# (Note: Real visualization would save network, activity, and weight data)
+print("Visualization completed")
+
+viz.close()
+```
+
+## Complete Example: Simulation with Performance Monitoring
+
+```python
+import pynlm
+import time
+
+def run_monitored_simulation(steps=1000, preset="default"):
+    """Run a complete simulation with performance monitoring and metrics collection"""
+    
+    # Create performance monitoring tools
+    monitor = pynlm.createPerformanceMonitor()
+    profiler = pynlm.createMemoryProfiler()
+    metrics = pynlm.createMetricsCollector()
+    
+    # Configure simulation
+    config = pynlm.createDefaultConfig()
+    config.apply_preset(preset)
+    
+    # Create brain and visualization
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent and world for interactive simulation
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # Start monitoring
+    monitor.start()
+    
+    # Run simulation
+    start_time = time.time()
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get perception and process
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain processes
+        brain.step(step)
+        
+        # Get action and apply
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Record metrics
+        metrics.record("spikes", brain.getFiringNeuronCount())
+        metrics.record("step_time_ms", 100.0)  # Approximate
+        
+        # Monitor records (in real implementation)
+        monitor.recordStep(0.1, brain.getFiringNeuronCount(), brain.getActiveNeuronCount())
+        
+        # Memory profiling
+        profiler.record()
+        
+        # Print progress
+        if step % 100 == 0:
+            stats = brain.get_stats()
+            print(f"Step {step}: {stats['firing_neurons']} neurons firing, "
+                  f"{stats['total_spikes']} total spikes")
+    
+    # Stop monitoring
+    monitor.stop()
+    end_time = time.time()
+    
+    # Get results
+    final_metrics = monitor.getCurrentMetrics()
+    peak_memory = profiler.getPeakMemoryMB()
+    
+    print(f"\n=== Simulation Complete ===")
+    print(f"Duration: {end_time - start_time:.2f} seconds")
+    print(f"Performance: {final_metrics.neuronsPerSecond:.0f} neurons/sec")
+    print(f"Memory usage: {peak_memory} MB peak")
+    print(f"Average step time: {final_metrics.avgStepTimeMs:.3f} ms")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    
+    # Save results
+    brain.save(f"simulation_results_step{steps}.json")
+    
+    # Generate report
+    report = {
+        "duration": end_time - start_time,
+        "steps": steps,
+        "performance_metrics": {
+            "neurons_per_second": final_metrics.neuronsPerSecond,
+            "memory_mb": peak_memory,
+            "avg_step_time_ms": final_metrics.avgStepTimeMs,
+            "total_spikes": brain.getTotalSpikeCount()
+        }
+    }
+    
+    return report
+
+# Run the simulation
+if __name__ == "__main__":
+    results = run_monitored_simulation(steps=500, preset="debug")
+    print("\nSimulation results:", results)
+```
+
+## Integration with Visualization
+
+```python
+import pynlm
+
+# Complete integration example with visualization
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+viz = pynlm.createVisualization()
+viz.initialize()
+viz.setUpdateRate(10.0)
 
-# Run agent
-for step in range(100):
+# Run interactive simulation
+for step in range(200):
+    # World update
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    # Agent perception and action
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    # Visualization
+    viz.update()
+    viz.visualizeNetwork(brain)
+    viz.visualizeActivity(brain)
+    viz.render()
+    
+    # Control visualization
+    if step % 50 == 0:
+        print(f"Step {step}: Active neurons: {brain.getActiveNeuronCount()}")
 
-print("Agent simulation complete!")
+viz.close()
+print("Interactive visualization completed")
 ```
-
----
-
-## Quick Reference
-
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
-
----
-
-## Troubleshooting
-
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
-
----
-
-## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
