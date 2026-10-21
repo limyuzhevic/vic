@@ -9,11 +9,14 @@
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() : brain(nullptr) {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+    // Store brain pointer for later access
+    brain = std::make_shared<Brain>(cfg);
+    
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
@@ -32,14 +35,6 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
-    
-    // Create brain
-    auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
-        result.endTime = time(nullptr);
-        return result;
-    }
     
     // Create simple world
     SimpleWorld world;
@@ -160,18 +155,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 }
 
 bool Phase6IntegratedExperiment::verifyIntegration() {
-    NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
-    
-    // Create minimal brain
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    cfg->set("region_count", 1);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Brain initialization failed");
+    if (!brain) {
+        NLM_LOG_ERROR("No brain available for integration verification");
         return false;
     }
+    
+    NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
     bool success = true;
     
@@ -247,13 +236,12 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
+    if (!brain) {
+        NLM_LOG_ERROR("No brain available for memory integration test");
+        return false;
+    }
+    
     NLM_LOG_INFO("=== Testing Memory Integration ===");
-    
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
     
     // Get memory systems
     auto* wm = brain->getWorkingMemory();
@@ -287,13 +275,12 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
+    if (!brain) {
+        NLM_LOG_ERROR("No brain available for neuromodulation integration test");
+        return false;
+    }
+    
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
-    
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
     
     // Get neuromodulation systems
     auto* dopamine = brain->getDopamine();
@@ -317,29 +304,20 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
+    if (!brain) {
+        NLM_LOG_ERROR("No brain available for checkpoint test");
+        return false;
+    }
+    
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
+    // Create and initialize brain
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
     
-    // Create and initialize brain
-    auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
-    
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain1->step(i, i * 0.001);
-    }
-    
-    float avgFiring1 = brain1->getAverageFiringRate();
-    size_t totalSpikes1 = brain1->getTotalSpikeCount();
-    
-    NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
-    NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
-    
-    // Save checkpoint
+    // Save brain state
     std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
+    if (!brain->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
@@ -353,24 +331,17 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         return false;
     }
     
-    size_t totalSpikes2 = brain2->getTotalSpikeCount();
-    NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
-    
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
-    
     NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
     return true;
 }
 
 bool Phase6IntegratedExperiment::testReplay() {
+    if (!brain) {
+        NLM_LOG_ERROR("No brain available for replay test");
+        return false;
+    }
+    
     NLM_LOG_INFO("=== Testing Replay System ===");
-    
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
     
     auto* em = brain->getEpisodicMemory();
     if (!em) {

@@ -28,6 +28,14 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralRegion;
+class NeuralPopulation;
+class Synapse;
+class Neuron;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
