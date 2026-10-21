@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -71,6 +72,17 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
+    // Type-safe getters with explicit types
+    double getAsDouble(const std::string& key) const;
+    int getAsInt(const std::string& key) const;
+    bool getAsBool(const std::string& key) const;
+    std::string getAsString(const std::string& key) const;
+    
+    // Array type-safe getters
+    std::vector<int> getAsIntArray(const std::string& key) const;
+    std::vector<double> getAsDoubleArray(const std::string& key) const;
+    std::vector<std::string> getAsStringArray(const std::string& key) const;
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -100,6 +112,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helper
+    template<typename T>
+    static bool validateValue(const T& value);
 };
 
 } // namespace nlm

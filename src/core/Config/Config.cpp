@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // JSON parser support
 
 namespace nlm {
 
@@ -18,41 +19,180 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Serialize ConfigValue to JSON format for file saving
+static nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json j;
+    // Convert variant value to appropriate JSON type using std::visit
+    std::visit([&j](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            j = arg;  // String values stored as JSON strings
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            j = arg;  // Integer arrays stored as JSON arrays
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            j = arg;  // Double arrays stored as JSON arrays
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            j = arg;  // String arrays stored as JSON arrays
+        } else {
+            j = arg;  // Other primitive types stored directly
+        }
+    }, value);
+    return j;
+}
+
+// Convert JSON value back to ConfigValue variant
+static ConfigValue jsonToConfigValue(const nlohmann::json& j) {
+    // JSON type to ConfigValue conversion with type safety
+    if (j.is_string()) {
+        return j.get<std::string>();  // JSON string -> std::string
+    } else if (j.is_number_integer()) {
+        return j.get<int>();  // JSON integer -> int
+    } else if (j.is_number_unsigned()) {
+        return j.get<uint64_t>();  // JSON unsigned -> uint64_t
+    } else if (j.is_number_float()) {
+        return j.get<double>();  // JSON float -> double
+    } else if (j.is_boolean()) {
+        return j.get<bool>();  // JSON boolean -> bool
+    } else if (j.is_array()) {
+        // Array type detection based on first element
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                return j.get<std::vector<int>>();  // Integer array
+            } else if (j[0].is_number_float()) {
+                return j.get<std::vector<double>>();  // Float array
+            } else if (j[0].is_string()) {
+                return j.get<std::vector<std::string>>();  // String array
+            }
+        }
+        return std::vector<int>{};  // fallback: empty int array
+    } else if (j.is_object()) {
+        // JSON objects converted to string representation
+        return j.dump();  // Serialize JSON object to string
+    }
+    return std::string{};  // fallback: empty string
+}
+
+// Validation functions
+namespace {
+
+bool validateString(const std::string& value) {
+    // Basic validation - can be extended as needed
+    return !value.empty();
+}
+
+bool validateInt(int value) {
+    return true; // Can add range checks if needed
+}
+
+bool validateDouble(double value) {
+    return !std::isnan(value) && !std::isinf(value);
+}
+
+bool validateBool(bool value) {
+    return true; // Always valid
+}
+
+bool validateVector(const std::vector<int>& value) {
+    return true; // Can add length/size checks
+}
+
+bool validateVector(const std::vector<double>& value) {
+    for (double v : value) {
+        if (std::isnan(v) || std::isinf(v)) return false;
+    }
+    return true;
+}
+
+bool validateVector(const std::vector<std::string>& value) {
+    for (const std::string& v : value) {
+        if (!validateString(v)) return false;
+    }
+    return true;
+}
+
+// Generic validation function template
+template<typename T>
+bool validateValue(const T& value) {
+    if constexpr (std::is_same_v<T, std::string>) {
+        return validateString(value);
+    } else if constexpr (std::is_same_v<T, int>) {
+        return validateInt(value);
+    } else if constexpr (std::is_same_v<T, double>) {
+        return validateDouble(value);
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return validateBool(value);
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        return validateVector(value);
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        return validateVector(value);
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        return validateVector(value);
+    } else {
+        return true; // Default to valid for unknown types
+    }
+}
+
+} // namespace
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Parse JSON from file using nlohmann/json library
+        // This provides robust JSON parsing with validation and type safety
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Clear existing entries before loading new configuration
+        clear();
+        
+        // Process JSON entries into Config structure
+        // Each JSON key-value pair becomes a ConfigEntry with File source
+        if (jsonConfig.is_object()) {
+            for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value = jsonToConfigValue(*it);
+                set(key, value, ConfigSource::File);
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        return true;
+    } catch (const std::exception& e) {
+        // Fallback to simple key=value format for backward compatibility
+        // This handles legacy configuration files that don't follow JSON format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments (lines starting with # or /)
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs (legacy format)
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present in legacy format
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true; // Still return true for backward compatibility
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +226,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the variant value to a string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << '[';
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << ']';
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << '[';
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << ']';
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << '[';
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << '"' << arg[i] << '"';
+                }
+                file << ']';
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -115,6 +288,13 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the value before setting
+    std::visit([](const auto& val) {
+        if (!validateValue(val)) {
+            throw std::invalid_argument("Invalid configuration value for key: " + std::to_string(key));
+        }
+    }, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -124,6 +304,186 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+}
+
+// Improved type-safe getters with validation
+
+// For string values
+double Config::getAsDouble(const std::string& key) const {
+    auto val = get<double>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+int Config::getAsInt(const std::string& key) const {
+    auto val = get<int>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+bool Config::getAsBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+std::string Config::getAsString(const std::string& key) const {
+    auto val = get<std::string>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+// For array values with type-safe access
+std::vector<int> Config::getAsIntArray(const std::string& key) const {
+    auto val = get<std::vector<int>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+std::vector<double> Config::getAsDoubleArray(const std::string& key) const {
+    auto val = get<std::vector<double>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+std::vector<std::string> Config::getAsStringArray(const std::string& key) const {
+    auto val = get<std::vector<std::string>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Enhanced type-safe getters with compile-time type checking and runtime validation
+ * 
+ * These methods provide safer alternatives to template-based get<T>() by using
+ * explicit type names, which enables better error messages and IDE support.
+ * They also provide consistent error handling with descriptive exceptions.
+ */
+
+/**
+ * @brief Get a string value with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return String value associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+double Config::getAsDouble(const std::string& key) const {
+    auto val = get<double>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get an integer value with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return Integer value associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+int Config::getAsInt(const std::string& key) const {
+    auto val = get<int>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get a boolean value with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return Boolean value associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+bool Config::getAsBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get a string value with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return String value associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+std::string Config::getAsString(const std::string& key) const {
+    auto val = get<std::string>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get an integer array with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return Integer array associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+std::vector<int> Config::getAsIntArray(const std::string& key) const {
+    auto val = get<std::vector<int>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get a double array with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return Double array associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+std::vector<double> Config::getAsDoubleArray(const std::string& key) const {
+    auto val = get<std::vector<double>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
+}
+
+/**
+ * @brief Get a string array with type safety and error checking
+ * 
+ * @param key Configuration key to retrieve
+ * @return String array associated with the key
+ * @throws runtime_error if the key is not found in configuration
+ */
+
+std::vector<std::string> Config::getAsStringArray(const std::string& key) const {
+    auto val = get<std::vector<std::string>>(key);
+    if (!val.has_value()) {
+        throw std::runtime_error("Configuration key not found: " + key);
+    }
+    return val.value();
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
