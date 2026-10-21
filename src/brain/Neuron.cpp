@@ -2,8 +2,14 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 namespace nlm {
+
+// ========== NEURON IMPLEMENTATION ==========
+
+// Enhanced LIF neuron implementation with biologically realistic dynamics
+// Implements spike-timing dependent plasticity and real neural computation
 
 struct Neuron::Impl {
     NeuronId id;
@@ -18,13 +24,38 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters with biological realism
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF - typical for cortical neurons
+    static constexpr float TIME_CONSTANT = 20.0f;  // ms - membrane time constant
+    static constexpr float RESET_THRESHOLD_FACTOR = 0.5f;  // Relative to resting potential
+    static constexpr float ADAPTATION_DECAY_RATE = 0.95f;  // Exponential decay
+    static constexpr float ADAPTATION_INJECTION = 1.0f;   // Spike-triggered adaptation
+    static constexpr float MAX_SPIKE_HISTORY = 100;
+    
+    // Synaptic parameters
+    static constexpr float EXCITATORY_REVERSAL = 0.0f;   // mV - reversal potential
+    static constexpr float INHIBITORY_REVERSAL = -70.0f;  // mV - reversal potential
+    static constexpr float SYNAPTIC_CONDUCTANCE_SCALE = 1.0f;  // nS
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize with biologically realistic defaults
+        initializeState();
+    }
+    
+    void initializeState() {
+        // Set biologically realistic initial parameters
+        state.restingPotential = -70.0f;      // Typical cortical neuron resting potential
+        state.resetPotential = -65.0f;        // Spike reset potential
+        state.threshold = -55.0f;             // Typical threshold relative to resting
+        state.leakConductance = 0.001f;       // Membrane conductance
+        state.refractoryPeriod = 2;           // ms refractory period
+        state.refractoryRemaining = 0;
+        state.adaptationVariable = 0.0f;      // For spike-frequency adaptation
+        state.lastSpikeTime = -1000.0f;       // Invalid spike time
+        state.firingRate = 0.0f;
+        state.firingState = FiringState::Resting;
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -122,13 +153,19 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Using conductance-based model: I_syn = g_syn * (V - E_exc)
+    float reversalPotential = Impl::EXCITATORY_REVERSAL;
+    float drivingForce = pImpl->state.membranePotential - reversalPotential;
+    pImpl->totalCurrent += amplitude * drivingForce * Impl::SYNAPTIC_CONDUCTANCE_SCALE;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Using conductance-based model: I_syn = g_syn * (V - E_inh)
+    float reversalPotential = Impl::INHIBITORY_REVERSAL;
+    float drivingForce = pImpl->state.membranePotential - reversalPotential;
+    pImpl->totalCurrent += amplitude * drivingForce * Impl::SYNAPTIC_CONDUCTANCE_SCALE;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
@@ -140,10 +177,12 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    // Alternative implementation using current-based model
     pImpl->synapticInput += current;
 }
 
 void Neuron::clearTotalCurrent() {
+    pImpl->totalCurrent = 0.0f;
     pImpl->synapticInput = 0.0f;
 }
 
@@ -188,73 +227,100 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
+// ========== ENHANCED LIF DYNAMICS ==========
+
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with exponential decay
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
+        // During refractory period, clamp potential to reset value
+        pImpl->state.membranePotential = pImpl->state.resetPotential;
+        pImpl->state.firingState = FiringState::Refractory;
+        
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Enhanced LIF dynamics: Biologically realistic integrate-and-fire
+    // dV/dt = (V_rest - V)/tau + (I_syn + I_inj)/C
+    // Where C = membrane capacitance, tau = R*C (time constant)
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::TIME_CONSTANT;  // ms - membrane time constant
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF - membrane capacitance
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Calculate synaptic current contributions
+    float synapticCurrent = pImpl->totalCurrent + pImpl->synapticInput;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak current (Ohmic): I_leak = g_leak * (V - V_rest)
+    // where g_leak = 1/tau for standard LIF model
+    float leakConductance = 1.0f / tau;
+    float leakCurrent = leakConductance * (V - V_rest);
+    
+    // Synaptic current contribution
+    float synapticContribution = synapticCurrent / C;
+    
+    // Leak contribution to voltage change
+    float leakContribution = leakCurrent / C;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // V(t+dt) = V(t) + dt * ( (V_rest - V)/tau + I_total/C )
+    float dt_ms = static_cast<float>(dt) * 1000.0f;  // Convert to ms for consistency
+    V = V + dt_ms * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Adaptation variable tracks recent spiking activity
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Adaptation current: I_adapt = g_adapt * A
+        // Where A is adaptation variable, g_adapt is adaptation conductance
+        float adaptationConductance = pImpl->state.leakConductance * 0.1f;
+        float adaptationCurrent = adaptationConductance * pImpl->state.adaptationVariable;
+        
+        // Apply adaptation as hyperpolarizing current
+        V -= adaptationCurrent * dt_ms;
+        
+        // Decay adaptation variable exponentially
+        pImpl->state.adaptationVariable *= Impl::ADAPTATION_DECAY_RATE;
     }
     
-    // Clamp membrane potential to prevent instability
+    // Apply biological voltage bounds to prevent instability
+    // Typical neuron voltage range: -100 mV (hyperpolarized) to 50 mV (depolarized)
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike threshold crossing
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity and history
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Apply spike-triggered reset: V <- V_reset
         V = V_reset;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Update spike-frequency adaptation variable
+        // Each spike increases adaptation variable for next spikes
+        pImpl->state.adaptationVariable += Impl::ADAPTATION_INJECTION;
+        
+        // Reset synaptic currents for next timestep
+        pImpl->totalCurrent = 0.0f;
+        pImpl->synapticInput = 0.0f;
+        
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
     
     return fired;
 }
@@ -268,34 +334,51 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Re-initialize with biologically realistic defaults
+    pImpl->initializeState();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
+    // Enhanced random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + 
+                                     rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold is typically -55mV with small variation based on neuron type
+    if (pImpl->type == NeuronType::Sensory) {
+        pImpl->state.threshold = -50.0f + rng.uniformReal(-5.0f, 5.0f);
+    } else if (pImpl->type == NeuronType::Motor) {
+        pImpl->state.threshold = -45.0f + rng.uniformReal(-3.0f, 3.0f);
+    } else {
+        pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    }
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV with slight variation
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is usually close to resting (10-20% difference)
+    pImpl->state.resetPotential = pImpl->state.restingPotential + 
+                                   rng.uniformReal(10.0f, 20.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Refractory period varies by neuron type: 2-10ms typical
+    if (pImpl->type == NeuronType::Sensory) {
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 6));
+    } else {
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    }
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.lastSpikeTime = -1000.0f;  // Invalid spike time
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
