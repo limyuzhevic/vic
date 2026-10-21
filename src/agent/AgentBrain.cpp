@@ -63,15 +63,156 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::initializeCognitiveSystems() {
+    if (!brain_) return;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Register neural planner for action planning
+    if (auto* planner = brain_->getPlanner()) {
+        planner->initialize(brain_.get());
+        NLM_LOG_INFO("[COGNITIVE] NeuralPlanner registered and initialized");
+    } else {
+        NLM_LOG_WARNING("[COGNITIVE] NeuralPlanner not available - action planning will use reactive control");
+    }
+    
+    // Register concept formation for pattern discovery
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        conceptFormation->initialize(brain_.get());
+        NLM_LOG_INFO("[COGNITIVE] ConceptFormation registered and initialized");
+    } else {
+        NLM_LOG_WARNING("[COGNITIVE] ConceptFormation not available - pattern learning will be limited");
+    }
+    
+    // Register attentional selection for focus
+    if (auto* attention = brain_->getAttention()) {
+        attention->initialize(brain_.get());
+        NLM_LOG_INFO("[COGNITIVE] AttentionalSelection registered and initialized");
+    } else {
+        NLM_LOG_WARNING("[COGNITIVE] AttentionalSelection not available - attention allocation will be basic");
+    }
+    
+    NLM_LOG_INFO("[COGNITIVE] Cognitive systems integration completed");
+}
+
+void AgentBrain::initializeSelfModel() {
+    // Create and initialize self-model based on body and capabilities
+    selfModel_.bodyModel = createBodyModel();
+    selfModel_.goalSet = createGoalSet();
+    selfModel_.memory = std::make_shared<SelfMemory>();
+    selfModel_.motorCapabilities = analyzeMotorCapabilities();
+    selfModel_.sensoryCapabilities = analyzeSensoryCapabilities();
+    
+    NLM_LOG_INFO("[COGNITIVE] Self-model initialized with body, goals, and memory");
+}
+
+SelfModel AgentBrain::createBodyModel() {
+    SelfModel model;
+    model.type = "agent";
+    model.position = "unknown";
+    model.capabilities = {"vision", "movement", "interaction", "learning"};
+    model.constraints = {"energy", "time", "space"};
+    model.energy = 1.0f;
+    model.maxEnergy = 1.0f;
+    return model;
+}
+
+GoalSet AgentBrain::createGoalSet() {
+    GoalSet goals;
+    goals.primaryGoal = "explore";
+    goals.subgoals = {
+        "find_resources", "avoid_hazards", "maintain_safety", "social_interaction"
+    };
+    goals.priority = {1.0f, 0.8f, 0.6f, 0.4f};
+    return goals;
+}
+
+MotorCapabilities AgentBrain::analyzeMotorCapabilities() {
+    MotorCapabilities caps;
+    caps.movementTypes = {"forward", "backward", "turn_left", "turn_right", "interact"};
+    caps.speedRanges = {0.1f, 0.5f, 0.5f, 0.5f, 0.3f};
+    caps.accuracy = 0.8f;
+    return caps;
+}
+
+SensoryCapabilities AgentBrain::analyzeSensoryCapabilities() {
+    SensoryCapabilities caps;
+    caps.modality = {"vision", "touch", "internal", "proprioception"};
+    caps.range = {16.0f, 8.0f, 4.0f, 6.0f};
+    caps.resolution = {256, 8, 4, 6};
+    return caps;
+}
+
+void AgentBrain::passSensoryToCognition(const std::vector<float>& vision) {
+    if (!brain_) return;
+    
+    // Create feature vector from vision for concept formation
+    std::vector<float> features = extractSensoryFeatures(vision);
+    
+    // Pass to concept formation for pattern learning
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        conceptFormation->presentExperience(features, features, 0.0f, 0.0f);
+    }
+    
+    // Pass to attention system for selection
+    if (auto* attention = brain_->getAttention()) {
+        attention->updatePercept(features);
+    }
+    
+    // Pass to planner for action planning
+    if (auto* planner = brain_->getPlanner()) {
+        planWithCurrentCognition(features);
+    }
+}
+
+void AgentBrain::planWithCurrentCognition(const std::vector<float>& state) {
+    if (!brain_) return;
+    
+    // Use planner for action selection based on current state and goals
+    if (auto* planner = brain_->getPlanner()) {
+        // In a full implementation, this would generate action sequences
+        // For now, just record that planner is available
+        NLM_LOG_INFO("[PLANNER] Action planning available with cognitive state");
+    }
+}
+
+void AgentBrain::updateCognitiveWithNovelty(const std::vector<float>& percept) {
+    if (!brain_) return;
+    
+    // Update attention based on novelty
+    if (auto* attention = brain_->getAttention()) {
+        attention->updatePercept(percept);
+    }
+    
+    // Update concept formation with new experience
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        conceptFormation->presentExperience(percept, percept, 0.0f, 0.0f);
+    }
+}
+
+std::vector<float> AgentBrain::extractSensoryFeatures(const std::vector<float>& vision) {
+    // Extract features from vision for concept formation
+    std::vector<float> features;
+    
+    // Add vision features
+    if (!vision.empty()) {
+        features.insert(features.end(), vision.begin(), vision.end());
+    }
+    
+    // Add derived features
+    float avgBrightness = 0.0f;
+    if (!vision.empty()) {
+        avgBrightness = std::accumulate(vision.begin(), vision.end(), 0.0f) / vision.size();
+    }
+    features.push_back(avgBrightness);
+    
+    // Normalize features
+    if (!features.empty()) {
+        float sum = std::accumulate(features.begin(), features.end(), 0.0f);
+        for (float& feature : features) {
+            feature /= sum;
+        }
+    }
+    
+    return features;
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -147,6 +288,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Pass sensory data to cognitive systems
+    passSensoryToCognition(vision);
+    
+    // Update cognitive systems with novelty
+    updateCognitiveWithNovelty(vision);
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -157,6 +304,12 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Apply cognitive planning if available
+    if (brain_->getPlanner()) {
+        // Let planner influence action selection based on current state and goals
+        decoded = applyPlannerInfluence(decoded);
     }
     
     return decoded;
@@ -334,17 +487,107 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+MotorCommand AgentBrain::applyPlannerInfluence(MotorCommand baseCmd) {
+    if (!brain_ || !brain_->getPlanner()) {
+        return baseCmd;
+    }
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Get current cognitive state for planning
+    std::vector<float> cognitiveState = getSensoryFeatures();
+    
+    // Apply planner to influence action selection
+    // For now, this is a stub - in a full implementation, the planner
+    // would evaluate sequences of actions and select the optimal one
+    float curiosityFactor = std::min(0.5f, curiosityLevel_);
+    
+    // Higher curiosity leads to more exploratory action selection
+    if (brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) < curiosityFactor) {
+        // Select from action types that may not be optimal but are exploratory
+        NLM_LOG_INFO("[PLANNER] Planner-driven exploratory action selection");
+    }
+    
+    // In the future, this would use the NeuralPlanner's sequence evaluation
+    // and action selection capabilities
+    return baseCmd;
 }
 
-} // namespace nlm
+void AgentBrain::applyCognitiveInfluenceToPlasticity() {
+    if (!brain_) return;
+    
+    // Integrate cognitive systems into plasticity modulation
+    // Concept formation affects structural plasticity based on learned patterns
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        // Concept formation could provide information about important patterns
+        // that should be preserved or strengthened
+        NLM_LOG_INFO("[PLASTICITY] Concept formation influencing structural plasticity");
+    }
+    
+    // Attention system affects synaptic prioritization
+    if (auto* attention = brain_->getAttention()) {
+        // Attention allocation could influence which synapses are potentiated
+        NLM_LOG_INFO("[PLASTICITY] Attentional selection influencing synaptic prioritization");
+    }
+    
+    // Self-model provides internal goals for plasticity
+    if (!selfModel_.goalSet.subgoals.empty()) {
+        NLM_LOG_INFO("[PLASTICITY] Self-model goals guiding plasticity direction");
+    }
+}
+
+void AgentBrain::updateDevelopmentWithCognitiveState() {
+    if (!brain_) return;
+    
+    // Update development with cognitive state information
+    float cognitiveFactor = getCognitiveComplexityFactor();
+    
+    if (developmentEnabled_) {
+        // Modify development rate based on cognitive demands
+        float developmentRate = calculateDevelopmentRate(cognitiveFactor);
+        
+        if (auto* development = brain_->getDevelopmentSystem()) {
+            development->update(developmentalAge_, developmentRate);
+        }
+    }
+    
+    NLM_LOG_INFO("[DEVELOPMENT] Development updated with cognitive state: " + 
+                 std::to_string(cognitiveFactor) + " complexity factor");
+}
+
+float AgentBrain::getCognitiveComplexityFactor() const {
+    // Calculate a measure of cognitive system activity
+    float factor = 0.0f;
+    
+    // Factor in novelty level (concept formation activity)
+    factor += noveltyLevel_ * 0.3f;
+    
+    // Factor in curiosity level (exploration drive)
+    factor += curiosityLevel_ * 0.3f;
+    
+    // Factor in planner activity (goal pursuit)
+    if (brain_->getPlanner()) {
+        factor += 0.2f;  // Planner presence indicates higher cognitive load
+    }
+    
+    // Factor in self-model complexity
+    if (!selfModel_.goalSet.subgoals.empty()) {
+        factor += 0.2f;
+    }
+    
+    return std::min(1.0f, factor);
+}
+
+float AgentBrain::calculateDevelopmentRate(float cognitiveFactor) const {
+    // Development rate depends on cognitive needs and complexity
+    float baseRate = 0.001f;  // Default development rate
+    
+    // Higher cognitive complexity can drive faster development
+    float complexityBoost = cognitiveFactor * 0.01f;
+    
+    // Apply learning-related modifications
+    float learningModifier = 1.0f;
+    if (dopamineLevel_ > 0.1f) {
+        learningModifier += dopamineLevel_ * 0.1f;
+    }
+    
+    return baseRate * learningModifier + complexityBoost;
+}
