@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,15 +20,102 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception classes for better error handling
+class NLMException : public std::runtime_error {
+public:
+    explicit NLMException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class InvalidArgumentError : public std::runtime_error {
+public:
+    explicit InvalidArgumentError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigurationError : public std::runtime_error {
+public:
+    explicit ConfigurationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class SimulationError : public std::runtime_error {
+public:
+    explicit SimulationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Helper function to convert C++ exceptions to Python
+void register_nlm_exceptions(py::module_& m) {
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMException& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const InvalidArgumentError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const ConfigurationError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const SimulationError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
+}
+
 PYBIND11_MODULE(pynlm, m) {
+    register_nlm_exceptions(m);
+    
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Complete brain simulation with spiking neurons
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Developmental stages and structural plasticity
+        - Prediction and cognition systems
+        - Checkpoint/save-load functionality
+        - Comprehensive error handling and validation
+        
+        Quick Start:
+        ```python
+        import pynlm
+        
+        # Create a brain
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+            if step % 10 == 0:
+                print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+        ```
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Set version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__license__") = "MIT";
+    m.attr("__description__") = "An experimental artificial developmental brain for neural simulation";
+
+    // Register custom exceptions for better error handling
+    py::class_<NLMException, std::runtime_error>(m, "NLMError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<InvalidArgumentError, std::runtime_error>(m, "InvalidArgumentError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<ConfigurationError, std::runtime_error>(m, "ConfigurationError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<SimulationError, std::runtime_error>(m, "SimulationError")
+        .def(py::init<const std::string&>());
+
+    // Register basic std::runtime_error for backward compatibility
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -39,6 +127,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return "NeuronId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -160,8 +251,82 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced Config methods
+        .def("copy", [](const Config& self) {
+            auto copy = std::make_shared<Config>(self);
+            return copy;
+        }, "Create a copy of this configuration")
+        .def("merge", &Config::merge, py::arg("other"),
+             "Merge another configuration into this one")
+        .def("compare", [](const Config& self, const Config& other) {
+            std::vector<std::string> differences;
+            
+            auto self_keys = self.getKeys();
+            auto other_keys = other.getKeys();
+            
+            for (const auto& key : self_keys) {
+                if (!other.has(key)) {
+                    differences.push_back("Missing in other: " + key);
+                } else {
+                    auto self_val = self.getAsString(key);
+                    auto other_val = other.getAsString(key);
+                    if (self_val != other_val) {
+                        differences.push_back("Different: " + key + " (self: " + 
+                                            (self_val ? *self_val : "null") + 
+                                            ", other: " + 
+                                            (other_val ? *other_val : "null") + ")");
+                    }
+                }
+            }
+            
+            for (const auto& key : other_keys) {
+                if (!self.has(key)) {
+                    differences.push_back("Missing in self: " + key);
+                }
+            }
+            
+            return differences;
+        }, "Compare this configuration with another and return differences")
+        .def("validate", [](Config& self) {
+            std::vector<std::string> errors;
+            
+            // Basic validation
+            if (!self.has("neuron_count")) {
+                errors.push_back("Missing required key: neuron_count");
+            } else {
+                auto neuron_count = self.get<int64_t>("neuron_count");
+                if (neuron_count && *neuron_count < 10) {
+                    errors.push_back("neuron_count should be at least 10");
+                }
+            }
+            
+            if (!self.has("simulation_timestep")) {
+                errors.push_back("Missing required key: simulation_timestep");
+            } else {
+                auto timestep = self.get<double>("simulation_timestep");
+                if (timestep && (*timestep <= 0.0 || *timestep > 1.0)) {
+                    errors.push_back("simulation_timestep must be between 0.0 and 1.0");
+                }
+            }
+            
+            if (errors.empty()) {
+                return true;
+            } else {
+                std::string error_msg = "Configuration validation failed:\n";
+                for (const auto& error : errors) {
+                    error_msg += "  - " + error + "\n";
+                }
+                throw ConfigurationError(error_msg);
+            }
+        }, "Validate configuration and throw ConfigurationError on issues")
+        .def("__eq__", [](const Config& self, const Config& other) {
+            return self.getKeys() == other.getKeys();
+        }, "Check if two configurations are equal")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        .def("__copy__", [](Config& self) {
+            return Config(self);
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -400,26 +565,214 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Add convenience functions for easier Python usage
+    m.def("quick_brain", [](size_t neuron_count, const std::string& config_file) {
+        auto config = std::make_shared<Config>();
+        if (!config_file.empty()) {
+            config->loadFromFile(config_file);
+        }
+        config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Runtime);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("neuron_count"), py::arg("config_file") = "",
+         "Create a brain with specified neuron count and optional config file");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    m.def("run_agent_simulation", [](std::shared_ptr<AgentBrain> agent, 
+                                     std::shared_ptr<SimpleWorld> world, 
+                                     size_t num_steps,
+                                     bool enable_learning) {
+        
+        std::vector<std::unordered_map<std::string, double>> stats;
+        
+        for (size_t step = 0; step < num_steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process input
+            agent->processSensoryInput(percept);
+            
+            // Get brain's step number
+            auto brain = agent->getBrain();
+            brain->step(static_cast<SimulationStep>(step));
+            
+            // Decode motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply learning if enabled
+            if (enable_learning) {
+                double reward = 1.0; // Simple reward for movement
+                double predicted = 0.5;
+                agent->applyRewardModulation(reward, predicted);
+            }
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Collect statistics
+            std::unordered_map<std::string, double> step_stats;
+            step_stats["step"] = step;
+            step_stats["neurons_firing"] = brain->getFiringNeuronCount();
+            step_stats["total_spikes"] = brain->getTotalSpikeCount();
+            step_stats["average_firing_rate"] = brain->getAverageFiringRate();
+            step_stats["action_type"] = static_cast<int>(action->getType());
+            stats.push_back(step_stats);
+        }
+        
+        // Return final statistics
+        std::unordered_map<std::string, double> final_stats;
+        auto final_brain = agent->getBrain();
+        final_stats["final_spike_count"] = final_brain->getTotalSpikeCount();
+        final_stats["final_firing_neurons"] = final_brain->getFiringNeuronCount();
+        final_stats["final_firing_rate"] = final_brain->getAverageFiringRate();
+        final_stats["total_steps"] = num_steps;
+        
+        return std::make_pair(stats, final_stats);
+    }, py::arg("agent"), py::arg("world"), py::arg("num_steps"), py::arg("enable_learning") = false,
+         "Run a complete agent simulation with statistics collection");
+
+    m.def("create_brain_with_preset", [](const std::string& preset_name, size_t neuron_count) {
+        auto config = std::make_shared<Config>();
+        
+        if (preset_name == "simple") {
+            config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.05f, ConfigSource::Default);
+        } else if (preset_name == "complex") {
+            config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+        } else if (preset_name == "optimized") {
+            config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("plasticity_learning_rate", 0.02f, ConfigSource::Default);
+        } else {
+            throw InvalidArgumentError("Unknown preset: " + preset_name);
+        }
+        
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("preset_name"), py::arg("neuron_count"),
+         "Create a brain with predefined configuration presets");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("create_agent_with_preset", [](const std::string& preset_name, std::shared_ptr<Brain> brain) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        if (preset_name == "explorer") {
+            agent->enableCuriosity(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+        } else if (preset_name == "learner") {
+            agent->enableRewardModulation(true);
+            agent->enableDevelopment(true);
+        } else if (preset_name == "methodical") {
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(false);
+        } else {
+            throw InvalidArgumentError("Unknown agent preset: " + preset_name);
+        }
+        
+        return agent;
+    }, py::arg("preset_name"), py::arg("brain"),
+         "Create an agent brain with predefined behavior preset");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("save_config_to_file", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        bool success = config->saveToFile(filepath);
+        if (!success) {
+            throw ConfigurationError("Failed to save configuration to: " + filepath);
+        }
+        return true;
+    }, py::arg("config"), py::arg("filepath"),
+         "Save configuration to file with error handling");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("load_config_from_file", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw ConfigurationError("Failed to load configuration from: " + filepath);
+        }
+        return config;
+    }, py::arg("filepath"),
+         "Load configuration from file with error handling");
+
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        if (!config->has("neuron_count")) {
+            errors.push_back("Missing required key: neuron_count");
+        } else {
+            auto neuron_count = config->get<int64_t>("neuron_count");
+            if (neuron_count && *neuron_count < 10) {
+                errors.push_back("neuron_count should be at least 10");
+            }
+        }
+        
+        if (!config->has("simulation_timestep")) {
+            errors.push_back("Missing required key: simulation_timestep");
+        }
+        
+        if (!errors.empty()) {
+            std::string error_msg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                error_msg += "  - " + error + "\n";
+            }
+            throw ConfigurationError(error_msg);
+        }
+        
+        return true;
+    }, py::arg("config"),
+         "Validate configuration and throw ConfigurationError on issues");
+
+    m.def("quick_experiment", [](const std::string& experiment_type, size_t steps) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::unordered_map<std::string, double> results;
+        
+        if (experiment_type == "memory") {
+            // Run memory experiment
+            for (size_t step = 0; step < steps; ++step) {
+                brain->step(static_cast<SimulationStep>(step));
+                if (step % 10 == 0) {
+                    results["step_" + std::to_string(step)] = brain->getTotalSpikeCount();
+                }
+            }
+            results["experiment_type"] = "memory";
+        } else if (experiment_type == "learning") {
+            // Run learning experiment with injected input
+            for (size_t step = 0; step < steps; ++step) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
+                brain->step(static_cast<SimulationStep>(step));
+                if (step % 10 == 0) {
+                    results["step_" + std::to_string(step)] = brain->getTotalSpikeCount();
+                }
+            }
+            results["experiment_type"] = "learning";
+        } else if (experiment_type == "plasticity") {
+            // Run plasticity experiment
+            for (size_t step = 0; step < steps; ++step) {
+                brain->step(static_cast<SimulationStep>(step));
+                if (step % 10 == 0) {
+                    results["step_" + std::to_string(step)] = brain->getTotalSpikeCount();
+                }
+            }
+            results["experiment_type"] = "plasticity";
+        } else {
+            throw InvalidArgumentError("Unknown experiment type: " + experiment_type);
+        }
+        
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        results["total_steps"] = steps;
+        
+        return results;
+    }, py::arg("experiment_type"), py::arg("steps"),
+         "Run quick predefined experiments with automatic statistics collection");
 
 } // namespace nlm

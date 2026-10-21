@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Version:** 0.1.0 | **Author:** NLM Research Team | **License:** MIT
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -10,7 +12,12 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+**NLM Architecture:** All systems are now integrated into a complete artificial brain!
+- 🧠 **Brain** - The virtual brain that thinks (spiking neural network)
+- 🌍 **World** - The environment the brain lives in (simulation space)
+- 🤖 **Agent** - The bridge connecting brain to world (sensory-motor interface)
+
+**New in Version 0.1.0:** Enhanced Python bindings with better error handling, convenience functions, and comprehensive integration!
 
 ---
 
@@ -58,6 +65,10 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
+# Enable learning features (NEW!)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
 # Run for 50 steps
 for step in range(50):
     world.update(0.1)  # Update world
@@ -69,19 +80,95 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+print("Total spikes:", brain.getTotalSpikeCount())
 ```
 
----
+### Example 3: Using Convenience Functions (NEW!)
 
-## Simple Analogy
+```python
+import pynlm
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+# Quick brain creation with convenience function
+brain = pynlm.quick_brain(200, "configs/default.cfg")
+brain.initialize()
+
+# Run complete simulation with statistics
+world = pynlm.createSimpleWorld()
+world.configure(20, 20, 8, 8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation with learning and statistics
+stats, final_stats = pynlm.run_agent_simulation(agent, world, 200, enable_learning=True)
+
+print("Simulation completed!")
+print("Final spike count:", final_stats["final_spike_count"])
+print("Average firing rate:", final_stats["average_firing_rate"])
+```
+
+### Example 4: Predefined Presets (NEW!)
+
+```python
+import pynlm
+
+# Create different types of brains with presets
+simple_brain = pynlm.create_brain_with_preset("simple", 100)
+complex_brain = pynlm.create_brain_with_preset("complex", 500)
+optimized_brain = pynlm.create_brain_with_preset("optimized", 200)
+
+# Initialize and use
+simple_brain.initialize()
+for i in range(50):
+    simple_brain.step(i)
+
+print(f"Simple brain: {simple_brain.getTotalNeuronCount()} neurons")
+```
+
+### Example 5: Error Handling (NEW!)
+
+```python
+import pynlm
+
+# Safe configuration with error handling
+try:
+    config = pynlm.createDefaultConfig()
+    config.set("neuron_count", 100)
+    
+    # Validate configuration
+    if pynlm.validate_config(config):
+        print("Configuration is valid!")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Save configuration safely
+    pynlm.save_config_to_file(config, "my_config.json")
+    
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+except pynlm.NLMError as e:
+    print(f"NLM error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Example 6: Quick Experiments (NEW!)
+
+```python
+import pynlm
+
+# Run quick predefined experiments
+results = pynlm.quick_experiment("memory", 100)
+print(f"Memory experiment: {results['total_spikes']} total spikes")
+
+results = pynlm.quick_experiment("learning", 100)
+print(f"Learning experiment: {results['total_spikes']} total spikes")
+
+results = pynlm.quick_experiment("plasticity", 100)
+print(f"Plasticity experiment: {results['total_spikes']} total spikes")
+```
 
 ---
 
@@ -143,7 +230,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (NEW!)
 
 ```python
 # These are all optional:
@@ -178,6 +265,32 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+### New Functions Available:
+
+#### `pynlm.quick_brain(neuron_count, config_file="")`
+Quick brain creation with optional config file.
+
+#### `pynlm.run_agent_simulation(agent, world, num_steps, enable_learning=False)`
+Run complete agent simulation with statistics.
+
+#### `pynlm.create_brain_with_preset(preset_name, neuron_count)`
+Create brains with predefined configurations ("simple", "complex", "optimized").
+
+#### `pynlm.create_agent_with_preset(preset_name, brain)`
+Create agent brains with behavior presets ("explorer", "learner", "methodical").
+
+#### `pynlm.save_config_to_file(config, filepath)`
+Save configuration with error handling.
+
+#### `pynlm.load_config_from_file(filepath)`
+Load configuration with error handling.
+
+#### `pynlm.validate_config(config)`
+Validate configuration and throw ConfigurationError on issues.
+
+#### `pynlm.quick_experiment(experiment_type, steps)`
+Run quick predefined experiments ("memory", "learning", "plasticity").
 
 ---
 
@@ -221,7 +334,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (NEW!)
 
 ```python
 import pynlm
@@ -269,6 +382,18 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+**NEW:**
+| What you want | Code |
+|--------------|------|
+| Quick brain | `pynlm.quick_brain(neuron_count, filepath)` |
+| Agent simulation | `pynlm.run_agent_simulation(agent, world, steps)` |
+| Brain presets | `pynlm.create_brain_with_preset(preset, count)` |
+| Agent presets | `pynlm.create_agent_with_preset(preset, brain)` |
+| Save config | `pynlm.save_config_to_file(config, "file.json")` |
+| Load config | `pynlm.load_config_from_file("file.json")` |
+| Validate config | `pynlm.validate_config(config)` |
+| Quick experiment | `pynlm.quick_experiment(type, steps)` |
+
 ---
 
 ## Troubleshooting
@@ -285,13 +410,32 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Configuration errors"**
+- Use `pynlm.validate_config()` to check for issues
+- Check that required keys exist and have valid values
+
+**"Unknown experiment type"**
+- Available types: "memory", "learning", "plasticity"
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Use the new convenience functions to simplify your code
 
-That's it! You're now ready to use NLM.
+**Pro Tips:**
+- Use presets for different brain types
+- Run quick experiments to test functionality
+- Use error handling to make your code robust
+- Leverage statistics collection in agent simulations
+
+That's it! You're now ready to use the enhanced NLM with all its new features and improved error handling.
+
+**Version 0.1.0 Features:** Enhanced Python bindings, convenience functions, better error handling, integrated systems, comprehensive documentation.
+
+The easy usage guide has been updated to reflect all the improvements made to the NLM project!
