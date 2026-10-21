@@ -132,12 +132,20 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
+    // Update last spike time for short-term plasticity
+    if (timestamp > pImpl->lastPreSpikeTime) {
+        pImpl->lastPreSpikeTime = static_cast<float>(timestamp);
+    }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
+    // Update last spike time for short-term plasticity
+    if (timestamp > pImpl->lastPostSpikeTime) {
+        pImpl->lastPostSpikeTime = static_cast<float>(timestamp);
     }
 }
 
@@ -177,8 +185,15 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Improved eligibility trace decay with better numerical stability
+    if (decayRate <= 0.0f || decayRate >= 1.0f) {
+        return; // Invalid decay rate
+    }
+    
     pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+    
+    // Better threshold check for near-zero values
+    if (std::abs(pImpl->eligibilityTrace) < 1e-6f) {
         pImpl->eligibilityTrace = 0.0f;
     }
 }
@@ -199,27 +214,40 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Decay short-term facilitation (Tsodyks-Markram model) with numerical stability
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Prevent numerical issues with very large exponents
+        timeSincePre = std::min(timeSincePre, 1000.0f); // Cap at 1000ms
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Clamp to prevent negative values due to numerical errors
+        pImpl->shortTermFacilitation = std::max(0.0f, pImpl->shortTermFacilitation);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression with improved stability
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
+        float timeSincePost = pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f;
+        float timeSincePre = pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f;
+        float timeSinceActivity = std::max(timeSincePost, timeSincePre);
+        // Recovery from depression toward 1.0 with bounded update
+        timeSinceActivity = std::min(timeSinceActivity, 1000.0f); // Cap at 1000ms
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Clamp to prevent exceeding bounds
+        pImpl->shortTermDepression = std::min(pImpl->shortTermDepression, 1.0f);
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Decay eligibility trace for reward-modulated learning with configurable rate
+    const float eligibilityDecayRate = 0.001f; // Fast decay, ~0.1% per timestep
+    if (std::abs(pImpl->eligibilityTrace) > 1e-6f) { // Only decay if trace is significant
+        decayEligibilityTrace(eligibilityDecayRate);
+    }
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Smooth weight clamping to prevent instability
+    if (pImpl->weight < Impl::MIN_WEIGHT) {
+        pImpl->weight = Impl::MIN_WEIGHT + (pImpl->weight - Impl::MIN_WEIGHT) * 0.1f;
+    } else if (pImpl->weight > Impl::MAX_WEIGHT) {
+        pImpl->weight = Impl::MAX_WEIGHT - (pImpl->weight - Impl::MAX_WEIGHT) * 0.1f;
+    }
 }
 
 void Synapse::reset() {
@@ -231,35 +259,43 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
+    // Proper random initialization based on synapse type with biological constraints
     if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
+        // Excitatory synapses: small positive weights with realistic range
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
+        // Excitatory synapses have moderate initial efficacy with variability
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->efficacy *= rng.uniformReal(0.9f, 1.1f); // Add some variation
     } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
+        // Inhibitory synapses: negative weights with realistic range
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->efficacy *= rng.uniformReal(0.9f, 1.1f);
     } else {
-        // Other types: small random weights
+        // Other types: small random weights with higher variance
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        // Add more variation for other types
+        pImpl->efficacy *= rng.uniformReal(0.8f, 1.2f);
     }
     
-    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    // Random delay with biological plausibility (1-10 steps = 1-10ms)
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 10));
     
-    // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    // Initialize short-term plasticity state with recovery bias
+    pImpl->shortTermDepression = 1.0f - rng.uniformReal(0.0f, 0.2f); // 0.8-1.0
+    pImpl->shortTermFacilitation = rng.uniformReal(0.0f, 0.3f); // 0-0.3
     
-    // Initialize eligibility trace to 0
+    // Initialize eligibility trace to 0 (no prior reward-modulated learning)
     pImpl->eligibilityTrace = 0.0f;
     
-    // Initialize last spike times
+    // Initialize last spike times to indicate no activity yet
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Ensure weight is within valid bounds after randomization
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
 }
 
 } // namespace nlm
