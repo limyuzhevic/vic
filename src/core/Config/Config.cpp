@@ -3,11 +3,17 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <map>
+#include <any>
+#include <typeindex>
+#include <cassert>
 
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    // Use map for O(log n) lookups, better than vector for larger configs
+    std::map<std::string, ConfigEntry> entries;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -28,7 +34,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -40,6 +48,11 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty()) {
+                // Log warning: missing key
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -56,11 +69,15 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (!argv) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 3 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
@@ -69,7 +86,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg.size() >= 2 && arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
@@ -84,9 +101,9 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
+    for (const auto& [key, entry] : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
     return true;
@@ -94,15 +111,13 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
+    auto it = pImpl->entries.find(key);
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<T>(it->second.value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -115,14 +130,18 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (key.empty()) {
+        // Log error: cannot set empty key
+        return;
+    }
+    
+    auto it = pImpl->entries.find(key);
     
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        it->second.value = value;
+        it->second.source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace(key, ConfigEntry{key, value, source});
     }
 }
 
@@ -143,24 +162,21 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->entries.find(key) != pImpl->entries.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    pImpl->entries.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    for (const auto& [key, entry] : pImpl->entries) {
+        keys.push_back(key);
     }
+    
     return keys;
 }
 
@@ -171,8 +187,9 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+    
+    for (const auto& [key, entry] : pImpl->entries) {
+        oss << "  " << key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
