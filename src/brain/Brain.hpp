@@ -44,9 +44,14 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Forward declarations for new architecture
+class BrainCore;
+class BrainSimulation;
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// NEW ARCHITECTURE: Delegates to BrainCore and BrainSimulation modules
 
 class Brain {
 public:
@@ -193,9 +198,18 @@ public:
     // Logging
     void logStatus() const;
     
+    // New architecture integration
+    BrainCore* getBrainCore() const { return brainCore_.get(); }
+    BrainSimulation* getBrainSimulation() const { return brainSimulation_.get(); }
+    
 private:
+    // Legacy implementation (for backward compatibility)
     struct Impl;
     Impl* pImpl;
+    
+    // New architecture modules
+    std::unique_ptr<BrainCore> brainCore_;
+    std::unique_ptr<BrainSimulation> brainSimulation_;
 };
 
 } // namespace nlm

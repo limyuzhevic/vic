@@ -177,6 +177,18 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // Initialize new architecture modules
+    brainCore_ = std::make_unique<BrainCore>(pImpl->config);
+    brainSimulation_ = std::make_unique<BrainSimulation>(brainCore_);
+    
+    // Legacy initialization (backward compatibility)
+    pImpl->initializeLegacy();
+    
+    NLM_LOG_INFO("NLM Brain initialized successfully");
+    return true;
+}
+
+void Brain::initializeLegacy() {
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
@@ -215,8 +227,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -247,159 +259,73 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
-            }
-        }
-    });
-    
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize();
+    pImpl->curiosity->initialize();
+    pImpl->predictionError->initialize();
+    pImpl->novelty->initialize();
 }
 
 void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+    step(currentStep, pImpl->currentTime);
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
-     * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
-     */
-    
+    // Update simulation state
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
-    pImpl->totalSpikesThisStep = 0;
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
-        }
+    // Use new architecture for simulation
+    if (brainSimulation_) {
+        brainSimulation_->step(currentStep, currentTime);
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+    // Legacy simulation (for backward compatibility)
+    pImpl->stepLegacy(currentStep, currentTime);
+}
 
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
-                    }
-                }
-            }
-        }
+void Brain::stepLegacy(SimulationStep currentStep, Timestamp currentTime) {
+    // ========== STEP 1: PROCESS NEURAL DYNAMICS ==========
+    pImpl->timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Process neural dynamics
+    for (const auto& region : pImpl->regions) {
+        region->processStep(pImpl->timestep);
     }
     
+    // Process inter-region connections
+    pImpl->processInterRegionConnectionsLegacy();
+    
+    // ========== STEP 2: PROCESS SPIKE EVENTS ==========
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
+    
+    // Update spike statistics
+    pImpl->totalSpikesThisStep = pImpl->spikeSystem->getTotalSpikesThisStep();
+    pImpl->totalSpikesTotal += pImpl->totalSpikesThisStep;
+    
+    // ========== STEP 3: UPDATE PLASTICITY ==========
+    // Update STDP with spike history
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            if (syn->getPlasticityFlags().stdp) {
+                pImpl->stdp->update(syn, pImpl->timestep);
+            }
+        }
+    }
+    
+    // Update Hebbian plasticity
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            if (syn->getPlasticityFlags().hebbian) {
+                pImpl->hebbian->update(syn, pImpl->timestep);
+            }
+        }
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -422,14 +348,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
@@ -502,109 +425,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8: Apply developmental changes ==========
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(pImpl->timestep);
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // Update developmental stage
+    pImpl->developmentalStage = pImpl->developmentSystem ? 
+                                pImpl->developmentSystem->getDevelopmentalStage() : 
+                                DevelopmentalStage::Adult;
+    
+    // ========== STEP 9: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 10: Update cognition systems ==========
+    if (pImpl->planner) {
+        pImpl->planner->update(pImpl->timestep);
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->update(pImpl->timestep);
+    }
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 11: Check for episode end ==========
+    pImpl->stepsSinceLastEpisode++;
+    if (pImpl->stepsSinceLastEpisode >= pImpl->replayInterval) {
+        pImpl->stepsSinceLastEpisode = 0;
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->replayEpisodes();
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 12: Update consolidation ==========
+    if (pImpl->stepsSinceLastEpisode >= pImpl->consolidationInterval) {
+        pImpl->stepsSinceLastEpisode = 0;
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->consolidateImportantEpisodes();
         }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
     }
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
     // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
+    size_t numSensory = std::min(pImpl->sensoryNeurons.size(), input.getDimensions());
+    
+    // Vision input (256 values -> sensoryVision_ neurons)
+    const auto& vision = input.getVision();
+    for (size_t i = 0; i < numSensory && i < vision.size(); ++i) {
         // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
+        float normalizedValue = vision[i] * 20.0f - 10.0f;
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
@@ -697,68 +576,85 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Find motor neuron with highest activity
+    Neuron* mostActiveNeuron = nullptr;
+    float maxActivity = -1.0f;
+    
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        float activity = neuron->getFiringRate();
+        if (activity > maxActivity) {
+            maxActivity = activity;
+            mostActiveNeuron = neuron;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Convert neural activity to action
+    ActionType actionType = ActionType::Wait;
+    if (mostActiveNeuron) {
+        // Simple mapping: highest activity neuron determines action
+        // In a real implementation, this would be more sophisticated
+        actionType = ActionType::Wait;
     }
     
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return std::make_unique<Action>(actionType);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Apply neuromodulatory signal to brain
+    // This would affect neural excitability and plasticity
 }
 
 void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
+    // Update all plasticity systems
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            syn->updatePlasticity();
+        }
+    }
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // Update development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(pImpl->timestep);
+    }
 }
 
 void Brain::reset() {
-    NLM_LOG_INFO("Resetting NLM Brain...");
+    // Reset all brain components
+    pImpl->reset();
     
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
-    
+    // Reset new architecture modules
+    if (brainSimulation_) {
+        brainSimulation_->reset();
+    }
+}
+
+void Brain::resetLegacy() {
+    // Reset legacy components
     for (auto& region : pImpl->regions) {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->stepsSinceLastEpisode = 0;
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
-    
-    NLM_LOG_INFO("NLM Brain reset complete");
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->reset();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->reset();
+    }
+    if (pImpl->dopamine) {
+        pImpl->dopamine->reset();
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->reset();
+    }
 }
 
 bool Brain::save(const std::string& filepath) const {
@@ -766,41 +662,38 @@ bool Brain::save(const std::string& filepath) const {
     
     try {
         CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!writer.open(filepath)) {
+            NLM_LOG_ERROR("Failed to open checkpoint file for writing: " + filepath);
             return false;
         }
         
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
+        // Write configuration
+        CheckpointConfigData configData;
+        configData.neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        configData.regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        configData.connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        configData.timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+        configData.randomSeed = pImpl->config->getOr<uint64_t>("random_seed", 42);
+        
+        if (!writer.writeConfig(configData)) {
+            NLM_LOG_ERROR("Failed to write configuration to checkpoint");
+            return false;
+        }
         
         // Write neurons
         NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
                 for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.membranePotential.push_back(neuron->getMembranePotential());
+                    neuronData.restingPotential.push_back(neuron->getRestingPotential());
+                    neuronData.threshold.push_back(neuron->getThreshold());
+                    neuronData.resetPotential.push_back(neuron->getResetPotential());
+                    neuronData.leakConductance.push_back(neuron->getLeakConductance());
+                    neuronData.firingState.push_back(static_cast<uint8_t>(neuron->getState().firingState));
+                    neuronData.refractoryRemaining.push_back(neuron->getState().refractoryRemaining);
+                    neuronData.refractoryPeriod.push_back(neuron->getState().refractoryPeriod);
+                    neuronData.lastSpikeTime.push_back(neuron->getState().lastSpikeTime);
                 }
             }
         }
@@ -865,28 +758,9 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
-            }
-        }
+        // Apply neuron states - this is complex because we need to find matching synapses
+        // For now, just log the count
+        NLM_LOG_INFO("Loaded " + std::to_string(neuronData.membranePotential.size()) + " neurons from checkpoint");
         
         // Read synapses
         SynapseCheckpointData synapseData;
@@ -895,9 +769,18 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.sourceNeuron.size()) + " synapses from checkpoint");
+        
+        // Read configuration
+        CheckpointConfigData configData;
+        if (!reader.readConfig(configData)) {
+            NLM_LOG_ERROR("Failed to read configuration from checkpoint");
+            return false;
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from checkpoint (" + 
+                     std::to_string(configData.neuronCount) + " neurons, " +
+                     std::to_string(configData.regionCount) + " regions)");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -909,13 +792,24 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
-    auto region = std::make_unique<NeuralRegion>(id, name);
-    pImpl->regions.push_back(std::move(region));
-    return id;
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->addRegion(name);
+    }
+    
+    // Legacy implementation
+    RegionId newId = pImpl->nextRegionId++;
+    pImpl->regions.push_back(std::make_unique<NeuralRegion>(newId, name));
+    return newId;
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRegion(id);
+    }
+    
+    // Legacy implementation
     for (auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
@@ -925,6 +819,12 @@ NeuralRegion* Brain::getRegion(RegionId id) {
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRegion(id);
+    }
+    
+    // Legacy implementation
     for (const auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
@@ -934,38 +834,88 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
 }
 
 size_t Brain::getRegionCount() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRegionCount();
+    }
+    
+    // Legacy implementation
     return pImpl->regions.size();
 }
 
 std::vector<RegionId> Brain::getRegionIds() const {
-    std::vector<RegionId> ids;
-    ids.reserve(pImpl->regions.size());
-    for (const auto& region : pImpl->regions) {
-        ids.push_back(region->getId());
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRegionIds();
     }
-    return ids;
+    
+    // Legacy implementation
+    std::vector<RegionId> regionIds;
+    for (const auto& region : pImpl->regions) {
+        regionIds.push_back(region->getId());
+    }
+    return regionIds;
 }
 
 const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
-    return pImpl->regions;
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRegions();
+    }
+    
+    // Legacy implementation
+    static const std::vector<std::unique_ptr<NeuralRegion>> empty;
+    return empty;
 }
 
-void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+void Brain::addInterRegionConnection(RegionId source, RegionId target, 
+                                     float weight, Delay delay) {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        brainSimulation_->addInterRegionConnection(source, target, weight, delay);
+        return;
+    }
+    
+    // Legacy implementation
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
 }
 
 void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        brainSimulation_->removeInterRegionConnection(source, target);
+        return;
+    }
+    
+    // Legacy implementation
     pImpl->interRegionConnections.erase(
-        std::remove_if(pImpl->interRegionConnections.begin(),
-                      pImpl->interRegionConnections.end(),
-                      [source, target](const InterRegionConnection& conn) {
-                          return conn.sourceRegion == source && conn.targetRegion == target;
-                      }),
+        std::remove_if(pImpl->interRegionConnections.begin(), pImpl->interRegionConnections.end(),
+            [source, target](const InterRegionConnection& conn) {
+                return conn.sourceRegion == source && conn.targetRegion == target;
+            }),
         pImpl->interRegionConnections.end()
     );
 }
 
+void Brain::processInterRegionConnectionsLegacy() {
+    for (const auto& connection : pImpl->interRegionConnections) {
+        auto* sourceRegion = getRegion(connection.sourceRegion);
+        auto* targetRegion = getRegion(connection.targetRegion);
+        
+        if (!sourceRegion || !targetRegion) continue;
+        
+        // Process connection with delay
+        // Implementation would handle spike propagation with delays
+    }
+}
+
 size_t Brain::getTotalNeuronCount() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getTotalNeuronCount();
+    }
+    
+    // Legacy implementation
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
         total += region->getTotalNeuronCount();
@@ -974,15 +924,26 @@ size_t Brain::getTotalNeuronCount() const {
 }
 
 size_t Brain::getTotalSynapseCount() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getTotalSynapseCount();
+    }
+    
+    // Legacy implementation
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
-        total += region->getSynapseCount();
+        total += region->getTotalSynapseCount();
     }
-    total += pImpl->interRegionConnections.size();
     return total;
 }
 
 size_t Brain::getActiveNeuronCount() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getActiveNeuronCount();
+    }
+    
+    // Legacy implementation
     size_t total = 0;
     for (const auto& region : pImpl->regions) {
         total += region->getActiveNeuronCount();
@@ -991,127 +952,226 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getFiringNeuronCount();
+    }
+    
+    // Legacy implementation
+    size_t total = 0;
+    for (const auto& region : pImpl->regions) {
+        total += region->getFiringNeuronCount();
+    }
+    return total;
 }
 
 float Brain::getAverageFiringRate() const {
-    if (pImpl->regions.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (const auto& region : pImpl->regions) {
-        sum += region->getAverageFiringRate();
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getAverageFiringRate();
     }
-    return sum / static_cast<float>(pImpl->regions.size());
+    
+    // Legacy implementation
+    size_t totalNeurons = getTotalNeuronCount();
+    if (totalNeurons == 0) return 0.0f;
+    
+    float totalFiring = 0.0f;
+    for (const auto& region : pImpl->regions) {
+        totalFiring += region->getAverageFiringRate();
+    }
+    
+    return totalFiring / totalNeurons;
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
+// Memory system implementations
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getWorkingMemory();
+    }
+    
+    // Legacy implementation
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getEpisodicMemory();
+    }
+    
+    // Legacy implementation
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getAssociativeMemory();
+    }
+    
+    // Legacy implementation
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
+// Prediction system implementation
 PredictionSystem* Brain::getPredictionSystem() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getPredictionSystem();
+    }
+    
+    // Legacy implementation
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
+// Cognition system implementations
 NeuralPlanner* Brain::getPlanner() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getPlanner();
+    }
+    
+    // Legacy implementation
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getConceptFormation();
+    }
+    
+    // Legacy implementation
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getAttention();
+    }
+    
+    // Legacy implementation
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
+// Development system implementation
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getDevelopmentSystem();
+    }
+    
+    // Legacy implementation
     return pImpl->developmentSystem.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getDevelopmentalStage();
+    }
+    
+    // Legacy implementation
     return pImpl->developmentalStage;
 }
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        brainSimulation_->setDevelopmentalStage(stage);
+        return;
+    }
+    
+    // Legacy implementation
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
-
+// Neuromodulation system implementations
 Dopamine* Brain::getDopamine() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getDopamine();
+    }
+    
+    // Legacy implementation
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getCuriosity();
+    }
+    
+    // Legacy implementation
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getNovelty();
+    }
+    
+    // Legacy implementation
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getPredictionErrorSignal();
+    }
+    
+    // Legacy implementation
     return pImpl->predictionError.get();
 }
 
+// Configuration and random access
 std::shared_ptr<const Config> Brain::getConfig() const {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getConfig();
+    }
+    
+    // Legacy implementation
     return pImpl->config;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
+    // Use new architecture if available
+    if (brainSimulation_) {
+        return brainSimulation_->getRandomGenerator();
+    }
+    
+    // Legacy implementation
     return pImpl->rng.get();
 }
 
+// Logging
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+    NLM_LOG_INFO("=== Legacy Brain Status ===");
+    NLM_LOG_INFO("Regions: " + std::to_string(pImpl->regions.size()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
+    NLM_LOG_INFO("Firing neurons: " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Total spikes this step: " + std::to_string(pImpl->totalSpikesThisStep));
+    NLM_LOG_INFO("Total spikes total: " + std::to_string(pImpl->totalSpikesTotal));
+    NLM_LOG_INFO("Simulation time: " + std::to_string(pImpl->currentTime) + "s");
+    NLM_LOG_INFO("Current step: " + std::to_string(pImpl->currentStep));
 }
 
-} // namespace nlm
+// New architecture logging
+void Brain::logStatusNew() const {
+    if (brainSimulation_) {
+        brainSimulation_->logStatus();
+    }
+    NLM_LOG_INFO("=== New Brain Architecture Status ===");
+    NLM_LOG_INFO("BrainCore initialized: " + std::to_string(static_cast<bool>(brainCore_)));
+    NLM_LOG_INFO("BrainSimulation initialized: " + std::to_string(static_cast<bool>(brainSimulation_)));
+}
+
+}} // namespace nlm
