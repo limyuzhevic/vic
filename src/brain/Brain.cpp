@@ -1017,6 +1017,15 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+// Additional memory system accessors for completeness
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return nullptr; // Placeholder - to be implemented
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return nullptr; // Placeholder - to be implemented
+}
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {

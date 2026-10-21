@@ -1,3 +1,4 @@
+// Enhanced Config.hpp with validation and better defaults
 #pragma once
 
 #include <string>
@@ -5,6 +6,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
 
 namespace nlm {
 
@@ -31,19 +34,48 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
+// Configuration validation error
+struct ConfigValidationError {
     std::string key;
-    ConfigValue value;
+    std::string message;
     ConfigSource source;
-    std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigValidationError(const std::string& k, const std::string& msg, ConfigSource s)
+        : key(k), message(msg), source(s) {}
 };
 
-// Main configuration class
+// Type constraint for configuration values
+enum class ConfigType {
+    INT,
+    INT64,
+    DOUBLE,
+    BOOL,
+    STRING,
+    INT_VECTOR,
+    DOUBLE_VECTOR,
+    STRING_VECTOR,
+    NONE
+};
+
+// Parameter constraints
+struct ConfigConstraint {
+    std::string key;
+    ConfigType type;
+    std::optional<double> minValue;
+    std::optional<double> maxValue;
+    std::optional<std::string> description;
+    bool required;
+    
+    ConfigConstraint(const std::string& k, ConfigType t) 
+        : key(k), type(t), required(false) {}
+    
+    ConfigConstraint(const std::string& k, ConfigType t, double min, double max) 
+        : key(k), type(t), minValue(min), maxValue(max), required(false) {}
+    
+    bool validate(const ConfigValue& value, std::vector<ConfigValidationError>& errors) const;
+};
+
+// Main configuration class with validation
 class Config {
 public:
     Config();
@@ -64,14 +96,14 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with validation
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +125,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateAll() const;
+    std::vector<ConfigValidationError> getValidationErrors() const;
+    void clearValidationErrors();
+    
+    // Configuration schema management
+    void registerParameter(const ConfigConstraint& constraint);
+    bool isParameterRegistered(const std::string& key) const;
+    
+    // Default values management
+    void setDefault(const std::string& key, const ConfigValue& value);
+    bool hasDefault(const std::string& key) const;
+    
+    // Configuration history for debugging
+    void logChanges() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +148,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool validateValue(const ConfigConstraint& constraint, const ConfigValue& value, ConfigSource source) const;
+    
+    // Validation errors
+    mutable std::vector<ConfigValidationError> validationErrors;
 };
 
 } // namespace nlm
