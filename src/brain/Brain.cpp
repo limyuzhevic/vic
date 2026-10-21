@@ -649,14 +649,38 @@ const SpikeSystem* Brain::getSpikeSystem() const {
 }
 
 STDP* Brain::getSTDP() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getSTDP: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->stdp) {
+        NLM_LOG_WARNING("Brain::getSTDP: STDP system not initialized");
+        return nullptr;
+    }
     return pImpl->stdp.get();
 }
 
 Hebbian* Brain::getHebbian() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getHebbian: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->hebbian) {
+        NLM_LOG_WARNING("Brain::getHebbian: Hebbian system not initialized");
+        return nullptr;
+    }
     return pImpl->hebbian.get();
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getStructuralPlasticity: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->structuralPlasticity) {
+        NLM_LOG_WARNING("Brain::getStructuralPlasticity: Structural plasticity system not initialized");
+        return nullptr;
+    }
     return pImpl->structuralPlasticity.get();
 }
 
@@ -736,6 +760,11 @@ void Brain::develop() {
 }
 
 void Brain::reset() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::reset: pImpl is null");
+        return;
+    }
+    
     NLM_LOG_INFO("Resetting NLM Brain...");
     
     pImpl->currentStep = 0;
@@ -746,10 +775,19 @@ void Brain::reset() {
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
-        region->reset();
+        if (region) {
+            region->reset();
+        } else {
+            NLM_LOG_WARNING("Brain::reset: Found null region in regions list");
+        }
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    } else {
+        NLM_LOG_WARNING("Brain::reset: spikeSystem is null");
+    }
+    
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -757,6 +795,12 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -916,20 +960,34 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getRegion: pImpl is null");
+        return nullptr;
+    }
+    
     for (auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Brain::getRegion: Region " + std::to_string(id) + " not found");
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getRegion (const): pImpl is null");
+        return nullptr;
+    }
+    
     for (const auto& region : pImpl->regions) {
         if (region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Brain::getRegion (const): Region " + std::to_string(id) + " not found");
     return nullptr;
 }
 
@@ -1006,74 +1064,186 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getWorkingMemory: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->workingMemory) {
+        NLM_LOG_WARNING("Brain::getWorkingMemory: Working memory system not initialized");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getEpisodicMemory: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_WARNING("Brain::getEpisodicMemory: Episodic memory system not initialized");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getAssociativeMemory: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_WARNING("Brain::getAssociativeMemory: Associative memory system not initialized");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getPredictionSystem: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_WARNING("Brain::getPredictionSystem: Prediction system not initialized");
+        return nullptr;
+    }
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
 NeuralPlanner* Brain::getPlanner() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getPlanner: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->planner) {
+        NLM_LOG_WARNING("Brain::getPlanner: Neural planner system not initialized");
+        return nullptr;
+    }
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getConceptFormation: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_WARNING("Brain::getConceptFormation: Concept formation system not initialized");
+        return nullptr;
+    }
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getAttention: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->attention) {
+        NLM_LOG_WARNING("Brain::getAttention: Attention system not initialized");
+        return nullptr;
+    }
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getDevelopmentSystem: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->developmentSystem) {
+        NLM_LOG_WARNING("Brain::getDevelopmentSystem: Development system not initialized");
+        return nullptr;
+    }
     return pImpl->developmentSystem.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getDevelopmentalStage: pImpl is null");
+        return DevelopmentalStage::Initial;
+    }
     return pImpl->developmentalStage;
 }
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::setDevelopmentalStage: pImpl is null");
+        return;
+    }
     pImpl->developmentalStage = stage;
 }
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getDopamine: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->dopamine) {
+        NLM_LOG_WARNING("Brain::getDopamine: Dopamine system not initialized");
+        return nullptr;
+    }
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getCuriosity: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->curiosity) {
+        NLM_LOG_WARNING("Brain::getCuriosity: Curiosity system not initialized");
+        return nullptr;
+    }
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getNovelty: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->novelty) {
+        NLM_LOG_WARNING("Brain::getNovelty: Novelty system not initialized");
+        return nullptr;
+    }
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getPredictionErrorSignal: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->predictionError) {
+        NLM_LOG_WARNING("Brain::getPredictionErrorSignal: Prediction error system not initialized");
+        return nullptr;
+    }
     return pImpl->predictionError.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getConfig: pImpl is null");
+        return nullptr;
+    }
     return pImpl->config;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getRandomGenerator: pImpl is null");
+        return nullptr;
+    }
+    if (!pImpl->rng) {
+        NLM_LOG_WARNING("Brain::getRandomGenerator: Random generator not initialized");
+        return nullptr;
+    }
     return pImpl->rng.get();
 }
 

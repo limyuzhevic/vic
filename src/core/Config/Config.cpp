@@ -18,41 +18,162 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Validate a single configuration value
+bool Config::validateEntry(const ConfigEntry& entry) const {
+    std::string key = entry.key;
+    std::string valueStr = "";
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Convert value to string for validation
+    std::visit([&valueStr](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            valueStr = val;
+        } else if constexpr (std::is_same_v<T, int>) {
+            valueStr = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            valueStr = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            valueStr = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            valueStr = val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            valueStr = "[int]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            valueStr = "[double]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            valueStr = "[string]";
+        }
+    }, entry.value);
+    
+    // Key validation
+    if (key.empty()) {
+        NLM_LOG_ERROR("Configuration key cannot be empty");
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Key character validation (alphanumeric and underscores)
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-') {
+            NLM_LOG_ERROR("Invalid character in configuration key: '" + std::string(1, c) + "'. Keys must contain only alphanumeric characters, underscores, or hyphens");
+            return false;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    }
+    
+    // Value validation based on key
+    if (key == "neuron_count" || key == "region_count") {
+        try {
+            int64_t val = std::get<int64_t>(entry.value);
+            if (val <= 0) {
+                NLM_LOG_ERROR("Invalid " + key + ": " + valueStr + ". Must be greater than 0");
+                return false;
+            }
+        } catch (const std::bad_variant_access&) {
+            NLM_LOG_ERROR("Invalid value type for " + key + ". Expected integer");
+            return false;
+        }
+    } else if (key == "connection_probability" || key == "dopamine_baseline" || key == "plasticity_learning_rate" || 
+               key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "stdp_time_constant" ||
+               key == "development_synaptogenesis_rate" || key == "development_pruning_rate" ||
+               key == "dopamine_excitability" || key == "dopamine_plasticity" ||
+               key == "reward_discount_factor" || key == "simulation_timestep" ||
+               key == "visualization_update_rate") {
+        try {
+            double val = std::get<double>(entry.value);
+            if (val < 0.0) {
+                NLM_LOG_ERROR("Invalid " + key + ": " + valueStr + ". Must be non-negative");
+                return false;
             }
             
-            set(key, value, ConfigSource::File);
+            // Additional range validation for specific parameters
+            if (key == "connection_probability" || key == "dopamine_baseline" || key == "plasticity_learning_rate" ||
+                key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "dopamine_excitability" ||
+                key == "dopamine_plasticity" || key == "reward_discount_factor") {
+                if (val > 1.0) {
+                    NLM_LOG_ERROR("Invalid " + key + ": " + valueStr + ". Must be between 0.0 and 1.0");
+                    return false;
+                }
+            }
+            
+            if (key == "simulation_timestep" || key == "stdp_time_constant" || key == "visualization_update_rate") {
+                if (val <= 0.0 || val > 1000.0) {
+                    NLM_LOG_ERROR("Invalid " + key + ": " + valueStr + ". Must be between 0.001 and 1000.0");
+                    return false;
+                }
+            }
+        } catch (const std::bad_variant_access&) {
+            NLM_LOG_ERROR("Invalid value type for " + key + ". Expected floating point number");
+            return false;
+        }
+    } else if (key == "log_level" || key == "log_to_file") {
+        try {
+            int val = std::get<int>(entry.value);
+            if (key == "log_level" && (val < 0 || val > 3)) {
+                NLM_LOG_ERROR("Invalid log_level: " + valueStr + ". Must be between 0 and 3");
+                return false;
+            }
+        } catch (const std::bad_variant_access&) {
+            NLM_LOG_ERROR("Invalid value type for " + key + ". Expected integer");
+            return false;
+        }
+    } else if (key == "max_simulation_steps") {
+        try {
+            int64_t val = std::get<int64_t>(entry.value);
+            if (val < 0 || val > 1000000) {
+                NLM_LOG_ERROR("Invalid max_simulation_steps: " + valueStr + ". Must be between 0 and 1,000,000");
+                return false;
+            }
+        } catch (const std::bad_variant_access&) {
+            NLM_LOG_ERROR("Invalid value type for " + key + ". Expected integer");
+            return false;
         }
     }
     
     return true;
+}
+
+// Validate all configuration entries
+bool Config::validateAll() const {
+    NLM_LOG_INFO("Validating all configuration entries...");
+    
+    bool allValid = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!validateEntry(entry)) {
+            NLM_LOG_ERROR("Validation failed for key: " + entry.key);
+            allValid = false;
+        }
+    }
+    
+    // Check for critical missing values with sensible defaults
+    std::vector<std::string> criticalKeys = {
+        "neuron_count", "region_count", "connection_probability", 
+        "simulation_timestep", "random_seed"
+    };
+    
+    for (const auto& key : criticalKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing critical configuration key: '" + key + "'. Using sensible default.");
+            // Set sensible defaults
+            if (key == "neuron_count") {
+                set(key, static_cast<int64_t>(500), ConfigSource::Default);
+            } else if (key == "region_count") {
+                set(key, static_cast<int64_t>(1), ConfigSource::Default);
+            } else if (key == "connection_probability") {
+                set(key, 0.15f, ConfigSource::Default);
+            } else if (key == "simulation_timestep") {
+                set(key, 0.001, ConfigSource::Default);
+            } else if (key == "random_seed") {
+                set(key, static_cast<int64_t>(42), ConfigSource::Default);
+            }
+        }
+    }
+    
+    if (allValid) {
+        NLM_LOG_INFO("All configuration entries are valid.");
+    } else {
+        NLM_LOG_ERROR("Configuration validation failed.");
+    }
+    
+    return allValid;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
