@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/Action.hpp"
+#include "../agent/AgentBody.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -89,8 +91,10 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
+    // Get a specific neuron by ID (for debugging and integration)
+    Neuron* getNeuron(NeuronId id);
+    
     // Statistics
-    float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
@@ -161,8 +165,9 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Get last planned action for integration
+    ActionType getLastPlannedAction() const;
+    void setLastPlannedAction(ActionType action);
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -189,6 +194,13 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Rest cycle state
+    bool isResting() const { return pImpl->isResting; }
+    size_t getRestStartStep() const { return pImpl->restStartStep; }
+    size_t getRestDurationSteps() const { return pImpl->restDurationSteps; }
+    void setRestStartStep(size_t step) { pImpl->restStartStep = step; }
+    void setRestDurationSteps(size_t duration) { pImpl->restDurationSteps = duration; }
     
     // Logging
     void logStatus() const;

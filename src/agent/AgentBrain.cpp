@@ -159,6 +159,73 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // NEW: Integrate with brain's neural planner for higher-level planning
+    if (brain_->getPlanner() && brain_->getWorkingMemory()) {
+        // Get current state from working memory (already contains sensory input)
+        std::vector<float> currentState = brain_->getWorkingMemory()->retrieve();
+        
+        if (!currentState.empty()) {
+            // Use neural planner to get more intelligent action selection
+            // This goes beyond simple motor neuron activity to include planning
+            ActionType plannedAction = brain_->getPlanner()->planAction(
+                currentState, 
+                0.5f  // Default target reward for exploration
+            );
+            
+            // Convert ActionType to MotorCommand
+            // This maps planned actions to actual motor commands
+            MotorCommand plannedMotor = convertActionToMotorCommand(plannedAction);
+            
+            // Apply planned action if it's better than current decision
+            if (isBetterAction(plannedMotor, decoded)) {
+                decoded = plannedMotor;
+            }
+        }
+    }
+    
+    // Apply concept formation guidance
+    if (brain_->getConceptFormation() && conceptGuidanceEnabled_) {
+        // Get current working memory pattern
+        std::vector<float> currentPattern = brain_->getWorkingMemory()->retrieve();
+        if (!currentPattern.empty()) {
+            // Find matching concept
+            size_t conceptId = brain_->getConceptFormation()->getMatchingConcept(currentPattern);
+            
+            if (conceptId > 0) {
+                // Concept formation can provide guidance
+                // This can influence motor command selection based on learned patterns
+                const auto& concepts = brain_->getConceptFormation()->getConcepts();
+                if (conceptId < concepts.size()) {
+                    const auto& concept = concepts[conceptId];
+                    
+                    // Use concept category hint to guide action selection
+                    // This provides learned behavioral patterns
+                    if (!concept.categoryHint.empty()) {
+                        // Map concept hints to appropriate motor commands
+                        MotorCommand guidedCommand = conceptGuidanceToMotorCommand(concept.categoryHint);
+                        if (isAppropriateAction(guidedCommand, decoded)) {
+                            decoded = guidedCommand;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply attentional selection for prioritized action
+    if (brain_->getAttention() && attentionGuidanceEnabled_) {
+        // Get current attentional winners
+        const auto& winners = brain_->getAttention()->getWinners();
+        if (!winners.empty()) {
+            // Attentional focus can guide action selection
+            // Focus on actions related to attended neural populations
+            MotorCommand attendedAction = attentionToMotorCommand(winners);
+            if (attendedAction != MotorCommand::Wait) {
+                decoded = attendedAction;
+            }
+        }
+    }
+    
     return decoded;
 }
 
