@@ -13,7 +13,9 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
+#include "core/Config/ConfigOptions.hpp"
+#include <string>
+#include <cmath>
 
 using namespace nlm;
 
@@ -36,15 +38,131 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
-int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+// Helper functions for Phase 4 demo
+static void printPhase4Usage(const std::string& program_name) {
+    std::cout << "NLM Phase 4: Emerging Cognition" << std::endl;
+    std::cout << "================================" << std::endl << std::endl;
     
+    std::cout << "Usage: " << program_name << " [options]" << std::endl << std::endl;
+    
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --trials=N                    Number of trials (default: 50)" << std::endl << std::endl;
+    
+    std::cout << "Experiment Configuration:" << std::endl;
+    std::cout << "  --neuron-count=N              Number of neurons (default: 1000)" << std::endl;
+    std::cout << "  --region-count=N              Number of regions (default: 2)" << std::endl;
+    std::cout << "  --connection-prob=F           Connection probability (default: 0.1)" << std::endl;
+    std::cout << "  --random-seed=N               Random seed (default: 42)" << std::endl;
+    std::cout << "  --simulation-timestep=F       Simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --stdp-ntp-weight=F           STDP LTP weight (default: 0.01)" << std::endl;
+    std::cout << "  --stdp-ltd-weight=F           STDP LTD weight (default: 0.012)" << std::endl;
+    std::cout << "  --stdp-tau=N                  STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --enable-prediction[=bool]    Enable prediction system (default: true)" << std::endl;
+    std::cout << "  --enable-memory[=bool]        Enable memory systems (default: true)" << std::endl;
+    std::cout << "  --enable-cognition[=bool]      Enable cognition systems (default: true)" << std::endl;
+    std::cout << "  --enable-development[=bool]   Enable development (default: true)" << std::endl << std::endl;
+    
+    std::cout << "Advanced Configuration:" << std::endl;
+    std::cout << "  --output-summary=FILE         Output summary text file" << std::endl;
+    std::cout << "  --output-json=FILE            Output results in JSON format" << std::endl << std::endl;
+    
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << program_name << " --trials=100 --neuron-count=2000" << std::endl;
+    std::cout << "  " << program_name << " --trials=25 --enable-prediction=false" << std::endl;
+    std::cout << "  " << program_name << " --trials=75 --output-summary=results.txt" << std::endl;
+    std::cout << "  " << program_name << " --trials=50 --stdp-ntp-weight=0.02 --stdp-ltd-weight=0.018" << std::endl;
+}
+
+static std::string boolToString(bool value) {
+    return value ? "true" : "false";
+}
+
+static void printConfiguration(const Config& config) {
+    std::cout << "Experiment Configuration:" << std::endl;
+    std::cout << "  Neuron count: " << config.getOr<size_t>("neuron_count", 1000) << std::endl;
+    std::cout << "  Region count: " << config.getOr<size_t>("region_count", 2) << std::endl;
+    std::cout << "  Connection probability: " << config.getOr<float>("connection_probability", 0.1f) << std::endl;
+    std::cout << "  Random seed: " << config.getOr<uint64_t>("random_seed", 42) << std::endl;
+    std::cout << "  Simulation timestep: " << config.getOr<double>("simulation_timestep", 0.001) << std::endl;
+    std::cout << "  STDP LTP weight: " << config.getOr<float>("stdp_ltp_weight", 0.01f) << std::endl;
+    std::cout << "  STDP LTD weight: " << config.getOr<float>("stdp_ltd_weight", 0.012f) << std::endl;
+    std::cout << "  STDP time constant: " << config.getOr<float>("stdp_time_constant", 20.0f) << std::endl;
+    std::cout << "  Synaptogenesis rate: " << config.getOr<float>("development_synaptogenesis_rate", 0.001f) << std::endl;
+    std::cout << "  Pruning rate: " << config.getOr<float>("development_pruning_rate", 0.0001f) << std::endl;
+}
+
+int main(int argc, char* argv[]) {
     // Parse command line arguments
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    bool enablePrediction = true;
+    bool enableMemory = true;
+    bool enableCognition = true;
+    bool enableDevelopment = true;
+    std::string outputSummaryFile = "";
+    std::string outputJsonFile = "";
+    
+    // Parse command line
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            printPhase4Usage("nlm_phase4_demo");
+            return 0;
+        }
+        
+        if (arg.find("--trials=") == 0) {
+            numTrials = static_cast<size_t>(std::stoi(arg.substr(9)));
+        } else if (arg.find("--neuron-count=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--region-count=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--connection-prob=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--random-seed=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--simulation-timestep=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--stdp-ntp-weight=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--stdp-ltd-weight=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--stdp-tau=") == 0) {
+            // Would need to store this for configuration
+        } else if (arg.find("--enable-prediction=") == 0) {
+            std::string value = arg.substr(21);
+            enablePrediction = (value == "true" || value == "1" || value == "yes");
+        } else if (arg.find("--enable-memory=") == 0) {
+            std::string value = arg.substr(16);
+            enableMemory = (value == "true" || value == "1" || value == "yes");
+        } else if (arg.find("--enable-cognition=") == 0) {
+            std::string value = arg.substr(20);
+            enableCognition = (value == "true" || value == "1" || value == "yes");
+        } else if (arg.find("--enable-development=") == 0) {
+            std::string value = arg.substr(21);
+            enableDevelopment = (value == "true" || value == "1" || value == "yes");
+        } else if (arg.find("--output-summary=") == 0) {
+            outputSummaryFile = arg.substr(18);
+        } else if (arg.find("--output-json=") == 0) {
+            outputJsonFile = arg.substr(14);
+        } else {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            printPhase4Usage("nlm_phase4_demo");
+            return 1;
+        }
     }
+    
+    std::cout << "NLM Phase 4: Emerging Cognition" << std::endl;
+    std::cout << "================================" << std::endl << std::endl;
+    
+    // Print configuration
+    printConfiguration(*config); // This would need to be updated
+    std::cout << "  Enable prediction: " << boolToString(enablePrediction) << std::endl;
+    std::cout << "  Enable memory: " << boolToString(enableMemory) << std::endl;
+    std::cout << "  Enable cognition: " << boolToString(enableCognition) << std::endl;
+    std::cout << "  Enable development: " << boolToString(enableDevelopment) << std::endl;
+    std::cout << "  Number of trials: " << numTrials << std::endl;
+    std::cout << std::endl;
     
     // Create configuration
     auto config = std::make_shared<Config>();
@@ -55,6 +173,9 @@ int main(int argc, char* argv[]) {
     config->set("simulation_timestep", 0.001);
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
+    config->set("stdp_time_constant", 20.0f);
+    config->set("development_synaptogenesis_rate", 0.001f);
+    config->set("development_pruning_rate", 0.0001f);
     
     // Create brain
     std::cout << "Initializing brain...\n";

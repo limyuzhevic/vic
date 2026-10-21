@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * Phase6IntegratedExperiment - Phase 6 final integration test
+ * Phase6IntegratedExperiment - Updated version with NLMConfig support
  * 
  * This experiment demonstrates that the integrated brain systems work together:
  * - Memory systems are connected to neural processing
@@ -17,6 +17,7 @@
 
 #include "../experiments/Experiment.hpp"
 #include "../experiments/Metrics.hpp"
+#include "../core/Config/ConfigOptions.hpp"
 #include <vector>
 #include <string>
 #include <memory>
@@ -74,6 +75,7 @@ struct Phase6IntegrationResult {
 
 /**
  * Configuration for Phase 6 integration experiment
+ * Updated to support NLMConfig integration
  */
 struct Phase6Config {
     uint64_t maxSteps;
@@ -85,6 +87,9 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Integration with NLMConfig
+    NLMConfig nlm_config;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -94,6 +99,20 @@ struct Phase6Config {
         , enableReplay(true)
         , enableDevelopment(true)
         , checkpointPath("./checkpoint_test.bin") {}
+    
+    // Convert NLMConfig to Phase6-specific values
+    void fromNLMConfig(const NLMConfig& nlm) {
+        nlm_config = nlm;
+        
+        // Convert commonly used values
+        maxSteps = nlm.max_steps;
+        neuronCount = nlm.phase6_neuron_count;
+        regionCount = 1; // Keep simple for demo
+        connectionProbability = nlm.connection_probability;
+        enableCheckpointing = nlm.phase6_enable_checkpointing;
+        enableReplay = nlm.phase6_enable_replay;
+        enableDevelopment = nlm.phase6_enable_development;
+    }
 };
 
 /**

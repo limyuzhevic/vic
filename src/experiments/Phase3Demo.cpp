@@ -1,3 +1,6 @@
+// Main Phase 3 demonstration
+// Shows: experience -> neural activity -> action -> consequence -> learning
+
 #include "Phase3Experiment.hpp"
 #include "../agent/AgentBrain.hpp"
 #include "../agent/SensoryPercept.hpp"
