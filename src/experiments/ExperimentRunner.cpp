@@ -1,4 +1,10 @@
+// ExperimentRunner: Runs experiments and collects data
+
 #include "ExperimentRunner.hpp"
+#include "../brain/Brain.hpp"
+#include "../environment/Environment.hpp"
+#include <fstream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -8,10 +14,6 @@ struct ExperimentRunner::Impl {
     
     Impl() : globalSeed(42) {}
 };
-
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
-
-ExperimentRunner::~ExperimentRunner() = default;
 
 std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
     auto exp = std::make_shared<Experiment>(name);
@@ -112,9 +114,58 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
     pImpl->globalSeed = seed;
 }
 
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
-}
+// Save experiment results
+    bool ExperimentRunner::saveResults(const std::string& filepath) const {
+        try {
+            // Open output file
+            std::ofstream outfile(filepath);
+            if (!outfile.is_open()) {
+                NLM_LOG_ERROR("Failed to open output file: " + filepath);
+                return false;
+            }
+            
+            // Write header
+            outfile << "# NLM Experiment Results" << std::endl;
+            outfile << "# Generated: " << std::ctime(&std::time(nullptr));
+            outfile << std::endl;
+            
+            // Write each experiment
+            for (const auto& experiment : pImpl->experiments) {
+                outfile << "=== Experiment: " << experiment->getName() << " ===" << std::endl;
+                outfile << "Seed: " << experiment->getSeed() << std::endl;
+                outfile << std::endl;
+                
+                // Write step data
+                outfile << "StepData:" << std::endl;
+                const auto& stepData = experiment->getStepData();
+                outfile << "Step,NeuronCount,SynapseCount,FiringCount,AvgFiringRate" << std::endl;
+                for (const auto& step : stepData) {
+                    outfile << step.step << ","
+                            << step.neuronCount << ","
+                            << step.synapseCount << ","
+                            << step.firingCount << ","
+                            << std::fixed << std::setprecision(6) << step.avgFiringRate
+                            << std::endl;
+                }
+                outfile << std::endl;
+                
+                // Write metrics
+                outfile << "Metrics:" << std::endl;
+                const auto& metrics = experiment->getMetrics();
+                for (const auto& metric : metrics) {
+                    outfile << metric.first << ": " << std::fixed << std::setprecision(6) << metric.second << std::endl;
+                }
+                outfile << std::endl;
+            }
+            
+            outfile.close();
+            NLM_LOG_INFO("Experiment results saved to: " + filepath);
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception saving experiment results: ") + e.what());
+            return false;
+        }
+    }
 
 } // namespace nlm

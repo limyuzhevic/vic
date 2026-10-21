@@ -509,12 +509,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+// ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        // Update prediction system with current sensory input and state
+        // This enables predictive coding and forward models
+        
+        // Get current sensory activity from sensory neurons
+        std::vector<float> sensoryActivity;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            sensoryActivity.push_back(activation);
+        }
+        
+        // Feed to prediction system
+        pImpl->predictionSystem->update(sensoryActivity, pImpl->timestep);
+        
+        // Apply prediction error signals (computed by dopamine/prediction error)
+        // This guides learning about prediction accuracy
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getError();
+            if (std::abs(predictionError) > 0.01f) {
+                // Apply prediction error to modify synaptic weights
+                // This implements predictive learning
+                for (auto& region : pImpl->regions) {
+                    for (Synapse* syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stdp) {
+                            // Scale STDP learning by prediction error
+                            float errorFactor = std::min(1.0f, std::abs(predictionError));
+                            if (predictionError > 0.0f) {
+                                // Positive error: strengthen synapses (learning needed)
+                                float weight = syn->getWeight();
+                                syn->setWeight(weight * (1.0f + errorFactor * 0.1f));
+                            } else {
+                                // Negative error: weaken synapses (over-prediction)
+                                float weight = syn->getWeight();
+                                syn->setWeight(weight * (1.0f - errorFactor * 0.05f));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -526,12 +563,139 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+// ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
+        // Process current neural activity patterns to form concepts
+        // This enables abstraction and generalization from experiences
+        
+        // Get current neural activity patterns
+        std::vector<std::vector<float>> neuralPatterns;
+        
+        // Collect activity from all neurons
+        for (auto& region : pImpl->regions) {
+            std::vector<float> regionPattern;
+            for (auto* neuron : region->getAllNeurons()) {
+                float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                if (activation > 0.01f) {  // Only record active neurons
+                    regionPattern.push_back(activation);
+                }
+            }
+            if (!regionPattern.empty()) {
+                neuralPatterns.push_back(regionPattern);
+            }
+        }
+        
+// Feed patterns to concept formation system
+        if (!neuralPatterns.empty()) {
+            // Get the most recent pattern for concept formation
+            if (!neuralPatterns.empty()) {
+                const auto& mostRecentPattern = neuralPatterns.back();
+                std::vector<float> dummyFeatures(mostRecentPattern.size(), 0.5f);  // Placeholder features
+                size_t conceptId = pImpl->conceptFormation->presentExperience(mostRecentPattern, dummyFeatures, 0.5f, currentStep);
+                
+                // Log concept discovery if new concept formed
+                if (conceptId > 0 && pImpl->conceptFormation->getConceptCount() == 1) {
+                    NLM_LOG_INFO("ConceptFormation: Discovered first concept with " + std::to_string(mostRecentPattern.size()) + " features");
+                }
+            }
+        }
+        
+        // Apply formed concepts to attention and working memory
+        // This enables goal-directed behavior and planning
+        if (pImpl->attention && pImpl->workingMemory) {
+            // Get the current goal or use a simple one based on current state
+            if (pImpl->currentGoal_.empty()) {
+                // Create a simple goal from current neural activity
+                float totalActivity = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    }
+                }
+                float goalStrength = std::min(1.0f, totalActivity / 100.0f);
+                std::vector<float> goal(1, goalStrength);
+                pImpl->currentGoal_ = goal;
+            }
+            
+            // Check if current pattern matches any concept
+            if (!neuralPatterns.empty() && pImpl->conceptFormation->getConceptCount() > 0) {
+                size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(neuralPatterns.back());
+                if (matchingConcept > 0) {
+                    // Concept matched - apply to attention as top-down bias
+                    auto concept = pImpl->conceptFormation->getConceptPrototype(matchingConcept);
+                    if (!concept.empty() && pImpl->workingMemory) {
+                        // Use concept features to guide attention
+                        pImpl->attention->applyTopDownBias(NeuronId(1), concept[0] * 0.5f);
+                        
+                        // Store concept in working memory for planning
+                        pImpl->workingMemory->store(concept, concept[0]);
+                    }
+                }
+            }
+        }
+        
+        // ========== STEP 10.5: Use concepts to guide neural planning ==========
+        if (pImpl->planner && pImpl->currentGoal_.size() > 0) {
+            // Use concept formation to inform planning
+            // Get current context from working memory
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                // Create state vector from working memory
+                std::vector<float> currentState;
+                for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                    if (activation > 0.01f) {
+                        currentState.push_back(activation);
+                    }
+                }
+                
+                if (!currentState.empty()) {
+                    // Plan action based on current state and goal
+                    ActionType action = pImpl->planner->planAction(currentState, 
+                                                                  pImpl->currentGoal_.size() > 0 ? 0.5f : 0.1f);
+                    
+                    // If planner produces an action, apply it to motor system
+                    if (action != ActionType::Wait && action != ActionType::Idle) {
+                        // Find motor neurons and apply excitation
+                        for (NeuronId neuron : pImpl->motorNeurons) {
+                            pImpl->motorNeurons[0]->injectCurrent(50.0f);  // Apply action
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+        if (pImpl->planner && pImpl->currentGoal_.size() > 0) {
+            // Use concept formation to inform planning
+            // Get current context from working memory
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                // Create state vector from working memory
+                std::vector<float> currentState;
+                for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                    if (activation > 0.01f) {
+                        currentState.push_back(activation);
+                    }
+                }
+                
+                if (!currentState.empty()) {
+                    // Plan action based on current state and goal
+                    ActionType action = pImpl->planner->planAction(currentState, 
+                                                                  pImpl->currentGoal_.size() > 0 ? 0.5f : 0.1f);
+                    
+                    // If planner produces an action, apply it to motor system
+                    if (action != ActionType::Wait && action != ActionType::Idle) {
+                        // Find motor neurons and apply excitation
+                        for (NeuronId neuron : pImpl->motorNeurons) {
+                            pImpl->motorNeurons[0]->injectCurrent(50.0f);  // Apply action
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
@@ -896,8 +1060,8 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // For now, just log the count and note this needs proper implementation
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses (Note: synapse states not restored - needs proper implementation)");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
