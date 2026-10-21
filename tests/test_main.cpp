@@ -37,6 +37,22 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_metaplasticity {
+    void runAll();
+}
+
+namespace test_bcm {
+    void runAll();
+}
+
+namespace test_memory_enhanced {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +129,42 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running MetaPlasticityRule tests..." << std::endl;
+    try {
+        test_metaplasticity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running BCMRule tests..." << std::endl;
+    try {
+        test_bcm::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running MemoryEnhanced tests..." << std::endl;
+    try {
+        test_memory_enhanced::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

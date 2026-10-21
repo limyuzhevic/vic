@@ -95,6 +95,21 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Install the NLM CLI Python module
+install(FILES nlm_cli.py
+    DESTINATION pynlm
+)
+
+# Install Python package metadata
+install(FILES pyproject.toml
+    DESTINATION pynlm
+)
+
+install(FILES README.md
+    DESTINATION pynlm
+)
+
+# Installation targets
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm

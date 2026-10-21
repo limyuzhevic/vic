@@ -11,6 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/MemoryEnhanced.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -108,10 +109,20 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // Initialize enhanced memory systems
+        workingMemory = std::make_unique<nlm::NeuralWorkingMemoryEnhanced>();
+        episodicMemory = std::make_unique<nlm::NeuralEpisodicMemoryEnhanced>();
+        associativeMemory = std::make_unique<nlm::NeuralAssociativeMemoryEnhanced>();
+        
+        // Initialize enhanced memory types
+        auto* workingMemEnhanced = static_cast<nlm::NeuralWorkingMemoryEnhanced*>(workingMemory.get());
+        auto* episodicMemEnhanced = static_cast<nlm::NeuralEpisodicMemoryEnhanced*>(episodicMemory.get());
+        auto* associativeMemEnhanced = static_cast<nlm::NeuralAssociativeMemoryEnhanced*>(associativeMemory.get());
+        
+        // Initialize brain integration for enhanced memory systems
+        workingMemEnhanced->initialize(this);
+        episodicMemEnhanced->initialize(this);
+        associativeMemEnhanced->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -231,16 +242,37 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Initialize enhanced memory systems
+    pImpl->workingMemory = std::make_unique<nlm::NeuralWorkingMemoryEnhanced>();
+    pImpl->episodicMemory = std::make_unique<nlm::NeuralEpisodicMemoryEnhanced>();
+    pImpl->associativeMemory = std::make_unique<nlm::NeuralAssociativeMemoryEnhanced>();
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // Cast to enhanced versions for initialization
+    auto* workingMemEnhanced = static_cast<nlm::NeuralWorkingMemoryEnhanced*>(pImpl->workingMemory.get());
+    auto* episodicMemEnhanced = static_cast<nlm::NeuralEpisodicMemoryEnhanced*>(pImpl->episodicMemory.get());
+    auto* associativeMemEnhanced = static_cast<nlm::NeuralAssociativeMemoryEnhanced*>(pImpl->associativeMemory.get());
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize enhanced memory systems
+    workingMemEnhanced->initialize(this);
+    episodicMemEnhanced->initialize(this);
+    associativeMemEnhanced->initialize(this);
+    
+    // Configure enhanced memory systems
+    workingMemEnhanced->setCapacity(neuronCount / 10);
+    workingMemEnhanced->setDecayRate(0.01f);
+    workingMemEnhanced->setDecayTimeConstant(1000.0f);
+    workingMemEnhanced->setInterferenceThreshold(0.5f);
+    workingMemEnhanced->setCompetitionIntensity(1.0f);
+    
+    episodicMemEnhanced->setMaxEpisodes(1000);
+    episodicMemEnhanced->enableReplay(true);
+    
+    associativeMemEnhanced->setAssociationStrength(1.0f);
+    
+    // Initialize original memory systems (backward compatibility)
+    // pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+    // pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    // pImpl->associativeMemory = std::make_unique<NeuralAssociativeMemory>();
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -752,7 +784,21 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
+    // Reset enhanced memory systems
+    if (pImpl->workingMemory) {
+        auto* workingMemEnhanced = static_cast<nlm::NeuralWorkingMemoryEnhanced*>(pImpl->workingMemory.get());
+        if (workingMemEnhanced) workingMemEnhanced->clear();
+    }
+    if (pImpl->episodicMemory) {
+        auto* episodicMemEnhanced = static_cast<nlm::NeuralEpisodicMemoryEnhanced*>(pImpl->episodicMemory.get());
+        if (episodicMemEnhanced) episodicMemEnhanced->clear();
+    }
+    if (pImpl->associativeMemory) {
+        auto* associativeMemEnhanced = static_cast<nlm::NeuralAssociativeMemoryEnhanced*>(pImpl->associativeMemory.get());
+        if (associativeMemEnhanced) associativeMemEnhanced->clear();
+    }
+    
+    // Reset memory systems (backward compatibility)
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
@@ -1009,12 +1055,27 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+nlm::NeuralWorkingMemoryEnhanced* Brain::getWorkingMemoryEnhanced() {
+    auto* workingMemEnhanced = static_cast<nlm::NeuralWorkingMemoryEnhanced*>(pImpl->workingMemory.get());
+    return workingMemEnhanced;
+}
+
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+nlm::NeuralEpisodicMemoryEnhanced* Brain::getEpisodicMemoryEnhanced() {
+    auto* episodicMemEnhanced = static_cast<nlm::NeuralEpisodicMemoryEnhanced*>(pImpl->episodicMemory.get());
+    return episodicMemEnhanced;
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+nlm::NeuralAssociativeMemoryEnhanced* Brain::getAssociativeMemoryEnhanced() {
+    auto* associativeMemEnhanced = static_cast<nlm::NeuralAssociativeMemoryEnhanced*>(pImpl->associativeMemory.get());
+    return associativeMemEnhanced;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

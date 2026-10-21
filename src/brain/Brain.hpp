@@ -11,11 +11,16 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
+// Enhanced neural memory systems
+class NeuralWorkingMemoryEnhanced;
+class NeuralEpisodicMemoryEnhanced;
+class NeuralAssociativeMemoryEnhanced;
+class ProceduralMemoryEnhanced;
+class SemanticMemoryEnhanced;
+class EmotionalMemoryEnhanced;
+class MemoryGateway;
+
+// Original neural memory systems (maintained for backward compatibility)
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
@@ -141,12 +146,15 @@ public:
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
+    nlm::NeuralWorkingMemoryEnhanced* getWorkingMemoryEnhanced();
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    nlm::NeuralEpisodicMemoryEnhanced* getEpisodicMemoryEnhanced();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    nlm::NeuralAssociativeMemoryEnhanced* getAssociativeMemoryEnhanced();
     
     // ========== PREDICTION SYSTEM ==========
     

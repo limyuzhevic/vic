@@ -43,6 +43,19 @@ add_library(nlm_core STATIC
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/AsynchronousSTDP.cpp
+    src/plasticity/TripletSTDP.cpp
+    src/plasticity/PairwiseSTDP.cpp
+    src/plasticity/OjaRule.cpp
+    src/plasticity/BCMRule.cpp
+    src/plasticity/CompetitiveHebbian.cpp
+    src/plasticity/DopamineGatedSTDP.cpp
+    src/plasticity/EligibilityTraceSTDP.cpp
+    src/plasticity/PolicyGradientPlasticity.cpp
+    src/plasticity/MetaPlasticityRule.cpp
+    src/plasticity/ActivityDependentSynaptogenesis.cpp
+    src/plasticity/CompetitionForResources.cpp
+    src/plasticity/AxonalDendriticGrowth.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
@@ -62,6 +75,7 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/MemoryEnhanced.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -139,13 +153,42 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Command-line tools
+add_subdirectory(tools)
+
+# Python bindings
+enable_testing()
+add_subdirectory(python)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
+# Install targets
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Tools installation
+install(DIRECTORY tools/
+    DESTINATION bin
+    FILES_MATCHING PATTERN "*.cpp" PATTERN "*.h" PATTERN "*.hpp"
+)
+
+# Python bindings installation
+install(DIRECTORY python/
+    DESTINATION pynlm
+    FILES_MATCHING PATTERN "*.py" PATTERN "*.cpp" PATTERN "*.h" PATTERN "CMakeLists.txt"
+)
+
+# Tools installation
+install(DIRECTORY tools/
+    DESTINATION bin
+    FILES_MATCHING PATTERN "*.cpp" PATTERN "*.h" PATTERN "*.hpp"
+    OPTIONAL
+)
+
+# Include tools CMakeLists.txt
+add_subdirectory(tools)
