@@ -193,6 +193,58 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== CONVENIENCE FACTORY METHODS ==========
+    
+    // Static factory method for default brain configuration
+    static Brain createDefaultBrain();
+    
+    // Batch configuration method
+    void configure(const std::map<std::string, std::string>& configValues);
+    
+    // ========== BATCH OPERATION METHODS ==========
+    
+    // Bulk neuron creation
+    std::vector<NeuronId> addNeurons(size_t count, NeuronType type = NeuronType::Internal);
+    
+    // Batch connectivity setup between regions
+    void connectRegions(RegionId sourceRegion, const std::vector<RegionId>& targetRegions,
+                       float weight = 1.0f, Delay delay = 1);
+    
+    // ========== RESET AND REINITIALIZATION ==========
+    
+    // Reset and reinitialize brain
+    void resetAndInitialize();
+    
+    // ========== PYTHONIC API - PROPERTY-LIKE ACCESS ==========
+    
+    // Python property-like access for neuron counts
+    size_t getNeuronCount() const { return getTotalNeuronCount(); }
+    size_t getSynapseCount() const { return getTotalSynapseCount(); }
+    
+    // Python property-like access for firing statistics
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikes() const { return getTotalSpikeCount(); }
+    size_t getPendingSpikes() const { return getPendingSpikeEventCount(); }
+    
+    // ========== STATISTICS METHODS ==========
+    
+    // Get neuron statistics
+    std::string getNeuronStats() const;
+    
+    // Get synapse statistics
+    std::string getSynapseStats() const;
+    
+    // ========== BATCH OPERATION METHODS ==========
+    
+    // Step multiple steps
+    void stepMultiple(size_t steps);
+    
+    // Inject current into all neurons
+    void injectCurrentAll(MembranePotential current);
+    
+    // Inject current to neurons of specific type
+    void injectCurrentAllToType(NeuronType type, MembranePotential current);
+    
 private:
     struct Impl;
     Impl* pImpl;

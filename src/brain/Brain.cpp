@@ -1105,6 +1105,22 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+        // Memory system status
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Neuromodulation status
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    // Development status
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
@@ -1114,4 +1130,253 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// ========== CONVENIENCE FACTORY METHODS ==========
+
+Brain Brain::createDefaultBrain() {
+    // Create default configuration
+    auto config = std::make_shared<Config>("default");
+    
+    // Set sensible defaults for a simple brain
+    config->set<size_t>("neuron_count", 1000);
+    config->set<size_t>("region_count", 1);
+    config->set<float>("connection_probability", 0.1f);
+    config->set<double>("simulation_timestep", 0.001);
+    config->set<size_t>("random_seed", 42);
+    config->set<float>("stdp_ltp_weight", 0.01f);
+    config->set<float>("stdp_ltd_weight", 0.012f);
+    config->set<float>("stdp_tau", 20.0f);
+    config->set<float>("synaptogenesis_rate", 0.0001f);
+    config->set<float>("pruning_rate", 0.00001f);
+    config->set<size_t>("replay_interval", 100);
+    config->set<size_t>("consolidation_interval", 1000);
+    
+    // Create brain with default configuration
+    Brain brain(config);
+    
+    // Initialize the brain
+    brain.initialize();
+    
+    return brain;
+}
+
+void Brain::configure(const std::map<std::string, std::string>& configValues) {
+    // Apply batch configuration
+    for (const auto& pair : configValues) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
+        // Try to parse common numeric types
+        try {
+            // Try unsigned integer
+            size_t intValue = std::stoul(value);
+            pImpl->config->set<size_t>(key, intValue);
+        } catch (...) {
+            try {
+                // Try float
+                float floatValue = std::stof(value);
+                pImpl->config->set<float>(key, floatValue);
+            } catch (...) {
+                try {
+                    // Try double
+                    double doubleValue = std::stod(value);
+                    pImpl->config->set<double>(key, doubleValue);
+                } catch (...) {
+                    // Fall back to string
+                    pImpl->config->set<std::string>(key, value);
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Brain configured with " + std::to_string(configValues.size()) + " values");
+}
+
+// ========== BATCH OPERATION METHODS ==========
+
+std::vector<NeuronId> Brain::addNeurons(size_t count, NeuronType type) {
+    std::vector<NeuronId> newNeuronIds;
+    
+    if (pImpl->regions.empty()) {
+        NLM_LOG_WARNING("No regions exist, cannot add neurons");
+        return newNeuronIds;
+    }
+    
+    // Distribute neurons across all regions
+    size_t neuronsPerRegion = count / pImpl->regions.size();
+    
+    for (auto& region : pImpl->regions) {
+        if (neuronsPerRegion > 0) {
+            // Add neurons to this region
+            auto popId = region->addPopulation(neuronsPerRegion, type);
+            auto* pop = region->getPopulation(popId);
+            if (pop) {
+                for (auto* neuron : pop->getNeurons()) {
+                    newNeuronIds.push_back(neuron->getId());
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Added " + std::to_string(newNeuronIds.size()) + " neurons to the brain");
+    return newNeuronIds;
+}
+
+void Brain::connectRegions(RegionId sourceRegion, const std::vector<RegionId>& targetRegions,
+                          float weight, Delay delay) {
+    auto* src = getRegion(sourceRegion);
+    if (!src) {
+        NLM_LOG_WARNING("Source region not found: " + std::to_string(sourceRegion.index()));
+        return;
+    }
+    
+    // Connect to each target region
+    for (const auto& targetId : targetRegions) {
+        auto* tgt = getRegion(targetId);
+        if (!tgt) {
+            NLM_LOG_WARNING("Target region not found: " + std::to_string(targetId.index()));
+            continue;
+        }
+        
+        // Get neurons from both regions and create inter-region connections
+        const auto& sourceNeurons = src->getAllNeurons();
+        const auto& targetNeurons = tgt->getAllNeurons();
+        
+        if (sourceNeurons.empty() || targetNeurons.empty()) {
+            NLM_LOG_WARNING("One of the regions has no neurons");
+            continue;
+        }
+        
+        // Connect a fraction of neuron pairs
+        size_t connectionsToCreate = std::min(sourceNeurons.size(), targetNeurons.size()) / 10;
+        connectionsToCreate = std::max(connectionsToCreate, size_t(1));
+        
+        for (size_t i = 0; i < connectionsToCreate; ++i) {
+            // Select random source and target neurons
+            auto srcNeuron = sourceNeurons[rand() % sourceNeurons.size()];
+            auto tgtNeuron = targetNeurons[rand() % targetNeurons.size()];
+            
+            // Store connection in inter-region connection list
+            pImpl->interRegionConnections.emplace_back(sourceRegion, targetId, weight, delay);
+        }
+        
+        NLM_LOG_INFO("Connected region " + std::to_string(sourceRegion.index()) + 
+                    " to " + std::to_string(targetId.index()) + 
+                    " with " + std::to_string(connectionsToCreate) + " connections");
+    }
+}
+
+// ========== RESET AND REINITIALIZATION ==========
+
+void Brain::resetAndInitialize() {
+    NLM_LOG_INFO("Resetting and reinitializing brain...");
+    
+    // First, reset the brain
+    reset();
+    
+    // Then reinitialize
+    if (!initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain after reset");
+    } else {
+        NLM_LOG_INFO("Brain reset and reinitialized successfully");
+    }
+}
+
+// ========== BATCH OPERATION METHODS ==========
+
+void Brain::stepMultiple(size_t steps) {
+    if (steps == 0) {
+        return;
+    }
+    
+    NLM_LOG_INFO("Stepping brain " + std::to_string(steps) + " steps");
+    
+    for (size_t i = 0; i < steps; ++i) {
+        step(pImpl->currentStep);
+    }
+    
+    NLM_LOG_INFO("Brain step complete: " + std::to_string(steps) + " steps processed");
+}
+
+void Brain::injectCurrentAll(MembranePotential current) {
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                neuron->injectCurrent(current);
+            }
+        }
+    }
+}
+
+void Brain::injectCurrentAllToType(NeuronType type, MembranePotential current) {
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->injectCurrent(current);
+                }
+            }
+        }
+    }
+}
+
+// ========== STATISTICS METHODS ==========
+
+std::string Brain::getNeuronStats() const {
+    std::stringstream ss;
+    
+    ss << "=== NEURON STATISTICS ===\n";
+    ss << "Total neurons: " << getTotalNeuronCount() << "\n";
+    ss << "Active neurons: " << getActiveNeuronCount() << "\n";
+    ss << "Firing neurons: " << getFiringNeuronCount() << "\n";
+    ss << "Average firing rate: " << getAverageFiringRate() << " Hz\n";
+    
+    // Count by type
+    size_t sensory = 0, internal = 0, motor = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                switch (pop->getNeuronType()) {
+                    case NeuronType::Sensory: sensory++; break;
+                    case NeuronType::Internal: internal++; break;
+                    case NeuronType::Motor: motor++; break;
+                }
+            }
+        }
+    }
+    
+    ss << "Sensory neurons: " << sensory << "\n";
+    ss << "Internal neurons: " << internal << "\n";
+    ss << "Motor neurons: " << motor << "\n";
+    ss << "E/I ratio: " << getExcitationInhibitionRatio() << "\n";
+    
+    return ss.str();
+}
+
+std::string Brain::getSynapseStats() const {
+    std::stringstream ss;
+    
+    ss << "=== SYNAPSE STATISTICS ===\n";
+    ss << "Total synapses: " << getTotalSynapseCount() << "\n";
+    
+    // Count by type and properties
+    size_t excitatory = 0, inhibitory = 0;
+    float totalWeight = 0.0f;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto* syn : region->getSynapses()) {
+            float weight = syn->getWeight();
+            totalWeight += std::abs(weight);
+            if (weight > 0) {
+                excitatory++;
+            } else {
+                inhibitory++;
+            }
+        }
+    }
+    
+    ss << "Excitatory synapses: " << excitatory << "\n";
+    ss << "Inhibitory synapses: " << inhibitory << "\n";
+    ss << "Average absolute weight: " << (getTotalSynapseCount() > 0 ? totalWeight / getTotalSynapseCount() : 0.0f) << "\n";
+    
+    return ss.str();
+}

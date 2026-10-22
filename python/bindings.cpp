@@ -12,9 +12,30 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/EpisodicMemory.hpp"
+#include "../src/memory/AssociativeMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -400,26 +421,386 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message)
+        .def("__repr__", [](const ActionResult& result) {
+            std::stringstream ss;
+            ss << "<ActionResult: " << (result.success ? "SUCCESS" : "FAILURE") << ", " << result.reward << ", \"" << result.message << "\">";
+            return ss.str();
+        });
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active)
+        .def("getTypeName", [](const WorldObject& obj) {
+            switch(obj.type) {
+                case WorldObjectType::Empty: return std::string("Empty");
+                case WorldObjectType::Resource: return std::string("Resource");
+                case WorldObjectType::Hazard: return std::string("Hazard");
+                case WorldObjectType::Wall: return std::string("Wall");
+                case WorldObjectType::Marker: return std::string("Marker");
+                default: return std::string("Unknown");
+            }
+        });
+
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &AgentBody::x)
+        .def_readwrite("y", &AgentBody::y)
+        .def_readwrite("orientation", &AgentBody::orientation)
+        .def_readwrite("velocityX", &AgentBody::velocityX)
+        .def_readwrite("velocityY", &AgentBody::velocityY)
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("energy", &AgentBody::energy)
+        .def_readwrite("health", &AgentBody::health)
+        .def_readwrite("age", &AgentBody::age)
+        .def_readwrite("isMoving", &AgentBody::isMoving)
+        .def_readwrite("isTurning", &AgentBody::isTurning)
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset)
+        .def("getPosition", [](AgentBody& body) {
+            return std::make_pair(body.x, body.y);
+        })
+        .def("setPosition", [](AgentBody& body, float x, float y) {
+            body.x = x;
+            body.y = y;
+        })
+        .def("distanceTo", [](AgentBody& body, float x, float y) {
+            float dx = body.x - x;
+            float dy = body.y - y;
+            return std::sqrt(dx*dx + dy*dy);
+        });
+
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Base neuromodulator class)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor)
+        .def("update", &Neuromodulator::update)
+        .def("getTypeName", [](const Neuromodulator& mod) {
+            if (dynamic_cast<const Dopamine*>(&mod)) return std::string("Dopamine");
+            if (dynamic_cast<const Curiosity*>(&mod)) return std::string("Curiosity");
+            if (dynamic_cast<const Novelty*>(&mod)) return std::string("Novelty");
+            if (dynamic_cast<const PredictionError*>(&mod)) return std::string("PredictionError");
+            if (dynamic_cast<const Reward*>(&mod)) return std::string("Reward");
+            return std::string("Neuromodulator");
+        });
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Dopamine::getLevel)
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("update", &Dopamine::update);
+
+    py::class_<Curiosity, Neuromodulator>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Curiosity::getLevel)
+        .def("update", &Curiosity::update);
+
+    py::class_<Novelty, Neuromodulator>(m, "Novelty", R"pbdoc(Novelty neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Novelty::getLevel)
+        .def("update", &Novelty::update);
+
+    py::class_<PredictionError, Neuromodulator>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &PredictionError::getLevel)
+        .def("getPredictionError", &PredictionError::getPredictionError)
+        .def("update", &PredictionError::update);
+
+    py::class_<Reward, Neuromodulator>(m, "Reward", R"pbdoc(Reward neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Reward::getLevel)
+        .def("update", &Reward::update);
+
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeToNeuron", &WorkingMemory::storeToNeuron)
+        .def("getActiveTraces", &WorkingMemory::getActiveTraces)
+        .def("update", &WorkingMemory::update)
+        .def("clear", &WorkingMemory::clear)
+        .def("getMemoryTrace", [](WorkingMemory& wm, NeuronId neuronId) {
+            return wm.getMemoryTrace(neuronId);
+        }, py::arg("neuron_id"));
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode)
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("getEpisodesForReplay", &EpisodicMemory::getEpisodesForReplay)
+        .def("replayEpisode", &EpisodicMemory::replayEpisode)
+        .def("consolidate", &EpisodicMemory::consolidate)
+        .def("clear", &EpisodicMemory::clear);
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory system)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate)
+        .def("recall", &AssociativeMemory::recall)
+        .def("getAssocationStrength", [](AssociativeMemory& am, NeuronId pattern1, NeuronId pattern2) {
+            return am.getAssociationStrength(pattern1, pattern2);
+        }, py::arg("pattern1"), py::arg("pattern2"))
+        .def("clear", &AssociativeMemory::clear);
+
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory)pbdoc")
+        .def(py::init<>())
+        .def("initialize", [](NeuralWorkingMemory& nwm, std::shared_ptr<Brain> brain) {
+            nwm.initialize(brain.get());
+        }, py::arg("brain"))
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron)
+        .def("update", &NeuralWorkingMemory::update)
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons)
+        .def("clear", &NeuralWorkingMemory::clear);
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory)pbdoc")
+        .def(py::init<>())
+        .def("initialize", [](NeuralEpisodicMemory& nem, std::shared_ptr<Brain> brain) {
+            nem.initialize(brain.get());
+        }, py::arg("brain"))
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode)
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay)
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode)
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount)
+        .def("clear", &NeuralEpisodicMemory::clear);
+
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system)pbdoc")
+        .def(py::init<>())
+        .def("update", [](PredictionSystem& ps, double timestep) {
+            ps.update(timestep);
+        }, py::arg("timestep"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getPredictionConfidence", &PredictionSystem::getPredictionConfidence);
+
+    py::class_<NeuralPrediction>(m, "NeuralPrediction", R"pbdoc(Neural prediction)pbdoc")
+        .def(py::init<>())
+        .def("getPrediction", &NeuralPrediction::getPrediction)
+        .def("getConfidence", &NeuralPrediction::getConfidence);
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation system)pbdoc")
+        .def(py::init<>())
+        .def("update", &ConceptFormation::update)
+        .def("getConceptCount", &ConceptFormation::getConceptCount)
+        .def("getConceptSimilarity", &ConceptFormation::getConceptSimilarity);
+
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner)pbdoc")
+        .def(py::init<>())
+        .def("update", &NeuralPlanner::update)
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth)
+        .def("getPlanLength", &NeuralPlanner::getPlanLength);
+
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system)pbdoc")
+        .def(py::init<>())
+        .def("update", &DevelopmentSystem::update)
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage)
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate);
+
+    py::class_<CheckpointManager>(m, "CheckpointManager", R"pbdoc(Checkpoint manager)pbdoc")
+        .def(py::init<>())
+        .def("configure", &CheckpointManager::configure,
+             py::arg("directory"), py::arg("maxCheckpoints"), py::arg("maxAge"), py::arg("autoSave") = false)
+        .def("update", &CheckpointManager::update)
+        .def("save", &CheckpointManager::save)
+        .def("load", &CheckpointManager::load)
+        .def("getCheckpointCount", &CheckpointManager::getCheckpointCount)
+        .def("getLatestCheckpoint", &CheckpointManager::getLatestCheckpoint);
+
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface)pbdoc")
+        .def(py::init<>())
+        .def("configure", &VisualizationInterface::configure,
+             py::arg("width"), py::arg("height"), py::arg("title") = "NLM Visualization")
+        .def("update", &VisualizationInterface::update)
+        .def("render", &VisualizationInterface::render)
+        .def("saveFrame", &VisualizationInterface::saveFrame)
+                .def("configure", &VisualizationInterface::configure,
+             py::arg("width"), py::arg("height"), py::arg("title") = "NLM Visualization")
+        .def("update", &VisualizationInterface::update)
+        .def("render", &VisualizationInterface::render)
+        .def("saveFrame", &VisualizationInterface::saveFrame)
+        .def("isRunning", &VisualizationInterface::isRunning)
+        .def("stop", &VisualizationInterface::stop);
+
+    // Add convenience factory functions for common setup patterns
+    m.def("createDefaultBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("createDefaultAgentBrain", []() -> std::shared_ptr<AgentBrain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, "Create an agent brain with default configuration");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("createStandardWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8); // Standard 20x20 world with 8x8 vision
+        return world;
+    }, "Create a standard world with default settings");
+
+    m.def("createAndInitializeAgent", 
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            return agent;
+        }, py::arg("brain"), py::arg("world"), "Create and initialize an agent brain");
+
+    m.def("enableAllFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all learning features in an agent");
+
+    m.def("runStandardSimulation", 
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent,
+           int numSteps, bool enableLearning = false) {
+            if (enableLearning) {
+                agent->enableRewardModulation(true);
+                agent->enableCuriosity(true);
+            }
+            
+            for (int step = 0; step < numSteps; ++step) {
+                world->update(0.1); // 0.1 second timesteps
+                
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                
+                brain->step(step);
+                
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+        }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), 
+           py::arg("enableLearning") = false, "Run a standard simulation loop");
+
+    m.def("getSystemInfo", []() {
+        std::stringstream info;
+        info << "NLM Python Bindings - Version 0.1.0\n";
+        info << "Build: " << "CMAKE_CXX_STANDARD 20\n";
+        info << "Features: LIF neurons, STDP, Hebbian learning, Structural plasticity\n";
+        info << "Memory systems: Working, Episodic, Associative\n";
+        info << "Neuromodulation: Dopamine, Curiosity, Novelty, PredictionError, Reward\n";
+        info << "Cognition: NeuralPlanner, ConceptFormation\n";
+        return info.str();
+    }, "Get system information and version details");
+
+    m.def("createFromCheckpoint", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->load(filepath);
+        return brain;
+    }, py::arg("filepath"), "Create a brain from a checkpoint file");
+
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) {
+        bool isValid = true;
+        std::vector<std::string> errors;
+        
+        // Basic validation
+        if (!config->has("brain.neuron_count")) {
+            errors.push_back("Missing brain.neuron_count");
+            isValid = false;
+        }
+        
+        if (!config->has("brain.connection_probability")) {
+            errors.push_back("Missing brain.connection_probability");
+            isValid = false;
+        }
+        
+        if (config->getOr<size_t>("brain.neuron_count", 0) == 0) {
+            errors.push_back("brain.neuron_count must be > 0");
+            isValid = false;
+        }
+        
+        if (config->getOr<float>("brain.connection_probability", 1.0f) > 1.0f) {
+            errors.push_back("brain.connection_probability must be <= 1.0");
+            isValid = false;
+        }
+        
+        return std::make_pair(isValid, errors);
+    }, py::arg("config"), "Validate a configuration and return errors if any");
+
+    m.def("createLearningPreset", [](const std::string& presetName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "fast_learning") {
+            config->set("brain.neuron_count", 500);
+            config->set("brain.connection_probability", 0.15f);
+            config->set("plasticity.stdp.learning_rate", 0.02f);
+            config->set("plasticity.hebbian.learning_rate", 0.01f);
+            config->set("neuromod.dopamine.scale", 1.5f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("development.enable", true);
+        }
+        else if (presetName == "slow_stable") {
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.connection_probability", 0.05f);
+            config->set("plasticity.stdp.learning_rate", 0.001f);
+            config->set("plasticity.hebbian.learning_rate", 0.0005f);
+            config->set("neuromod.dopamine.scale", 0.5f);
+            config->set("neuromod.curiosity.enable", false);
+            config->set("development.enable", true);
+        }
+        else if (presetName == "curiosity_driven") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.connection_probability", 0.1f);
+            config->set("plasticity.stdp.learning_rate", 0.01f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("development.enable", true);
+        }
+        else {
+            throw std::invalid_argument("Unknown preset: " + presetName);
+        }
+        
+        return config;
+    }, py::arg("presetName"), "Create a configuration preset");
+
+    m.def("exportBrainStats", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        auto config = brain->getConfig();
+        config->saveToFile(filepath);
+        
+        // Also save brain state
+        brain->save(filepath + ".checkpoint");
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), "Export brain statistics and checkpoint");
+
+    m.def("getRandomSeed", []() {
+        return static_cast<unsigned int>(std::random_device{}());
+    }, "Generate a random seed for reproducible simulations");
+
+    m.def("validateWorldSetup", [](std::shared_ptr<SimpleWorld> world) {
+        bool isValid = true;
+        std::vector<std::string> errors;
+        
+        if (world->getWidth() == 0 || world->getHeight() == 0) {
+            errors.push_back("World dimensions must be > 0");
+            isValid = false;
+        }
+        
+        if (world->getVisionWidth() > world->getWidth()) {
+            errors.push_back("Vision width cannot exceed world width");
+            isValid = false;
+        }
+        
+        if (world->getVisionHeight() > world->getHeight()) {
+            errors.push_back("Vision height cannot exceed world height");
+            isValid = false;
+        }
+        
+        return std::make_pair(isValid, errors);
+    }, py::arg("world"), "Validate world configuration");
 }
 
 } // namespace nlm
