@@ -16,8 +16,30 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
-namespace py = pybind11;
 namespace nlm {
+
+// Custom exception classes for Python
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class FileError : public std::runtime_error {
+public:
+    explicit FileError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ValidationError : public std::runtime_error {
+public:
+    explicit ValidationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class InitializationError : public std::runtime_error {
+public:
+    explicit InitializationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+} // namespace nlm
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -27,6 +49,11 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<nlm::ConfigError>(m, "ConfigError");
+    py::register_exception<nlm::FileError>(m, "FileError");
+    py::register_exception<nlm::ValidationError>(m, "ValidationError");
+    py::register_exception<nlm::InitializationError>(m, "InitializationError");
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -142,18 +169,142 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM (Neural Learning Machine) system
+        
+        The Config class manages key-value pairs for configuring brain behavior.
+        Configuration values can be strings, integers, floats, or booleans.
+        
+        Configuration can be loaded from files (key=value format) or command line
+        arguments (--key=value or -key value). Values can be accessed with type-
+        specific getters or generically as strings.
+        
+        Example:
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 2000)
+            config.set("brain.synapse_density", 0.2)
+            config.set("plasticity.stdp.enable", True)
+            
+            # Get values with type checking
+            neurons = config.getInt("brain.neuron_count")
+            density = config.getFloat("brain.synapse_density")
+            stdp_enabled = config.getBool("plasticity.stdp.enable")
+        )pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            if (!self.loadFromFile(filepath)) {
+                throw nlm::FileError("Failed to load configuration from file: " + filepath);
+            }
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            if (!self.loadFromArgs(argc, argv)) {
+                throw nlm::ConfigError("Failed to load configuration from command line arguments");
+            }
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            if (!self.saveToFile(filepath)) {
+                throw nlm::FileError("Failed to save configuration to file: " + filepath);
+            }
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val) {
+                return *val;
+            }
+            throw nlm::ConfigError("Configuration key not found: " + key);
+        }, py::arg("key"), "Get a configuration value as string")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) {
+                return *val;
+            }
+            throw nlm::ConfigError("Configuration key not found: " + key);
+        }, py::arg("key"), "Get a configuration value as int")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) {
+                return *val;
+            }
+            throw nlm::ConfigError("Configuration key not found: " + key);
+        }, py::arg("key"), "Get a configuration value as double")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) {
+                return *val;
+            }
+            throw nlm::ConfigError("Configuration key not found: " + key);
+        }, py::arg("key"), "Get a configuration value as bool")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a configuration value as string with default")
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a configuration value as int with default")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a configuration value as double with default")
+        .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a configuration value as bool with default")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            if (key.empty()) {
+                throw nlm::ValidationError("Configuration key cannot be empty");
+            }
+            // Validate key format (alphanumeric, underscores, dots)
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '.') {
+                    throw nlm::ValidationError("Configuration key contains invalid characters. Only alphanumeric, underscore, and dot are allowed: " + key);
+                }
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as string")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            if (key.empty()) {
+                throw nlm::ValidationError("Configuration key cannot be empty");
+            }
+            // Validate key format (alphanumeric, underscores, dots)
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '.') {
+                    throw nlm::ValidationError("Configuration key contains invalid characters. Only alphanumeric, underscore, and dot are allowed: " + key);
+                }
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as int")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            if (key.empty()) {
+                throw nlm::ValidationError("Configuration key cannot be empty");
+            }
+            // Validate key format (alphanumeric, underscores, dots)
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '.') {
+                    throw nlm::ValidationError("Configuration key contains invalid characters. Only alphanumeric, underscore, and dot are allowed: " + key);
+                }
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as float")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            if (key.empty()) {
+                throw nlm::ValidationError("Configuration key cannot be empty");
+            }
+            // Validate key format (alphanumeric, underscores, dots)
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '.') {
+                    throw nlm::ValidationError("Configuration key contains invalid characters. Only alphanumeric, underscore, and dot are allowed: " + key);
+                }
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as bool")
+        .def("remove", [](Config& self, const std::string& key) {
+            if (key.empty()) {
+                throw nlm::ValidationError("Configuration key cannot be empty");
+            }
+            self.remove(key);
+        }, py::arg("key"), "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -263,7 +414,57 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(
+        Simple 2D world for NLM (Neural Learning Machine) simulation
+        
+        The SimpleWorld class represents a 2D environment in which the NLM brain
+        operates. It provides the external context for the agent's sensory input
+        and motor output, implementing the closed-loop control system.
+        
+        Key world features include:
+        - **2D grid world**: Agents navigate in a continuous 2D space
+        - **Sensory modalities**: Vision (camera-like), touch (proximity), internal (energy)
+        - **World objects**: Resources (positive), hazards (negative), walls, markers
+        - **Physics simulation**: Agent movement, energy decay, collision detection
+        - **Action execution**: Applying motor commands and getting world consequences
+        
+        The world implements a simplified but realistic environment where agents
+        can sense their surroundings, take actions, receive feedback (rewards),
+        and learn from experience.
+        
+        Example:
+            import pynlm
+            
+            # Create world environment
+            world = pynlm.createSimpleWorld()
+            world.configure(
+                width=20, 
+                height=20, 
+                visionWidth=8, 
+                visionHeight=8
+            )
+            world.reset()
+            world.setAgentStart(10.0, 10.0)  # Starting position
+            
+            # Add world objects
+            world.addObject(pynlm.WorldObject(
+                5.0, 5.0, 
+                pynlm.WorldObjectType.Resource, 
+                value=10.0
+            ))
+            
+            # Update world over time
+            for step in range(50):
+                world.update(0.1)  # Advance 0.1 seconds
+                
+            # Get agent's sensory perception
+            percept = world.getSensoryPercept()
+            vision = percept.getVision()
+            energy = percept.getInternal()[0] if percept.getInternal() else 0.0
+            
+            print(f"World time: {world.getSimulationTime():.1f}s")
+            print(f"Agent position: ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+        )pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
              py::arg("visionWidth"), py::arg("visionHeight"))
@@ -289,7 +490,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+        Central neural simulation brain class for NLM (Neural Learning Machine)
+        
+        The Brain class represents the core neural simulation system with thousands
+        of neurons connected by synapses. The brain operates using Leaky Integrate-
+        and-Fire (LIF) neuron dynamics with event-driven spike propagation.
+        
+        Key brain processes include:
+        - **Neuronal dynamics**: LIF neuron models with spike generation
+        - **Synaptic communication**: Event-driven spike propagation through synapses
+        - **Learning mechanisms**: STDP, Hebbian learning, and neuromodulation-based plasticity
+        - **Attention and working memory**: Neural mechanisms for information selection and maintenance
+        - **Prediction and planning**: Forward models and prediction error signals
+        - **Development**: Age-dependent plasticity and structural changes
+        
+        The brain operates in a closed-loop with the world, receiving sensory input
+        and producing motor actions to achieve goals.
+        
+        Example:
+            import pynlm
+            
+            # Create brain with default configuration
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Run simulation
+            for step in range(100):
+                brain.step(step)
+                
+            # Monitor brain state
+            print(f"Neurons: {brain.getTotalNeuronCount()}")
+            print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+        )pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -353,7 +588,61 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(
+        Agent brain interface connecting NLM brain to world
+        
+        The AgentBrain class serves as the bridge between the neural brain and the
+        external world, implementing the closed-loop control system. It processes
+        sensory input from the world, injects it into the brain, and decodes brain
+        activity into motor commands to act in the world.
+        
+        Key agent functions include:
+        - **Sensory processing**: Receives and formats world information
+        - **Motor control**: Transforms neural activity into action commands
+        - **Learning modulation**: Applies rewards and prediction errors to plasticity
+        - **Development tracking**: Monitors and manages developmental stages
+        - **Curiosity and exploration**: Drives goal-directed behavior
+        
+        The agent cycles through the brain-world loop:
+        1. Update world environment
+        2. Get sensory percept from world
+        3. Process sensory input through agent brain
+        4. Run brain neural simulation
+        5. Decode motor command from brain
+        6. Apply action to world
+        7. Apply reward prediction error for learning
+        
+        Example:
+            import pynlm
+            
+            # Create complete agent system
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            world = pynlm.createSimpleWorld()
+            world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+            world.reset()
+            
+            agent = pynlm.createAgentBrain(brain)
+            agent.initialize(world)
+            
+            # Enable learning systems
+            agent.enableRewardModulation(True)
+            agent.enableCuriosity(True)
+            agent.enableDevelopment(True)
+            
+            # Run agent simulation
+            for step in range(100):
+                world.update(0.1)
+                percept = world.getSensoryPercept()
+                agent.processSensoryInput(percept)
+                brain.step(step)
+                action = agent.decodeMotorCommand()
+                world.applyMotorCommand(action, world.getSimulationTime())
+                
+            print(f"Agent behavior: {brain.getFiringNeuronCount()} neurons firing")
+        )pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
