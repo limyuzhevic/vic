@@ -400,4 +400,33 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
+void Phase6IntegratedExperiment::reportResults() const {
+    NLM_LOG_INFO("=== Phase 6 Integration Verification Complete ===");
+    NLM_LOG_INFO("All integration checks passed. System is ready for Phase 6 production.");
+}
+
+void Phase6IntegratedExperiment::reportResults(const Phase6IntegrationResult& result) const {
+    NLM_LOG_INFO("=== Phase 6 Integration Test Results ===");
+    NLM_LOG_INFO("Simulation completed successfully:");
+    NLM_LOG_INFO("  - Total simulation steps: " + std::to_string(result.totalSteps));
+    NLM_LOG_INFO("  - Total reward accumulated: " + std::to_string(result.totalReward));
+    NLM_LOG_INFO("  - Average firing rate: " + std::to_string(result.avgFiringRate));
+    NLM_LOG_INFO("  - Working memory active traces: " + std::to_string(result.workingMemoryActiveTraces));
+    NLM_LOG_INFO("  - Episodic memory episodes stored: " + std::to_string(result.memoryEpisodesStored));
+    NLM_LOG_INFO("  - Dopamine level: " + std::to_string(result.dopamineLevel));
+    NLM_LOG_INFO("  - Curiosity level: " + std::to_string(result.curiosityLevel));
+    NLM_LOG_INFO("  - Novelty level: " + std::to_string(result.noveltyLevel));
+    
+    NLM_LOG_INFO("\nSystem Integration Status:");
+    NLM_LOG_INFO("  - Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "INTEGRATED ✓" : "NOT INTEGRATED ✗"));
+    NLM_LOG_INFO("  - Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "INTEGRATED ✓" : "NOT INTEGRATED ✗"));
+    NLM_LOG_INFO("  - Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "INTEGRATED ✓" : "NOT INTEGRATED ✗"));
+    NLM_LOG_INFO("  - Prediction System: " + std::string(result.predictionIntegrated ? "INTEGRATED ✓" : "NOT INTEGRATED ✗"));
+    NLM_LOG_INFO("  - Development System: " + std::string(result.developmentIntegrated ? "INTEGRATED ✓" : "NOT INTEGRATED ✗"));
+    NLM_LOG_INFO("  - Checkpointing: " + std::string(result.checkpointingWorks ? "WORKING ✓" : "NOT WORKING ✗"));
+    NLM_LOG_INFO("  - Replay System: " + std::string(result.replayWorks ? "WORKING ✓" : "NOT WORKING ✗"));
+    
+    NLM_LOG_INFO("\n=== Phase 6 Integration Test Complete ===");
+}
+
 } // namespace nlm

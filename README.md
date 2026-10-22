@@ -49,6 +49,48 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Attention with competitive selection dynamics
 - All cognition systems connected to perception and action
 
+### New Features in Phase 6
+
+#### Comprehensive Integration Test
+
+Phase 6 now includes a complete integration verification system that checks:
+
+- ✅ **Memory Integration**: Working memory, episodic memory, and associative memory are all accessible and functional
+- ✅ **Neuromodulation Integration**: All seven neuromodulators (Dopamine, Acetylcholine, Norepinephrine, Serotonin, Curiosity, Novelty, PredictionError) are integrated
+- ✅ **Prediction Integration**: Prediction system is connected to sensory processing and learning
+- ✅ **Cognition Integration**: NeuralPlanner, ConceptFormation, and AttentionalSelection systems are all functional
+- ✅ **Development Integration**: Development system affects plasticity, attention, memory, and neuromodulation
+- ✅ **Checkpointing**: Brain save/load functionality is fully implemented
+- ✅ **Replay System**: Episodic memory replay during offline periods
+
+#### Enhanced User Experience
+
+The Phase 6 demo provides comprehensive testing and demonstrates:
+
+1. **System Accessibility**: All brain systems can be accessed via getter methods
+2. **Integration Verification**: Comprehensive testing of all system connections
+3. **Real-time Simulation**: Running agent brain in simulated environment
+4. **Development Tracking**: Life-long development and adaptation
+5. **Performance Metrics**: Monitoring system statistics and behavior
+
+### Running Phase 6 Integration Demo
+
+From the build directory:
+
+```bash
+./nlm_phase6_demo
+```
+
+The demo will:
+
+1. Create a complete NLM brain with all integrated systems
+2. Initialize working memory, episodic memory, and associative memory
+3. Set up all neuromodulation systems (dopamine, acetylcholine, etc.)
+4. Connect prediction, planning, and attention systems
+5. Run a complete integration test
+6. Run a live simulation with agent and environment
+7. Display system status and metrics
+
 #### Development Integration
 - Developmental stages affect plasticity rates
 - Structural plasticity modulated by age

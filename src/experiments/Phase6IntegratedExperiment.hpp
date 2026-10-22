@@ -133,6 +133,16 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Report experiment results
+     */
+    void reportResults(const Phase6IntegrationResult& result) const;
+    
+    /**
+     * Report integration verification results
+     */
+    void reportResults() const;
 };
 
 } // namespace nlm

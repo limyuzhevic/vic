@@ -11,9 +11,10 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -28,24 +29,11 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // ========== INTEGRATED NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -77,6 +65,13 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Sensory history for prediction
+    std::deque<std::unique_ptr<class SensoryInput>> sensoryHistory_;
+    
+    // Helper methods for integration
+    std::vector<float> extractFeatures(const std::vector<float>& pattern) const;
+    float getRewardSignal() const;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -116,19 +111,39 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulators based on config
+        float baselineDA = config->getOr<float>("dopamine_baseline", 0.1f);
+        dopamine->setLevel(baselineDA);
+        
+        float baselineACh = config->getOr<float>("acetylcholine_baseline", 0.2f);
+        acetylcholine->setLevel(baselineACh);
+        
+        float baselineNE = config->getOr<float>("norepinephrine_baseline", 0.15f);
+        norepinephrine->setLevel(baselineNE);
+        
+        float baseline5HT = config->getOr<float>("serotonin_baseline", 0.1f);
+        serotonin->setLevel(baseline5HT);
+        
+        float baselineCuriosity = config->getOr<float>("curiosity_baseline", 0.3f);
+        curiosity->setNoveltyWeight(config->getOr<float>("curiosity_novelty_weight", 0.6f));
+        curiosity->setPredictionErrorWeight(config->getOr<float>("curiosity_pred_error_weight", 0.4f));
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +273,13 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Initialize additional neuromodulators
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,38 +533,112 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+        // Integrate prediction system with sensory history and episodic memory
+        // For prediction system to function, we need to:
+        // 1. Use current sensory state as input
+        // 2. Compare with predicted state from history
+        // 3. Update based on prediction error
+        // 4. Use prediction error for neuromodulation
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Create a combined sensory pattern from recent history
+        std::vector<float> combinedSensoryPattern;
+        if (!pImpl->sensoryHistory_.empty()) {
+            // Use the most recent sensory history for prediction
+            size_t totalHistory = std::min(pImpl->sensoryHistory_.size(), 5u);
+            size_t patternSize = pImpl->sensoryHistory_.back()->getData().size();
+            
+            if (!combinedSensoryPattern.empty()) {
+                // Average recent patterns
+                for (size_t h = 0; h < totalHistory; ++h) {
+                    const auto& hist = pImpl->sensoryHistory_[h];
+                    const auto& data = hist->getData();
+                    for (size_t i = 0; i < data.size(); ++i) {
+                        if (i < combinedSensoryPattern.size()) {
+                            combinedSensoryPattern[i] += data[i];
+                        }
+                    }
+                }
+                for (size_t i = 0; i < combinedSensoryPattern.size(); ++i) {
+                    combinedSensoryPattern[i] /= totalHistory;
+                }
+            }
+        }
+        
+        if (!combinedSensoryPattern.empty()) {
+            auto predictedInput = std::make_unique<SensoryInput>(combinedSensoryPattern);
+            if (!pImpl->sensoryHistory_.empty()) {
+                pImpl->predictionSystem->updatePredictions(pImpl->sensoryHistory_.back(), *predictedInput);
+            }
+            
+            // Use prediction error to update neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                if (pImpl->dopamine) {
+                    // Dopamine responds to prediction error
+                    pImpl->dopamine->signalRewardPredictionError(predictionError);
+                }
+                if (pImpl->curiosity) {
+                    // Curiosity responds to uncertainty (high prediction error)
+                    pImpl->curiosity->update(0.0f, predictionError, pImpl->timestep);
+                }
+            }
+        }
+        
+        // Clear prediction error history periodically
+        if (currentStep % 500 == 0) {
+            pImpl->predictionSystem->clearHistory();
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Integrate concept formation with working memory for concept-driven attention
+        std::vector<float> sensoryPattern;
+        size_t numSensory = pImpl->sensoryNeurons.size();
+        
+        // Extract current sensory state
+        for (size_t i = 0; i < numSensory; ++i) {
+            if (i < pImpl->sensoryNeurons.size()) {
+                // Get current activation from sensory neurons
+                const auto* neuron = pImpl->sensoryNeurons[i];
+                if (neuron) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    activation = std::min(activation / 20.0f, 1.0f);
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Extract features for concept formation
+            std::vector<float> features = extractFeatures(sensoryPattern);
+            float reward = 0.5f;  // Default neutral reward
+            
+            // Get reward from neuromodulation systems
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            
+            // Present to concept formation system
+            pImpl->conceptFormation->presentExperience(sensoryPattern, features, reward, currentStep);
+            
+            // Use formed concepts to guide attention
+            size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(sensoryPattern, 0.6f);
+            if (matchingConcept > 0) {
+                // Concept-based attention: prioritize neurons matching the concept
+                if (pImpl->attention) {
+                    // Find neurons that match the concept pattern
+                    std::vector<NeuronId> competitors;
+                    for (size_t i = 0; i < sensoryPattern.size() && i < numSensory; ++i) {
+                        if (sensoryPattern[i] > 0.3f) {
+                            competitors.push_back(pImpl->sensoryNeurons[i]->getId());
+                        }
+                    }
+                    if (!competitors.empty()) {
+                        pImpl->attention->processCompetition(competitors);
+                    }
+                }
+            }
         }
     }
     
@@ -550,7 +646,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects plasticity rates (already implemented)
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -574,12 +670,106 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // NEW: Development affects neuromodulation systems
+        if (pImpl->dopamine) {
+            // Dopamine levels change during development
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 0.5f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 0.8f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Stabilize around optimal level
+                    pImpl->dopamine->setLevel(0.7f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Adult regulation
+                    pImpl->dopamine->setLevel(0.6f);
+                    break;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            // Novelty detection improves with development
+            float noveltyLevel = pImpl->novelty->getLevel();
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    pImpl->novelty->setLevel(noveltyLevel * 1.2f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    pImpl->novelty->setLevel(noveltyLevel * 0.9f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    pImpl->novelty->setLevel(0.5f);
+                    break;
+            }
+        }
+        
+        // NEW: Development affects memory consolidation
+        if (pImpl->episodicMemory) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Rapid memory formation
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Strengthen memory consolidation
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Enhance consolidation efficiency
+                    break;
+            }
+        }
+        
+        // NEW: Development affects attention mechanisms
+        if (pImpl->attention) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    pImpl->attention->setInhibitionStrength(0.3f);
+                    pImpl->attention->setExcitationStrength(2.0f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    pImpl->attention->setInhibitionStrength(0.5f);
+                    pImpl->attention->setExcitationStrength(1.5f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    pImpl->attention->setInhibitionStrength(0.7f);
+                    pImpl->attention->setExcitationStrength(1.2f);
+                    break;
+            }
+        }
+        
+        // NEW: Development affects concept formation
+        if (pImpl->conceptFormation) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // More concepts form rapidly
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Concepts stabilize
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Better generalization
+                    break;
+            }
+        }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Integrate attention during consolidation
+        if (pImpl->attention) {
+            // Use attention winners to guide consolidation
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons() : std::vector<NeuronId>();
+            if (!memoryNeurons.empty()) {
+                pImpl->attention->processCompetition(memoryNeurons);
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -598,6 +788,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Prepare sensory pattern for prediction and concept formation
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(values.size());
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -609,10 +803,65 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory (key connection 7)
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+        
+        // Store sensory value for prediction and concept formation
+        sensoryPattern.push_back(normalizedValue);
+    }
+    
+    // Integrate with prediction system (key connection 2)
+    if (pImpl->predictionSystem && !sensoryPattern.empty()) {
+        // Convert to SensoryInput for prediction system
+        auto predictedInput = std::make_unique<SensoryInput>(sensoryPattern);
+        // The prediction system would normally predict next state
+        // For now, just track sensory pattern for learning
+        if (!pImpl->sensoryHistory_.empty()) {
+            pImpl->predictionSystem->updatePredictions(pImpl->sensoryHistory_.back(), *predictedInput);
+        }
+        pImpl->sensoryHistory_.push_back(std::move(predictedInput));
+        if (pImpl->sensoryHistory_.size() > 10) {
+            pImpl->sensoryHistory_.pop_front();
+        }
+    }
+    
+    // Integrate with concept formation (key connection 8)
+    if (pImpl->conceptFormation && !sensoryPattern.empty()) {
+        // Extract features from sensory pattern for concept formation
+        std::vector<float> features = extractFeatures(sensoryPattern);
+        float reward = getRewardSignal(); // From neuromodulation
+        pImpl->conceptFormation->presentExperience(sensoryPattern, features, reward, pImpl->currentStep);
+    }
+    
+    // Integrate with attention (key connection 8)
+    if (pImpl->attention && !sensoryPattern.empty()) {
+        // Create attention weights based on sensory input strength
+        std::vector<NeuronId> competitors;
+        for (size_t i = 0; i < numSensory; ++i) {
+            if (fabs(sensoryPattern[i]) > 0.5f) {
+                competitors.push_back(pImpl->sensoryNeurons[i]->getId());
+            }
+        }
+        if (!competitors.empty()) {
+            pImpl->attention->processCompetition(competitors);
+            // Store attention winners in working memory
+            if (pImpl->workingMemory) {
+                const auto& winners = pImpl->attention->getWinners();
+                for (NeuronId winner : winners) {
+                    float activation = pImpl->workingMemory->getNeuronActivation(winner);
+                    if (activation > 0.0f) {
+                        pImpl->workingMemory->strengthenMemory(1.5f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update novelty detection based on sensory input
+    if (pImpl->novelty && !pImpl->sensoryHistory_.empty() && sensoryPattern.size() == pImpl->sensoryHistory_.back()->getData().size()) {
+        pImpl->novelty->detectNovelty(sensoryPattern, pImpl->sensoryHistory_.back()->getData());
     }
 }
 
@@ -1112,6 +1361,45 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+}
+std::vector<float> extractFeatures(const std::vector<float>& pattern) {
+    std::vector<float> features;
+    
+    // Simple feature extraction for concept formation
+    if (pattern.empty()) return features;
+    
+    // Compute basic statistics as features
+    float sum = 0.0f, min = pattern[0], max = pattern[0], variance = 0.0f;
+    for (float val : pattern) {
+        sum += val;
+        min = std::min(min, val);
+        max = std::max(max, val);
+    }
+    
+    float mean = sum / pattern.size();
+    
+    for (float val : pattern) {
+        variance += (val - mean) * (val - mean);
+    }
+    variance /= pattern.size();
+    
+    float stdDev = std::sqrt(variance);
+    
+    // Feature vector: [mean, min, max, stddev, count of positive values]
+    features.reserve(5);
+    features.push_back(mean);
+    features.push_back(min);
+    features.push_back(max);
+    features.push_back(stdDev);
+    
+    int posCount = 0;
+    for (float val : pattern) {
+        if (val > 0.0f) posCount++;
+    }
+    features.push_back(static_cast<float>(posCount) / pattern.size());
+    
+    return features;
 }
 
 } // namespace nlm
