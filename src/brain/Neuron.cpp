@@ -184,8 +184,16 @@ void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {

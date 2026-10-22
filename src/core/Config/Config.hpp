@@ -55,8 +55,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both simple key=value and JSON formats)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from simple key=value file format
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Load from JSON file format
+    bool loadFromJsonFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -93,13 +99,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal JSON parsing helpers
+    void parseJsonContent(const std::string& json);
+    static std::pair<ConfigValue, size_t> parseJsonValue(const std::string& json, size_t startPos);
+    static std::pair<ConfigValue, size_t> parseJsonArray(const std::string& json, size_t startPos);
+    
+    // Internal string utilities
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
+    static std::string unescapeString(const std::string& str);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

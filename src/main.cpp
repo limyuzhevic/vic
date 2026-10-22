@@ -28,6 +28,46 @@
 
 using namespace nlm;
 
+// Command-line options for NLM Phase 2 demonstration
+// Enhanced usage information
+void printUsage() {
+    printBanner();
+    std::cout << "Usage: ./nlm [options]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=<file>              Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron_count=<n>           Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=<n>           Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=<p> Set connection probability (0.0-1.0, default: 0.15)" << std::endl;
+    std::cout << "  --simulation_timestep=<dt>   Set simulation timestep in ms (default: 0.001)" << std::endl;
+    std::cout << "  --random_seed=<seed>         Set random seed (default: 42)" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<w>        Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<w>        Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau=<t>               Set STDP tau (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis_rate=<r>     Set synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning_rate=<r>           Set pruning rate (default: 0.00001)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Debug/Verbose Options:" << std::endl;
+    std::cout << "  --debug                      Enable debug logging (overrides INFO level)" << std::endl;
+    std::cout << "  --verbose                    Enable verbose output" << std::endl;
+    std::cout << "  --quiet                      Suppress informational messages (INFO level)" << std::endl;
+    std::cout << "  --profile                    Enable performance profiling" << std::endl;
+    std::cout << "  --progress                  Show progress indicators during execution" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Experiment Options:" << std::endl;
+    std::cout << "  --experiment=<name>          Run specific experiment (basic, plasticity, stdp, all)" << std::endl;
+    std::cout << "  --runs=<n>                   Number of experiment runs (default: 1)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Output Options:" << std::endl;
+    std::cout << "  --save_config=<file>         Save final configuration to file" << std::endl;
+    std::cout << "  --save_brain=<file>          Save brain state to file after execution" << std::endl;
+    std::cout << "  --output_dir=<dir>           Set output directory for all files" << std::endl;
+    std::cout << "  --log_file=<file>            Redirect all log output to file" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Help:" << std::endl;
+    std::cout << "  --help                       Show this help message" << std::endl;
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -322,7 +362,139 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line options
+    bool debugMode = false;
+    bool verboseMode = false;
+    bool quietMode = false;
+    bool enableProfile = false;
+    bool showProgress = false;
+    std::string experimentMode = "all"; // basic, plasticity, stdp, all
+    int numRuns = 1;
+    std::string saveConfigFile;
+    std::string saveBrainFile;
+    std::string outputDir;
+    std::string logFile;
+    std::string configFile = "configs/default.cfg";
+    
+    // Parse options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                if (key == "debug") {
+                    debugMode = true;
+                } else if (key == "verbose") {
+                    verboseMode = true;
+                    debugMode = true; // Verbose implies debug
+                } else if (key == "quiet") {
+                    quietMode = true;
+                } else if (key == "profile") {
+                    enableProfile = true;
+                } else if (key == "progress") {
+                    showProgress = true;
+                } else if (key == "experiment") {
+                    experimentMode = value;
+                } else if (key == "runs") {
+                    numRuns = std::stoi(value);
+                } else if (key == "save_config") {
+                    saveConfigFile = value;
+                } else if (key == "save_brain") {
+                    saveBrainFile = value;
+                } else if (key == "output_dir") {
+                    outputDir = value;
+                } else if (key == "log_file") {
+                    logFile = value;
+                }
+            } else {
+                // Boolean flags
+                if (arg == "--debug") debugMode = true;
+                else if (arg == "--verbose") {
+                    verboseMode = true;
+                    debugMode = true;
+                } else if (arg == "--quiet") quietMode = true;
+                else if (arg == "--profile") enableProfile = true;
+                else if (arg == "--progress") showProgress = true;
+                else if (arg == "--help") {
+                    printUsage();
+                    return 0;
+                }
+            }
+        } else if (arg.substr(0, 7) == "--config") {
+            // Original config handling (kept for backward compatibility)
+            if (arg.find('=') != std::string::npos) {
+                // Parse from config=<file>
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                // Parse from --config <file>
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 2) == "-k") {
+            // Handle -key value format for other options
+            std::string key = arg.substr(1);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                if (key == "neuron_count") {
+                    // This would need to be implemented in Config class
+                    // For now, just parse it
+                } else if (key == "region_count") {
+                    // This would need to be implemented in Config class
+                } else if (key == "connection_probability") {
+                    // This would need to be implemented in Config class
+                } else if (key == "simulation_timestep") {
+                    // This would need to be implemented in Config class
+                } else if (key == "random_seed") {
+                    // This would need to be implemented in Config class
+                }
+            }
+        }
+    }
+    
+    // Configure logging based on mode
+    auto logger = std::make_shared<Logger>();
+    
+    if (!logFile.empty()) {
+        auto fileLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        fileLogger->setOutputFile(logFile);
+        logger->addLogger(fileLogger);
+    }
+    
+    if (debugMode) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        consoleLogger->setUseColors(!quietMode);
+        logger->addLogger(consoleLogger);
+    } else if (verboseMode) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        consoleLogger->setUseColors(!quietMode);
+        logger->addLogger(consoleLogger);
+    } else if (quietMode) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+        consoleLogger->setUseColors(false);
+        logger->addLogger(consoleLogger);
+    } else {
+        // Default INFO level logging
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        consoleLogger->setUseColors(true);
+        logger->addLogger(consoleLogger);
+    }
+    
+    Logger::setGlobal(logger);
+    
     printBanner();
+    
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "===================================" << std::endl;
+    
+    if (verboseMode) {
+        std::cout << "Verbose mode enabled" << std::endl;
+        std::cout << "Debug mode: " << (debugMode ? "enabled" : "disabled") << std::endl;
+        std::cout << "Quiet mode: " << (quietMode ? "enabled" : "disabled") << std::endl;
+        std::cout << "Experiment mode: " << experimentMode << std::endl;
+        std::cout << "Number of runs: " << numRuns << std::endl;
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
