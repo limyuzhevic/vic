@@ -1,14 +1,170 @@
 #include "Config.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
 
+// JSON support
+#ifdef __has_include
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#define HAS_NLOHMANN_JSON 1
+#endif
+#endif
+
+// YAML support
+#ifdef __has_include
+#if __has_include(<yaml-cpp/yaml.h>)
+#include <yaml-cpp/yaml.h>
+#define HAS_YAML_CPP 1
+#endif
+#endif
+
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// JSON helper functions
+#ifdef HAS_NLOHMANN_JSON
+nlohmann::json configEntryToJson(const ConfigEntry& entry) {
+    nlohmann::json j;
+    j["key"] = entry.key;
+    
+    // Convert ConfigValue to JSON
+    std::visit([&j](auto&& value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, int>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, double>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            j["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            j["value"] = value;
+        }
+    }, entry.value);
+    
+    j["source"] = static_cast<int>(entry.source);
+    j["description"] = entry.description;
+    return j;
+}
+
+ConfigEntry jsonToConfigEntry(const nlohmann::json& j) {
+    ConfigEntry entry;
+    if (j.contains("key")) entry.key = j["key"].get<std::string>();
+    if (j.contains("source")) entry.source = static_cast<ConfigSource>(j["source"].get<int>());
+    if (j.contains("description")) entry.description = j["description"].get<std::string>();
+    
+    // Convert JSON value back to ConfigValue
+    if (j.contains("value")) {
+        const auto& val = j["value"];
+        if (val.is_number_integer()) {
+            // Try int first, then int64_t
+            try { entry.value = val.get<int>(); }
+            catch (...) {
+                entry.value = val.get<int64_t>();
+            }
+        } else if (val.is_number_float()) {
+            entry.value = val.get<double>();
+        } else if (val.is_boolean()) {
+            entry.value = val.get<bool>();
+        } else if (val.is_string()) {
+            entry.value = val.get<std::string>();
+        } else if (val.is_array()) {
+            // Try to infer vector type from first element
+            if (!val.empty()) {
+                const auto& first = val[0];
+                if (first.is_number_integer()) {
+                    entry.value = val.get<std::vector<int>>();
+                } else if (first.is_number_float()) {
+                    entry.value = val.get<std::vector<double>>();
+                } else if (first.is_string()) {
+                    entry.value = val.get<std::vector<std::string>>();
+                }
+            }
+        }
+    }
+    
+    return entry;
+}
+#endif
+
+// YAML helper functions
+#ifdef HAS_YAML_CPP
+YAML::Node configEntryToYaml(const ConfigEntry& entry) {
+    YAML::Node node;
+    node["key"] = entry.key;
+    
+    // Convert ConfigValue to YAML
+    std::visit([&node](auto&& value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, int>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, double>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            node["value"] = value;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            node["value"] = value;
+        }
+    }, entry.value);
+    
+    node["source"] = static_cast<int>(entry.source);
+    node["description"] = entry.description;
+    return node;
+}
+
+ConfigEntry yamlToConfigEntry(const YAML::Node& node) {
+    ConfigEntry entry;
+    if (node["key"]) entry.key = node["key"].as<std::string>();
+    if (node["source"]) entry.source = static_cast<ConfigSource>(node["source"].as<int>());
+    if (node["description"]) entry.description = node["description"].as<std::string>();
+    
+    // Convert YAML value back to ConfigValue
+    if (node["value"]) {
+        const YAML::Node& val = node["value"];
+        if (val.IsInteger()) {
+            try { entry.value = val.as<int>(); }
+            catch (...) { entry.value = val.as<int64_t>(); }
+        } else if (val.IsFloat()) {
+            entry.value = val.as<double>();
+        } else if (val.IsBoolean()) {
+            entry.value = val.as<bool>();
+        } else if (val.IsScalar()) {
+            entry.value = val.as<std::string>();
+        } else if (val.IsSequence()) {
+            // Try to infer vector type from first element
+            if (!val.empty()) {
+                const YAML::Node& first = val[0];
+                if (first.IsInteger()) {
+                    entry.value = val.as<std::vector<int>>();
+                } else if (first.IsFloat()) {
+                    entry.value = val.as<std::vector<double>>();
+                } else if (first.IsScalar()) {
+                    entry.value = val.as<std::vector<std::string>>();
+                }
+            }
+        }
+    }
+    
+    return entry;
+}
+#endif
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 

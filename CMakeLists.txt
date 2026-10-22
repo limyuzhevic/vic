@@ -29,12 +29,20 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/brain_constructor.cpp
+    src/brain/brain_memory_systems.cpp
+    src/brain/brain_neuromodulation.cpp
+    src/brain/brain_plasticity.cpp
+    src/brain/brain_simulation.cpp
+    src/brain/brain_io.cpp
+    src/brain/brain_checkpoint.cpp
+    src/brain/brain_region_management.cpp
+    src/brain/brain_statistics.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -124,6 +132,9 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/main_test.cpp
+    src/plasticity_test.cpp
+    src/stdp_test.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 

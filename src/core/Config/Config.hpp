@@ -58,11 +58,14 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from file (JSON/YAML/key=value format)
+    bool loadFromFile(const std::string& filepath) override;
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from command line arguments
+    bool loadFromArgs(int argc, char** argv) override;
+    
+    // Save to file (JSON/YAML/key=value format)
+    bool saveToFile(const std::string& filepath) const override;
     
     // Get values
     template<typename T>
@@ -92,6 +95,17 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+private:
+    // Internal file loading methods
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromYamlFile(const std::string& filepath);
+    bool loadFromLegacyFile(const std::string& filepath);
+    
+    // Internal file saving methods
+    bool saveToJsonFile(const std::string& filepath) const;
+    bool saveToYamlFile(const std::string& filepath) const;
+    bool saveToLegacyFile(const std::string& filepath) const;
     
 private:
     struct Impl;
