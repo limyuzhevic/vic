@@ -26,9 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
+    src/core/Config/JsonParser.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -41,8 +39,7 @@ add_library(nlm_core STATIC
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/OjaLearning.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
@@ -126,6 +123,12 @@ add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Configuration tool executable
+add_executable(nlm-config-tool
+    src/bin/nlm-config-tool.cpp
+)
+target_link_libraries(nlm-config-tool PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

@@ -4,8 +4,7 @@ cmake_minimum_required(VERSION 3.16)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 # Create test executable
-add_executable(nlm_test
-    test_main.cpp
+test_main.cpp
     test_types.cpp
     test_config.cpp
     test_random.cpp
@@ -14,6 +13,11 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_neural_working_memory.cpp
+    test_plasticity.cpp
+    test_enhanced_config.cpp
+    test_ojalearning.cpp
+)
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

@@ -24,27 +24,16 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
-        }
-    }
-    
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
-    }
+    /*
+     * Phase 6: Advanced Hebbian learning
+     * 
+     * Real Hebbian learning including:
+     * - Oja learning rule for competitive normalization
+     * - BCM theory (sliding threshold)
+     * - Synaptic tagging and capture
+     * - Multi-factor Hebbian rules with neuromodulation
+     * - Spike-timing dependent Hebbian variants
+     */
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

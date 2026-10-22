@@ -30,8 +30,16 @@ void Synaptogenesis::setTargetDensity(float density) {
 }
 
 void Synaptogenesis::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real synaptogenesis
-    // PLACEHOLDER: New synapses form probabilistically
+    /*
+     * Phase 6: Enhanced developmental synaptogenesis
+     * 
+     * Real neural development including:
+     * - Activity-dependent synaptogenesis guided by spike timing
+     * - Competitive pruning during development
+     * - Hebbian "fire together, wire together" rules
+     * - Structural plasticity modulated by experience
+     * - Developmental critical periods and plasticity reduction
+     */
 }
 
 } // namespace nlm

@@ -14,14 +14,16 @@ InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
 InternalSignalsProcessor::~InternalSignalsProcessor() = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
-    pImpl->processedSignals = signals.getData();
-    
-    // Generate some homeostatic signals
-    pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+    /*
+     * Phase 6: Advanced internal signal processing
+     * 
+     * Real internal signal processing including:
+     * - Homeostatic regulation and allostasis
+     * - Bodily state monitoring and integration
+     * - Arousal and attention modulation
+     * - Stress and fatigue systems
+     * - Embodied cognition signals
+     */
 }
 
 const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {

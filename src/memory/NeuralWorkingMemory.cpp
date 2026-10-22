@@ -43,12 +43,17 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Set neuron activation - more robust approach
+        if (brain_) {
+            if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+                auto neurons = region->getAllNeurons();
+                if (neurons) {
+                    for (auto* nn : *neurons) {
+                        if (nn->getId() == neuron) {
+                            nn->injectCurrent(activation * 5.0f);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -128,7 +133,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Check if trace is too old - bounds check
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
             }

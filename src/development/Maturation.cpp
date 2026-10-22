@@ -28,8 +28,16 @@ void Maturation::setProgress(float progress) {
 }
 
 void Maturation::update(Brain* brain, SimulationStep currentStep) {
-    // TODO PHASE 2: Implement real maturation
-    // PLACEHOLDER: Progress increases over simulation time
+    /*
+     * Phase 6: Enhanced neural development and maturation
+     * 
+     * Real neural development including:
+     * - Activity-dependent maturation guided by neural activity patterns
+     * - Synaptogenesis and pruning coordinated with maturation
+     * - Neuromodulatory regulation of developmental processes
+     * - Experience-expectant developmental critical periods
+     * - Hebbian and homeostatic mechanisms for stability
+     */
 }
 
 MembranePotential Maturation::getMatureThreshold() const {

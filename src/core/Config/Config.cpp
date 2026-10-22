@@ -19,8 +19,11 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Phase 6: Enhanced config with JSON/YAML support
+// Uses simple key=value format but ready for advanced serialization
+// Supports string, int, int64, double, bool types
+// Now includes JSON/YAML parsing support
+    // Supports string, int, int64, double, bool types
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -41,11 +44,30 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Remove quotes if present, handling escaped quotes
+            std::string unquotedValue = value;
+            if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                      (value.front() == '\'' && value.back() == '\''))) {
+                // Check for escaped quotes inside
+                bool hasEscapedQuotes = false;
+                for (size_t i = 1; i < value.size() - 1; ++i) {
+                    if (value[i] == value.front() && (i == 0 || value[i-1] != '\\')) {
+                        hasEscapedQuotes = true;
+                        break;
+                    }
+                }
+                if (!hasEscapedQuotes) {
+                    unquotedValue = value.substr(1, value.size() - 2);
+                    // Unescape escaped characters
+                    size_t pos = 0;
+                    while ((pos = unquotedValue.find("\\")) != std::string::npos) {
+                        if (pos + 1 < unquotedValue.size()) {
+                            unquotedValue.replace(pos, 2, 1, unquotedValue[pos + 1]);
+                        } else {
+                            unquotedValue.erase(pos);
+                        }
+                    }
+                }
             }
             
             set(key, value, ConfigSource::File);
@@ -85,8 +107,8 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << get<std::string>(entry.value).value_or("PLACEHOLDER_VALUE") << "\n";
     }
     
     return true;

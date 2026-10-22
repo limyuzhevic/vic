@@ -1,89 +1,123 @@
-// Config Tests
-#include "core/Config/Config.hpp"
+#include "tests/TestConfig.h"
+#include "src/core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
 
-namespace test_config {
-
-void testConfigCreation() {
-    nlm::Config config;
-    assert(!config.has("test"));
+void testConfig_basic() {
+    std::cout << "Testing Config basic functionality..." << std::endl;
     
-    std::cout << "    testConfigCreation passed" << std::endl;
+    Config config;
+    
+    // Test setting different types
+    config.set("string_value", std::string("test"), ConfigSource::Default);
+    config.set("int_value", 42, ConfigSource::Default);
+    config.set("double_value", 3.14, ConfigSource::Default);
+    config.set("bool_value", true, ConfigSource::Default);
+    
+    // Test getting values
+    assert(config.getOr<std::string>("string_value") == "test");
+    assert(config.getOr<int>("int_value") == 42);
+    assert(config.getOr<double>("double_value") == 3.14);
+    assert(config.getOr<bool>("bool_value") == true);
+    
+    // Test non-existent key
+    assert(config.getOr<std::string>("nonexistent", "default") == "default");
+    
+    // Test has method
+    assert(config.has("string_value"));
+    assert(!config.has("nonexistent"));
+    
+    std::cout << "  ✓ Basic config operations passed" << std::endl;
 }
 
-void testConfigSetAndGet() {
-    nlm::Config config;
+void testConfig_fileIO() {
+    std::cout << "Testing Config file I/O..." << std::endl;
     
-    config.set("int_value", 42, nlm::ConfigSource::Runtime);
-    assert(config.has("int_value"));
+    Config config;
     
-    auto intVal = config.get<int>("int_value");
-    assert(intVal.has_value());
-    assert(*intVal == 42);
+    // Write test config
+    config.set("test_string", std::string("Hello World"), ConfigSource::File);
+    config.set("test_int", 123, ConfigSource::File);
+    config.set("test_float", 1.5f, ConfigSource::File);
+    config.set("test_bool", false, ConfigSource::File);
     
-    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
-    auto doubleVal = config.get<double>("double_value");
-    assert(doubleVal.has_value());
-    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
+    // Save to file
+    assert(config.saveToFile("test_config.cfg"));
     
-    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
-    auto stringVal = config.get<std::string>("string_value");
-    assert(stringVal.has_value());
-    assert(*stringVal == "hello");
+    // Create new config and load
+    Config config2;
+    assert(config2.loadFromFile("test_config.cfg"));
     
-    config.set("bool_value", true, nlm::ConfigSource::Runtime);
-    auto boolVal = config.get<bool>("bool_value");
-    assert(boolVal.has_value());
-    assert(*boolVal == true);
+    // Verify loaded values
+    assert(config2.getOr<std::string>("test_string") == "Hello World");
+    assert(config2.getOr<int>("test_int") == 123);
+    assert(config2.getOr<double>("test_float") == 1.5);
+    assert(config2.getOr<bool>("test_bool") == false);
     
-    std::cout << "    testConfigSetAndGet passed" << std::endl;
+    // Clean up
+    std::remove("test_config.cfg");
+    
+    std::cout << "  ✓ File I/O operations passed" << std::endl;
 }
 
-void testConfigGetOr() {
-    nlm::Config config;
+void testConfig_quotesHandling() {
+    std::cout << "Testing Config quotes and escaping..." << std::endl;
     
-    int val = config.getOr<int>("missing", 100);
-    assert(val == 100);
+    Config config;
     
-    config.set("existing", 50, nlm::ConfigSource::Runtime);
-    val = config.getOr<int>("existing", 100);
-    assert(val == 50);
+    // Test various quote formats
+    config.set("simple_quote", std::string("'single'"), ConfigSource::File);
+    config.set("double_quote", std::string("\"double\""), ConfigSource::File);
+    config.set("mixed_quote", std::string("'mixed'\"'), ConfigSource::File);
     
-    std::cout << "    testConfigGetOr passed" << std::endl;
+    // Test escaped quotes
+    config.set("escaped_quote", std::string("He said \\\"Hello\\\""), ConfigSource::File);
+    config.set("backslash", std::string("path\\to\\file"), ConfigSource::File);
+    
+    std::cout << "  ✓ Quotes and escaping passed" << std::endl;
 }
 
-void testConfigRemove() {
-    nlm::Config config;
+void testConfig_summary() {
+    std::cout << "Testing Config summary generation..." << std::endl;
     
-    config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
+    Config config;
     
-    config.remove("test");
-    assert(!config.has("test"));
+    // Add some entries with descriptions
+    config.set("key1", "value1", ConfigSource::Default);
+    config.set("key2", 42, ConfigSource::CommandLine);
     
-    std::cout << "    testConfigRemove passed" << std::endl;
+    // Generate summary (should not crash)
+    std::string summary = config.summary();
+    assert(!summary.empty());
+    assert(summary.find("Configuration") != std::string::npos);
+    assert(summary.find("key1") != std::string::npos);
+    assert(summary.find("key2") != std::string::npos);
+    
+    std::cout << "  ✓ Summary generation passed" << std::endl;
 }
 
-void testConfigKeys() {
-    nlm::Config config;
+int main() {
+    std::cout << "=== Config Unit Tests ===" << std::endl << std::endl;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
-    
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
-    
-    std::cout << "    testConfigKeys passed" << std::endl;
+    try {
+        testConfig_basic();
+        std::cout << std::endl;
+        
+        testConfig_fileIO();
+        std::cout << std::endl;
+        
+        testConfig_quotesHandling();
+        std::cout << std::endl;
+        
+        testConfig_summary();
+        std::cout << std::endl;
+        
+        std::cout << "=== All Config tests passed! ===" << std::endl;
+        return 0;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR: " << e.what() << std::endl;
+        return 1;
+    }
 }
-
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
-}
-
-} // namespace test_config

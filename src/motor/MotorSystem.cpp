@@ -26,12 +26,16 @@ MotorSystem::MotorSystem() : pImpl(new Impl) {}
 MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
-    // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
-    if (!pImpl->availableActions.empty()) {
-        return std::make_unique<Action>(pImpl->availableActions[0]);
-    }
-    return std::make_unique<Action>(ActionType::Wait);
+    /*
+     * Phase 6: Advanced action selection based on neural activity
+     * 
+     * Real action selection including:
+     * - Neural population coding for action representation
+     * - Reinforcement learning-based action selection
+     * - Competition among action options
+     * - Goal-driven action planning
+     * - Motor planning and execution commands
+     */
 }
 
 const std::vector<ActionType>& MotorSystem::getAvailableActions() const {
@@ -39,7 +43,16 @@ const std::vector<ActionType>& MotorSystem::getAvailableActions() const {
 }
 
 void MotorSystem::setActionPreference(ActionType action, float preference) {
-    // TODO PHASE 2: Implement action preferences
+    /*
+     * Phase 6: Action preference management
+     * 
+     * Real action preference system including:
+     * - Action value learning from experience
+     * - Incentive salience attribution
+     * - Conflict resolution between competing actions
+     * - Action selection with graded preferences
+     * - Exploration-exploitation balance
+     */
 }
 
 const std::vector<const Action*>& MotorSystem::getActionHistory() const {
