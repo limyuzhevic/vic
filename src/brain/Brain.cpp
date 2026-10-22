@@ -16,9 +16,7 @@
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include <limits>
 
 namespace nlm {
 
