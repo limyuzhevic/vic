@@ -293,5 +293,118 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the BrainManager examples in the demo directory
+5. Check out the BUILD_AND_TEST.md for a comprehensive demonstration
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the powerful new BrainManager interface!
+
+### Quick BrainManager Reference
+
+**Quick Start Code:**
+
+```python
+import pynlm
+
+# Simple brain creation and simulation
+brain = pynlm.BrainManager.createBrain(
+    pynlm.BrainManager.createConfig(neuron_count=500, region_count=2)
+)
+pynlm.BrainManager.initializeBrain(brain)
+pynlm.BrainManager.runSimpleSimulation(brain, 50)
+
+print("✓ Brain simulation completed!")
+```
+
+**Advanced Configuration:**
+
+```python
+# Create custom config with BrainManager
+config = pynlm.BrainManager.createConfig(
+    neuron_count=1000,
+    region_count=3,
+    connection_probability=0.15,
+    timestep=0.001,
+    random_seed=42
+)
+
+# Save and load
+pynlm.BrainManager.saveConfigToFile(config, "my_config.json")
+loaded_config = pynlm.BrainManager.loadConfigFromFile("my_config.json")
+```
+
+**Enable Learning Features:**
+
+```python
+# Enable all learning and development features
+pynlm.BrainManager.enableDevelopment(brain, True)
+pynlm.BrainManager.enablePlasticity(brain, True)
+pynlm.BrainManager.enableRewardModulation(brain, True)
+pynlm.BrainManager.enableCuriosity(brain, True)
+```
+
+**Monitor and Save State:**
+
+```python
+# Get system statistics
+stats = pynlm.BrainManager.getSystemStats(brain)
+print(f"Neurons: {stats['neuron_count']}")
+print(f"Firing rate: {stats['average_firing_rate']} Hz")
+
+# Save for later use
+pynlm.BrainManager.saveBrainState(brain, "brain_checkpoint.dat")
+```
+
+**Error Handling:**
+
+```python
+# BrainManager handles null objects safely
+brain = pynlm.BrainManager.createBrain(some_config)
+# Methods return safe defaults if brain is invalid
+neuron_count = pynlm.BrainManager.getNeuronCount(brain)  # Safe even if null
+```
+
+**BrainManager Methods Summary:**
+
+| Method | Purpose | Returns |
+|--------|---------|---------|
+| `createConfig()` | Create default configuration | Config |
+| `loadConfigFromFile()` | Load config from file | Config |
+| `saveConfigToFile()` | Save config to file | bool |
+| `createBrain()` | Create brain with config | Brain |
+| `initializeBrain()` | Initialize brain | bool |
+| `runSimpleSimulation()` | Run simulation with optional input | void |
+| `enableDevelopment()` | Enable development features | void |
+| `enablePlasticity()` | Enable plasticity | void |
+| `enableRewardModulation()` | Enable reward modulation | void |
+| `enableCuriosity()` | Enable curiosity | void |
+| `saveBrainState()` | Save brain state | bool |
+| `loadBrainState()` | Load brain state | bool |
+| `getSystemStats()` | Get system statistics | dict |
+| `getBrainStatus()` | Get formatted status | string |
+| `getNeuronCount()` | Get neuron count | size_t |
+| `getSynapseCount()` | Get synapse count | size_t |
+| `getAverageFiringRate()` | Get average firing rate | float |
+| `getExcitationInhibitionRatio()` | Get E/I ratio | float |
+
+**Key Benefits:**
+
+- **Simplified API**: Easy-to-use high-level interface
+- **Error Handling**: Graceful handling of null/invalid objects
+- **Configuration Management**: Create, save, and load configurations
+- **Development Features**: Enable learning, plasticity, reward, and curiosity
+- **State Management**: Save and restore brain states
+- **System Monitoring**: Get statistics and formatted status
+- **Production Ready**: Robust and tested implementation
+- **Backward Compatible**: Works with existing nlm framework
+- **Well Documented**: Comprehensive examples and documentation
+
+**Ready to use!** You can now use BrainManager for:
+
+- Quick prototyping and testing
+- Production simulations with learning
+- Research experiments with configurable brains
+- Educational demonstrations
+- Integration with existing systems
+- Custom simulation scenarios
+
+Get started with BrainManager today! The framework is now more accessible, powerful, and user-friendly than ever before.
