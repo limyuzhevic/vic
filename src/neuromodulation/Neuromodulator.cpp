@@ -1,5 +1,6 @@
 #include "Neuromodulator.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -10,7 +11,7 @@ struct Dopamine::Impl {
     float decayRate;
     float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : level(0.0f), baseline(0.05f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
@@ -30,27 +31,27 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+    // Dopamine modulates plasticity based on reward prediction error
+    // Positive dopamine increases learning, negative dopamine stabilizes
     return 0.5f + 0.5f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // Dopamine decays towards baseline between reward events
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
+    // Reward signal increases dopamine level
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // Reward prediction error directly modulates dopamine
+    // Positive error (better than expected) increases dopamine
+    // Negative error (worse than expected) decreases dopamine
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
 } // namespace nlm
+

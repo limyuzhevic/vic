@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,9 +129,21 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulators for complete functionality
+        auto acetylcholine = std::make_unique<Acetylcholine>();
+        auto norepinephrine = std::make_unique<Norepinephrine>();
+        auto serotonin = std::make_unique<Serotonin>();
+        
+        // Store the neuromodulators in the implementation (these should be added to the Impl struct)
+        // For now, we'll store them as additional unique_ptrs
+        // The Impl struct needs to be updated to include these
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -410,6 +425,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    // Update acetylcholine (attention and memory)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+    }
+    
+    // Update serotonin (mood and behavioral control)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
     }
     
     // Update curiosity
@@ -1069,12 +1099,30 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+// ========== ADDITIONAL NEUROMODULATION SYSTEMS ==========
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
 }
 
 void Brain::logStatus() const {
@@ -1100,6 +1148,18 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
     }
     
     // Development status

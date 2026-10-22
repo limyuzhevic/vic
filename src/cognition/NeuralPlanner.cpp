@@ -29,16 +29,68 @@ void NeuralPlanner::initialize(Brain* brain) {
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
+    // Check if we have a self-model for better planning
+    if (brain_) {
+        auto* selfModel = brain_->getSelfModel();
+        if (selfModel && selfModel->hasSelfModel()) {
+            // Use self-model to get preferred action
+            ActionType preferredAction = selfModel->getPreferredAction(currentState);
+            if (preferredAction != ActionType::Wait) {
+                // Apply neuromodulation to the preferred action
+                float neuromodulation = getNeuromodulationLevel();
+                
+                // Neuromodulation affects action selection
+                if (neuromodulation > 1.0f) {
+                    // High neuromodulation encourages exploration
+                    return selectWithCuriosity(preferredAction);
+                } else {
+                    // Low neuromodulation encourages exploitation
+                    return preferredAction;
+                }
+            }
+        }
+    }
+    
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
     PlanningCandidate best;
     best.expectedReward = -1000.0f;
     
-    // Evaluate each sequence
+    // Evaluate each sequence with neuromodulation effects
     for (const auto& sequence : sequences) {
         PlanningCandidate candidate = evaluateSequence(sequence, currentState);
+        
+        // Apply neuromodulation to evaluation
+        if (brain_) {
+            // Acetylcholine affects evaluation of novel actions
+            if (brain_->getAcetylcholine()) {
+                float achLevel = brain_->getAcetylcholine()->getLevel();
+                if (achLevel > 0.5f) {
+                    // Strong ACh favors exploration
+                    candidate.expectedReward *= (1.0f + achLevel * 0.5f);
+                }
+            }
+            
+            // Norepinephrine affects evaluation focus
+            if (brain_->getNorepinephrine()) {
+                float neLevel = brain_->getNorepinephrine()->getLevel();
+                if (neLevel > 0.5f) {
+                    // Strong NE favors salient options
+                    candidate.expectedReward *= (1.0f + neLevel * 0.3f);
+                }
+            }
+            
+            // Dopamine affects evaluation of rewarded actions
+            if (brain_->getDopamine()) {
+                float daLevel = brain_->getDopamine()->getLevel();
+                if (daLevel > 0.0f) {
+                    // Positive dopamine favors high-value actions
+                    candidate.expectedReward *= (1.0f + daLevel * 0.4f);
+                }
+            }
+        }
         
         if (candidate.expectedReward > best.expectedReward) {
             best = candidate;

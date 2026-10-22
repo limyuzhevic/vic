@@ -19,6 +19,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -30,8 +33,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +49,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -133,7 +136,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        float noveltyFromBrain = 0.0f;
+        if (brain_ && brain_->getNovelty()) {
+            noveltyFromBrain = brain_->getNovelty()->getLevel();
+        }
+        
+        // Use brain's novelty or compute locally
+        float totalNovelty = noveltyFromBrain + totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalNovelty * 0.5f + noveltyLevel_ * 0.5f;  // Blend
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -142,10 +152,38 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error from brain
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float curiosityFromBrain = 0.0f;
+        float predictionErrorFromBrain = 0.0f;
+        
+        if (brain_) {
+            if (brain_->getCuriosity()) {
+                curiosityFromBrain = brain_->getCuriosity()->getLevel();
+            }
+            if (brain_->getPredictionErrorSignal()) {
+                predictionErrorFromBrain = std::abs(brain_->getPredictionErrorSignal()->getLevel());
+            }
+        }
+        
+        // Blend with local levels
+        curiosityLevel_ = curiosityFromBrain * 0.6f + curiosityLevel_ * 0.4f;
+        float curiosityFromLocal = noveltyLevel_ * 2.0f + predictionError_ * 0.5f;
+        curiosityLevel_ = curiosityFromLocal * 0.4f + curiosityLevel_ * 0.6f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update other neuromodulator levels from brain
+    if (brain_) {
+        if (brain_->getAcetylcholine()) {
+            acetylcholineLevel_ = brain_->getAcetylcholine()->getLevel();
+        }
+        if (brain_->getNorepinephrine()) {
+            norepinephrineLevel_ = brain_->getNorepinephrine()->getLevel();
+        }
+        if (brain_->getSerotonin()) {
+            serotoninLevel_ = brain_->getSerotonin()->getLevel();
+        }
     }
 }
 
@@ -238,17 +276,25 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
+    // Get actual neuromodulators from brain
+    auto* dopamine = brain_->getDopamine();
+    auto* acetylcholine = brain_->getAcetylcholine();
+    auto* norepinephrine = brain_->getNorepinephrine();
+    auto* serotonin = brain_->getSerotonin();
+    
+    if (!dopamine) return;
+    
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Use brain's neuromodulator level instead of local variable
+    float currentDopamineLevel = dopamine->getLevel();
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Apply reward prediction error to brain's dopamine
+    dopamine->signalRewardPredictionError(predictionError_);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -256,8 +302,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Apply reward-modulated weight change using brain's neuromodulation
+                float delta = eligibility * currentDopamineLevel * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -268,7 +314,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    float plasticityFactor = 0.5f + 0.5f * currentDopamineLevel;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -276,6 +322,20 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Update local variables for agent state tracking
+    dopamineLevel_ = currentDopamineLevel;
+    
+    // Integrate other neuromodulators
+    if (acetylcholine) {
+        acetylcholineLevel_ = acetylcholine->getLevel();
+    }
+    if (norepinephrine) {
+        norepinephrineLevel_ = norepinephrine->getLevel();
+    }
+    if (serotonin) {
+        serotoninLevel_ = serotonin->getLevel();
     }
 }
 
@@ -319,7 +379,61 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Return combined effect of all neuromodulators
+    float totalEffect = 1.0f;
+    
+    if (brain_) {
+        // Dopamine promotes exploration and plasticity
+        if (brain_->getDopamine()) {
+            totalEffect *= (1.0f + brain_->getDopamine()->getLevel() * 0.5f);
+        }
+        
+        // Acetylcholine enhances attention and working memory
+        if (brain_->getAcetylcholine()) {
+            totalEffect *= (1.0f + brain_->getAcetylcholine()->getLevel() * 0.3f);
+        }
+        
+        // Norepinephrine increases arousal and vigilance
+        if (brain_->getNorepinephrine()) {
+            totalEffect *= (1.0f + brain_->getNorepinephrine()->getLevel() * 0.2f);
+        }
+        
+        // Serotonin stabilizes mood and reduces impulsivity
+        if (brain_->getSerotonin()) {
+            float serotoninLevel = brain_->getSerotonin()->getLevel();
+            totalEffect *= (1.0f - serotoninLevel * 0.3f);  // Reduces excitation
+        }
+        
+        // Curiosity drives exploration
+        if (brain_->getCuriosity()) {
+            totalEffect *= (1.0f + brain_->getCuriosity()->getLevel() * 0.2f);
+        }
+        
+        // Novelty signals new experiences
+        if (brain_->getNovelty()) {
+            totalEffect *= (1.0f + brain_->getNovelty()->getLevel() * 0.2f);
+        }
+        
+        // Prediction error drives learning
+        if (brain_->getPredictionErrorSignal()) {
+            float errorLevel = std::abs(brain_->getPredictionErrorSignal()->getLevel());
+            totalEffect *= (1.0f + errorLevel * 0.4f);
+        }
+    }
+    
+    return std::clamp(totalEffect, 0.5f, 3.0f);
+}
+
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    return serotoninLevel_;
 }
 
 float AgentBrain::getCuriosityLevel() const {
@@ -336,6 +450,9 @@ float AgentBrain::getPredictionError() const {
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
