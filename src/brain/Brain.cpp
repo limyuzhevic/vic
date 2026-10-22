@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -259,6 +262,13 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
+    // Initialize new neuromodulators
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
@@ -406,6 +416,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // Update attention system with working memory competition
+    if (pImpl->attention) {
+        // Use working memory neurons as attentional competitors for focused processing
+        auto memoryNeurons = pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons() : std::vector<NeuronId>{};
+        pImpl->attention->processCompetition(memoryNeurons);
+        
+        // Update attention dynamics
+        pImpl->attention->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 4.5: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Get current working memory activity as input for concept formation
+        std::vector<float> workingMemoryActivity = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>{};
+        
+        // Create sensory features from working memory (in real implementation, would use actual sensory data)
+        std::vector<float> sensoryFeatures(workingMemoryActivity.size(), 0.0f);
+        for (size_t i = 0; i < workingMemoryActivity.size() && i < sensoryFeatures.size(); ++i) {
+            sensoryFeatures[i] = workingMemoryActivity[i];
+        }
+        
+        // Present to concept formation system
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->conceptFormation->presentExperience(workingMemoryActivity, sensoryFeatures, reward, currentStep);
+    }
+    
+    // ========== STEP 4.6: Update neural planner ==========
+    if (pImpl->planner) {
+        // Get current working memory as state for planning
+        std::vector<float> currentState = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>{};
+        
+        // If we have working memory activity, use it as state
+        if (!currentState.empty()) {
+            // Get target reward from dopamine (reward prediction error)
+            float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Plan action based on current state and target reward
+            ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+            
+            // Apply planner's decision to motor system
+            // This creates the integration between cognition and action selection
+            if (plannedAction != ActionType::Wait) {
+                // Get planning confidence from planner
+                bool planConfidence = pImpl->planner->wasRecentPlanSuccessful();
+                
+                // Store planning result for later evaluation
+                if (currentStep % 10 == 0) {  // Store every 10 steps
+                    pImpl->planner->updatePlanQuality(std::vector<ActionType>{plannedAction}, 
+                                                    std::vector<ActionType>{plannedAction}, 
+                                                    targetReward);
+                }
+            }
+        }
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -511,8 +576,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use working memory as current sensory state for prediction
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Record current state for prediction learning
+            // In a real implementation, this would come from actual sensory input
+            pImpl->predictionSystem->train(currentSensoryState);
+            
+            // Generate prediction for next state
+            std::vector<float> predictedState = currentSensoryState;  // Simplified - could use real prediction
+            
+            // Compute prediction error (difference from actual)
+            float predictionError = 0.0f;
+            if (!predictedState.empty() && predictedState.size() == currentSensoryState.size()) {
+                for (size_t i = 0; i < predictedState.size(); ++i) {
+                    predictionError += std::abs(predictedState[i] - currentSensoryState[i]);
+                }
+                predictionError /= currentSensoryState.size();
+            }
+            
+            // Update prediction system with error
+            if (predictionError > 0.01f) {
+                pImpl->predictionSystem->updatePredictions(predictedState, currentSensoryState);
+            }
+            
+            // Use prediction error to modulate learning via neuromodulators
+            if (pImpl->dopamine && predictionError > 0.5f) {
+                // High prediction error strengthens dopamine response
+                float modulation = predictionError;
+                pImpl->dopamine->setLearningRate(modulation);
+            }
+            
+            // Update prediction error signal for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->update(pImpl->timestep);
+            }
+        }
+    }
+    
+    // ========== STEP 8.5: Update action-consequence prediction ==========
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Get current working memory state
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        if (!currentState.empty() && !pImpl->motorNeurons.empty()) {
+            // Determine what action might be taken based on motor neuron activity
+            ActionType likelyAction = ActionType::Wait;
+            
+            // Simple action selection based on motor neuron activity
+            size_t firingMotor = 0;
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring()) {
+                    ++firingMotor;
+                }
+            }
+            
+            if (firingMotor > 0) {
+                // Determine action type from firing pattern
+                // This is simplified - in reality would use more complex mapping
+                if (firingMotor < pImpl->motorNeurons.size() / 3) {
+                    likelyAction = ActionType::MoveForward;
+                } else if (firingMotor < pImpl->motorNeurons.size() * 2 / 3) {
+                    likelyAction = ActionType::MoveBackward;
+                } else {
+                    likelyAction = ActionType::Interact;
+                }
+            }
+            
+            // Record action for consequence prediction
+            pImpl->predictionSystem->recordAction(likelyAction, pImpl->currentStep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -735,31 +872,51 @@ void Brain::develop() {
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
-void Brain::reset() {
-    NLM_LOG_INFO("Resetting NLM Brain...");
-    
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
-    
-    for (auto& region : pImpl->regions) {
-        region->reset();
+    void Brain::reset() {
+        NLM_LOG_INFO("Resetting NLM Brain...");
+        
+        pImpl->currentStep = 0;
+        pImpl->currentTime = 0.0;
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->totalSpikesTotal = 0;
+        pImpl->isResting = false;
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        for (auto& region : pImpl->regions) {
+            region->reset();
+        }
+        
+        pImpl->spikeSystem->reset();
+        pImpl->developmentalStage = DevelopmentalStage::Initial;
+        
+        // Reset all integrated systems
+        // Memory systems
+        if (pImpl->workingMemory) pImpl->workingMemory->clear();
+        if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+        if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+        
+        // Cognition systems
+        if (pImpl->planner) pImpl->planner->reset();
+        if (pImpl->conceptFormation) pImpl->conceptFormation->reset();
+        if (pImpl->attention) pImpl->attention->reset();
+        
+        // Prediction system
+        if (pImpl->predictionSystem) pImpl->predictionSystem->reset();
+        
+        // Neuromodulation systems
+        if (pImpl->dopamine) pImpl->dopamine->reset();
+        if (pImpl->acetylcholine) pImpl->acetylcholine->reset();
+        if (pImpl->norepinephrine) pImpl->norepinephrine->reset();
+        if (pImpl->serotonin) pImpl->serotonin->reset();
+        if (pImpl->curiosity) pImpl->curiosity->reset();
+        if (pImpl->novelty) pImpl->novelty->reset();
+        if (pImpl->predictionError) pImpl->predictionError->reset();
+        
+        // Development system
+        if (pImpl->developmentSystem) pImpl->developmentSystem->reset();
+        
+        NLM_LOG_INFO("NLM Brain reset complete");
     }
-    
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
-    
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
-    
-    NLM_LOG_INFO("NLM Brain reset complete");
-}
 
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
@@ -1055,6 +1212,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
