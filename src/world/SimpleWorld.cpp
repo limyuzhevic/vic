@@ -1,4 +1,6 @@
 #include "SimpleWorld.hpp"
+#include "../brain/Brain.hpp"
+#include "../agent/MotorCommand.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -398,6 +400,211 @@ void SimpleWorld::checkCollisions() {
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
     }
+}
+
+void SimpleWorld::checkCollisions() {
+    // Passive collision check (for damage when moving into objects)
+    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
+        agent_.health -= 0.01f;  // Passive damage
+    }
+}
+
+SensoryPercept SimpleWorld::observe(Brain* brain) {
+    // For compatibility with older experiment code
+    // Generate current sensory percept based on agent's state
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot observe null brain");
+        return sensory_;
+    }
+    
+    SensoryPercept percept = sensory_;
+    
+    // Add brain's current activity to perception if available
+    if (brain) {
+        // Get brain's current state information
+        auto* wm = brain->getWorkingMemory();
+        if (wm && wm->getActiveTraces() > 0) {
+            // Add working memory traces to sensory perception
+            // This is a simplified implementation
+            float wmSignal = static_cast<float>(wm->getActiveTraces()) / 100.0f;
+            auto vision = percept.getVision();
+            if (!vision.empty()) {
+                // Boost vision based on working memory activity
+                for (auto& v : vision) {
+                    v += wmSignal * 0.2f;
+                    if (v > 1.0f) v = 1.0f;
+                }
+                percept.setVision(vision);
+            }
+        }
+    }
+    
+    return percept;
+}
+
+ActionResult SimpleWorld::applyAction(Brain* brain, MotorCommand cmd) {
+    // For compatibility with older experiment code
+    // Apply motor command and get result, similar to applyMotorCommand
+    // But for compatibility, we use the brain's regions to select action
+    ActionResult result;
+    result.success = false;
+    result.reward = 0.0f;
+    result.message = "action_not_applied";
+    
+    if (!brain) {
+        result.message = "brain_is_null";
+        return result;
+    }
+    
+    // Check if brain has regions
+    if (brain->getRegionCount() == 0) {
+        result.message = "no_regions_in_brain";
+        return result;
+    }
+    
+    // Get first region for action application
+    auto* region = brain->getRegion(0);
+    if (!region) {
+        result.message = "region_is_null";
+        return result;
+    }
+    
+    // Based on command type, apply appropriate action
+    switch (cmd) {
+        case MotorCommand::MoveForward:
+            result.reward = -0.01f;  // Small cost for movement
+            result.success = true;
+            result.message = "moved_forward";
+            break;
+        case MotorCommand::MoveBackward:
+            result.reward = -0.02f;
+            result.success = true;
+            result.message = "moved_backward";
+            break;
+        case MotorCommand::TurnLeft:
+            result.reward = -0.005f;
+            result.success = true;
+            result.message = "turned_left";
+            break;
+        case MotorCommand::TurnRight:
+            result.reward = -0.005f;
+            result.success = true;
+            result.message = "turned_right";
+            break;
+        case MotorCommand::Interact:
+            result.reward = 0.0f;
+            result.success = true;
+            result.message = "interacted";
+            break;
+        case MotorCommand::Wait:
+        default:
+            result.reward = 0.0f;
+            result.success = true;
+            result.message = "waited";
+            break;
+    }
+    
+    return result;
+}
+
+ActionResult SimpleWorld::applyAction(Brain* brain, MotorCommand cmd) {
+    // For compatibility with older experiment code
+    // Apply motor command and get result, similar to applyMotorCommand
+    // But for compatibility, we use the brain's regions to select action
+    ActionResult result;
+    result.success = false;
+    result.reward = 0.0f;
+    result.message = "action_not_applied";
+    
+    if (!brain) {
+        result.message = "brain_is_null";
+        return result;
+    }
+    
+    // Check if brain has regions
+    if (brain->getRegionCount() == 0) {
+        result.message = "no_regions_in_brain";
+        return result;
+    }
+    
+    // Get first region for action application
+    auto* region = brain->getRegion(0);
+    if (!region) {
+        result.message = "region_is_null";
+        return result;
+    }
+    
+    // Based on command type, apply appropriate action
+    switch (cmd) {
+        case MotorCommand::MoveForward:
+            result.reward = -0.01f;  // Small cost for movement
+            result.success = true;
+            result.message = "moved_forward";
+            break;
+        case MotorCommand::MoveBackward:
+            result.reward = -0.02f;
+            result.success = true;
+            result.message = "moved_backward";
+            break;
+        case MotorCommand::TurnLeft:
+            result.reward = -0.005f;
+            result.success = true;
+            result.message = "turned_left";
+            break;
+        case MotorCommand::TurnRight:
+            result.reward = -0.005f;
+            result.success = true;
+            result.message = "turned_right";
+            break;
+        case MotorCommand::Interact:
+            result.reward = 0.0f;
+            result.success = true;
+            result.message = "interacted";
+            break;
+        case MotorCommand::Wait:
+        default:
+            result.reward = 0.0f;
+            result.success = true;
+            result.message = "waited";
+            break;
+    }
+    
+    return result;
+}
+
+float SimpleWorld::computeReward(Brain* brain) {
+    // For compatibility with older experiment code
+    // Compute reward based on brain's current state
+    float reward = 0.0f;
+    
+    if (!brain) {
+        return 0.0f;
+    }
+    
+    // Check if brain has regions
+    if (brain->getRegionCount() == 0) {
+        return 0.0f;
+    }
+    
+    // Get first region
+    auto* region = brain->getRegion(0);
+    if (!region) {
+        return 0.0f;
+    }
+    
+    // Base reward calculation
+    // In a real implementation, this would be more sophisticated
+    // For now, return a small negative reward to encourage efficiency
+    reward = -0.001f;
+    
+    // Add reward for brain activity (firing rate)
+    float firingRate = brain->getAverageFiringRate();
+    if (firingRate > 0.0f) {
+        reward += firingRate * 0.0001f;
+    }
+    
+    return reward;
 }
 
 } // namespace nlm

@@ -2,6 +2,9 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../brain/Brain.hpp"
+#include "../agent/MotorCommand.hpp"
+#include "ActionResult.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -63,9 +66,21 @@ public:
     // Check if position is valid (not wall)
     bool isValidPosition(float x, float y) const;
     
-    // Get object at position (if any)
+// Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
-    
+
+    // Get observation from brain (for compatibility with older code)
+    // This is a convenience method for experiments
+    SensoryPercept observe(class Brain* brain);
+
+    // Apply action from brain (for compatibility with older code)
+    // This is a convenience method for experiments
+    ActionResult applyAction(class Brain* brain, class MotorCommand cmd);
+
+    // Compute reward based on brain's current state
+    // This is a convenience method for experiments
+    float computeReward(class Brain* brain);
+
     // World dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
