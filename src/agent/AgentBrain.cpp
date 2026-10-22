@@ -347,4 +347,318 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// Advanced AgentBrain methods implementation
+
+void AgentBrain::explore(int maxSteps) {
+    NLM_LOG_INFO("Starting exploration with curiosity-driven behavior for " + std::to_string(maxSteps) + " steps");
+    
+    float totalExploration = 0.0f;
+    int explorationSteps = 0;
+    
+    for (int step = 0; step < maxSteps; ++step) {
+        // Simple exploration loop with curiosity
+        if (curiosityLevel_ > 0.3f) {
+            // Random action exploration
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            MotorCommand action;
+            switch (choice) {
+                case 0: action = MotorCommand::MoveForward; break;
+                case 1: action = MotorCommand::MoveBackward; break;
+                case 2: action = MotorCommand::TurnLeft; break;
+                case 3: action = MotorCommand::TurnRight; break;
+                case 4: action = MotorCommand::LookLeft; break;
+                case 5: action = MotorCommand::LookRight; break;
+                case 6: action = MotorCommand::Interact; break;
+                default: action = MotorCommand::Wait; break;
+            }
+            
+            // Apply exploration action
+            brain_->injectCurrentToNeurons(NeuronType::Motor, 20.0f);
+            
+            // Record exploration experience
+            std::vector<float> dummyObservation(256, 0.0f);
+            recordExperience(actionToString(action), dummyObservation, 0.0f, false);
+            
+            totalExploration += curiosityLevel_;
+            explorationSteps++;
+            
+            // Update curiosity
+            curiosityLevel_ = std::max(0.0f, curiosityLevel_ - 0.01f);
+        }
+        
+        // Step the brain
+        brain_->step(step, step * 0.001f);
+        
+        // Log progress every 100 steps
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Exploration step " + std::to_string(step) + 
+                        " | Curiosity: " + std::to_string(curiosityLevel_) +
+                        " | Exploration rate: " + std::to_string(explorationSteps > 0 ? totalExploration / explorationSteps : 0.0f));
+        }
+    }
+    
+    NLM_LOG_INFO("Exploration completed: " + std::to_string(explorationSteps) + " exploratory steps, " +
+                std::to_string(totalExploration / std::max(1, explorationSteps)) + " avg curiosity level");
+}
+
+std::vector<float> AgentBrain::getMotorCommandStrengths() const {
+    std::vector<float> strengths;
+    
+    // Calculate activity in each motor group
+    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+        if (neurons.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (Neuron* n : neurons) {
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        return sum / neurons.size();
+    };
+    
+    strengths.push_back(calcActivity(motorForward_));
+    strengths.push_back(calcActivity(motorBackward_));
+    strengths.push_back(calcActivity(motorTurnLeft_));
+    strengths.push_back(calcActivity(motorTurnRight_));
+    strengths.push_back(calcActivity(motorInteract_));
+    strengths.push_back(calcActivity(motorWait_));
+    
+    return strengths;
+}
+
+void AgentBrain::recordExperience(const std::string& action, 
+                                  const std::vector<float>& observation,
+                                  float reward, bool terminal) {
+    // Store experience in replay buffer for learning
+    ExperienceRecord record;
+    record.action = action;
+    record.observation = observation;
+    record.reward = reward;
+    record.terminal = terminal;
+    record.timestamp = developmentalAge_;
+    
+    // Simple replay buffer (FIFO)
+    if (experienceReplay_.size() >= maxReplaySize_) {
+        experienceReplay_.pop_front();
+    }
+    experienceReplay_.push_back(record);
+    
+    // Learn from experience if in learning mode
+    if (learningModeEnabled_) {
+        // Update action values using simple temporal difference learning
+        float tdError = reward + (terminal ? 0.0f : 0.9f * expectedReward_) - expectedReward_;
+        
+        // Update action value (simplified)
+        float actionValue = actionValues_[action] + 0.01f * tdError;
+        actionValues_[action] = actionValue;
+    }
+}
+
+float AgentBrain::getLearningStats() const {
+    float totalValue = 0.0f;
+    int count = 0;
+    
+    for (const auto& pair : actionValues_) {
+        totalValue += pair.second;
+        count++;
+    }
+    
+    return count > 0 ? totalValue / count : 0.0f;
+}
+
+void AgentBrain::enableLearningMode(bool enabled) {
+    learningModeEnabled_ = enabled;
+    if (enabled) {
+        NLM_LOG_INFO("Learning mode enabled");
+        // Initialize action values if not already done
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Motor) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        std::string action = neuronToActionString(n);
+                        if (actionValues_.find(action) == actionValues_.end()) {
+                            actionValues_[action] = 0.0f;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        NLM_LOG_INFO("Learning mode disabled");
+    }
+}
+
+void AgentBrain::setExplorationRate(float rate) {
+    explorationRate_ = std::clamp(rate, 0.0f, 1.0f);
+    NLM_LOG_INFO("Exploration rate set to " + std::to_string(explorationRate_));
+}
+
+void AgentBrain::simulateEpisode(int maxSteps) {
+    NLM_LOG_INFO("Simulating episode with max steps: " + std::to_string(maxSteps));
+    
+    float totalReward = 0.0f;
+    int steps = 0;
+    
+    for (int step = 0; step < maxSteps; ++step) {
+        // Simple world simulation loop
+        brain_->step(step, step * 0.001f);
+        
+        // Simple action selection based on neural activity
+        MotorCommand action = decodeMotorCommand();
+        
+        // Apply action and get reward
+        float reward = brain_->getRandomGenerator()->uniformReal(0.0f, 0.5f);
+        totalReward += reward;
+        
+        // Record experience
+        std::vector<float> observation(256, brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f));
+        recordExperience(actionToString(action), observation, reward, false);
+        
+        steps++;
+        
+        // Update development
+        updateDevelopment(0.001f);
+        
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Episode step " + std::to_string(step) + 
+                        " | Reward: " + std::to_string(reward) +
+                        " | Total: " + std::to_string(totalReward));
+        }
+    }
+    
+    NLM_LOG_INFO("Episode simulation completed: " + std::to_string(steps) + " steps, " +
+                std::to_string(totalReward) + " total reward");
+}
+
+void AgentBrain::saveExperienceReplay(const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open file for writing: " + filename);
+        return;
+    }
+    
+    file << "Action,Observation,Reward,Terminal,Timestamp\n";
+    for (const auto& record : experienceReplay_) {
+        file << record.action << ",";
+        file << "[";
+        for (size_t i = 0; i < record.observation.size(); ++i) {
+            file << record.observation[i];
+            if (i < record.observation.size() - 1) file << ",";
+        }
+        file << "]," << record.reward << "," << (record.terminal ? "true" : "false") 
+             << "," << record.timestamp << "\n";
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Saved " + std::to_string(experienceReplay_.size()) + 
+                " experiences to " + filename);
+}
+
+void AgentBrain::loadExperienceReplay(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open file for reading: " + filename);
+        return;
+    }
+    
+    std::string line;
+    std::getline(file, line); // Skip header
+    
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string token;
+        std::vector<std::string> tokens;
+        
+        while (std::getline(ss, token, ',')) {
+            tokens.push_back(token);
+        }
+        
+        if (tokens.size() >= 5) {
+            ExperienceRecord record;
+            record.action = tokens[0];
+            
+            // Parse observation (simplified - assumes format [val1,val2,...])
+            std::string obsStr = tokens[1];
+            if (obsStr.front() == '[' && obsStr.back() == ']') {
+                obsStr = obsStr.substr(1, obsStr.size() - 2);
+                std::stringstream obsStream(obsStr);
+                float val;
+                char comma;
+                while (obsStream >> val) {
+                    record.observation.push_back(val);
+                    if (obsStream >> comma && comma == ',') continue;
+                    else break;
+                }
+            }
+            
+            record.reward = std::stof(tokens[2]);
+            record.terminal = (tokens[3] == "true");
+            record.timestamp = std::stof(tokens[4]);
+            
+            experienceReplay_.push_back(record);
+        }
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Loaded " + std::to_string(experienceReplay_.size()) + 
+                " experiences from " + filename);
+}
+
+int AgentBrain::getExperienceCount() const {
+    return static_cast<int>(experienceReplay_.size());
+}
+
+void AgentBrain::clearExperienceReplay() {
+    experienceReplay_.clear();
+    NLM_LOG_INFO("Cleared experience replay buffer");
+}
+
+std::vector<float> AgentBrain::getRecentObservations(int count) const {
+    std::vector<float> result;
+    
+    count = std::min(count, static_cast<int>(experienceReplay_.size()));
+    
+    // Extract recent observations (simplified approach)
+    int startIndex = std::max(0, static_cast<int>(experienceReplay_.size()) - count);
+    for (int i = startIndex; i < static_cast<int>(experienceReplay_.size()); ++i) {
+        for (float val : experienceReplay_[i].observation) {
+            result.push_back(val);
+        }
+    }
+    
+    return result;
+}
+
+std::vector<std::string> AgentBrain::getActionHistory(int count) const {
+    std::vector<std::string> result;
+    
+    count = std::min(count, static_cast<int>(experienceReplay_.size()));
+    
+    int startIndex = std::max(0, static_cast<int>(experienceReplay_.size()) - count);
+    for (int i = startIndex; i < static_cast<int>(experienceReplay_.size()); ++i) {
+        result.push_back(experienceReplay_[i].action);
+    }
+    
+    return result;
+}
+
+// Helper methods
+std::string AgentBrain::actionToString(MotorCommand cmd) const {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return "MoveForward";
+        case MotorCommand::MoveBackward: return "MoveBackward";
+        case MotorCommand::TurnLeft: return "TurnLeft";
+        case MotorCommand::TurnRight: return "TurnRight";
+        case MotorCommand::LookLeft: return "LookLeft";
+        case MotorCommand::LookRight: return "LookRight";
+        case MotorCommand::Interact: return "Interact";
+        case MotorCommand::Wait: return "Wait";
+        default: return "Unknown";
+    }
+}
+
+std::string AgentBrain::neuronToActionString(Neuron* neuron) const {
+    // Simple mapping from neuron to action (simplified)
+    return "Action_" + std::to_string(neuron->getId().value);
+}
+
 } // namespace nlm

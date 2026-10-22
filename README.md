@@ -228,3 +228,32 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Enhanced Features
+
+The NLM framework has been enhanced with advanced Python bindings and command-line tools:
+
+### Python API
+
+Enhanced Python bindings provide:
+- **AgentBrain Advanced Features**: Experience replay, exploration strategies, learning modes
+- **Learning System**: Action value tracking, experience recording and analysis
+- **Exploration Control**: Curiosity-driven exploration, configurable exploration rates
+- **Performance Monitoring**: Comprehensive statistics and metrics collection
+
+### Command-Line Tools
+
+New tools for advanced usage:
+- **nlm_configure**: Advanced configuration management with schema validation
+- **nlm_simulate**: Multi-stage simulation runs with checkpoint management
+- **nlm_visualize**: Real-time brain activity monitoring and visualization
+
+### Key Improvements
+
+1. **Enhanced Integration**: Better connections between memory, prediction, and action systems
+2. **Learning Capabilities**: Experience replay and reinforcement learning support
+3. **Exploration Strategies**: Curated exploration for efficient learning
+4. **Performance Tools**: Comprehensive monitoring and analysis tools
+5. **User Experience**: Improved documentation and examples for both new and advanced users
+
+See `README_enhanced.md` for detailed documentation of all new features.

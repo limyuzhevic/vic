@@ -399,6 +399,39 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    
+    // Advanced AgentBrain features for experienced users
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AdvancedAgentBrain")
+        .def("explore", [](AgentBrain& self, int maxSteps) {
+            return self.explore(maxSteps);
+        }, py::arg("maxSteps") = 1000,
+             "Run exploration with curiosity-driven behavior")
+        .def("getMotorCommandStrengths", &AgentBrain::getMotorCommandStrengths,
+             "Get current motor command activation strengths")
+        .def("recordExperience", [](AgentBrain& self, const std::string& action,
+                                              const std::vector<float>& observation,
+                                              float reward, bool terminal) {
+            self.recordExperience(action, observation, reward, terminal);
+        }, py::arg("action"), py::arg("observation"), py::arg("reward"), py::arg("terminal"),
+             "Record an experience for learning")
+        .def("getLearningStats", &AgentBrain::getLearningStats,
+             "Get statistics about learning progress")
+        .def("enableLearningMode", &AgentBrain::enableLearningMode,
+             py::arg("enabled"),
+             "Enable/disable learning mode")
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"),
+             "Set exploration rate for action selection")
+        .def("simulateEpisode", &AgentBrain::simulateEpisode,
+             py::arg("maxSteps") = 500,
+             "Simulate a complete episode with the agent")
+        .def("saveExperienceReplay", &AgentBrain::saveExperienceReplay,
+             py::arg("filename"),
+             "Save experience replay for later analysis")
+        .def("getExperienceCount", &AgentBrain::getExperienceCount,
+             "Get number of recorded experiences")
+        .def("clearExperienceReplay", &AgentBrain::clearExperienceReplay,
+             "Clear all recorded experiences");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

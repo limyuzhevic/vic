@@ -112,6 +112,93 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+
+    // Advanced learning features
+    struct ExperienceRecord {
+        std::string action;
+        std::vector<float> observation;
+        float reward;
+        bool terminal;
+        double timestamp;
+    };
+    
+    std::deque<ExperienceRecord> experienceReplay_;
+    static const size_t maxReplaySize_ = 10000;
+    bool learningModeEnabled_;
+    std::unordered_map<std::string, float> actionValues_;
+    float explorationRate_;
+    
+    // Helper methods
+    std::string actionToString(MotorCommand cmd) const;
+    std::string neuronToActionString(Neuron* neuron) const;
+    
+public:
+    // Advanced AgentBrain features for experienced users
+    void explore(int maxSteps = 1000);
+    std::vector<float> getMotorCommandStrengths() const;
+    void recordExperience(const std::string& action,
+                         const std::vector<float>& observation,
+                         float reward, bool terminal);
+    float getLearningStats() const;
+    void enableLearningMode(bool enabled);
+    void setExplorationRate(float rate);
+    void simulateEpisode(int maxSteps = 500);
+    void saveExperienceReplay(const std::string& filename);
+    void loadExperienceReplay(const std::string& filename);
+    int getExperienceCount() const;
+    void clearExperienceReplay();
+    std::vector<float> getRecentObservations(int count = 10) const;
+    std::vector<std::string> getActionHistory(int count = 20) const;
+    
+    // Get current exploration rate
+    float getExplorationRate() const { return explorationRate_; }
+    
+    // Get current action (placeholder - would need more state tracking)
+    MotorCommand getCurrentAction() const { return MotorCommand::Wait; }
+    
+private:
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    std::shared_ptr<Brain> brain_;
+    
+    // Motor neuron groups
+    std::vector<Neuron*> motorForward_;
+    std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorTurnLeft_;
+    std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorWait_;
+    
+    // Sensory neuron groups
+    std::vector<Neuron*> sensoryVision_;
+    std::vector<Neuron*> sensoryTouch_;
+    std::vector<Neuron*> sensoryInternal_;
+    std::vector<Neuron*> sensoryProprioception_;
+    
+    // Neuromodulation state
+    float dopamineLevel_;
+    float noveltyLevel_;
+    float curiosityLevel_;
+    float predictionError_;
+    float expectedReward_;
+    
+    // Development state
+    double developmentalAge_;
+    float plasticityModifier_;
+    
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
+    
+    // Previous sensory state for novelty detection
+    std::vector<float> previousVision_;
+    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm
