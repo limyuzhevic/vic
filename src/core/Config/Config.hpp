@@ -93,6 +93,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validateConfiguration() const;
+    std::string getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

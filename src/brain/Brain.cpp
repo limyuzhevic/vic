@@ -20,6 +20,22 @@
 #include <cmath>
 #include <sstream>
 
+// Brain constants - extracted from magic numbers for better maintainability
+namespace {
+    const TimestepDuration DEFAULT_TIMESTEP = 0.001;  // Default simulation timestep (1ms)
+    const uint64_t DEFAULT_RANDOM_SEED = 42;          // Default random seed for reproducibility
+    const size_t DEFAULT_REPLAY_INTERVAL = 100;       // Replay memory every 100 steps
+    const size_t DEFAULT_CONSOLIDATION_INTERVAL = 1000; // Consolidate memory every 1000 steps
+    const float DEFAULT_LTP_WEIGHT = 0.01f;          // Default LTP weight for STDP
+    const float DEFAULT_LTD_WEIGHT = 0.012f;         // Default LTD weight for STDP
+    const float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f; // Default synaptogenesis rate
+    const float DEFAULT_PRUNING_RATE = 0.00001f;     // Default pruning rate
+    const float DEFAULT_SIMULATION_TIMESTEP = 0.001f; // Default simulation timestep for config
+    const size_t DEFAULT_NEURON_COUNT = 1000;        // Default number of neurons
+    const size_t DEFAULT_REGION_COUNT = 1;           // Default number of regions
+    const float DEFAULT_CONNECTION_PROBABILITY = 0.1f; // Default connection probability
+} // namespace
+
 namespace nlm {
 
 struct Brain::Impl {
@@ -83,18 +99,18 @@ struct Brain::Impl {
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(DEFAULT_TIMESTEP)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(DEFAULT_REPLAY_INTERVAL)      // Replay every 100 steps
+        , consolidationInterval(DEFAULT_CONSOLIDATION_INTERVAL)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
+        uint64_t seed = DEFAULT_RANDOM_SEED;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
@@ -131,23 +147,23 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", DEFAULT_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", DEFAULT_LTD_WEIGHT);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", DEFAULT_SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", DEFAULT_PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<double>("simulation_timestep", DEFAULT_SIMULATION_TIMESTEP);
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = config->getOr<size_t>("replay_interval", DEFAULT_REPLAY_INTERVAL);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", DEFAULT_CONSOLIDATION_INTERVAL);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -178,9 +194,9 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", DEFAULT_NEURON_COUNT);
+    size_t regionCount = pImpl->config->getOr<size_t>("region_count", DEFAULT_REGION_COUNT);
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", DEFAULT_CONNECTION_PROBABILITY);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

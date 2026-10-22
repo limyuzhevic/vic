@@ -404,6 +404,8 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        // Clean up resources before returning error
+        brain.reset();
         return 1;
     }
     
@@ -444,6 +446,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Explicitly clean up resources
+    brain.reset();
+    NLM_LOG_INFO("Resources cleaned up successfully.");
     
     return 0;
 }

@@ -79,10 +79,10 @@ public:
                 // 2. Inject sensory input into brain
                 agentBrain.processSensoryInput(percept);
                 
-                // 3. Simulate brain (multiple steps per action)
-                for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
-                }
+                // 3. Simulate brain (single step per world step for better efficiency)
+                // Each brain step advances neural simulation by 1ms
+                // World update advances simulation time by 10ms
+                brain->step(step, step * 0.001f);  // 1ms timestep
                 
                 // 4. Decode motor command from brain activity
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
@@ -93,11 +93,11 @@ public:
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
-                // 7. Update world
-                world.update(0.01);  // 10ms timestep
+                // 7. Update world (10ms timestep)
+                world.update(0.01f);  // 10ms timestep
                 
-                // 8. Update development
-                agentBrain.updateDevelopment(0.01);
+                // 8. Update development (10ms timestep)
+                agentBrain.updateDevelopment(0.01f);
                 
                 // Track metrics
                 episodeReward += result.reward;
