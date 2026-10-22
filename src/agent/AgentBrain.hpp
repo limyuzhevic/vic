@@ -2,6 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "../motor/Action.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -51,6 +52,19 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+    
+    // Record action consequences in SelfModel
+    void recordActionConsequence(ActionType action,
+                                 const std::vector<float>& beforeState,
+                                 const std::vector<float>& afterState);
+    
+    // Apply social learning observation
+    void applySocialLearningObservation(ActionType observedAction,
+                                        const std::vector<float>& observerState,
+                                        const std::vector<float>& resultingState);
+    
+    // Update self-model from prediction error
+    void updateSelfModelFromPredictionError();
     
     // Reset agent for new episode
     void reset();

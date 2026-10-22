@@ -1,5 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../sensory/SensoryPercept.hpp"
+#include "../motor/Action.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -157,6 +161,60 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // NEW: Integrate NeuralPlanner
+    if (brain_ && brain_->getPlanner()) {
+        // Create current state vector from sensory neuron activations
+        std::vector<float> currentState;
+        
+        // Add vision-related sensory neuron activities
+        float totalVisionActivity = 0.0f;
+        for (Neuron* n : sensoryVision_) {
+            totalVisionActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        if (!sensoryVision_.empty()) {
+            currentState.push_back(totalVisionActivity / sensoryVision_.size());
+        }
+        
+        // Add touch-related sensory neuron activities
+        float totalTouchActivity = 0.0f;
+        for (Neuron* n : sensoryTouch_) {
+            totalTouchActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        if (!sensoryTouch_.empty()) {
+            currentState.push_back(totalTouchActivity / sensoryTouch_.size());
+        }
+        
+        // Add internal-related sensory neuron activities
+        float totalInternalActivity = 0.0f;
+        for (Neuron* n : sensoryInternal_) {
+            totalInternalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        if (!sensoryInternal_.empty()) {
+            currentState.push_back(totalInternalActivity / sensoryInternal_.size());
+        }
+        
+        // Get planner's recommended action
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState, curiosityLevel_);
+        
+        // Convert planned action to MotorCommand
+        if (plannedAction != ActionType::Wait) {
+            switch (plannedAction) {
+                case ActionType::MoveForward: decoded = MotorCommand::MoveForward; break;
+                case ActionType::MoveBackward: decoded = MotorCommand::MoveBackward; break;
+                case ActionType::TurnLeft: decoded = MotorCommand::TurnLeft; break;
+                case ActionType::TurnRight: decoded = MotorCommand::TurnRight; break;
+                case ActionType::Interact: decoded = MotorCommand::Interact; break;
+                case ActionType::Look: decoded = MotorCommand::LookLeft; break;  // Map Look to LookLeft for now
+                case ActionType::LookUp: decoded = MotorCommand::LookLeft; break;  // Map LookUp to LookLeft for now
+                case ActionType::LookDown: decoded = MotorCommand::LookLeft; break;  // Map LookDown to LookLeft for now
+                default: break;
+            }
+        }
+        
+        // Update planner quality based on decoded action
+        brain_->getPlanner()->setActionQuality(static_cast<ActionType>(static_cast<int>(decoded)), curiosityLevel_);
     }
     
     return decoded;
@@ -330,8 +388,33 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+void AgentBrain::recordActionConsequence(ActionType action,
+                                       const std::vector<float>& beforeState,
+                                       const std::vector<float>& afterState) {
+    // Track action consequences in SelfModel
+    if (brain_ && brain_->getSelfModel()) {
+        brain_->getSelfModel()->recordSelfAction(action, beforeState, afterState);
+    }
+}
+
+void AgentBrain::applySocialLearningObservation(ActionType observedAction,
+                                                const std::vector<float>& observerState,
+                                                const std::vector<float>& resultingState) {
+    // Track observations of other agents in SocialLearning
+    if (brain_ && brain_->getSocialLearning()) {
+        brain_->getSocialLearning()->observeAgentAction(observedAction, observerState, resultingState);
+    }
+}
+
+void AgentBrain::updateSelfModelFromPredictionError() {
+    if (brain_ && brain_->getSelfModel() && brain_->getPredictionSystem()) {
+        float predictionError = brain_->getPredictionSystem()->getPredictionError();
+        
+        // Update self-model based on prediction error
+        brain_->getSelfModel()->updateSelfModel(
+            /* Would use predicted and actual states */ {}  // Simplified for now
+        );
+    }
 }
 
 void AgentBrain::reset() {
