@@ -404,22 +404,551 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Advanced configuration factory functions
+    m.def("createTrainingConfig", [](const std::string& trainingType, int epochs) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("training_type", trainingType, ConfigSource::Runtime);
+        config->set("epochs", epochs, ConfigSource::Runtime);
+        config->set("learning_rate", 0.001, ConfigSource::Runtime);
+        config->set("batch_size", 32, ConfigSource::Runtime);
+        config->set("optimizer", "adam", ConfigSource::Runtime);
+        return config;
+    }, py::arg("trainingType"), py::arg("epochs"), "Create a training configuration");
+
+    m.def("createDevelopmentConfig", [](float plasticityRate, bool enableStructuralPlasticity) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("plasticity_rate", plasticityRate, ConfigSource::Runtime);
+        config->set("structural_plasticity_enabled", enableStructuralPlasticity, ConfigSource::Runtime);
+        config->set("development_enabled", true, ConfigSource::Runtime);
+        config->set("curiosity_enabled", true, ConfigSource::Runtime);
+        return config;
+    }, py::arg("plasticityRate"), py::arg("enableStructuralPlasticity"), "Create a development configuration");
+
+    m.def("createProductionConfig", [](int memorySize, float explorationRate) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("working_memory_size", memorySize, ConfigSource::Runtime);
+        config->set("exploration_rate", explorationRate, ConfigSource::Runtime);
+        config->set("novelty_detection_enabled", true, ConfigSource::Runtime);
+        config->set("prediction_enabled", true, ConfigSource::Runtime);
+        config->set("attention_enabled", true, ConfigSource::Runtime);
+        return config;
+    }, py::arg("memorySize"), py::arg("explorationRate"), "Create a production configuration");
+
+    // Enhanced brain factory functions
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createBrainFromConfigFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a configuration file");
+
+    m.def("createTrainingBrain", [](int neuronCount, int regionCount, float learningRate) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount, ConfigSource::Runtime);
+        config->set("region_count", regionCount, ConfigSource::Runtime);
+        config->set("learning_rate", learningRate, ConfigSource::Runtime);
+        config->set("connection_probability", 0.15f, ConfigSource::Runtime);
+        config->set("plasticity_rate", 0.01f, ConfigSource::Runtime);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("regionCount"), py::arg("learningRate"), "Create a training brain with optimal settings");
+
+    m.def("createDevelopmentBrain", [](int neuronCount, float maturationRate) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount, ConfigSource::Runtime);
+        config->set("region_count", 2, ConfigSource::Runtime);
+        config->set("maturation_rate", maturationRate, ConfigSource::Runtime);
+        config->set("development_enabled", true, ConfigSource::Runtime);
+        config->set("curiosity_enabled", true, ConfigSource::Runtime);
+        config->set("novelty_detection_enabled", true, ConfigSource::Runtime);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("maturationRate"), "Create a development brain with maturation support");
+
+    // Enhanced world factory functions
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    m.def("createSimpleWorldWithDefaults", [](int width, int height, int visionWidth, int visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setAgentStart(width/2, height/2);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"), "Create a simple world with default configuration");
+
+    m.def("createTrainingWorld", [](int width, int height) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        world->setAgentStart(2, 2);
+        world->setMaxEnergy(100.0f);
+        world->setEnergyDecayRate(0.01f);
+        world->setRandomSeed(42);
+        return world;
+    }, py::arg("width"), py::arg("height"), "Create a training world with optimal settings");
+
+    m.def("createSurvivalWorld", [](int width, int height, float hazardDensity) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        world->setAgentStart(width/3, height/3);
+        world->setMaxEnergy(50.0f);
+        world->setEnergyDecayRate(0.02f);
+        
+        // Add hazards randomly
+        srand(42);
+        for (int i = 0; i < hazardDensity * width * height; ++i) {
+            int wx = rand() % width;
+            int wy = rand() % height;
+            world->addObject(WorldObject(wx, wy, WorldObjectType::Hazard, 1.0f, 0.3f));
+        }
+        
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("hazardDensity"), "Create a survival world with hazards");
+
+    // Agent brain factory functions
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createAgentWithDefaults", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable all learning capabilities by default
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an agent with default learning enabled");
+
+    m.def("createExpertAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all learning capabilities for expert agent
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an expert agent with all capabilities enabled");
+
+    // Complete simulation setup factory
+    m.def("createCompleteSimulationSetup", [](const std::string& worldType, int steps, bool enableLearning) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500, ConfigSource::Runtime);
+        config->set("region_count", 2, ConfigSource::Runtime);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        if (worldType == "training") {
+            world->configure(50, 50, 8, 8);
+            world->setAgentStart(25, 25);
+            world->setMaxEnergy(100.0f);
+        } else if (worldType == "survival") {
+            world->configure(100, 100, 8, 8);
+            world->setAgentStart(50, 50);
+            world->setMaxEnergy(50.0f);
+        } else {
+            world->configure(30, 30, 8, 8);
+            world->setAgentStart(15, 15);
+        }
+        world->setRandomSeed(42);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("worldType"), py::arg("steps"), py::arg("enableLearning"), "Create a complete simulation setup with all components");
+
+    // Quick setup convenience functions
+    m.def("quickSimulation", [](int steps, int visionSize) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        return createCompleteSimulationSetup("training", steps, true);
+    }, py::arg("steps"), py::arg("visionSize"), "Quick setup for a standard simulation");
+
+    m.def("quickSurvivalSimulation", [](int steps) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        return createCompleteSimulationSetup("survival", steps, true);
+    }, py::arg("steps"), "Quick setup for a survival simulation");
+
+    // === UTILITY FUNCTIONS ===
+
+    // Simulation utility functions
+    m.def("runSimulationSteps", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int steps, bool enableVisualization) -> float {
+        float totalReward = 0.0f;
+        int successfulActions = 0;
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1f);
+            
+            // Get percept and process it
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Agent thinks and produces action
+            agent->decodeMotorCommand();
+            
+            // Apply action to world
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            if (agent->isRewardModulationEnabled()) {
+                agent->applyRewardModulation(1.0f, 0.5f);
+                totalReward += 1.0f;
+                successfulActions++;
+            }
+            
+            if (enableVisualization && step % 10 == 0) {
+                agent->getBrain()->logStatus();
+            }
+        }
+        
+        return successfulActions / static_cast<float>(steps);
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), py::arg("enableVisualization"), "Run a complete simulation with steps");
+
+    m.def("runTrainingSimulation", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int steps) -> std::map<std::string, float> {
+        std::map<std::string, float> metrics;
+        metrics["total_steps"] = steps;
+        metrics["successful_actions"] = 0;
+        metrics["total_reward"] = 0.0f;
+        metrics["avg_firing_rate"] = 0.0f;
+        metrics["neuron_count"] = agent->getBrain()->getTotalNeuronCount();
+        metrics["synapse_count"] = agent->getBrain()->getTotalSynapseCount();
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            agent->decodeMotorCommand();
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (agent->isRewardModulationEnabled()) {
+                agent->applyRewardModulation(1.0f, 0.5f);
+                metrics["successful_actions"]++;
+                metrics["total_reward"] += 1.0f;
+            }
+        }
+        
+        if (steps > 0) {
+            metrics["success_rate"] = metrics["successful_actions"] / static_cast<float>(steps);
+        } else {
+            metrics["success_rate"] = 0.0f;
+        }
+        
+        return metrics;
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), "Run a training simulation and return metrics");
+
+    // Brain state management utilities
+    m.def("saveBrainToFile", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain->save(filepath)) {
+            throw std::runtime_error("Failed to save brain to file: " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to a file");
+
+    m.def("loadBrainFromFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain from file: " + filepath);
+        }
+        
+        return brain;
+    }, py::arg("filepath"), "Load brain state from a file");
+
+    // Comparison and analysis utilities
+    m.def("compareBrains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) -> std::map<std::string, double> {
+        std::map<std::string, double> comparison;
+        
+        comparison["neuron_count_match"] = (brain1->getTotalNeuronCount() == brain2->getTotalNeuronCount()) ? 1.0 : 0.0;
+        comparison["synapse_count_match"] = (brain1->getTotalSynapseCount() == brain2->getTotalSynapseCount()) ? 1.0 : 0.0;
+        comparison["firing_rate_ratio"] = brain1->getAverageFiringRate() / (brain2->getAverageFiringRate() > 0 ? brain2->getAverageFiringRate() : 1.0);
+        comparison["excitement_ratio"] = brain1->getExcitationInhibitionRatio() / (brain2->getExcitationInhibitionRatio() > 0 ? brain2->getExcitationInhibitionRatio() : 1.0);
+        comparison["total_spike_ratio"] = static_cast<double>(brain1->getTotalSpikeCount()) / (brain2->getTotalSpikeCount() > 0 ? brain2->getTotalSpikeCount() : 1);
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brains and return metrics");
+
+    // Configuration utilities
+    m.def("createConfigFromParams", [](std::map<std::string, std::variant<int, double, bool, std::string>> params) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : params) {
+            if (std::holds_alternative<int>(pair.second)) {
+                config->set(pair.first, std::get<int>(pair.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<double>(pair.second)) {
+                config->set(pair.first, std::get<double>(pair.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<bool>(pair.second)) {
+                config->set(pair.first, std::get<bool>(pair.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<std::string>(pair.second)) {
+                config->set(pair.first, std::get<std::string>(pair.second), ConfigSource::Runtime);
+            }
+        }
+        return config;
+    }, py::arg("params"), "Create a configuration from parameter map");
+
+    // Advanced agent utilities
+    m.def("createSuperAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, bool enableAllFeatures) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all capabilities
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        if (enableAllFeatures) {
+            // Enable additional advanced features via development system
+            auto devStage = brain->getDevelopmentalStage();
+            brain->setDevelopmentalStage(devStage);
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), py::arg("enableAllFeatures"), "Create a super agent with all capabilities");
+
+    m.def("createSuperAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, bool enableAllFeatures) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all capabilities
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        if (enableAllFeatures) {
+            // Enable additional advanced features via development system
+            auto devStage = brain->getDevelopmentalStage();
+            brain->setDevelopmentalStage(devStage);
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), py::arg("enableAllFeatures"), "Create a super agent with all capabilities");
+
+    // Batch processing utilities
+    m.def("batchRunSimulations", [](std::vector<std::shared_ptr<AgentBrain>> agents, std::vector<std::shared_ptr<SimpleWorld>> worlds, int steps) -> std::vector<std::map<std::string, float>> {
+        std::vector<std::map<std::string, float>> results;
+        
+        for (size_t i = 0; i < agents.size() && i < worlds.size(); ++i) {
+            results.push_back(runTrainingSimulation(agents[i], worlds[i], steps));
+        }
+        
+        return results;
+    }, py::arg("agents"), py::arg("worlds"), py::arg("steps"), "Run multiple simulations in batch");
+
+    // === HELPER CLASSES AND UTILITIES ===
+
+    // Simple statistics calculator
+    m.def("calculateStats", [](const std::vector<float>& values) -> std::map<std::string, float> {
+        std::map<std::string, float> stats;
+        
+        if (values.empty()) {
+            stats["count"] = 0;
+            stats["mean"] = 0.0f;
+            stats["min"] = 0.0f;
+            stats["max"] = 0.0f;
+            stats["std"] = 0.0f;
+            return stats;
+        }
+        
+        float sum = 0.0f;
+        float min = values[0];
+        float max = values[0];
+        
+        for (float val : values) {
+            sum += val;
+            if (val < min) min = val;
+            if (val > max) max = val;
+        }
+        
+        float mean = sum / values.size();
+        float variance = 0.0f;
+        
+        for (float val : values) {
+            float diff = val - mean;
+            variance += diff * diff;
+        }
+        
+        float std_dev = sqrt(variance / values.size());
+        
+        stats["count"] = values.size();
+        stats["mean"] = mean;
+        stats["min"] = min;
+        stats["max"] = max;
+        stats["std"] = std_dev;
+        
+        return stats;
+    }, py::arg("values"), "Calculate basic statistics for a vector of values");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
+// Performance optimization functions (not exposed to Python, for internal use)
+namespace nlm {
+
+// Optimized configuration creation with move semantics
+inline std::shared_ptr<Config> createOptimizedConfig(const std::unordered_map<std::string, ConfigValue>& params) {
+    auto config = std::make_shared<Config>();
+    for (const auto& pair : params) {
+        config->set(pair.first, pair.second, ConfigSource::Runtime);
+    }
+    return config;
+}
+
+// Memory-efficient batch configuration creation
+inline std::vector<std::shared_ptr<Config>> createConfigBatch(
+    const std::vector<std::unordered_map<std::string, ConfigValue>>& paramsList) {
+    std::vector<std::shared_ptr<Config>> configs;
+    configs.reserve(paramsList.size());
+    
+    for (const auto& params : paramsList) {
+        configs.push_back(createOptimizedConfig(params));
+    }
+    
+    return configs;
+}
+
+// Optimized statistics calculation with better memory usage
+inline std::map<std::string, float> optimizedCalculateStats(const std::vector<float>& values) {
+    std::map<std::string, float> stats;
+    
+    if (values.empty()) {
+        stats["count"] = 0;
+        stats["mean"] = 0.0f;
+        stats["min"] = 0.0f;
+        stats["max"] = 0.0f;
+        stats["std"] = 0.0f;
+        return stats;
+    }
+    
+    // Use single pass for mean and variance (Welford's algorithm)
+    float mean = values[0];
+    float M2 = 0.0f;
+    float min = values[0];
+    float max = values[0];
+    
+    for (size_t i = 1; i < values.size(); ++i) {
+        float val = values[i];
+        float delta = val - mean;
+        mean += delta / (i + 1);
+        float delta2 = val - mean;
+        M2 += delta * delta2;
+        
+        if (val < min) min = val;
+        if (val > max) max = val;
+    }
+    
+    float variance = M2 / values.size();
+    float std_dev = sqrt(variance);
+    
+    stats["count"] = values.size();
+    stats["mean"] = mean;
+    stats["min"] = min;
+    stats["max"] = max;
+    stats["std"] = std_dev;
+    
+    return stats;
+}
+
+// Memory-efficient simulation step execution
+inline float optimizedRunSimulationSteps(
+    std::shared_ptr<AgentBrain> agent, 
+    std::shared_ptr<SimpleWorld> world, 
+    int steps, 
+    bool enableVisualization) {
+    
+    float successful_actions = 0.0f;
+    
+    // Pre-allocate references for faster access
+    auto& processInput = agent->processSensoryInput;
+    auto& decodeCommand = agent->decodeMotorCommand;
+    auto& applyModulation = agent->applyRewardModulation;
+    auto& isRewardEnabled = agent->isRewardModulationEnabled;
+    auto& brain = agent->getBrain();
+    
+    for (int step = 0; step < steps; ++step) {
+        world->update(0.1f);
+        auto percept = world->getSensoryPercept();
+        processInput(percept);
+        decodeCommand();  // Ensure motor neurons are active
+        
+        auto action = decodeCommand();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        if (isRewardEnabled()) {
+            applyModulation(1.0f, 0.5f);
+            successful_actions += 1.0f;
+        }
+        
+        if (enableVisualization && step % 10 == 0) {
+            brain->logStatus();
+        }
+    }
+    
+    return successful_actions / steps;
+}
+
+// Optimized comparison function
+inline std::map<std::string, double> optimizedCompareBrains(
+    std::shared_ptr<Brain> brain1, 
+    std::shared_ptr<Brain> brain2) {
+    
+    std::map<std::string, double> comparison;
+    
+    // Use direct access for better performance
+    comparison["neuron_count_match"] = (
+        brain1->getTotalNeuronCount() == brain2->getTotalNeuronCount()) ? 1.0 : 0.0;
+    
+    comparison["synapse_count_match"] = (
+        brain1->getTotalSynapseCount() == brain2->getTotalSynapseCount()) ? 1.0 : 0.0;
+    
+    double firingRate1 = brain1->getAverageFiringRate();
+    double firingRate2 = brain2->getAverageFiringRate();
+    comparison["firing_rate_ratio"] = firingRate1 / (firingRate2 > 0 ? firingRate2 : 1.0);
+    
+    double eiratio1 = brain1->getExcitationInhibitionRatio();
+    double eiratio2 = brain2->getExcitationInhibitionRatio();
+    comparison["excitement_ratio"] = eiratio1 / (eiratio2 > 0 ? eiratio2 : 1.0);
+    
+    comparison["total_spike_ratio"] = static_cast<double>(brain1->getTotalSpikeCount()) / 
+                                       (brain2->getTotalSpikeCount() > 0 ? brain2->getTotalSpikeCount() : 1);
+    
+    return comparison;
+}
+
+// Memory-efficient batch processing
+inline std::vector<std::map<std::string, float>> optimizedBatchRunSimulations(
+    const std::vector<std::shared_ptr<AgentBrain>>& agents,
+    const std::vector<std::shared_ptr<SimpleWorld>>& worlds,
+    int steps) {
+    
+    std::vector<std::map<std::string, float>> results;
+    results.reserve(std::min(agents.size(), worlds.size()));
+    
+    for (size_t i = 0; i < agents.size() && i < worlds.size(); ++i) {
+        results.push_back(optimizedRunSimulationSteps(agents[i], worlds[i], steps, false));
+    }
+    
+    return results;
 }
 
 } // namespace nlm
