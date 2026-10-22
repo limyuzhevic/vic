@@ -105,7 +105,7 @@ int main() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Performance Benchmark                                     ║
+    ║     Phase 6: Performance Benchmark                             ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -116,7 +116,7 @@ int main() {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    std::cout << "Running NLM Performance Benchmarks..." << std::endl;
+    std::cout << "Running NLM Phase 6 Performance Benchmarks..." << std::endl;
     std::cout << std::endl;
     
     std::vector<BenchmarkResult> results;
