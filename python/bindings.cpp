@@ -420,6 +420,191 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Add version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) - Phase 6: Integrated Artificial Brain";
+    
+    // Add utility functions for error handling and validation
+    m.def("createConfigFromJson", [](const std::string& json_content) {
+        auto config = std::make_shared<Config>();
+        
+        // Simple JSON parsing for basic key=value pairs
+        // For a full implementation, consider using nlohmann::json
+        std::istringstream iss(json_content);
+        std::string line;
+        while (std::getline(iss, line)) {
+            line = Config::trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = Config::trim(line.substr(0, pos));
+                std::string value = Config::trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to parse as int, double, or bool
+                bool parsed = false;
+                try {
+                    size_t end;
+                    int int_val = std::stoi(value, &end);
+                    if (end == value.size()) {
+                        config->set(key, int_val);
+                        parsed = true;
+                    }
+                } catch (...) {}
+                
+                if (!parsed) {
+                    try {
+                        size_t end;
+                        double double_val = std::stod(value, &end);
+                        if (end == value.size()) {
+                            config->set(key, double_val);
+                            parsed = true;
+                        }
+                    } catch (...) {}
+                }
+                
+                if (!parsed) {
+                    try {
+                        if (value == "true") {
+                            config->set(key, true);
+                            parsed = true;
+                        } else if (value == "false") {
+                            config->set(key, false);
+                            parsed = true;
+                        }
+                    } catch (...) {}
+                }
+                
+                if (!parsed) {
+                    config->set(key, value);
+                }
+            }
+        }
+        
+        return config;
+    }, py::arg("json_content"), 
+         "Create configuration from JSON-like string (simple key=value format)");
+    
+    m.def("createConfigFromDict", [](const py::dict& d) {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : d) {
+            std::string key = py::cast<std::string>(item.first);
+            
+            // Handle different value types
+            py::object value_obj = item.second;
+            
+            if (value_obj.is(py::int_())) {
+                config->set(key, py::cast<int>(value_obj));
+            } else if (value_obj.is(py::float_())) {
+                config->set(key, py::cast<double>(value_obj));
+            } else if (value_obj.is(py::bool_())) {
+                config->set(key, py::cast<bool>(value_obj));
+            } else {
+                // String or other type
+                config->set(key, py::cast<std::string>(value_obj));
+            }
+        }
+        
+        return config;
+    }, py::arg("dict"), "Create configuration from Python dictionary");
+    
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        // Basic validation - check for required fields if any
+        // This can be expanded based on specific requirements
+        
+        if (errors.empty()) {
+            return true;
+        } else {
+            std::string error_msg = "Configuration validation failed:";
+            for (const auto& error : errors) {
+                error_msg += "\n  - " + error;
+            }
+            throw std::runtime_error(error_msg);
+        }
+    }, py::arg("config"), "Validate configuration and return true if valid");
+    
+    // Add performance monitoring and profiling utilities
+    m.def("createPerformanceMonitor", []() {
+        return std::make_shared<PerformanceMonitor>();
+    }, "Create a performance monitor for tracking simulation metrics");
+    
+    m.def("profileBrainOperation", [](const std::shared_ptr<Brain>& brain, std::function<void()> operation) {
+        PerformanceMonitor monitor;
+        monitor.start();
+        
+        operation();
+        
+        monitor.stop();
+        return monitor.getResults();
+    }, py::arg("brain"), py::arg("operation"), 
+         "Profile a brain operation and return performance metrics");
+    
+    m.def("createBenchmarkSuite", []() {
+        return std::make_shared<BenchmarkSuite>();
+    }, "Create a benchmark suite for comparing performance");
+    
+    // Add visualization utilities
+    m.def("plotMetrics", [](const std::vector<double>& data, const std::string& title, 
+                           const std::string& xlabel, const std::string& ylabel) {
+        // This would integrate with matplotlib if available
+        // For now, just store the data for potential plotting
+        return MetricPlot{data, title, xlabel, ylabel};
+    }, py::arg("data"), py::arg("title"), py::arg("xlabel"), py::arg("ylabel"),
+         "Create a metric plot from data (requires matplotlib)");
+    
+    m.def("saveMetricsToFile", [](const std::string& filename, const std::vector<double>& data, 
+                                 const std::vector<std::string>& labels) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filename);
+        }
+        
+        file << "# NLM Performance Metrics\n";
+        file << "# Generated at: " << std::ctime(&std::time(nullptr));
+        
+        for (size_t i = 0; i < labels.size() && i < data.size(); ++i) {
+            file << labels[i] << ": ";
+            for (size_t j = 0; j < data.size(); ++j) {
+                file << data[j];
+                if (j < data.size() - 1) file << ", ";
+            }
+            file << "\n";
+        }
+        
+        file.close();
+    }, py::arg("filename"), py::arg("data"), py::arg("labels"),
+         "Save performance metrics to a CSV file");
+    
+    // Add time series utilities
+    m.def("createTimeSeries", [](const std::vector<double>& values, 
+                                const std::vector<double>& timestamps) {
+        return std::make_shared<TimeSeries>(values, timestamps);
+    }, py::arg("values"), py::arg("timestamps"),
+         "Create a time series from values and timestamps");
+    
+    m.def("analyzeTimeSeries", [](const std::shared_ptr<TimeSeries>& ts) {
+        TimeSeriesAnalysis analysis;
+        analysis.mean = ts->getMean();
+        analysis.std = ts->getStd();
+        analysis.min = ts->getMin();
+        analysis.max = ts->getMax();
+        analysis.trend = ts->getTrend();
+        analysis.trend_strength = ts->getTrendStrength();
+        return analysis;
+    }, py::arg("ts"), "Analyze time series and return statistics");
 }
 
 } // namespace nlm
