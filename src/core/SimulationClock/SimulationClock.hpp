@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include <mutex>
 
 namespace nlm {
 
@@ -56,7 +57,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

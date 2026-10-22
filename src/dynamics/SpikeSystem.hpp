@@ -6,6 +6,7 @@
 #include <queue>
 #include <functional>
 #include <unordered_map>
+#include <mutex>
 
 namespace nlm {
 
@@ -74,7 +75,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -55,14 +55,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file formats
     bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    bool loadFromJson(const std::string& filepath);
+    bool loadFromYaml(const std::string& filepath);
     
-    // Save to file
+    // Save to file formats
     bool saveToFile(const std::string& filepath) const;
+    bool saveToJson(const std::string& filepath) const;
+    bool saveToYaml(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -100,6 +102,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper methods for JSON/YAML parsing and conversion
+    ConfigValue convertJsonToVariant(const nlohmann::json& j) const;
+    void parseJsonObject(const nlohmann::json& j, const std::string& prefix);
+    void parseJsonArray(const nlohmann::json& j, const std::string& prefix);
+    void convertEntriesToJson(nlohmann::json& j, const std::string& prefix) const;
+    void convertEntriesToYaml(YAML::Emitter& out, const std::string& prefix) const;
 };
 
 } // namespace nlm
