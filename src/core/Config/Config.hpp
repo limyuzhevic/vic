@@ -93,6 +93,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON serialization/deserialization
+    nlohmann::json toJson() const;
+    static Config fromJson(const nlohmann::json& json, ConfigSource source = ConfigSource::File);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +104,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    static ConfigValue jsonToConfigValue(const nlohmann::json& json);
+    static void configValueToJson(const ConfigValue& value, nlohmann::json& json);
+    void fromJson(const nlohmann::json& json, ConfigSource source);
 };
 
 } // namespace nlm

@@ -400,21 +400,76 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Performance monitoring functions
+    m.def("startPerformanceMonitor", [](const std::string& name) {
+        GlobalPerformanceMonitor::getInstance().startSimulation(name);
+    }, py::arg("name"), "Start performance monitoring for a simulation");
+    
+    m.def("recordPerformanceStep", [](uint64_t step, size_t spikeCount, double firingRate) {
+        GlobalPerformanceMonitor::getInstance().recordStep(step, spikeCount, firingRate);
+    }, py::arg("step"), py::arg("spikeCount"), py::arg("firingRate"), "Record performance metrics for a simulation step");
+    
+    m.def("stopPerformanceMonitor", []() {
+        PerformanceMetrics metrics = GlobalPerformanceMonitor::getInstance().stopSimulation();
+        py::dict result;
+        result["total_steps"] = metrics.totalSteps;
+        result["total_time"] = metrics.totalWallTime;
+        result["avg_step_time"] = metrics.avgStepTime;
+        result["steps_per_second"] = metrics.stepsPerSecond;
+        result["total_spikes"] = metrics.totalSpikes;
+        result["avg_firing_rate"] = metrics.totalFiringRate;
+        result["peak_memory_mb"] = metrics.peakMemoryUsage / (1024 * 1024);
+        result["current_memory_mb"] = metrics.currentMemoryUsage / (1024 * 1024);
+        return result;
+    }, "Stop performance monitoring and return metrics");
+    
+    m.def("getPerformanceMetrics", []() {
+        PerformanceMetrics metrics = GlobalPerformanceMonitor::getInstance().getMetrics();
+        py::dict result;
+        result["total_steps"] = metrics.totalSteps;
+        result["total_time"] = metrics.totalWallTime;
+        result["avg_step_time"] = metrics.avgStepTime;
+        result["steps_per_second"] = metrics.stepsPerSecond;
+        result["total_spikes"] = metrics.totalSpikes;
+        result["avg_firing_rate"] = metrics.totalFiringRate;
+        result["peak_memory_mb"] = metrics.peakMemoryUsage / (1024 * 1024);
+        result["current_memory_mb"] = metrics.currentMemoryUsage / (1024 * 1024);
+        return result;
+    }, "Get current performance metrics");
+    
+    m.def("isPerformanceMonitoring", []() {
+        return GlobalPerformanceMonitor::getInstance().isMonitoring();
+    }, "Check if performance monitoring is active");
+    
+    m.def("generatePerformanceReport", []() {
+        return GlobalPerformanceMonitor::getInstance().generateReport();
+    }, "Generate detailed performance report");
+    
+    m.def("benchmarkWithMonitor", [](const std::shared_ptr<Brain> brain, uint64_t numSteps, const std::string& simulationName) {
+        GlobalPerformanceMonitor::getInstance().startSimulation(simulationName);
+        
+        for (uint64_t step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            GlobalPerformanceMonitor::getInstance().recordStep(
+                step, brain->getFiringNeuronCount(), brain->getAverageFiringRate()
+            );
+        }
+        
+        return GlobalPerformanceMonitor::getInstance().stopSimulation();
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("simulationName"), 
+             "Run simulation with performance monitoring and return metrics");
+    
+    m.def("saveBrainCheckpoint", [](const std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain->save(filepath)) {
+            throw py::value_error("Failed to save brain checkpoint: " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to checkpoint file");
+    
+    m.def("loadBrainCheckpoint", [](const std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain->load(filepath)) {
+            throw py::value_error("Failed to load brain checkpoint: " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from checkpoint file");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

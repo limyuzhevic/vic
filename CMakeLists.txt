@@ -1,5 +1,15 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# CMakeLists.txt
+# Add nlohmann/json as a dependency
+include(FetchContent)
+
+# Fetch nlohmann/json
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+
+FetchContent_MakeAvailable(nlohmann_json)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
@@ -87,9 +97,12 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+target_link_libraries(nlm_core PUBLIC ${nlohmann_json_LIBRARIES})
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${nlohmann_json_INCLUDE_DIRS}
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
