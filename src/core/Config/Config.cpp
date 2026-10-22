@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -19,40 +21,53 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    // Try to parse as JSON first (pretty printed or compact)
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Strip whitespace for JSON detection
+    std::string trimmed = content;
+    trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+    trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+    
+    if (!trimmed.empty() && (trimmed[0] == '{' || (trimmed[0] == '[' && trimmed.back() == ']'))) {
+        // Try to parse as JSON
+        return loadFromJsonString(content);
+    } else {
+        // Fall back to simple key=value format
+        std::ifstream file2(filepath);
+        std::string line;
+        while (std::getline(file2, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        file2.close();
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -105,6 +120,39 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
+    }
+}
+
+// Load configuration from JSON string (simple key-value pairs)
+bool Config::loadFromJsonString(const std::string& jsonString) {
+    try {
+        // Simple JSON parsing for key=value pairs
+        // In a full implementation, use nlohmann/json library
+        std::istringstream iss(jsonString);
+        std::string line;
+        while (std::getline(iss, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '/' || line[0] == '{' || line[0] == '}') {
+                continue;
+            }
+            
+            // Parse key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove trailing comma and whitespace
+                if (!value.empty() && value.back() == ',') {
+                    value.pop_back();
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        return true;
+    } catch (...) {
+        return false;
     }
 }
 

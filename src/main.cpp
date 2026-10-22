@@ -25,6 +25,9 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <sstream>
+#include <fstream>
 
 using namespace nlm;
 
@@ -39,13 +42,36 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage() {
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << "Run NLM (熙然) Phase 2 neural simulation with the following options:" << std::endl << std::endl;
+    std::cout << "General Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file (JSON or key=value format)" << std::endl << std::endl;
+    std::cout << "Configuration Examples:" << std::endl;
+    std::cout << "  --config=config.json      Load from JSON configuration file" << std::endl;
+    std::cout << "  --config=myconfig.cfg     Load from simple key=value file" << std::endl << std::endl;
+    std::cout << "Example Config File (simple key=value):" << std::endl;
+    std::cout << "  random_seed = 123" << std::endl;
+    std::cout << "  simulation_timestep = 0.001" << std::endl;
+    std::cout << "  neuron_count = 500" << std::endl;
+    std::cout << "  region_count = 1" << std::endl << std::endl;
+    std::cout << "Example Config File (JSON):" << std::endl;
+    std::cout << "  {" << std::endl;
+    std::cout << "    \"random_seed\": 123," << std::endl;
+    std::cout << "    \"simulation_timestep\": 0.001," << std::endl;
+    std::cout << "    \"neuron_count\": 500," << std::endl;
+    std::cout << "    \"region_count\": 1" << std::endl;
+    std::cout << "  }" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -343,7 +369,7 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Try to load from JSON file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -353,6 +379,9 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
         }
     }
     

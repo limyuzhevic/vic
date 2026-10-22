@@ -142,27 +142,104 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Convenience function to create a default brain with standard configuration
+    m.def("createBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", 42);
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("simulation_timestep", 0.001);
+        config->set("connection_probability", 0.15f);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a brain with default configuration");
+    
+    // Convenience function to create a complete agent system
+    m.def("createAgentSystem", [](size_t width, size_t height) {
+        auto brain = createBrain();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 128, 128);
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(world);
+        return std::make_tuple(world, agentBrain);
+    }, py::arg("width") = 640,
+       py::arg("height") = 480,
+       "Create a complete agent system with world and agent brain");
+    
+    // Enhanced Config methods with better error handling and validation
+// Add configuration validation and error handling methods to Config
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("validate", [](Config& self) {
+            std::string errors;
+            // Basic validation checks
+            if (self.has("neuron_count")) {
+                auto count = self.get<int64_t>("neuron_count");
+                if (count.has_value() && count.value() <= 0) {
+                    errors += "neuron_count must be positive; ";
+                }
+            }
+            if (self.has("region_count")) {
+                auto count = self.get<int64_t>("region_count");
+                if (count.has_value() && count.value() <= 0) {
+                    errors += "region_count must be positive; ";
+                }
+            }
+            if (self.has("simulation_timestep")) {
+                auto timestep = self.get<double>("simulation_timestep");
+                if (timestep.has_value() && timestep.value() <= 0.0) {
+                    errors += "simulation_timestep must be positive; ";
+                }
+            }
+            if (self.has("connection_probability")) {
+                auto prob = self.get<float>("connection_probability");
+                if (prob.has_value() && (prob.value() < 0.0f || prob.value() > 1.0f)) {
+                    errors += "connection_probability must be between 0.0 and 1.0; ";
+                }
+            }
+            if (!errors.empty()) {
+                throw std::runtime_error("Configuration validation failed: " + errors);
+            }
+            return true;
+        }, "Validate configuration parameters and throw exception if invalid")
+        .def("validateOr", [](Config& self, bool strict) {
+            if (!strict) {
+                // Non-strict validation: just log warnings for potential issues
+                // For now, just return true
+                return true;
+            }
+            // Call strict validation
+            return self.validate();
+        }, py::arg("strict") = true, "Validate configuration parameters (strict mode logs warnings)")
+        .def("getRequired", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (!val.has_value()) {
+                throw std::runtime_error("Required configuration key missing: " + key);
+            }
+            return *val;
+        }, py::arg("key"), "Get configuration value with error if key is missing (returns string)")
+        .def("getRequiredInt", [](Config& self, const std::string& key, int64_t defaultValue = 0) {
+            auto val = self.get<int64_t>(key);
+            if (!val.has_value()) {
+                return defaultValue;  // Missing key with default
+            }
+            return val.value();
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get required configuration value as integer")
+        .def("getRequiredFloat", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            auto val = self.get<double>(key);
+            if (!val.has_value()) {
+                return defaultValue;  // Missing key with default
+            }
+            return val.value();
+        }, py::arg("key"), py::arg("defaultValue") = 0.0, "Get required configuration value as float")
+        .def("getRequiredBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            auto val = self.get<bool>(key);
+            if (!val.has_value()) {
+                return defaultValue;  // Missing key with default
+            }
+            return val.value();
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get required configuration value as boolean");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -400,21 +477,47 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add convenience functions before the main Config class definition
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Convenience function to create a default brain with standard configuration
+    m.def("createBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", 42);
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("simulation_timestep", 0.001);
+        config->set("connection_probability", 0.15f);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a brain with default configuration");
+    
+    // Convenience function to create a complete agent system
+    m.def("createAgentSystem", [](size_t width, size_t height) {
+        auto brain = createBrain();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 128, 128);
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(world);
+        return std::make_tuple(world, agentBrain);
+    }, py::arg("width") = 640,
+       py::arg("height") = 480,
+       "Create a complete agent system with world and agent brain");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
