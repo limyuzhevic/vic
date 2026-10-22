@@ -373,16 +373,21 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // STDP parameters with improved defaults
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
+    // Structural plasticity parameters with improved defaults
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Add new configuration options for better control
+    config->set("enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("enable_development", true, ConfigSource::Default);
+    config->set("enable_curiosity", true, ConfigSource::Default);
+    
+    // Log configuration summary with more details
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -390,6 +395,9 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  enable_structural_plasticity: " + std::string(config->getOr<bool>("enable_structural_plasticity", true) ? "YES" : "NO"));
+    NLM_LOG_INFO("  enable_development: " + std::string(config->getOr<bool>("enable_development", true) ? "YES" : "NO"));
+    NLM_LOG_INFO("  enable_curiosity: " + std::string(config->getOr<bool>("enable_curiosity", true) ? "YES" : "NO"));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

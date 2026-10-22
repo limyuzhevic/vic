@@ -101,6 +101,11 @@ void Synapse::addToWeight(SynapticWeight delta) {
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Additional safety: prevent weight from becoming exactly zero (avoids numerical issues)
+    if (std::abs(pImpl->weight) < 1e-6f) {
+        pImpl->weight = 0.0f;
+    }
 }
 
 Delay Synapse::getDelay() const {

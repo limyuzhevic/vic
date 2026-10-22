@@ -60,6 +60,14 @@ void Neuron::setMembranePotential(MembranePotential potential) {
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
+    
+    // Safety check: prevent membrane potential from exceeding reasonable bounds
+    // This helps prevent numerical instability in the simulation
+    if (pImpl->state.membranePotential > 50.0f) {
+        pImpl->state.membranePotential = 50.0f;
+    } else if (pImpl->state.membranePotential < -100.0f) {
+        pImpl->state.membranePotential = -100.0f;
+    }
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
