@@ -12,6 +12,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
     , expectedReward_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , developmentalAge_(0.0)
     , plasticityModifier_(1.0f)
     , rewardModulationEnabled_(true)
@@ -334,12 +337,28 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+// NEW: Get new neuromodulator levels
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    return serotoninLevel_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     

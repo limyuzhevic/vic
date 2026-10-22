@@ -52,6 +52,11 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // NEW: Get new neuromodulator levels
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -96,9 +101,14 @@ private:
     float dopamineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
-    float predictionError_;
+float predictionError_;
     float expectedReward_;
     
+    // NEW: Neuromodulation state
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
+
     // Development state
     double developmentalAge_;
     float plasticityModifier_;

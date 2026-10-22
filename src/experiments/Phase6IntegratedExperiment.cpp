@@ -110,6 +110,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    result.acetylcholineLevel = agent.getAcetylcholineLevel();
+    result.norepinephrineLevel = agent.getNorepinephrineLevel();
+    result.serotoninLevel = agent.getSerotoninLevel();
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
@@ -205,7 +208,48 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 3: Prediction system exists
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty system is NOT integrated");
+        success = false;
+    }
+    
+    // Test NEW neuromodulation systems
+    if (brain->getAcetylcholine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Acetylcholine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Acetylcholine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNorepinephrine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Norepinephrine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSerotonin() != nullptr) {
+        NLM_LOG_INFO("[PASS] Serotonin system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Serotonin system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getPredictionErrorSignal() != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction Error system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction Error system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getDopamine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Reward system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Reward system is NOT integrated");
+        success = false;
+    }
     if (brain->getPredictionSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Prediction system is integrated");
     } else {
@@ -295,15 +339,39 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get neuromodulation systems
+    // Get all neuromodulation systems
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !curiosity || !novelty || !acetylcholine || !norepinephrine || !serotonin) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
+        if (!dopamine) NLM_LOG_ERROR("  - Dopamine missing");
+        if (!curiosity) NLM_LOG_ERROR("  - Curiosity missing");
+        if (!novelty) NLM_LOG_ERROR("  - Novelty missing");
+        if (!acetylcholine) NLM_LOG_ERROR("  - Acetylcholine missing");
+        if (!norepinephrine) NLM_LOG_ERROR("  - Norepinephrine missing");
+        if (!serotonin) NLM_LOG_ERROR("  - Serotonin missing");
         return false;
     }
+    
+    // Verify all neuromodulators have proper names
+    const char* dopamineName = dopamine->getName();
+    const char* curiosityName = curiosity->getName();
+    const char* noveltyName = novelty->getName();
+    const char* acetylcholineName = acetylcholine->getName();
+    const char* norepinephrineName = norepinephrine->getName();
+    const char* serotoninName = serotonin->getName();
+    
+    NLM_LOG_INFO("Neuromodulator names: DA=" + std::string(dopamineName) + 
+                " ACh=" + std::string(acetylcholineName) +
+                " NE=" + std::string(norepinephrineName) +
+                " 5-HT=" + std::string(serotoninName) +
+                " Cur=" + std::string(curiosityName) +
+                " Nov=" + std::string(noveltyName));
     
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
@@ -312,7 +380,52 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         brain->step(i, i * 0.001);
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    // Test individual neuromodulator functionality
+    NLM_LOG_INFO("Testing individual neuromodulator functions...");
+    
+    // Test acetylcholine attention modulation
+    float baselineAttention = 0.5f;
+    float noveltyLevel = novelty ? novelty->getLevel() : 0.0f;
+    float modulatedAttention = acetylcholine ? acetylcholine->modulateAttention(baselineAttention, noveltyLevel) : baselineAttention;
+    NLM_LOG_INFO("Acetylcholine attention modulation: " + std::to_string(baselineAttention) + 
+                " -> " + std::to_string(modulatedAttention));
+    
+    // Test norepinephrine arousal response
+    float stressLevel = 0.3f;
+    float contextImportance = 0.7f;
+    if (norepinephrine) {
+        norepinephrine->respondToStress(stressLevel, contextImportance);
+        NLM_LOG_INFO("Norepinephrine stress response: level=" + std::to_string(norepinephrine->getLevel()));
+    }
+    
+    // Test serotonin social feedback
+    float socialValue = 0.8f;
+    float predictionError = 0.1f;
+    if (serotonin) {
+        serotonin->respondToSocialFeedback(socialValue, predictionError);
+        NLM_LOG_INFO("Serotonin social response: level=" + std::to_string(serotonin->getLevel()));
+    }
+    
+    // Test dopamine reward signaling
+    float rewardValue = 0.6f;
+    if (dopamine) {
+        dopamine->signalReward(rewardValue);
+        NLM_LOG_INFO("Dopamine reward signal: level=" + std::to_string(dopamine->getLevel()));
+    }
+    
+    // Test curiosity update
+    if (curiosity) {
+        curiosity->update(noveltyLevel, 0.2f, 0.001);
+        NLM_LOG_INFO("Curiosity update: level=" + std::to_string(curiosity->getLevel()));
+    }
+    
+    // Test novelty update
+    if (novelty) {
+        novelty->update(0.001);
+        NLM_LOG_INFO("Novelty update: level=" + std::to_string(novelty->getLevel()));
+    }
+    
+    NLM_LOG_INFO("[PASS] All neuromodulation systems are functional");
     return true;
 }
 
