@@ -38,11 +38,13 @@ namespace test_brain {
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Tests ===" << std::endl;
+    std::cout << "Testing Integrated Artificial Brain:" << std::endl;
+    std::cout << "  - Memory Systems Integration" << std::endl;
+    std::cout << "  - Neuromodulation Effects" << std::endl;
+    std::cout << "  - Prediction System" << std::endl;
+    std::cout << "  - Cognitive Functions" << std::endl;
+    std::cout << "  - Development Dynamics" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;

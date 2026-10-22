@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# NLM Command-line Tools Launcher
+# This script provides easy access to NLM command-line utilities
+
+export PYTHONPATH="$PYTHONPATH:/workspace/app"
+
+cd "$(dirname "$0")"
+
+# Execute the main Python script
+python3 nlm-tools.py "$@"

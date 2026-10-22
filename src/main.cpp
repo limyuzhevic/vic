@@ -35,14 +35,11 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     This phase integrates all existing systems into a coherent ║
+    ║     artificial brain capable of learning, memory, and cognition ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -332,12 +329,18 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
+    NLM_LOG_INFO("Integrating all existing systems into a coherent artificial brain.");
+    NLM_LOG_INFO("Previous phases built individual components; Phase 6 ensures they work together.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Phase 6 integrates:");
+    NLM_LOG_INFO("  - Memory Systems (Working, Episodic, Associative)");
+    NLM_LOG_INFO("  - Neuromodulation (Dopamine, Curiosity, Novelty)");
+    NLM_LOG_INFO("  - Prediction System");
+    NLM_LOG_INFO("  - Cognition Systems (Planning, Concept Formation, Attention)");
+    NLM_LOG_INFO("  - Development System");
+    NLM_LOG_INFO("  - Structural Plasticity");
+    NLM_LOG_INFO("  - Checkpoint and Replay Systems");
     NLM_LOG_INFO("");
     
     // Load configuration
