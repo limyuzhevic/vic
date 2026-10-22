@@ -40,7 +40,16 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
+    ${NLM_SOURCE_DIR}/memory/WorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/EpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/SemanticMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/ProceduralMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/AssociativeMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/SemanticMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/ProceduralMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/AssociativeMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
