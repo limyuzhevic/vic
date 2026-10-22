@@ -81,9 +81,12 @@ private:
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
 
-    // Decay weak memory traces
+// Decay weak memory traces
     void decayWeakTraces();
-
+    
+    // Update active memory traces
+    void updateActiveTraces();
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 

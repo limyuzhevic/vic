@@ -50,6 +50,11 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // NEWLY IMPLEMENTED NEUROMODULATORS
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -129,6 +134,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // NEWLY IMPLEMENTED NEUROMODULATORS
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -233,7 +243,13 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    
+    // Validate and set working memory capacity
+    size_t workingMemoryCapacity = neuronCount / 10;
+    // Ensure capacity is within reasonable bounds
+    if (workingMemoryCapacity < 1) workingMemoryCapacity = 1;
+    if (workingMemoryCapacity > neuronCount) workingMemoryCapacity = neuronCount;
+    pImpl->workingMemory->setCapacity(workingMemoryCapacity);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
@@ -243,7 +259,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +274,11 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // NEWLY IMPLEMENTED NEUROMODULATORS
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -288,7 +309,25 @@ bool Brain::initialize() {
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Validate checkpoint directory
+    if (!checkpointDir.empty()) {
+        // Check if directory can be created
+        // Note: This is a simple validation - in a production system,
+        // you might want to check write permissions and available disk space
+        NLM_LOG_INFO("Configuring checkpoint directory: " + checkpointDir);
+    } else {
+        NLM_LOG_WARNING("Empty checkpoint directory specified, using default");
+        checkpointDir = "./checkpoints";
+    }
+    
+    // Configure checkpoint manager with error handling
+    try {
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        NLM_LOG_INFO("Checkpoint manager configured successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to configure checkpoint manager: ") + e.what());
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -1051,10 +1090,26 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+// NEWLY IMPLEMENTED NEUROMODULATION SYSTEMS
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
