@@ -21,8 +21,17 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
-add_library(nlm_core STATIC
+# Check if we're building Python bindings
+if(PYTHON_BINDINGS)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    set(BUILD_PYTHON ON)
+else()
+    set(BUILD_PYTHON OFF)
+endif()
+
+# Core library sources (shared between C++ and Python)
+set(NLM_CORE_SOURCES
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
@@ -87,12 +96,8 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Agent system sources
 
-# Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
@@ -100,7 +105,8 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
+# World system sources
+
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
@@ -108,6 +114,7 @@ target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
+
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
@@ -115,36 +122,101 @@ target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
+
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 optimizations (if needed)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/performance/PerformanceOptimizations.cpp")
+    add_library(nlm_phase5 STATIC
+        src/performance/PerformanceOptimizations.cpp
+    )
+    target_include_directories(nlm_phase5 PUBLIC src)
+    target_link_libraries(nlm_phase5 PUBLIC nlm_core)
+endif()
+
+# Core library
+
+add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+# Python bindings
+
+if(BUILD_PYTHON)
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm PRIVATE src)
+    
+    if(MSVC)
+        target_compile_options(pynlm PRIVATE /permissive-)
+    endif()
+    
+    install(TARGETS pynlm
+        LIBRARY DESTINATION pynlm
+        ARCHIVE DESTINATION pynlm
+        RUNTIME DESTINATION pynlm
+    )
+endif()
+
 # Main executable
+
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
+
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
+
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 5 demo executable (if Phase 5 exists)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/experiments/Phase5Demo.cpp")
+    add_executable(nlm_phase5_demo
+        src/experiments/Phase5Demo.cpp
+    )
+    
+    if(TARGET nlm_phase5)
+        target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+    else()
+        target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+    endif()
+endif()
+
 # Testing
+
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

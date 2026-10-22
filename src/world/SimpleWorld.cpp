@@ -306,28 +306,54 @@ void SimpleWorld::generateVision() {
     const float fov = M_PI / 2.0f;  // 90 degree FOV
     const float maxRange = 8.0f;
     
+    // Validate parameters
+    if (rayCount <= 0 || maxRange <= 0.0f || fov <= 0.0f) {
+        // Reset to default vision and return
+        std::vector<float> vision(visionWidth_, 1.0f);
+        sensory_.setVision(vision);
+        return;
+    }
+    
+    // Avoid division by zero for rayCount = 1
+    float angleStep = (rayCount > 1) ? (fov / (rayCount - 1)) : 0.0f;
+    
     std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
     
     for (int i = 0; i < rayCount; ++i) {
         // Angle for this ray
-        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        float angle = agent_.orientation - fov / 2.0f + angleStep * i;
         
-        // Cast ray
+        // Validate trigonometric input
+        if (std::isnan(angle) || std::isinf(angle)) {
+            continue; // Skip invalid ray
+        }
+        
+        // Cast ray with floating point precision handling
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < maxRange) {
+        // Use epsilon for floating point comparison to avoid infinite loops
+        const float epsilon = 1e-6f;
+        while (t < maxRange - epsilon) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
-            // Check wall collision
-            if (!isValidPosition(px, py)) {
-                vision[i] = t / maxRange;
+            // Validate position calculations
+            if (std::isnan(px) || std::isnan(py) || std::isinf(px) || std::isinf(py)) {
+                // Invalid position due to overflow, break ray
+                vision[i] = 1.0f;
                 break;
             }
             
-            // Check object collision
+            // Check wall collision with bounds checking
+            if (!isValidPosition(px, py)) {
+                // Clamp t to valid range
+                vision[i] = std::max(0.0f, std::min(t / maxRange, 1.0f));
+                break;
+            }
+            
+            // Check object collision with null pointer validation
             WorldObject* obj = getObjectAt(px, py);
             if (obj != nullptr) {
                 // Encode object type as intensity pattern
@@ -343,6 +369,11 @@ void SimpleWorld::generateVision() {
             }
             
             t += 0.1f;
+            
+            // Additional safety check to prevent infinite loops
+            if (t > maxRange * 2.0f) {
+                break;
+            }
         }
     }
     
@@ -351,41 +382,94 @@ void SimpleWorld::generateVision() {
     
     // Generate touch sensors (proximity to obstacles in 8 directions)
     std::vector<float> touch(8, 0.0f);
+    const float touchMaxRange = 1.5f;
+    
     for (int i = 0; i < 8; ++i) {
         float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
+        
+        // Validate trigonometric input
+        if (std::isnan(angle) || std::isinf(angle)) {
+            continue; // Skip invalid direction
+        }
+        
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < 1.5f) {
+        const float epsilon = 1e-6f;
+        
+        while (t < touchMaxRange - epsilon) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
-            if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
+            // Validate position calculations
+            if (std::isnan(px) || std::isnan(py) || std::isinf(px) || std::isinf(py)) {
+                // Invalid position due to overflow, break touch ray
+                touch[i] = 1.0f;
                 break;
             }
+            
+            // Check for wall or object collision with bounds checking
+            if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
+                // Clamp t to valid range to avoid division by zero or out-of-range values
+                touch[i] = std::max(0.0f, std::min(1.0f - t / touchMaxRange, 1.0f));
+                break;
+            }
+            
             t += 0.1f;
+            
+            // Safety check to prevent infinite loops
+            if (t > touchMaxRange * 2.0f) {
+                break;
+            }
         }
     }
+    
+    // Validate and set touch sensors
+    for (float& touchValue : touch) {
+        // Clamp values to [0.0, 1.0] range
+        touchValue = std::max(0.0f, std::min(touchValue, 1.0f));
+    }
+    
     sensory_.setTouch(touch);
     
-    // Generate internal signals (energy, health)
+    // Generate internal signals (energy, health) with validation
     std::vector<float> internal(4, 0.0f);
-    internal[0] = agent_.energy / maxEnergy_;  // Energy level
-    internal[1] = agent_.health;               // Health
-    internal[2] = agent_.isMoving ? 1.0f : 0.0f;  // Movement state
-    internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
+    
+    // Energy level: clamp between 0 and 1
+    if (maxEnergy_ > 0.0f) {
+        internal[0] = std::max(0.0f, std::min(agent_.energy / maxEnergy_, 1.0f));
+    }
+    
+    // Health: clamp to reasonable range
+    internal[1] = std::max(0.0f, std::min(agent_.health, 1.0f));
+    
+    // Movement and turning states
+    internal[2] = agent_.isMoving ? 1.0f : 0.0f;
+    internal[3] = agent_.isTurning ? 1.0f : 0.0f;
+    
     sensory_.setInternal(internal);
     
-    // Generate proprioception (body position/velocity)
+    // Generate proprioception (body position/velocity) with validation
     std::vector<float> proprioception(6, 0.0f);
-    proprioception[0] = agent_.x / width_;     // Normalized X
-    proprioception[1] = agent_.y / height_;    // Normalized Y
-    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
+    
+    // Normalize position coordinates with division by zero protection
+    if (width_ > 0.0f) {
+        proprioception[0] = std::max(0.0f, std::min(agent_.x / width_, 1.0f));
+    }
+    if (height_ > 0.0f) {
+        proprioception[1] = std::max(0.0f, std::min(agent_.y / height_, 1.0f));
+    }
+    
+    // Normalize orientation to [0, 1] range
+    float normalizedOrientation = (agent_.orientation + M_PI) / (2.0f * M_PI);
+    proprioception[2] = std::max(0.0f, std::min(normalizedOrientation, 1.0f));
+    
+    // Normalize velocities with speed limits
+    proprioception[3] = std::max(0.0f, std::min(std::abs(agent_.velocityX) / 5.0f, 1.0f));
+    proprioception[4] = std::max(0.0f, std::min(std::abs(agent_.velocityY) / 5.0f, 1.0f));
+    proprioception[5] = std::max(0.0f, std::min(std::abs(agent_.angularVelocity) / 3.0f, 1.0f));
+    
     sensory_.setProprioception(proprioception);
     
     // No audio for now
