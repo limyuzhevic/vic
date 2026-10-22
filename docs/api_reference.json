@@ -1,0 +1,147 @@
+{
+    "name": "NLM Neural Learning Machine",
+    "version": "0.1.0",
+    "description": "Python bindings for the NLM (Neural Learning Machine) C++ neural simulation framework",
+    
+    "config": {
+        "defaults": {
+            "random_seed": 42,
+            "simulation_timestep": 0.001,
+            "neuron_count": 1000,
+            "region_count": 1,
+            "connection_probability": 0.15,
+            "plasticity_learning_rate": 0.01,
+            "stdp_ltp_weight": 0.02,
+            "stdp_ltd_weight": 0.015,
+            "stdp_time_constant": 20.0,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001,
+            "dopamine_baseline": 0.1,
+            "reward_discount_factor": 0.99,
+            "max_simulation_steps": 10000,
+            "environment_name": "GridWorld",
+            "environment_width": 10,
+            "environment_height": 10,
+            "log_level": "INFO",
+            "log_to_file": false,
+            "visualization_enabled": false,
+            "visualization_update_rate": 30.0
+        },
+        "groups": {
+            "simulation": [
+                "simulation_timestep",
+                "neuron_count",
+                "region_count",
+                "connection_probability",
+                "max_simulation_steps"
+            ],
+            "plasticity": [
+                "plasticity_learning_rate",
+                "stdp_ltp_weight",
+                "stdp_ltd_weight",
+                "stdp_time_constant",
+                "synaptogenesis_rate",
+                "pruning_rate"
+            ],
+            "neuromodulation": [
+                "dopamine_baseline"
+            ],
+            "environment": [
+                "environment_name",
+                "environment_width",
+                "environment_height"
+            ],
+            "logging": [
+                "log_level",
+                "log_to_file",
+                "log_filename"
+            ],
+            "visualization": [
+                "visualization_enabled",
+                "visualization_update_rate"
+            ]
+        }
+    },
+    
+    "api": {
+        "modules": [
+            {
+                "name": "core",
+                "description": "Core neural system functionality",
+                "classes": [
+                    "NeuralSystem",
+                    "Brain",
+                    "Neuron",
+                    "Synapse"
+                ]
+            },
+            {
+                "name": "agent",
+                "description": "Agent-environment interaction",
+                "classes": [
+                    "Agent",
+                    "AgentBody",
+                    "SensoryPercept",
+                    "MotorCommand"
+                ]
+            },
+            {
+                "name": "memory",
+                "description": "Memory systems integration",
+                "classes": [
+                    "WorkingMemory",
+                    "EpisodicMemory",
+                    "SemanticMemory",
+                    "AssociativeMemory"
+                ]
+            },
+            {
+                "name": "cognition",
+                "description": "Cognitive functions",
+                "classes": [
+                    "ConceptFormation",
+                    "NeuralPlanner",
+                    "AttentionSystem",
+                    "SelfModel"
+                ]
+            },
+            {
+                "name": "experiment",
+                "description": "Experiment framework",
+                "classes": [
+                    "ExperimentRunner",
+                    "MetricsCollector",
+                    "AblationSystem"
+                ]
+            }
+        ],
+        "functions": [
+            "initialize_system",
+            "run_experiment",
+            "save_checkpoint",
+            "load_checkpoint",
+            "get_system_info"
+        ]
+    },
+    
+    "examples": [
+        "basic_usage.py",
+        "agent_example.py",
+        "experiment_example.py",
+        "visualization_example.py"
+    ],
+    
+    "tutorials": [
+        "getting_started.md",
+        "creating_brains.md",
+        "using_agents.md",
+        "running_experiments.md"
+    ],
+    
+    "documentation": [
+        "api_reference.md",
+        "configuration.md",
+        "performance.md",
+        "extending.md"
+    ]
+}
