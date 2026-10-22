@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Raises RuntimeError on failure.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Raises RuntimeError on failure.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -162,7 +162,19 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("set", &Config::set,
+             py::arg("key"), py::arg("value"),
+             "Set a configuration value. Key can be dotted for nested access.")
+        .def("getOr", [](const Config& self, const std::string& key, const T& default_value) {
+            return self.getOr<T>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+           "Get configuration value with default fallback")
+        .def("loadFromDefaultConfig", []() {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile("configs/default.cfg");
+            return config;
+        }, "Load configuration from default.cfg file. Creates new config if file not found.");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -177,21 +189,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::runtime_error("Vision data cannot be empty");
+            }
+            if (data.size() < self.getWidth() * self.getHeight() * self.getChannels()) {
+                throw std::runtime_error("Vision data size doesn't match dimensions");
+            }
             self.setData(data);
-        }, py::arg("data"))
+        }, py::arg("data"), "Set vision data. Must match configured dimensions.")
+        .def("setDataFromArray", [](Vision& self, py::array_t<float> data) {
+            if (!data.mutable_data()) {
+                throw std::runtime_error("Cannot access vision data buffer");
+            }
+            py::buffer_info buf = data.request();
+            std::vector<float> vec(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size);
+            self.setData(vec);
+        }, py::arg("data"), "Set vision data from numpy array")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getNormalizedData", &Vision::getNormalizedData, "Get normalized vision data (0-1 range)");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::runtime_error("Audio data cannot be empty");
+            }
             self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        }, py::arg("data"), "Set audio data. Must not be empty.")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"), "Set audio sample rate (Hz)")
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDuration", &Audio::getDuration, "Get audio duration in seconds");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -363,25 +394,25 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             "Process sensory percept and inject into brain. Raises RuntimeError on invalid input.")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+             "Apply reward-based neuromodulation with optional prediction error")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
-             "Update development system")
+             "Update development system with time step")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+             "Get current neuromodulation level (0.0-1.0)")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+             "Get curiosity level (0.0-1.0)")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+             "Get novelty level (0.0-1.0)")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+             "Get prediction error value")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
@@ -398,7 +429,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getIntegrationStatus", &AgentBrain::getIntegrationStatus,
+             "Get integration status string with all enabled subsystems")
+        .def("createSensoryPercept", &AgentBrain::createSensoryPercept,
+             py::arg("vision_data"), py::arg("vision_width"), py::arg("vision_height"),
+             py::arg("vision_channels") = 3,
+             "Create a new sensory percept from vision data. Convenience method.")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

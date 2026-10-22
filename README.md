@@ -75,9 +75,19 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2: Real Neural Computation Demo
+```bash
+./nlm
+```
+
+### Phase 6: Final Integration Demo
 ```bash
 ./nlm_phase6_demo
+```
+
+### Unit Tests
+```bash
+./nlm_test
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.

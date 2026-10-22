@@ -37,12 +37,25 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_phase6 {
+    void runAllPhase6Tests();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "=== NLM Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Working Memory" << std::endl;
+    std::cout << "  - Episodic Memory" << std::endl;
+    std::cout << "  - Neuromodulation" << std::endl;
+    std::cout << "  - Prediction System" << std::endl;
+    std::cout << "  - Development System" << std::endl;
+    std::cout << "  - Cognition Systems" << std::endl;
+    std::cout << "  - Agent Brain Interface" << std::endl;
+    std::cout << "  - Checkpointing" << std::endl;
+    std::cout << "  - Replay System" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +126,16 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "Running Phase 6 Integration Tests..." << std::endl;
+    try {
+        test_phase6::runAllPhase6Tests();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

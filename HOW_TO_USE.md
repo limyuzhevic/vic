@@ -189,15 +189,20 @@ world.update(timestep=0.1)
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_phase6_integration_demo():
+    """Run a complete Phase 6 integration demonstration with all brain systems."""
     
-    # 1. Create configuration
+    # 1. Create configuration with Phase 6 settings
     config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)
+    config.set("brain.synapse_density", 0.1)
+    config.set("neuromod.dopamine.scale", 1.0)
+    config.set("plasticity.structural.enable", True)
     
     # 2. Create brain and initialize
     brain = pynlm.createBrain(config)
     brain.initialize()
+    print(f"Brain initialized: {brain.getTotalNeuronCount()} neurons")
     
     # 3. Create agent brain interface
     agent = pynlm.createAgentBrain(brain)
@@ -208,17 +213,15 @@ def run_agent_simulation(num_steps=1000):
     world.reset()
     world.setAgentStart(10.0, 10.0)
     
-    # 5. Initialize agent with world
+    # 5. Initialize agent with world and enable ALL Phase 6 subsystems
     agent.initialize(world)
+    agent.enableRewardModulation(True)      # Neuromodulation for learning
+    agent.enableStructuralPlasticity(True)  # Growth and pruning
+    agent.enableDevelopment(True)           # Developmental stages
+    agent.enableCuriosity(True)             # Exploration drive
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
+    # 6. Run simulation loop (Phase 6 features will activate)
+    for step in range(1000):
         # Update world
         world.update(timestep=0.1)
         
@@ -244,16 +247,31 @@ def run_agent_simulation(num_steps=1000):
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
-        if step % 100 == 0:
+        # Print progress (shows Phase 6 metrics)
+        if step % 200 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Neuromod level: {agent.getNeuromodulationLevel():.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+    
+    # 7. Get integration status (Phase 6 verification)
+    print("\n=== Phase 6 Integration Status ===")
+    print("Working Memory:", "CONNECTED" if brain.getWorkingMemory() else "DISCONNECTED")
+    print("Episodic Memory:", "CONNECTED" if brain.getEpisodicMemory() else "DISCONNECTED")
+    print("Neuromodulation:", "CONNECTED" if brain.getDopamine() else "DISCONNECTED")
+    print("Prediction:", "CONNECTED" if brain.getPredictionSystem() else "DISCONNECTED")
+    print("Development:", "CONNECTED" if brain.getDevelopmentSystem() else "DISCONNECTED")
+    print("Conceptual Thinking:", "CONNECTED" if brain.getConceptFormation() else "DISCONNECTED")
+    print("Planning:", "CONNECTED" if brain.getPlanner() else "DISCONNECTED")
+    print("Attention:", "CONNECTED" if brain.getAttention() else "DISCONNECTED")
+    
+    return brain, agent, world
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the Phase 6 integration demo
+brain, agent, world = run_phase6_integration_demo()
 ```
 
 ### Key Classes and Methods
