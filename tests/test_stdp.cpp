@@ -2,18 +2,16 @@
 #include "brain/Synapse.hpp"
 #include "plasticity/STDP.hpp"
 #include "core/Random/Random.hpp"
-#include <cassert>
+#include "core/test/TestFramework.hpp"
 #include <iostream>
 #include <cmath>
 
 namespace test_stdp {
 
 void testSTDPCreation() {
-    nlm::STDP stdp;
-    
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
+    nlm::test::TestAssert::equal(0.01f, nlm::STDP().getLTPWeight(), "testSTDPCreation");
+    nlm::test::TestAssert::equal(0.012f, nlm::STDP().getLTDWeight(), "testSTDPCreation");
+    nlm::test::TestAssert::equal(20.0f, nlm::STDP().getTimeConstant(), "testSTDPCreation");
     
     std::cout << "    testSTDPCreation passed" << std::endl;
 }
@@ -25,9 +23,9 @@ void testSTDPConfiguration() {
     stdp.setLTDWeight(0.06f);
     stdp.setTimeConstant(30.0f);
     
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
+    nlm::test::TestAssert::equal(0.05f, stdp.getLTPWeight(), "testSTDPConfiguration");
+    nlm::test::TestAssert::equal(0.06f, stdp.getLTDWeight(), "testSTDPConfiguration");
+    nlm::test::TestAssert::equal(30.0f, stdp.getTimeConstant(), "testSTDPConfiguration");
     
     std::cout << "    testSTDPConfiguration passed" << std::endl;
 }
@@ -37,9 +35,9 @@ void testSTDPConfigure() {
     
     stdp.configure(0.03f, 0.035f, 25.0f);
     
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
+    nlm::test::TestAssert::equal(0.03f, stdp.getLTPWeight(), "testSTDPConfigure");
+    nlm::test::TestAssert::equal(0.035f, stdp.getLTDWeight(), "testSTDPConfigure");
+    nlm::test::TestAssert::equal(25.0f, stdp.getTimeConstant(), "testSTDPConfigure");
     
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
@@ -47,8 +45,8 @@ void testSTDPConfigure() {
 void testSTDPName() {
     nlm::STDP stdp;
     
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
+    nlm::test::TestAssert::notNull(stdp.getName(), "testSTDPName");
+    nlm::test::TestAssert::equal(std::string("STDP"), std::string(stdp.getName()), "testSTDPName");
     
     std::cout << "    testSTDPName passed" << std::endl;
 }
@@ -73,7 +71,7 @@ void testSTDPPotentiation() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have increased due to pre-before-post
-    assert(finalWeight > initialWeight);
+    nlm::test::TestAssert::greaterThan(finalWeight, initialWeight, "testSTDPPotentiation");
     
     std::cout << "    testSTDPPotentiation passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -98,7 +96,7 @@ void testSTDPDepression() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have decreased due to post-before-pre
-    assert(finalWeight < initialWeight);
+    nlm::test::TestAssert::lessThan(finalWeight, initialWeight, "testSTDPDepression");
     
     std::cout << "    testSTDPDepression passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -115,13 +113,13 @@ void testSTDPEmptySpikes() {
     std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    nlm::test::TestAssert::equal(initialWeight, synapse.getWeight(), "testSTDPEmptySpikes");
     
     // Empty post spikes - should not change
     preSpikes = {1.0, 2.0};
     postSpikes = {};
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    nlm::test::TestAssert::equal(initialWeight, synapse.getWeight(), "testSTDPEmptySpikes");
     
     std::cout << "    testSTDPEmptySpikes passed" << std::endl;
 }
@@ -140,7 +138,7 @@ void testSTDPWeightBounds() {
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
     // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    nlm::test::TestAssert::lessThan(1.0f, synapse.getWeight() + 1e-6f, "testSTDPWeightBounds");
     
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }

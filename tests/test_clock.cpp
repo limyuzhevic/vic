@@ -1,6 +1,6 @@
 // SimulationClock Tests
 #include "core/SimulationClock/SimulationClock.hpp"
-#include <cassert>
+#include "core/test/TestFramework.hpp"
 #include <iostream>
 
 namespace test_clock {
@@ -8,9 +8,9 @@ namespace test_clock {
 void testClockCreation() {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
-    assert(clock.getTimestep() == 0.001);
+    nlm::test::TestAssert::equal(0, clock.getStep(), "testClockCreation");
+    nlm::test::TestAssert::equal(0.0, clock.getTime(), "testClockCreation");
+    nlm::test::TestAssert::equal(0.001, clock.getTimestep(), "testClockCreation");
     
     std::cout << "    testClockCreation passed" << std::endl;
 }
@@ -19,12 +19,12 @@ void testClockAdvance() {
     nlm::SimulationClock clock(0.001);
     
     clock.advance();
-    assert(clock.getStep() == 1);
-    assert(clock.getTime() == 0.001);
+    nlm::test::TestAssert::equal(1, clock.getStep(), "testClockAdvance");
+    nlm::test::TestAssert::equal(0.001, clock.getTime(), "testClockAdvance");
     
     clock.advance();
-    assert(clock.getStep() == 2);
-    assert(clock.getTime() == 0.002);
+    nlm::test::TestAssert::equal(2, clock.getStep(), "testClockAdvance");
+    nlm::test::TestAssert::equal(0.002, clock.getTime(), "testClockAdvance");
     
     std::cout << "    testClockAdvance passed" << std::endl;
 }
@@ -36,11 +36,11 @@ void testClockReset() {
     clock.advance();
     clock.advance();
     
-    assert(clock.getStep() == 3);
+    nlm::test::TestAssert::equal(3, clock.getStep(), "testClockReset");
     
     clock.reset();
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
+    nlm::test::TestAssert::equal(0, clock.getStep(), "testClockReset");
+    nlm::test::TestAssert::equal(0.0, clock.getTime(), "testClockReset");
     
     std::cout << "    testClockReset passed" << std::endl;
 }
@@ -49,8 +49,8 @@ void testClockSetStep() {
     nlm::SimulationClock clock(0.001);
     
     clock.setStep(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
+    nlm::test::TestAssert::equal(100, clock.getStep(), "testClockSetStep");
+    nlm::test::TestAssert::equal(0.1, clock.getTime(), "testClockSetStep");
     
     std::cout << "    testClockSetStep passed" << std::endl;
 }
@@ -59,8 +59,8 @@ void testClockSetTime() {
     nlm::SimulationClock clock(0.001);
     
     clock.setTime(0.5);
-    assert(clock.getTime() == 0.5);
-    assert(clock.getStep() == 500);
+    nlm::test::TestAssert::equal(0.5, clock.getTime(), "testClockSetTime");
+    nlm::test::TestAssert::equal(500, clock.getStep(), "testClockSetTime");
     
     std::cout << "    testClockSetTime passed" << std::endl;
 }
@@ -69,8 +69,8 @@ void testClockAdvanceBy() {
     nlm::SimulationClock clock(0.001);
     
     clock.advanceBy(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
+    nlm::test::TestAssert::equal(100, clock.getStep(), "testClockAdvanceBy");
+    nlm::test::TestAssert::equal(0.1, clock.getTime(), "testClockAdvanceBy");
     
     std::cout << "    testClockAdvanceBy passed" << std::endl;
 }
@@ -79,10 +79,10 @@ void testClockConversions() {
     nlm::SimulationClock clock(0.001);
     
     nlm::Timestamp ts = clock.stepToTime(500);
-    assert(ts == 0.5);
+    nlm::test::TestAssert::equal(0.5, ts, "testClockConversions");
     
     nlm::SimulationStep st = clock.timeToStep(0.5);
-    assert(st == 500);
+    nlm::test::TestAssert::equal(500, st, "testClockConversions");
     
     std::cout << "    testClockConversions passed" << std::endl;
 }
@@ -90,18 +90,18 @@ void testClockConversions() {
 void testClockFirstLastStep() {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.isFirstStep());
+    nlm::test::TestAssert::equal(true, clock.isFirstStep(), "testClockFirstLastStep");
     
     clock.advance();
-    assert(!clock.isFirstStep());
+    nlm::test::TestAssert::equal(false, clock.isFirstStep(), "testClockFirstLastStep");
     
     clock.reset();
-    assert(clock.isFirstStep());
+    nlm::test::TestAssert::equal(true, clock.isFirstStep(), "testClockFirstLastStep");
     
-    assert(clock.isLastStep(0));  // With 0 total steps, step 0 is last
+    nlm::test::TestAssert::equal(true, clock.isLastStep(0), "testClockFirstLastStep");  // With 0 total steps, step 0 is last
     clock.advance();
-    assert(!clock.isLastStep(0));
-    assert(clock.isLastStep(1));  // With 1 total step, step 1 is last
+    nlm::test::TestAssert::equal(false, clock.isLastStep(0), "testClockFirstLastStep");
+    nlm::test::TestAssert::equal(true, clock.isLastStep(1), "testClockFirstLastStep");  // With 1 total step, step 1 is last
     
     std::cout << "    testClockFirstLastStep passed" << std::endl;
 }
@@ -112,7 +112,7 @@ void testClockTimeAtFutureStep() {
     clock.advanceBy(100);
     
     nlm::Timestamp future = clock.timeAtFutureStep(50);
-    assert(future == 0.15);  // 100 steps + 50 steps = 150 steps * 0.001
+    nlm::test::TestAssert::equal(0.15, future, "testClockTimeAtFutureStep");  // 100 steps + 50 steps = 150 steps * 0.001
     
     std::cout << "    testClockTimeAtFutureStep passed" << std::endl;
 }

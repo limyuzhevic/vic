@@ -1,10 +1,40 @@
 #include "Config.hpp"
+#include "ConfigValidation.hpp"
+#include "Exceptions/Exceptions.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
+
+// Known configuration keys and their validation rules
+static std::unordered_map<std::string, std::string> knownConfigKeys = {
+    {"random_seed", "Random seed for reproducible experiments"},
+    {"simulation_timestep", "Simulation timestep in seconds"},
+    {"neuron_count", "Number of neurons in the brain"},
+    {"region_count", "Number of brain regions"},
+    {"connection_probability", "Connection probability for random connectivity"},
+    {"plasticity_learning_rate", "Plasticity learning rate"},
+    {"stdp_ltp_weight", "STDP LTP weight"},
+    {"stdp_ltd_weight", "STDP LTD weight"},
+    {"stdp_time_constant", "STDP time constant"},
+    {"development_synaptogenesis_rate", "Development synaptogenesis rate"},
+    {"development_pruning_rate", "Development pruning rate"},
+    {"dopamine_baseline", "Dopamine baseline value"},
+    {"reward_discount_factor", "Reward discount factor"},
+    {"environment_name", "Environment name"},
+    {"environment_width", "Environment width"},
+    {"environment_height", "Environment height"},
+    {"log_level", "Log level"},
+    {"log_to_file", "Log to file"},
+    {"log_filename", "Log filename"},
+    {"max_simulation_steps", "Maximum simulation steps"},
+    {"simulation_time_limit", "Simulation time limit"},
+    {"visualization_enabled", "Visualization enabled"},
+    {"visualization_update_rate", "Visualization update rate"}
+};
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -24,11 +54,13 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileException(filepath, "Cannot open file");
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +80,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const ConfigException& e) {
+                throw ConfigParseException(key, value, e.what());
+            }
+        } else {
+            throw ConfigParseException("<unknown>", line, "Invalid format (missing '=')");
         }
     }
     
@@ -66,6 +104,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                throw ConfigParseException(arg.substr(2), "", "Invalid format (missing '=')");
             }
         }
         // Handle -key value format
@@ -81,7 +121,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileException(filepath, "Cannot open file for writing");
     }
     
     for (const auto& entry : pImpl->entries) {
@@ -199,6 +239,114 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// Implementation of ConfigValidation.hpp methods
+void ConfigValidator::validateValue(const std::string& key, const ConfigValue& value, 
+                                    const std::string& description) {
+    // Basic validation for known keys
+    if (knownConfigKeys.find(key) == knownConfigKeys.end()) {
+        throw ConfigException("Unknown configuration key: " + key);
+    }
+    
+    // Type-specific validation (could be extended)
+    if (std::holds_alternative<int64_t>(value)) {
+        int64_t val = std::get<int64_t>(value);
+        if (key == "random_seed" && val < 0) {
+            throw ConfigException("random_seed must be non-negative");
+        }
+    } else if (std::holds_alternative<double>(value)) {
+        double val = std::get<double>(value);
+        if (key == "simulation_timestep" && val <= 0.0) {
+            throw ConfigException("simulation_timestep must be positive");
+        } else if (key == "neuron_count" && (val <= 0 || val > 1000000)) {
+            throw ConfigException("neuron_count must be between 1 and 1,000,000");
+        } else if (key == "region_count" && val <= 0) {
+            throw ConfigException("region_count must be positive");
+        } else if (key == "connection_probability" && (val < 0.0 || val > 1.0)) {
+            throw ConfigException("connection_probability must be between 0.0 and 1.0");
+        } else if (key == "plasticity_learning_rate" && val < 0.0) {
+            throw ConfigException("plasticity_learning_rate must be non-negative");
+        } else if (key == "environment_width" && val <= 0) {
+            throw ConfigException("environment_width must be positive");
+        } else if (key == "environment_height" && val <= 0) {
+            throw ConfigException("environment_height must be positive");
+    } else if (std::holds_alternative<bool>(value)) {
+        // Boolean values are fine
+    } else if (std::holds_alternative<std::string>(value)) {
+        std::string val = std::get<std::string>(value);
+        if (key == "environment_name" && val.empty()) {
+            throw ConfigException("environment_name cannot be empty");
+        } else if (key == "log_filename" && val.empty()) {
+            throw ConfigException("log_filename cannot be empty");
+        }
+    }
+}
+
+void ConfigValidator::validateRange(const std::string& key, double value, 
+                                    double min, double max, const std::string& description) {
+    if (value < min || value > max) {
+        throw ConfigException("Value " + std::to_string(value) + " for key '" + key + 
+                            "' is out of range [" + std::to_string(min) + ", " + 
+                            std::to_string(max) + "]");
+    }
+}
+
+void ConfigValidator::validatePositive(const std::string& key, double value, 
+                                      const std::string& description) {
+    if (value <= 0.0) {
+        throw ConfigException("Value " + std::to_string(value) + " for key '" + key + 
+                            "' must be positive");
+    }
+}
+
+void ConfigValidator::validateNonNegative(const std::string& key, double value, 
+                                         const std::string& description) {
+    if (value < 0.0) {
+        throw ConfigException("Value " + std::to_string(value) + " for key '" + key + 
+                            "' must be non-negative");
+    }
+}
+
+void ConfigValidator::validateEnum(const std::string& key, int64_t value, 
+                                  const std::string& description) {
+    // Basic enum validation - could be extended
+    if (key == "log_level" && (value < 0 || value > 4)) {
+        throw ConfigException("log_level must be between 0 and 4 (0=Debug, 1=Info, 2=Warning, 3=Error, 4=Critical)");
+    }
+}
+
+void ConfigValidator::validateString(const std::string& key, const std::string& value, 
+                                    size_t minLength, size_t maxLength, const std::string& description) {
+    if (value.size() < minLength) {
+        throw ConfigException("Value for key '" + key + "' must be at least " + 
+                            std::to_string(minLength) + " characters long");
+    }
+    if (value.size() > maxLength) {
+        throw ConfigException("Value for key '" + key + "' cannot exceed " + 
+                            std::to_string(maxLength) + " characters");
+    }
+}
+
+// Implementation of ConfigHelper methods
+std::string ConfigHelper::getValueDescription(const std::string& key) {
+    auto it = knownConfigKeys.find(key);
+    if (it != knownConfigKeys.end()) {
+        return it->second;
+    }
+    return "Unknown configuration key";
+}
+
+std::string ConfigHelper::getErrorPrefix(const ConfigEntry& entry) {
+    std::ostringstream oss;
+    oss << "[Config " << static_cast<int>(entry.source) << "]";
+    return oss.str();
+}
+
+void ConfigHelper::setValueWithValidation(const std::string& key, const std::string& value,
+                                         ConfigSource source) {
+    // This would be called from Config::set() after validation
+    // For now, just a placeholder
+}
+
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
@@ -213,3 +361,4 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+

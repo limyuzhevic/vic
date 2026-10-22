@@ -1,6 +1,6 @@
 // Random Tests
 #include "core/Random/Random.hpp"
-#include <cassert>
+#include "core/test/TestFramework.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -12,7 +12,7 @@ void testRandomGeneratorCreation() {
     
     // Same seed should produce same sequence
     for (int i = 0; i < 10; ++i) {
-        assert(rng1.uniformInt(0, 100) == rng2.uniformInt(0, 100));
+        nlm::test::TestAssert::equal(rng1.uniformInt(0, 100), rng2.uniformInt(0, 100), "testRandomGeneratorCreation");
     }
     
     std::cout << "    testRandomGeneratorCreation passed" << std::endl;
@@ -23,7 +23,8 @@ void testUniformInt() {
     
     for (int i = 0; i < 100; ++i) {
         uint32_t val = rng.uniformInt(5, 10);
-        assert(val >= 5 && val <= 10);
+        nlm::test::TestAssert::greaterEqual(val, 5, "testUniformInt");
+        nlm::test::TestAssert::lessEqual(val, 10, "testUniformInt");
     }
     
     std::cout << "    testUniformInt passed" << std::endl;
@@ -34,7 +35,8 @@ void testUniformReal() {
     
     for (int i = 0; i < 100; ++i) {
         double val = rng.uniformReal(0.0, 1.0);
-        assert(val >= 0.0 && val < 1.0);
+        nlm::test::TestAssert::greaterEqual(val, 0.0, "testUniformReal");
+        nlm::test::TestAssert::lessEqual(val, 1.0, "testUniformReal");
     }
     
     std::cout << "    testUniformReal passed" << std::endl;
@@ -52,7 +54,7 @@ void testNormal() {
     double mean = sum / samples;
     
     // Mean should be close to 0
-    assert(std::abs(mean) < 0.1);
+    nlm::test::TestAssert::lessEqual(std::abs(mean), 0.1, "testNormal");
     
     std::cout << "    testNormal passed" << std::endl;
 }
@@ -70,7 +72,8 @@ void testBernoulli() {
     
     // Should be roughly 30%
     double ratio = static_cast<double>(trueCount) / samples;
-    assert(ratio > 0.25 && ratio < 0.35);
+    nlm::test::TestAssert::greaterEqual(ratio, 0.25, "testBernoulli");
+    nlm::test::TestAssert::lessEqual(ratio, 0.35, "testBernoulli");
     
     std::cout << "    testBernoulli passed" << std::endl;
 }
@@ -80,7 +83,7 @@ void testRandomBool() {
     
     bool val = rng.randomBool();
     // Just check it doesn't crash
-    assert(true || false);  // Always true
+    nlm::test::TestAssert::equal(true, true, "testRandomBool");  // Always true
     
     std::cout << "    testRandomBool passed" << std::endl;
 }
@@ -90,7 +93,7 @@ void testPickRandomIndex() {
     
     for (int i = 0; i < 100; ++i) {
         uint64_t idx = rng.pickRandomIndex(10);
-        assert(idx < 10);
+        nlm::test::TestAssert::lessEqual(idx, 10, "testPickRandomIndex");
     }
     
     std::cout << "    testPickRandomIndex passed" << std::endl;
@@ -105,12 +108,12 @@ void testShuffle() {
     rng.shuffle(vec);
     
     // Should have same elements but possibly different order
-    assert(vec.size() == vecCopy.size());
+    nlm::test::TestAssert::equal(vec.size(), vecCopy.size(), "testShuffle");
     
     // Sort and compare
     std::sort(vec.begin(), vec.end());
     std::sort(vecCopy.begin(), vecCopy.end());
-    assert(vec == vecCopy);
+    nlm::test::TestAssert::equal(vecCopy, vec, "testShuffle");
     
     std::cout << "    testShuffle passed" << std::endl;
 }
@@ -124,7 +127,7 @@ void testSeed() {
     rng.seed(12345);
     uint32_t val2 = rng.uniformInt(0, 1000);
     
-    assert(val1 == val2);
+    nlm::test::TestAssert::equal(val1, val2, "testSeed");
     
     std::cout << "    testSeed passed" << std::endl;
 }

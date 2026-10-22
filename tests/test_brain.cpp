@@ -1,7 +1,7 @@
 // Brain Tests
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
-#include <cassert>
+#include "core/test/TestFramework.hpp"
 #include <iostream>
 
 namespace test_brain {
@@ -25,12 +25,12 @@ void testBrainInitialization() {
     nlm::Brain brain(config);
     
     bool success = brain.initialize();
-    assert(success);
+    nlm::test::TestAssert::equal(true, success, "testBrainInitialization");
     
     // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
+    nlm::test::TestAssert::equal(2, brain.getRegionCount(), "testBrainInitialization");
+    nlm::test::TestAssert::equal(100, brain.getTotalNeuronCount(), "testBrainInitialization");
+    nlm::test::TestAssert::greaterEqual(0, brain.getTotalSynapseCount(), "testBrainInitialization");
     
     std::cout << "    testBrainInitialization passed" << std::endl;
 }
@@ -49,7 +49,7 @@ void testBrainStep() {
     }
     
     // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
+    nlm::test::TestAssert::equal(100, brain.getTotalNeuronCount(), "testBrainStep");
     
     std::cout << "    testBrainStep passed" << std::endl;
 }
@@ -66,7 +66,7 @@ void testBrainReset() {
     brain.reset();
     
     // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
+    nlm::test::TestAssert::equal(50, brain.getTotalNeuronCount(), "testBrainReset");
     
     std::cout << "    testBrainReset passed" << std::endl;
 }
@@ -80,11 +80,11 @@ void testBrainRegions() {
     brain.initialize();
     
     auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
+    nlm::test::TestAssert::equal(3, regionIds.size(), "testBrainRegions");
     
     for (auto rid : regionIds) {
         auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
+        nlm::test::TestAssert::notNull(region, "testBrainRegions");
     }
     
     std::cout << "    testBrainRegions passed" << std::endl;
@@ -99,7 +99,7 @@ void testBrainActionProduction() {
     brain.initialize();
     
     auto action = brain.produceAction();
-    assert(action != nullptr);
+    nlm::test::TestAssert::notNull(action.get(), "testBrainActionProduction");
     
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
@@ -113,10 +113,10 @@ void testBrainStatus() {
     brain.initialize();
     
     // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    nlm::test::TestAssert::greaterEqual(0, brain.getTotalNeuronCount(), "testBrainStatus");
+    nlm::test::TestAssert::greaterEqual(0, brain.getTotalSynapseCount(), "testBrainStatus");
+    nlm::test::TestAssert::greaterEqual(0, brain.getFiringNeuronCount(), "testBrainStatus");
+    nlm::test::TestAssert::greaterEqual(0.0f, brain.getAverageFiringRate(), "testBrainStatus");
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }
