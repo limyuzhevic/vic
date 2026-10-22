@@ -175,8 +175,11 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
+              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Vision data cannot be empty");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
@@ -187,6 +190,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Audio data cannot be empty");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))

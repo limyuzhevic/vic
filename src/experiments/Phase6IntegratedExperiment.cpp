@@ -60,46 +60,54 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
-        }
+    // Get observation - validate regions exist before accessing
+    auto& regions = agent.getBrain()->getRegions();
+    if (regions.empty()) {
+        NLM_LOG_ERROR("No brain regions available for observation");
+        return result;
+    }
+    SensoryPercept percept = world.observe(regions[0].get());
+    
+    // Process sensory input
+    agent.processSensoryInput(percept);
+    
+    // Brain step
+    brain->step(step, step * 0.001);
+    
+    // Get motor command
+    MotorCommand cmd = agent.decodeMotorCommand();
+    
+    // Apply action to world - validate regions
+    if (!regions.empty()) {
+        world.applyAction(regions[0].get(), cmd);
+    }
+    
+    // Compute reward - validate regions
+    float reward = 0.0f;
+    if (!regions.empty()) {
+        reward = world.computeReward(regions[0].get());
+    }
+    totalReward += reward;
+    
+    // Apply reward modulation
+    agent.applyRewardModulation(reward, 0.0f);
+    
+    // Update development
+    if (config.enableDevelopment) {
+        agent.updateDevelopment(0.001);
+    }
+    
+    // Collect metrics
+    totalFiringRate += brain->getAverageFiringRate();
+    if (brain->getFiringNeuronCount() > 0) firingCount++;
+    
+    // Periodic status
+    if (step % 1000 == 0) {
+        NLM_LOG_INFO("Step " + std::to_string(step) + 
+                    " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                    " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                    " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                        brain->getWorkingMemory()->getActiveTraces() : 0));
     }
     
     // Collect final metrics
@@ -111,12 +119,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Verify integration with null checks
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    
+    // Note: getRegions() requires validation - accessing regions[0] without checking
+    // is potentially unsafe and should be fixed
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
