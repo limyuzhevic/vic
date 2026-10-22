@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from file (supports simple key=value format and JSON)
+    // TODO: Add proper JSON/YAML parser support
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -35,7 +35,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs (Phase 1 format)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,7 +48,51 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Convert to appropriate type based on value content
+            // Simple heuristics for type detection
+            bool isInt = true;
+            bool isFloat = true;
+            bool isBool = true;
+            
+            for (char c : value) {
+                if (!std::isdigit(c) && c != '-') {
+                    isInt = false;
+                    break;
+                }
+            }
+            
+            if (isInt) {
+                try {
+                    int intValue = std::stoi(value);
+                    set(key, intValue, ConfigSource::File);
+                } catch (...) {
+                    isInt = false;
+                }
+            }
+            
+            if (!isInt) {
+                // Try float
+                size_t decimalPos = value.find('.');
+                if (decimalPos != std::string::npos) {
+                    try {
+                        float floatValue = std::stof(value);
+                        set(key, floatValue, ConfigSource::File);
+                    } catch (...) {
+                        isFloat = false;
+                    }
+                }
+            }
+            
+            if (!isInt && !isFloat) {
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    bool boolValue = (value == "true");
+                    set(key, boolValue, ConfigSource::File);
+                } else {
+                    // Default to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
     }
     

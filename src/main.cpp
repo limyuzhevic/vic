@@ -1,12 +1,11 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
 
+// NLM Headers
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -18,13 +17,6 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
 
 using namespace nlm;
 
@@ -340,11 +332,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments
     std::string configFile = "configs/default.cfg";
+    bool enablePlasticityTest = true;
+    bool enableStdpTest = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,18 +345,73 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--no-plasticity") {
+            enablePlasticityTest = false;
+        } else if (arg == "--no-stdp") {
+            enableStdpTest = false;
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Try to load from file if provided
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse help, version and configuration options
+    std::string configFile = "configs/default.cfg";
+    bool enablePlasticityTest = true;
+    bool enableStdpTest = true;
+    bool showHelp = false;
+    bool showVersion = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--no-plasticity") {
+            enablePlasticityTest = false;
+        } else if (arg == "--no-stdp") {
+            enableStdpTest = false;
+        }
+    }
+    
+    // Show help if requested
+    if (showHelp) {
+        std::cout << "Usage: nlm_phase2 [OPTIONS]\n";
+        std::cout << "\nGeneral Options:\n";
+        std::cout << "  -h, --help           Show this help message\n";
+        std::cout << "  -v, --version        Show version information\n";
+        std::cout << "\nConfiguration:\n";
+        std::cout << "  --config <file>      Load configuration from file (default: configs/default.cfg)\n";
+        std::cout << "\nTesting Options:\n";
+        std::cout << "  --no-plasticity      Skip plasticity experiments\n";
+        std::cout << "  --no-stdp            Skip STDP verification test\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  nlm_phase2                     Run all tests\n";
+        std::cout << "  nlm_phase2 --no-plasticity    Skip plasticity tests\n";
+        std::cout << "  nlm_phase2 --config myconfig.cfg Load custom config\n";
+        return 0;
+    }
+    
+    // Show version if requested
+    if (showVersion) {
+        std::cout << "NLM Phase 2 - Version 0.1.0\n";
+        std::cout << "Real Neural Computation with LIF neurons and synaptic plasticity\n";
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
