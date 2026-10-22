@@ -93,6 +93,30 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and error handling
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    bool merge(const Config& other);
+    
+    // Configuration management
+    void setDefault(const std::string& key, const ConfigValue& value);
+    void setDefault(const std::string& key, const std::string& value);
+    void setDefault(const std::string& key, int value);
+    void setDefault(const std::string& key, double value);
+    void setDefault(const std::string& key, bool value);
+    
+    // Enhanced configuration with validation
+    void setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration section management
+    std::vector<ConfigEntry> getSection(const std::string& section) const;
+    
+    // Configuration statistics and analysis
+    std::string getStatistics() const;
+    
+    // Configuration display
+    void printConfig() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +124,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getCurrentTimestamp();
+    
+    // Helper functions
+    static std::string getConfigValueString(const ConfigValue& value);
 };
 
 } // namespace nlm

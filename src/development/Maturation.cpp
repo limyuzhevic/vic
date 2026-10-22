@@ -28,7 +28,7 @@ void Maturation::setProgress(float progress) {
 }
 
 void Maturation::update(Brain* brain, SimulationStep currentStep) {
-    // TODO PHASE 2: Implement real maturation
+    // TODO PHASE 6: Implement real maturation
     // PLACEHOLDER: Progress increases over simulation time
 }
 

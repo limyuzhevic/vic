@@ -1,215 +1,359 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+// New helper functions
 
-namespace nlm {
+// Add getCurrentTimestamp function
+std::string Config::getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Add validation functions
+bool Config::validate() const {
+    bool isValid = true;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Validate essential configuration parameters
+    if (has("brain.neuron_count")) {
+        auto neurons = get<size_t>("brain.neuron_count");
+        if (neurons && *neurons <= 0) {
+            NLM_LOG_ERROR("Invalid brain.neuron_count: must be positive");
+            isValid = false;
+        }
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (has("brain.connection_probability")) {
+        auto connProb = get<double>("brain.connection_probability");
+        if (connProb && (*connProb < 0.0 || *connProb > 1.0)) {
+            NLM_LOG_ERROR("Invalid brain.connection_probability: must be between 0.0 and 1.0");
+            isValid = false;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    }
+    
+    if (has("experiment.max_steps")) {
+        auto maxSteps = get<size_t>("experiment.max_steps");
+        if (maxSteps && *maxSteps <= 0) {
+            NLM_LOG_ERROR("Invalid experiment.max_steps: must be positive");
+            isValid = false;
+        }
+    }
+    
+    if (has("brain.synapse_density")) {
+        auto synapseDensity = get<double>("brain.synapse_density");
+        if (synapseDensity && (*synapseDensity < 0.0 || *synapseDensity > 1.0)) {
+            NLM_LOG_ERROR("Invalid brain.synapse_density: must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    // Validate plasticity parameters
+    if (has("plasticity.stdp.learning_rate")) {
+        auto stdpLearningRate = get<double>("plasticity.stdp.learning_rate");
+        if (stdpLearningRate && (*stdpLearningRate < 0.0 || *stdpLearningRate > 1.0)) {
+            NLM_LOG_ERROR("Invalid plasticity.stdp.learning_rate: must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    if (has("plasticity.hebbian.learning_rate")) {
+        auto hebbianLearningRate = get<double>("plasticity.hebbian.learning_rate");
+        if (hebbianLearningRate && (*hebbianLearningRate < 0.0 || *hebbianLearningRate > 1.0)) {
+            NLM_LOG_ERROR("Invalid plasticity.hebbian.learning_rate: must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    // Validate development stage
+    if (has("development.stage")) {
+        auto stage = get<std::string>("development.stage");
+        if (stage) {
+            std::string stageLower = toLower(*stage);
+            const std::vector<std::string> validStages = {
+                "initial", "criticalperiod", "maturation", "adult", "aging"
+            };
+            if (std::find(validStages.begin(), validStages.end(), stageLower) == validStages.end()) {
+                NLM_LOG_ERROR("Invalid development.stage: must be one of Initial, CriticalPeriod, Maturation, Adult, Aging");
+                isValid = false;
             }
-            
-            set(key, value, ConfigSource::File);
         }
     }
     
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    if (isValid) {
+        NLM_LOG_INFO("Configuration validation passed");
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_WARN("Configuration validation failed. Check log for details.");
     }
+    
+    return isValid;
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+// Get validation errors
+defs getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Validate essential configuration parameters
+    if (has("brain.neuron_count")) {
+        auto neurons = get<size_t>("brain.neuron_count");
+        if (neurons && *neurons <= 0) {
+            errors.push_back("brain.neuron_count: must be positive");
+        }
     }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+    
+    if (has("brain.connection_probability")) {
+        auto connProb = get<double>("brain.connection_probability");
+        if (connProb && (*connProb < 0.0 || *connProb > 1.0)) {
+            errors.push_back("brain.connection_probability: must be between 0.0 and 1.0");
+        }
+    }
+    
+    if (has("experiment.max_steps")) {
+        auto maxSteps = get<size_t>("experiment.max_steps");
+        if (maxSteps && *maxSteps <= 0) {
+            errors.push_back("experiment.max_steps: must be positive");
+        }
+    }
+    
+    if (has("brain.synapse_density")) {
+        auto synapseDensity = get<double>("brain.synapse_density");
+        if (synapseDensity && (*synapseDensity < 0.0 || *synapseDensity > 1.0)) {
+            errors.push_back("brain.synapse_density: must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Validate plasticity parameters
+    if (has("plasticity.stdp.learning_rate")) {
+        auto stdpLearningRate = get<double>("plasticity.stdp.learning_rate");
+        if (stdpLearningRate && (*stdpLearningRate < 0.0 || *stdpLearningRate > 1.0)) {
+            errors.push_back("plasticity.stdp.learning_rate: must be between 0.0 and 1.0");
+        }
+    }
+    
+    if (has("plasticity.hebbian.learning_rate")) {
+        auto hebbianLearningRate = get<double>("plasticity.hebbian.learning_rate");
+        if (hebbianLearningRate && (*hebbianLearningRate < 0.0 || *hebbianLearningRate > 1.0)) {
+            errors.push_back("plasticity.hebbian.learning_rate: must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Validate development stage
+    if (has("development.stage")) {
+        auto stage = get<std::string>("development.stage");
+        if (stage) {
+            std::string stageLower = toLower(*stage);
+            const std::vector<std::string> validStages = {
+                "initial", "criticalperiod", "maturation", "adult", "aging"
+            };
+            if (std::find(validStages.begin(), validStages.end(), stageLower) == validStages.end()) {
+                errors.push_back("development.stage: must be one of Initial, CriticalPeriod, Maturation, Adult, Aging");
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
     }
+    
+    return errors;
+}
+
+// Merge configuration from another config
+bool Config::merge(const Config& other) {
+    bool hasChanges = false;
+    
+    for (const auto& entry : other.pImpl->entries) {
+        // Check if key already exists
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                              [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        
+        if (it == pImpl->entries.end()) {
+            // Add new entry
+            pImpl->entries.push_back(entry);
+            hasChanges = true;
+            NLM_LOG_DEBUG("Merged configuration entry: " + entry.key);
+        } else if (it->source == ConfigSource::Default) {
+            // Override default with higher priority source
+            it->value = entry.value;
+            it->source = entry.source;
+            hasChanges = true;
+            NLM_LOG_DEBUG("Overrode default configuration entry: " + entry.key);
+        } else {
+            // Don't override existing non-default entries
+            NLM_LOG_DEBUG("Skipped configuration entry (already set): " + entry.key);
+        }
+    }
+    
+    if (hasChanges) {
+        NLM_LOG_INFO("Configuration merge completed with changes");
+    } else {
+        NLM_LOG_INFO("Configuration merge completed (no changes)");
+    }
+    
+    return hasChanges;
+}
+
+// Get configuration by category
+defs getByCategory(const std::string& category) const {
+    std::vector<ConfigEntry> categoryEntries;
+    std::string categoryLower = toLower(category);
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find(categoryLower + ".") == 0) {
+            categoryEntries.push_back(entry);
+        }
+    }
+    
+    return categoryEntries;
+}
+
+// Get configuration statistics
+std::string Config::getStatistics() const {
+    std::ostringstream oss;
+    
+    oss << "Configuration Statistics:\n";
+    oss << "  Total entries: " << pImpl->entries.size() << "\n";
+    
+    // Count by source
+    std::map<ConfigSource, size_t> sourceCount;
+    for (const auto& entry : pImpl->entries) {
+        sourceCount[entry.source]++;
+    }
+    
+    oss << "  Entries by source:\n";
+    for (const auto& pair : sourceCount) {
+        oss << "    " << static_cast<int>(pair.first) << ": " << pair.second << "\n";
+    }
+    
+    // Count by data type
+    std::map<std::string, size_t> typeCount;
+    for (const auto& entry : pImpl->entries) {
+        std::string typeName;
+        if (std::holds_alternative<int>(entry.value)) {
+            typeName = "int";
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            typeName = "int64_t";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            typeName = "double";
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            typeName = "bool";
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            typeName = "string";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            typeName = "vector<int>";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            typeName = "vector<double>";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            typeName = "vector<string>";
+        }
+        
+        typeCount[typeName]++;
+    }
+    
+    oss << "  Entries by type:\n";
+    for (const auto& pair : typeCount) {
+        oss << "    " << pair.first << ": " << pair.second << "\n";
+    }
+    
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Add missing method implementations
+void Config::setDefault(const std::string& key, const ConfigValue& value) {
+    set(key, value, ConfigSource::Default);
+}
 
-} // namespace nlm
+void Config::setDefault(const std::string& key, const std::string& value) {
+    setDefault(key, ConfigValue(value));
+}
+
+void Config::setDefault(const std::string& key, int value) {
+    setDefault(key, ConfigValue(value));
+}
+
+void Config::setDefault(const std::string& key, double value) {
+    setDefault(key, ConfigValue(value));
+}
+
+void Config::setDefault(const std::string& key, bool value) {
+    setDefault(key, ConfigValue(value));
+}
+
+// Enhanced getOr method with default source detection
+void Config::setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Basic validation
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set configuration with empty key");
+        return;
+    }
+    
+    // Apply validation based on key prefix
+    std::string keyLower = toLower(key);
+    
+    if (keyLower.find("brain.neuron_count") == 0 && std::holds_alternative<size_t>(value)) {
+        size_t neurons = std::get<size_t>(value);
+        if (neurons <= 0) {
+            NLM_LOG_ERROR("brain.neuron_count must be positive");
+            return;
+        }
+    }
+    
+    if (keyLower.find("brain.connection_probability") == 0 && std::holds_alternative<double>(value)) {
+        double prob = std::get<double>(value);
+        if (prob < 0.0 || prob > 1.0) {
+            NLM_LOG_ERROR("brain.connection_probability must be between 0.0 and 1.0");
+            return;
+        }
+    }
+    
+    // If validation passes, set the value
+    set(key, value, source);
+}
+
+// Get configuration by section
+std::vector<ConfigEntry> Config::getSection(const std::string& section) const {
+    std::vector<ConfigEntry> sectionEntries;
+    std::string sectionLower = toLower(section);
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find(sectionLower + ".") == 0) {
+            sectionEntries.push_back(entry);
+        }
+    }
+    
+    return sectionEntries;
+}
+
+// Print configuration with formatting
+void Config::printConfig() const {
+    NLM_LOG_INFO("=== NLM Configuration ===");
+    NLM_LOG_INFO("Total entries: " + std::to_string(pImpl->entries.size()));
+    
+    // Group by source
+    std::map<ConfigSource, std::vector<ConfigEntry>> entriesBySource;
+    for (const auto& entry : pImpl->entries) {
+        entriesBySource[entry.source].push_back(entry);
+    }
+    
+    // Print each source group
+    for (const auto& pair : entriesBySource) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Source " + std::to_string(static_cast<int>(pair.first)) + ":");
+        
+        for (const auto& entry : pair.second) {
+            NLM_LOG_INFO("  " + entry.key + " = " + getConfigValueString(entry.value));
+        }
+    }
+}
+
+// Get configuration value as string
+std::string Config::getConfigValueString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << '"' << arg << '"';
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}

@@ -16,7 +16,7 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // TODO PHASE 6: Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -108,7 +108,7 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO PHASE 6: Implement real consolidation
 }
 
 // Semantic Memory Implementation
