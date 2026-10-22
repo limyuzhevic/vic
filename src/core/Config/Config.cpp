@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "json/JSONValue.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,9 +20,39 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Try to parse as JSON first
+    try {
+        return loadFromJSON(filepath);
+    } catch (const std::exception& e) {
+        // Fall back to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        json::JSONValue root = json::parseJSON(content);
+        return parseJSON(root);
+    } catch (const std::exception& e) {
+        // If JSON parsing fails, try the simple format
+        file.clear();
+        file.seekg(0, std::ios::beg);
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
