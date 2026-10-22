@@ -97,9 +97,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Internal file loading methods
+    bool loadFromFileSimple(const std::string& filepath);
 };
 
 } // namespace nlm

@@ -50,12 +50,12 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
-void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -66,17 +66,32 @@ void Neuron::setThreshold(MembranePotential threshold) {
     pImpl->state.threshold = threshold;
 }
 
-void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
 }
 
-void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
-    }
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
@@ -174,21 +189,57 @@ PlasticityFlags& Neuron::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
 
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
 }
 
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
 }
 
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
     bool fired = false;
     
     // Handle refractory period
