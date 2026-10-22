@@ -1,0 +1,862 @@
+# NLM - Visualization and Monitoring Tools
+
+"""
+Visualization and monitoring tools for NLM (Neural Learning Machine) simulations.
+
+This module provides comprehensive visualization capabilities for monitoring
+and analyzing NLM brain simulations, including real-time plotting, data
+collection, and result visualization.
+"""
+
+import pynlm
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib import gridspec
+import pandas as pd
+from typing import Dict, List, Any, Optional, Tuple, Callable, Union
+import json
+import time
+import threading
+from collections import deque
+import warnings
+import os
+import sys
+
+
+class NMLLiveMonitor:
+    """
+    Real-time monitoring of NLM simulation with live plotting.
+    
+    Provides real-time visualization of brain activity and agent behavior
+    during simulation execution.
+    """
+    
+    def __init__(self, update_interval: float = 0.1, max_history: int = 1000):
+        self.update_interval = update_interval
+        self.max_history = max_history
+        
+        # Data buffers
+        self.time_data = deque(maxlen=max_history)
+        self.firing_rate_data = deque(maxlen=max_history)
+        self.active_neurons_data = deque(maxlen=max_history)
+        self.curiosity_data = deque(maxlen=max_history)
+        self.novelty_data = deque(maxlen=max_history)
+        self.prediction_error_data = deque(maxlen=max_history)
+        self.dopamine_data = deque(maxlen=max_history)
+        
+        # World state
+        self.position_data = deque(maxlen=max_history)
+        self.energy_data = deque(maxlen=max_history)
+        self.age_data = deque(maxlen=max_history)
+        
+        # Simulation state
+        self.is_running = False
+        self.current_step = 0
+        self.start_time = 0
+        
+        # Callback system
+        self.callbacks = []
+        
+        # Plotting
+        self.fig = None
+        self.axes = None
+        self.animation_obj = None
+        
+        # Setup
+        self._setup_plotting()
+    
+    def _setup_plotting(self):
+        """Setup matplotlib plotting environment."""
+        try:
+            plt.style.use('seaborn-v0_8')
+            self.fig = plt.figure(figsize=(15, 10))
+            gs = gridspec.GridSpec(3, 4, hspace=0.3, wspace=0.3)
+            
+            # Main brain activity plots
+            self.axes = {
+                'firing_rate': plt.subplot(gs[0, :2]),
+                'active_neurons': plt.subplot(gs[0, 2:]),
+                'curiosity': plt.subplot(gs[1, :]),
+                'novelty': plt.subplot(gs[2, 0]),
+                'prediction_error': plt.subplot(gs[2, 1]),
+                'dopamine': plt.subplot(gs[2, 2]),
+                'position': plt.subplot(gs[2, 3]),
+            }
+            
+            # Setup individual plots
+            self._setup_individual_plots()
+            
+        except Exception as e:
+            print(f"Warning: Could not setup matplotlib plots: {e}")
+            self.fig = None
+            self.axes = None
+    
+    def _setup_individual_plots(self):
+        """Setup individual plot configurations."""
+        if not self.axes:
+            return
+        
+        # Firing rate plot
+        self.axes['firing_rate'].set_title('Average Firing Rate (Hz)')
+        self.axes['firing_rate'].set_xlabel('Time (s)')
+        self.axes['firing_rate'].set_ylabel('Firing Rate')
+        self.axes['firing_rate'].grid(True, alpha=0.3)
+        
+        # Active neurons plot
+        self.axes['active_neurons'].set_title('Active Neurons')
+        self.axes['active_neurons'].set_xlabel('Time (s)')
+        self.axes['active_neurons'].set_ylabel('Number of Neurons')
+        self.axes['active_neurons'].grid(True, alpha=0.3)
+        
+        # Neuromodulation plots
+        for key in ['curiosity', 'novelty', 'prediction_error', 'dopamine']:
+            self.axes[key].set_title(key.replace('_', ' ').title())
+            self.axes[key].set_xlabel('Time (s)')
+            self.axes[key].set_ylabel(key.replace('_', ' ').title())
+            self.axes[key].grid(True, alpha=0.3)
+        
+        # Position plot
+        self.axes['position'].set_title('Agent Position')
+        self.axes['position'].set_xlabel('X Position')
+        self.axes['position'].set_ylabel('Y Position')
+        self.axes['position'].grid(True, alpha=0.3)
+        self.axes['position'].set_xlim(0, 30)
+        self.axes['position'].set_ylim(0, 30)
+    
+    def start_monitoring(self, brain: pynlm.Brain, agent: pynlm.AgentBrain, 
+                        world: pynlm.SimpleWorld, callback: Callable = None):
+        """
+        Start real-time monitoring of simulation.
+        
+        Args:
+            brain: Brain object to monitor
+            agent: Agent object to monitor
+            world: World object to monitor
+            callback: Optional callback function called with monitoring data
+        """
+        if self.fig is None:
+            print("Warning: Cannot start monitoring without matplotlib")
+            return
+        
+        self.is_running = True
+        self.start_time = time.time()
+        self.current_step = 0
+        
+        if callback:
+            self.callbacks.append(callback)
+        
+        # Start monitoring thread
+        self.monitor_thread = threading.Thread(target=self._monitor_loop, 
+                                             args=(brain, agent, world))
+        self.monitor_thread.daemon = True
+        self.monitor_thread.start()
+        
+        # Show plot
+        plt.show()
+    
+    def _monitor_loop(self, brain: pynlm.Brain, agent: pynlm.AgentBrain, 
+                     world: pynlm.SimpleWorld):
+        """Main monitoring loop."""
+        while self.is_running:
+            try:
+                current_time = time.time() - self.start_time
+                
+                # Collect data
+                self.time_data.append(current_time)
+                self.firing_rate_data.append(brain.getAverageFiringRate())
+                self.active_neurons_data.append(brain.getActiveNeuronCount())
+                self.curiosity_data.append(agent.getCuriosityLevel())
+                self.novelty_data.append(agent.getNoveltyLevel())
+                self.prediction_error_data.append(agent.getPredictionError())
+                self.dopamine_data.append(agent.getNeuromodulationLevel())
+                
+                body = world.getAgentBody()
+                self.position_data.append((body.x, body.y))
+                self.energy_data.append(body.energy)
+                self.age_data.append(body.age)
+                
+                # Update plots
+                if self.fig is not None:
+                    self._update_plots(current_time)
+                
+                # Call callbacks
+                for callback in self.callbacks:
+                    try:
+                        callback({
+                            'time': current_time,
+                            'firing_rate': brain.getAverageFiringRate(),
+                            'active_neurons': brain.getActiveNeuronCount(),
+                            'curiosity': agent.getCuriosityLevel(),
+                            'novelty': agent.getNoveltyLevel(),
+                            'prediction_error': agent.getPredictionError(),
+                            'dopamine': agent.getNeuromodulationLevel(),
+                            'position': (body.x, body.y),
+                            'energy': body.energy,
+                            'age': body.age
+                        })
+                    except Exception as e:
+                        print(f"Callback error: {e}")
+                
+                self.current_step += 1
+                time.sleep(self.update_interval)
+                
+            except Exception as e:
+                print(f"Monitoring error: {e}")
+                time.sleep(1.0)  # Wait before retrying
+    
+    def _update_plots(self, current_time: float):
+        """Update all plots with current data."""
+        if not self.axes:
+            return
+        
+        try:
+            # Update firing rate plot
+            if len(self.firing_rate_data) > 1:
+                self.axes['firing_rate'].clear()
+                self.axes['firing_rate'].plot(self.time_data, self.firing_rate_data, 
+                                            'b-', linewidth=2, alpha=0.7)
+                self.axes['firing_rate'].set_title('Average Firing Rate (Hz)')
+                self.axes['firing_rate'].set_xlabel('Time (s)')
+                self.axes['firing_rate'].set_ylabel('Firing Rate')
+                self.axes['firing_rate'].grid(True, alpha=0.3)
+                
+                # Add current value indicator
+                self.axes['firing_rate'].axvline(x=current_time, color='r', alpha=0.5, linestyle='--')
+            
+            # Update active neurons plot
+            if len(self.active_neurons_data) > 1:
+                self.axes['active_neurons'].clear()
+                self.axes['active_neurons'].plot(self.time_data, self.active_neurons_data,
+                                                'g-', linewidth=2, alpha=0.7)
+                self.axes['active_neurons'].set_title('Active Neurons')
+                self.axes['active_neurons'].set_xlabel('Time (s)')
+                self.axes['active_neurons'].set_ylabel('Number of Neurons')
+                self.axes['active_neurons'].grid(True, alpha=0.3)
+                
+                self.axes['active_neurons'].axvline(x=current_time, color='r', alpha=0.5, linestyle='--')
+            
+            # Update neuromodulation plots
+            for key in ['curiosity', 'novelty', 'prediction_error', 'dopamine']:
+                data = getattr(self, f'{key}_data')
+                if len(data) > 1:
+                    self.axes[key].clear()
+                    color = self._get_color_for_metric(key)
+                    self.axes[key].plot(self.time_data, data, color=color, linewidth=2, alpha=0.7)
+                    self.axes[key].set_title(key.replace('_', ' ').title())
+                    self.axes[key].set_xlabel('Time (s)')
+                    self.axes[key].set_ylabel(key.replace('_', ' ').title())
+                    self.axes[key].grid(True, alpha=0.3)
+                    
+                    self.axes[key].axvline(x=current_time, color='r', alpha=0.5, linestyle='--')
+            
+            # Update position plot
+            if len(self.position_data) > 1:
+                self.axes['position'].clear()
+                positions = np.array(self.position_data)
+                self.axes['position'].scatter(positions[:, 0], positions[:, 1], 
+                                            c=range(len(positions)), cmap='viridis', 
+                                            s=20, alpha=0.7)
+                self.axes['position'].set_title('Agent Position')
+                self.axes['position'].set_xlabel('X Position')
+                self.axes['position'].set_ylabel('Y Position')
+                self.axes['position'].grid(True, alpha=0.3)
+                self.axes['position'].set_xlim(0, max(30, positions[:, 0].max() + 5))
+                self.axes['position'].set_ylim(0, max(30, positions[:, 1].max() + 5))
+                
+                # Mark current position
+                self.axes['position'].scatter(positions[-1, 0], positions[-1, 1], 
+                                            color='red', s=100, marker='x', linewidths=3)
+            
+            # Adjust layout and redraw
+            self.fig.tight_layout()
+            
+            if self.fig.canvas:
+                self.fig.canvas.draw_idle()
+                
+        except Exception as e:
+            print(f"Error updating plots: {e}")
+    
+    def _get_color_for_metric(self, metric_name: str) -> str:
+        """Get appropriate color for a metric."""
+        colors = {
+            'curiosity': '#FF6B6B',
+            'novelty': '#4ECDC4',
+            'prediction_error': '#45B7D1',
+            'dopamine': '#96CEB4'
+        }
+        return colors.get(metric_name, '#95A5A6')
+    
+    def stop_monitoring(self):
+        """Stop monitoring and close plots."""
+        self.is_running = False
+        if self.animation_obj:
+            self.animation_obj.event_source.stop()
+        plt.close('all')
+    
+    def get_data_dataframe(self) -> pd.DataFrame:
+        """
+        Get monitoring data as a pandas DataFrame.
+        
+        Returns:
+            pd.DataFrame: Monitoring data
+        """
+        data = {
+            'time': list(self.time_data),
+            'firing_rate': list(self.firing_rate_data),
+            'active_neurons': list(self.active_neurons_data),
+            'curiosity': list(self.curiosity_data),
+            'novelty': list(self.novelty_data),
+            'prediction_error': list(self.prediction_error_data),
+            'dopamine': list(self.dopamine_data),
+            'position_x': [pos[0] for pos in self.position_data],
+            'position_y': [pos[1] for pos in self.position_data],
+            'energy': list(self.energy_data),
+            'age': list(self.age_data)
+        }
+        return pd.DataFrame(data)
+
+
+class NMLDataVisualizer:
+    """
+    Comprehensive data visualization for NLM simulations.
+    
+    Provides multiple visualization modes including time series, scatter plots,
+    correlation matrices, and statistical analysis.
+    """
+    
+    def __init__(self, figsize: Tuple[int, int] = (12, 8)):
+        self.figsize = figsize
+        self.figures = {}
+        self.axes = {}
+    
+    def create_time_series_plot(self, data: Dict[str, List[float]], 
+                               title: str = "Time Series Visualization",
+                               ylabel: str = "Value",
+                               save_path: Optional[str] = None) -> plt.Figure:
+        """
+        Create time series plots for monitoring data.
+        
+        Args:
+            data: Dictionary of time series data
+            title: Plot title
+            ylabel: Y-axis label
+            save_path: Optional path to save the plot
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        fig, axes = plt.subplots(len(data), 1, figsize=self.figsize, sharex=True)
+        
+        if len(data) == 1:
+            axes = [axes]
+        
+        for i, (name, values) in enumerate(data.items()):
+            ax = axes[i]
+            ax.plot(values, linewidth=2, alpha=0.8)
+            ax.set_ylabel(name.replace('_', ' ').title())
+            ax.grid(True, alpha=0.3)
+            
+            # Add statistics text
+            if len(values) > 0:
+                mean_val = np.mean(values)
+                std_val = np.std(values)
+                min_val = np.min(values)
+                max_val = np.max(values)
+                
+                stats_text = f"Mean: {mean_val:.3f}\nStd: {std_val:.3f}\nMin: {min_val:.3f}\nMax: {max_val:.3f}"
+                ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+                       verticalalignment='top', bbox=dict(boxstyle='round', 
+                                                       facecolor='wheat', alpha=0.8))
+        
+        axes[-1].set_xlabel('Time Step')
+        fig.suptitle(title, fontsize=16)
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+    
+    def create_scatter_plot(self, x_data: List[float], y_data: List[float],
+                           title: str = "Scatter Plot",
+                           xlabel: str = "X",
+                           ylabel: str = "Y",
+                           save_path: Optional[str] = None,
+                           correlation_threshold: float = 0.5) -> plt.Figure:
+        """
+        Create scatter plot with correlation analysis.
+        
+        Args:
+            x_data: X-axis data
+            y_data: Y-axis data
+            title: Plot title
+            xlabel: X-axis label
+            ylabel: Y-axis label
+            save_path: Optional path to save the plot
+            correlation_threshold: Threshold for showing correlation text
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        # Calculate correlation
+        if len(x_data) > 1 and len(y_data) > 1:
+            correlation = np.corrcoef(x_data, y_data)[0, 1]
+        else:
+            correlation = 0.0
+        
+        # Plot scatter
+        ax.scatter(x_data, y_data, alpha=0.6, s=20, edgecolors='black', linewidth=0.5)
+        
+        # Add trend line if correlation is significant
+        if abs(correlation) > correlation_threshold:
+            z = np.polyfit(x_data, y_data, 1)
+            p = np.poly1d(z)
+            x_range = np.linspace(min(x_data), max(x_data), 100)
+            ax.plot(x_range, p(x_range), "r--", linewidth=2, alpha=0.8)
+        
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(f"{title} (Correlation: {correlation:.3f})")
+        ax.grid(True, alpha=0.3)
+        
+        # Add correlation text
+        textstr = f"Correlation: {correlation:.3f}\nN = {len(x_data)}"
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10,
+               verticalalignment='top', bbox=props)
+        
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+    
+    def create_correlation_matrix(self, data: Dict[str, List[float]],
+                                 title: str = "Correlation Matrix",
+                                 save_path: Optional[str] = None) -> plt.Figure:
+        """
+        Create correlation matrix for multiple time series.
+        
+        Args:
+            data: Dictionary of time series data
+            title: Plot title
+            save_path: Optional path to save the plot
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        # Convert to DataFrame and calculate correlation
+        df = pd.DataFrame(data)
+        correlation_matrix = df.corr()
+        
+        # Create heatmap
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        # Create heatmap
+        im = ax.imshow(correlation_matrix.values, cmap='RdBu', vmin=-1, vmax=1, aspect='auto')
+        
+        # Set ticks
+        ax.set_xticks(range(len(correlation_matrix.columns)))
+        ax.set_yticks(range(len(correlation_matrix.index)))
+        ax.set_xticklabels(correlation_matrix.columns)
+        ax.set_yticklabels(correlation_matrix.index)
+        
+        # Add colorbar
+        cbar = ax.figure.colorbar(im, ax=ax)
+        cbar.set_label('Correlation Coefficient')
+        
+        # Add correlation values
+        for i in range(len(correlation_matrix.index)):
+            for j in range(len(correlation_matrix.columns)):
+                text = ax.text(j, i, f"{correlation_matrix.iloc[i, j]:.2f}",
+                              ha="center", va="center", color="black", fontsize=8)
+        
+        ax.set_title(title)
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+    
+    def create_2d_projection(self, data: Dict[str, List[float]],
+                             title: str = "2D Projection",
+                             save_path: Optional[str] = None) -> plt.Figure:
+        """
+        Create 2D projection using principal component analysis.
+        
+        Args:
+            data: Dictionary of time series data
+            title: Plot title
+            save_path: Optional path to save the plot
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        try:
+            import sklearn
+            from sklearn.decomposition import PCA
+        except ImportError:
+            print("Warning: scikit-learn not available, skipping PCA plot")
+            return None
+        
+        # Convert to DataFrame and normalize
+        df = pd.DataFrame(data)
+        df_normalized = (df - df.mean()) / df.std()
+        
+        # Apply PCA
+        pca = PCA(n_components=2)
+        pca_result = pca.fit_transform(df_normalized)
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        scatter = ax.scatter(pca_result[:, 0], pca_result[:, 1], 
+                           c=range(len(pca_result)), cmap='viridis', 
+                           s=20, alpha=0.7)
+        
+        ax.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
+        ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+        
+        # Add colorbar
+        cbar = ax.figure.colorbar(scatter, ax=ax)
+        cbar.set_label('Time Step')
+        
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+    
+    def create_animation(self, data: Dict[str, List[float]],
+                        duration: float = 10.0,
+                        save_path: Optional[str] = None) -> animation.FuncAnimation:
+        """
+        Create animation of time series data.
+        
+        Args:
+            data: Dictionary of time series data
+            duration: Animation duration in seconds
+            save_path: Optional path to save the animation
+            
+        Returns:
+            animation.FuncAnimation: Matplotlib animation
+        """
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        # Initialize line objects
+        lines = {}
+        for i, (name, values) in enumerate(data.items()):
+            line, = ax.plot([], [], label=name.replace('_', ' ').title())
+            lines[name] = line
+        
+        ax.set_xlabel('Time Step')
+        ax.set_ylabel('Value')
+        ax.set_title('Live Animation')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        def init():
+            for line in lines.values():
+                line.set_data([], [])
+            return list(lines.values())
+        
+        def update(frame):
+            for i, (name, line) in enumerate(lines.items()):
+                xdata = list(range(min(frame + 1, len(data[name]))))
+                ydata = data[name][:frame + 1]
+                line.set_data(xdata, ydata)
+            return list(lines.values())
+        
+        # Calculate number of frames
+        max_length = max(len(v) for v in data.values()) if data else 0
+        fps = max_length / duration if duration > 0 else 10
+        
+        anim = animation.FuncAnimation(fig, update, init_func=init,
+                                     frames=max_length, duration=duration*1000,
+                                     blit=True, repeat=True)
+        
+        if save_path:
+            anim.save(save_path, writer='ffmpeg', fps=fps)
+        
+        return anim
+
+
+class NMLLogVisualizer:
+    """
+    Visualization of NML simulation logs.
+    
+    Provides tools for visualizing simulation logs, error logs,
+    and event logs for debugging and analysis.
+    """
+    
+    def __init__(self, log_file: Optional[str] = None):
+        self.log_file = log_file
+        self.event_log = []
+        self.error_log = []
+        self.warning_log = []
+        
+        if log_file and os.path.exists(log_file):
+            self._load_log_file(log_file)
+    
+    def _load_log_file(self, log_file: str):
+        """Load log file data."""
+        try:
+            with open(log_file, 'r') as f:
+                content = f.read()
+            
+            # Parse log entries (simplified parsing)
+            lines = content.split('\n')
+            for line in lines:
+                if 'ERROR' in line:
+                    self.error_log.append(line)
+                elif 'WARNING' in line:
+                    self.warning_log.append(line)
+                elif 'INFO' in line:
+                    self.event_log.append(line)
+                    
+        except Exception as e:
+            print(f"Error loading log file: {e}")
+    
+    def create_error_timeline(self, title: str = "Error Timeline",
+                            save_path: Optional[str] = None) -> plt.Figure:
+        """
+        Create timeline of errors.
+        
+        Args:
+            title: Plot title
+            save_path: Optional path to save the plot
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        # Create horizontal bar chart for errors
+        if self.error_log:
+            # Extract error timestamps (simplified)
+            error_times = list(range(len(self.error_log)))
+            ax.barh(error_times, [1] * len(error_times), alpha=0.7, color='red')
+            ax.set_yticks(error_times)
+            ax.set_yticklabels([f"Error {i+1}" for i in error_times])
+            ax.set_xlabel('Time')
+            ax.set_title(title)
+            ax.grid(True, alpha=0.3)
+        
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+    
+    def create_log_statistics(self, title: str = "Log Statistics",
+                            save_path: Optional[str] = None) -> plt.Figure:
+        """
+        Create statistics of log entries.
+        
+        Args:
+            title: Plot title
+            save_path: Optional path to save the plot
+            
+        Returns:
+            plt.Figure: Matplotlib figure
+        """
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # Log counts
+        log_counts = {
+            'Errors': len(self.error_log),
+            'Warnings': len(self.warning_log),
+            'Events': len(self.event_log)
+        }
+        
+        # Bar chart
+        bars = ax1.bar(log_counts.keys(), log_counts.values(), 
+                      color=['red', 'orange', 'green'], alpha=0.7)
+        ax1.set_title('Log Entry Counts')
+        ax1.set_ylabel('Count')
+        ax1.grid(True, alpha=0.3)
+        
+        # Add count labels on bars
+        for bar, count in zip(bars, log_counts.values()):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
+                    str(count), ha='center', va='bottom')
+        
+        # Timeline of log entries
+        total_logs = len(self.error_log) + len(self.warning_log) + len(self.event_log)
+        if total_logs > 0:
+            timeline_data = []
+            for i, log in enumerate(self.error_log + self.warning_log + self.event_log):
+                timeline_data.append({
+                    'time': i,
+                    'type': 'Error' if i < len(self.error_log) else 
+                           ('Warning' if i < len(self.error_log) + len(self.warning_log) else 'Info'),
+                    'count': 1
+                })
+            
+            # Create stacked bar chart
+            error_counts = [1] * len(self.error_log)
+            warning_counts = [1] * len(self.warning_log)
+            event_counts = [1] * len(self.event_log)
+            
+            ax2.bar(range(len(error_counts)), error_counts, alpha=0.7, color='red', label='Errors')
+            ax2.bar(range(len(error_counts)), warning_counts, alpha=0.7, color='orange', 
+                   bottom=error_counts, label='Warnings')
+            ax2.bar(range(len(error_counts)), event_counts, alpha=0.7, color='green', 
+                   bottom=np.array(error_counts) + np.array(warning_counts), label='Events')
+            
+            ax2.set_title('Log Timeline')
+            ax2.set_xlabel('Entry Number')
+            ax2.set_ylabel('Count')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+        
+        fig.suptitle(title, fontsize=16)
+        fig.tight_layout()
+        
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
+
+
+class NMLExperimentRecorder:
+    """
+    Records and analyzes NML experiments for reproducibility.
+    
+    Provides tools for recording experiment configurations,
+    results, and visualization of experimental outcomes.
+    """
+    
+    def __init__(self, experiment_name: str, description: str = ""):
+        self.experiment_name = experiment_name
+        self.description = description
+        self.start_time = time.time()
+        self.end_time = None
+        self.config = None
+        self.results = {}
+        self.parameters = {}
+        self.data = {}
+        
+        # Create experiment directory
+        self.experiment_dir = f"experiments/{experiment_name}"
+        os.makedirs(self.experiment_dir, exist_ok=True)
+    
+    def set_config(self, config: Any):
+        """Set experiment configuration."""
+        self.config = config
+    
+    def set_parameters(self, parameters: Dict):
+        """Set experiment parameters."""
+        self.parameters = parameters
+    
+    def record_result(self, name: str, value: Any):
+        """Record a single result."""
+        self.results[name] = value
+    
+    def record_data(self, name: str, data: Any):
+        """Record experimental data."""
+        self.data[name] = data
+    
+    def end_experiment(self):
+        """End the experiment and save results."""
+        self.end_time = time.time()
+        self._save_experiment()
+    
+    def _save_experiment(self):
+        """Save experiment data to files."""
+        # Save configuration
+        if self.config:
+            config_path = os.path.join(self.experiment_dir, "config.json")
+            with open(config_path, 'w') as f:
+                # Convert config to serializable format
+                config_dict = {}
+                if hasattr(self.config, '__dict__'):
+                    for key, value in self.config.__dict__.items():
+                        if not key.startswith('_'):
+                            try:
+                                config_dict[key] = str(value)
+                            except:
+                                pass
+                json.dump(config_dict, f, indent=2)
+        
+        # Save parameters
+        params_path = os.path.join(self.experiment_dir, "parameters.json")
+        with open(params_path, 'w') as f:
+            json.dump(self.parameters, f, indent=2)
+        
+        # Save results
+        results_path = os.path.join(self.experiment_dir, "results.json")
+        with open(results_path, 'w') as f:
+            json.dump(self.results, f, indent=2)
+        
+        # Save metadata
+        metadata = {
+            'name': self.experiment_name,
+            'description': self.description,
+            'start_time': self.start_time,
+            'end_time': self.end_time,
+            'duration': self.end_time - self.start_time if self.end_time else None,
+            'parameters_count': len(self.parameters),
+            'results_count': len(self.results),
+            'data_count': len(self.data)
+        }
+        
+        metadata_path = os.path.join(self.experiment_dir, "metadata.json")
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        # Generate summary plot if data available
+        if self.data:
+            self._generate_summary_plot()
+    
+    def _generate_summary_plot(self):
+        """Generate summary plot for experiment data."""
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        axes = axes.flatten()
+        
+        # Plot each dataset
+        for i, (name, data) in enumerate(self.data.items()):
+            if i >= len(axes):
+                break
+                
+            ax = axes[i]
+            if isinstance(data, dict):
+                for key, values in data.items():
+                    if isinstance(values, list):
+                        ax.plot(values, label=key)
+            elif isinstance(data, list):
+                ax.plot(data, label=name)
+            
+            ax.set_title(name)
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+        
+        # Hide unused subplots
+        for i in range(len(self.data), len(axes)):
+            axes[i].set_visible(False)
+        
+        fig.suptitle(f"Experiment Summary: {self.experiment_name}", fontsize=16)
+        fig.tight_layout()
+        
+        # Save plot
+        plot_path = os.path.join(self.experiment_dir, "summary_plot.png")
+        fig.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+
+# Export all classes and functions
+__all__ = [
+    'NMLLiveMonitor',
+    'NMLDataVisualizer', 
+    'NMLLogVisualizer',
+    'NMLExperimentRecorder'
+]

@@ -1,0 +1,549 @@
+#!/usr/bin/env python3
+"""
+NLM - Convenience utilities and helper functions for easier use.
+
+This module provides high-level convenience functions to make working with
+NLM easier, especially for beginners and for common use cases.
+"""
+
+import pynlm
+import time
+import numpy as np
+from typing import Optional, Callable, List, Dict, Any
+import threading
+import json
+import os
+
+# Try to import the C++ convenience functions, fall back to Python implementation
+pynlm_convenience_available = False
+try:
+    # Try to import convenience functions from the C++ bindings
+    # This will work if the C++ module exports these functions
+    import importlib.util
+    spec = importlib.util.find_spec("pynlm_convenience")
+    if spec is not None:
+        import pynlm_convenience
+        pynlm_convenience_available = True
+except ImportError:
+    pass
+
+if not pynlm_convenience_available:
+    # Define convenience functions in Python (fallback implementation)
+
+    def create_standard_agent(config: Optional[pynlm.Config] = None, 
+                              world_size: tuple = (20, 20),
+                              vision_size: tuple = (8, 8)):
+        """
+        Create a standard agent setup for most use cases.
+        
+        This is a convenience function that creates all the necessary components
+        for a typical agent in a world with vision.
+        
+        Args:
+            config: Optional NLM configuration. If None, creates default.
+            world_size: (width, height) of the world.
+            vision_size: (width, height) of the agent's vision field of view.
+            
+        Returns:
+            tuple: (brain, agent, world) configured for standard agent behavior.
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> brain.initialize()
+            >>> agent.initialize(world)
+            >>> for i in range(100):
+            ...     world.update(0.1)
+            ...     percept = world.getSensoryPercept()
+            ...     agent.processSensoryInput(percept)
+            ...     brain.step(i)
+            ...     action = agent.decodeMotorCommand()
+            ...     world.applyMotorCommand(action, world.getSimulationTime())
+        """
+        if config is None:
+            config = pynlm.createDefaultConfig()
+        
+        # Configure the brain
+        config.set("neuron_count", 2000)
+        config.set("region_count", 2)
+        config.set("connection_probability", 0.05)
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(
+            width=world_size[0],
+            height=world_size[1],
+            visionWidth=vision_size[0],
+            visionHeight=vision_size[1]
+        )
+        world.reset()
+        
+        # Create agent
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        return brain, agent, world
+
+    def run_agent_simulation(world, agent, brain, steps: int = 1000,
+                            verbose: bool = False,
+                            callback: Optional[Callable] = None):
+        """
+        Run a complete agent simulation with the given components.
+        
+        This is a convenience function that encapsulates the complete
+        simulation loop for easy use.
+        
+        Args:
+            world: The world instance
+            agent: The agent instance
+            brain: The brain instance
+            steps: Number of simulation steps to run
+            verbose: If True, print progress information
+            callback: Optional callback function called every n steps
+            
+        Returns:
+            dict: Statistics collected during simulation
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> stats = run_agent_simulation(world, agent, brain, steps=500, verbose=True)
+            >>> print(f"Total spikes: {stats['total_spikes']}")
+        """
+        stats = {
+            'total_spikes': 0,
+            'max_firing_rate': 0.0,
+            'min_firing_rate': float('inf'),
+            'average_firing_rate': 0.0,
+            'episodes': 0,
+            'curiosity_levels': [],
+            'novelty_levels': [],
+            'prediction_errors': []
+        }
+        
+        for step in range(steps):
+            # Update world
+            world.update(0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Step brain
+            brain.step(step)
+            
+            # Get motor command
+            action = agent.decodeMotorCommand()
+            
+            # Apply action in world
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Collect statistics
+            stats['total_spikes'] += brain.getFiringNeuronCount()
+            firing_rate = brain.getAverageFiringRate()
+            stats['max_firing_rate'] = max(stats['max_firing_rate'], firing_rate)
+            stats['min_firing_rate'] = min(stats['min_firing_rate'], firing_rate)
+            
+            # Collect neuromodulation stats
+            stats['curiosity_levels'].append(agent.getCuriosityLevel())
+            stats['novelty_levels'].append(agent.getNoveltyLevel())
+            stats['prediction_errors'].append(agent.getPredictionError())
+            
+            # Increment episodes periodically
+            if step % 100 == 0:
+                stats['episodes'] += 1
+            
+            # Call callback if provided
+            if callback and step % 100 == 0:
+                callback(step, stats)
+            
+            # Print progress if verbose
+            if verbose and step % 100 == 0:
+                print(f"Step {step}: "
+                      f"Firing rate: {firing_rate:.2f}, "
+                      f"Curiosity: {agent.getCuriosityLevel():.2f}, "
+                      f"Novelty: {agent.getNoveltyLevel():.2f}, "
+                      f"Pred Error: {agent.getPredictionError():.2f}")
+        
+        # Calculate final statistics
+        num_steps = steps
+        stats['average_firing_rate'] = stats['total_spikes'] / num_steps if num_steps > 0 else 0.0
+        if stats['min_firing_rate'] == float('inf'):
+            stats['min_firing_rate'] = 0.0
+        
+        return stats
+
+    def create_training_episode(brain, agent, world, max_steps: int = 1000,
+                               curiosity_enabled: bool = True,
+                               reward_modulation: bool = True):
+        """
+        Create and run a single training episode.
+        
+        This function manages a complete training episode with proper
+        initialization, cleanup, and statistics tracking.
+        
+        Args:
+            brain: The brain instance
+            agent: The agent instance  
+            world: The world instance
+            max_steps: Maximum number of steps for the episode
+            curiosity_enabled: Whether to enable curiosity-based exploration
+            reward_modulation: Whether to enable reward modulation
+            
+        Returns:
+            dict: Episode statistics
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> brain.initialize()
+            >>> agent.initialize(world)
+            >>> agent.enableCuriosity(True)
+            >>> agent.enableRewardModulation(True)
+            >>> episode_stats = create_training_episode(brain, agent, world, max_steps=500)
+            >>> print(f"Episode completed with {episode_stats['steps']} steps")
+        """
+        # Enable features
+        agent.enableCuriosity(curiosity_enabled)
+        agent.enableRewardModulation(reward_modulation)
+        
+        # Reset all components
+        brain.reset()
+        agent.reset()
+        world.reset()
+        
+        # Initialize
+        brain.initialize()
+        agent.initialize(world)
+        
+        episode_stats = {
+            'steps': 0,
+            'total_spikes': 0,
+            'max_curiosity': 0.0,
+            'max_novelty': 0.0,
+            'total_reward': 0.0,
+            'learning_events': 0,
+            'successful_actions': 0
+        }
+        
+        for step in range(max_steps):
+            # Update world
+            world.update(0.1)
+            
+            # Get sensory percept
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Step brain
+            brain.step(step)
+            
+            # Decode motor command
+            action = agent.decodeMotorCommand()
+            
+            # Apply action in world
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            # Apply reward modulation (simplified reward)
+            reward = 0.0
+            if action != pynlm.MotorCommand.Wait:
+                reward = 0.1  # Small positive reward for action
+                episode_stats['successful_actions'] += 1
+            
+            agent.applyRewardModulation(reward, agent.getPredictionError())
+            
+            # Track statistics
+            episode_stats['steps'] += 1
+            episode_stats['total_spikes'] += brain.getFiringNeuronCount()
+            episode_stats['max_curiosity'] = max(episode_stats['max_curiosity'], 
+                                                agent.getCuriosityLevel())
+            episode_stats['max_novelty'] = max(episode_stats['max_novelty'], 
+                                              agent.getNoveltyLevel())
+            episode_stats['total_reward'] += reward
+            
+            # Check for learning events (significant changes)
+            if (agent.getCuriosityLevel() > 0.7 or 
+                agent.getNoveltyLevel() > 0.7 or
+                abs(agent.getPredictionError()) > 0.5):
+                episode_stats['learning_events'] += 1
+        
+        return episode_stats
+
+    def create_behavioral_experiment(brain, world, agent, trials: int = 10,
+                                    steps_per_trial: int = 100):
+        """
+        Run a behavioral experiment with consistent conditions.
+        
+        This function creates a controlled experimental setup where the
+        agent interacts with a predictable environment across multiple trials.
+        
+        Args:
+            brain: The brain instance
+            agent: The agent instance
+            world: The world instance
+            trials: Number of experimental trials
+            steps_per_trial: Number of steps per trial
+            
+        Returns:
+            dict: Experimental results with performance metrics per trial
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> results = create_behavioral_experiment(brain, world, agent, trials=5)
+            >>> for i, trial_data in enumerate(results['trials']):
+            ...     print(f"Trial {i+1}: Success rate = {trial_data['success_rate']:.2%}")
+        """
+        results = {
+            'trials': [],
+            'overall_success_rate': 0.0,
+            'overall_average_movement': 0.0,
+            'trial_count': trials
+        }
+        
+        for trial in range(trials):
+            trial_stats = {
+                'trial': trial + 1,
+                'steps_taken': 0,
+                'successful_actions': 0,
+                'total_rewards': 0.0,
+                'final_position': (0, 0),
+                'learning_moments': 0
+            }
+            
+            # Reset and initialize
+            brain.reset()
+            agent.reset()
+            world.reset()
+            brain.initialize()
+            agent.initialize(world)
+            
+            for step in range(steps_per_trial):
+                # Update world
+                world.update(0.1)
+                
+                # Get sensory input
+                percept = world.getSensoryPercept()
+                
+                # Process sensory input
+                agent.processSensoryInput(percept)
+                
+                # Step brain
+                brain.step(step)
+                
+                # Get and apply action
+                action = agent.decodeMotorCommand()
+                world.applyMotorCommand(action, world.getSimulationTime())
+                
+                # Track trial statistics
+                trial_stats['steps_taken'] += 1
+                if action != pynlm.MotorCommand.Wait:
+                    trial_stats['successful_actions'] += 1
+                    trial_stats['total_rewards'] += 0.1
+                
+                # Track learning moments
+                if (agent.getCuriosityLevel() > 0.5 or 
+                    agent.getNoveltyLevel() > 0.5):
+                    trial_stats['learning_moments'] += 1
+            
+            # Calculate success rate
+            trial_stats['success_rate'] = (
+                trial_stats['successful_actions'] / trial_stats['steps_taken']
+                if trial_stats['steps_taken'] > 0 else 0.0
+            )
+            
+            results['trials'].append(trial_stats)
+        
+        # Calculate overall statistics
+        total_successes = sum(t['successful_actions'] for t in results['trials'])
+        total_steps = sum(t['steps_taken'] for t in results['trials'])
+        results['overall_success_rate'] = (
+            total_successes / total_steps if total_steps > 0 else 0.0
+        )
+        
+        # Calculate average movement (non-wait actions)
+        total_movements = sum(1 for t in results['trials'] 
+                             if any(cmd != pynlm.MotorCommand.Wait 
+                                   for cmd in [pynlm.MotorCommand.MoveForward,
+                                             pynlm.MotorCommand.MoveBackward,
+                                             pynlm.MotorCommand.TurnLeft,
+                                             pynlm.MotorCommand.TurnRight]))
+        results['overall_average_movement'] = total_movements / trials
+        
+        return results
+
+    def create_visualization_data(brain, agent, world, duration: float = 10.0,
+                                 interval: float = 0.1):
+        """
+        Collect visualization data for brain activity and agent behavior.
+        
+        This function collects comprehensive data that can be used for
+        visualization, analysis, or machine learning.
+        
+        Args:
+            brain: The brain instance
+            agent: The agent instance
+            world: The world instance
+            duration: Total simulation time in seconds
+            interval: Sampling interval in seconds
+            
+        Returns:
+            dict: Time-series data for visualization
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> data = create_visualization_data(brain, agent, world, duration=5.0)
+            >>> import matplotlib.pyplot as plt
+            >>> plt.plot(data['time'], data['firing_rate'])
+            >>> plt.show()
+        """
+        num_samples = int(duration / interval)
+        
+        # Initialize data structures
+        visualization_data = {
+            'time': [],
+            'firing_rate': [],
+            'active_neurons': [],
+            'curiosity_level': [],
+            'novelty_level': [],
+            'prediction_error': [],
+            'dopamine_level': [],
+            'world_position': [],
+            'world_energy': []
+        }
+        
+        for i in range(num_samples):
+            current_time = i * interval
+            
+            # Update world
+            world.update(interval)
+            
+            # Get current percept
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Step brain
+            brain.step(i)
+            
+            # Get agent state
+            action = agent.decodeMotorCommand()
+            
+            # Collect data
+            visualization_data['time'].append(current_time)
+            visualization_data['firing_rate'].append(brain.getAverageFiringRate())
+            visualization_data['active_neurons'].append(brain.getActiveNeuronCount())
+            visualization_data['curiosity_level'].append(agent.getCuriosityLevel())
+            visualization_data['novelty_level'].append(agent.getNoveltyLevel())
+            visualization_data['prediction_error'].append(agent.getPredictionError())
+            visualization_data['dopamine_level'].append(agent.getNeuromodulationLevel())
+            
+            # Get world state
+            body = world.getAgentBody()
+            visualization_data['world_position'].append((body.x, body.y))
+            visualization_data['world_energy'].append(body.energy)
+            
+            # Update development
+            agent.updateDevelopment(interval)
+        
+        return visualization_data
+
+    def load_experiment_config(filepath: str) -> pynlm.Config:
+        """
+        Load experiment configuration from a JSON file.
+        
+        This convenience function loads configuration settings from a
+        JSON file and creates an appropriate NLM configuration.
+        
+        Args:
+            filepath: Path to the JSON configuration file
+            
+        Returns:
+            pynlm.Config: Configured NLM configuration
+            
+        Example:
+            >>> config = load_experiment_config("my_config.json")
+            >>> brain = pynlm.createBrain(config)
+            
+        File format example (my_config.json):
+            {
+                "neuron_count": 3000,
+                "region_count": 3,
+                "connection_probability": 0.03,
+                "simulation_timestep": 0.001,
+                "random_seed": 42
+            }
+        """
+        with open(filepath, 'r') as f:
+            config_data = json.load(f)
+        
+        config = pynlm.createDefaultConfig()
+        
+        # Map common configuration keys to NLM config
+        config_mapping = {
+            'neuron_count': lambda v: config.set("neuron_count", v),
+            'region_count': lambda v: config.set("region_count", v),
+            'connection_probability': lambda v: config.set("connection_probability", v),
+            'simulation_timestep': lambda v: config.set("simulation_timestep", v),
+            'random_seed': lambda v: config.set("random_seed", v),
+            'stdp_ltp_weight': lambda v: config.set("stdp_ltp_weight", v),
+            'stdp_ltd_weight': lambda v: config.set("stdp_ltd_weight", v),
+            'stdp_tau': lambda v: config.set("stdp_tau", v),
+            'synaptogenesis_rate': lambda v: config.set("synaptogenesis_rate", v),
+            'pruning_rate': lambda v: config.set("pruning_rate", v),
+            'replay_interval': lambda v: config.set("replay_interval", v),
+            'consolidation_interval': lambda v: config.set("consolidation_interval", v)
+        }
+        
+        for key, setter in config_mapping.items():
+            if key in config_data:
+                setter(config_data[key])
+        
+        return config
+
+    def save_experiment_results(results: dict, filepath: str):
+        """
+        Save experiment results to a JSON file.
+        
+        This function saves the results of experiment runs in a structured
+        format that can be easily analyzed or visualized.
+        
+        Args:
+            results: Dictionary containing experiment results
+            filepath: Path to save the results JSON file
+            
+        Example:
+            >>> brain, agent, world = create_standard_agent()
+            >>> stats = run_agent_simulation(world, agent, brain, steps=1000)
+            >>> save_experiment_results(stats, "experiment_results.json")
+        """
+        with open(filepath, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+        
+        print(f"Results saved to {filepath}")
+
+
+# High-level convenience functions
+__all__ = [
+    'create_standard_agent',
+    'run_agent_simulation',
+    'create_training_episode',
+    'create_behavioral_experiment',
+    'create_visualization_data',
+    'load_experiment_config',
+    'save_experiment_results'
+]
+
+# Add helpful aliases
+agent_factory = create_standard_agent
+run_simulation = run_agent_simulation
+create_episode = create_training_episode
+create_experiment = create_behavioral_experiment
+collect_data = create_visualization_data

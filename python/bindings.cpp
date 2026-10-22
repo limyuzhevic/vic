@@ -416,10 +416,203 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Convenience functions
+    m.def("create_standard_agent", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            config = std::make_shared<Config>();
+            config->set("neuron_count", 2000);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.05);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("config") = nullptr, "Create a standard agent setup with brain, agent, and world");
+
+    m.def("run_simulation", [](std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent,
+                               std::shared_ptr<Brain> brain,
+                               size_t steps) {
+        size_t total_spikes = 0;
+        float max_firing_rate = 0.0f;
+        float min_firing_rate = std::numeric_limits<float>::infinity();
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            total_spikes += brain->getFiringNeuronCount();
+            float firing_rate = brain->getAverageFiringRate();
+            max_firing_rate = std::max(max_firing_rate, firing_rate);
+            min_firing_rate = std::min(min_firing_rate, firing_rate);
+        }
+        
+        if (min_firing_rate == std::numeric_limits<float>::infinity()) {
+            min_firing_rate = 0.0f;
+        }
+        
+        py::dict stats;
+        stats["total_spikes"] = total_spikes;
+        stats["max_firing_rate"] = max_firing_rate;
+        stats["min_firing_rate"] = min_firing_rate;
+        stats["average_firing_rate"] = total_spikes / steps;
+        
+        return stats;
+    }, py::arg("world"), py::arg("agent"), py::arg("brain"), py::arg("steps"), "Run a complete simulation loop");
+
+    m.def("create_episode", [](std::shared_ptr<Brain> brain,
+                              std::shared_ptr<AgentBrain> agent,
+                              std::shared_ptr<SimpleWorld> world,
+                              size_t max_steps) {
+        // Reset all components
+        brain->reset();
+        agent->reset();
+        world->reset();
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        py::dict episode_stats;
+        episode_stats["steps"] = 0;
+        episode_stats["total_spikes"] = 0;
+        episode_stats["max_curiosity"] = 0.0f;
+        episode_stats["max_novelty"] = 0.0f;
+        episode_stats["total_reward"] = 0.0f;
+        episode_stats["learning_events"] = 0;
+        episode_stats["successful_actions"] = 0;
+        
+        for (size_t step = 0; step < max_steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            agent->updateDevelopment(0.1);
+            
+            float reward = 0.0f;
+            if (action != MotorCommand::Wait) {
+                reward = 0.1f;
+                episode_stats["successful_actions"] += 1;
+            }
+            
+            agent->applyRewardModulation(reward, agent->getPredictionError());
+            
+            episode_stats["steps"] = step + 1;
+            episode_stats["total_spikes"] += brain->getFiringNeuronCount();
+            episode_stats["max_curiosity"] = std::max(episode_stats["max_curiosity"].cast<float>(), agent->getCuriosityLevel());
+            episode_stats["max_novelty"] = std::max(episode_stats["max_novelty"].cast<float>(), agent->getNoveltyLevel());
+            episode_stats["total_reward"] += reward;
+            
+            if (agent->getCuriosityLevel() > 0.7f || agent->getNoveltyLevel() > 0.7f || std::abs(agent->getPredictionError()) > 0.5f) {
+                episode_stats["learning_events"] = episode_stats["learning_events"].cast<int>() + 1;
+            }
+        }
+        
+        return episode_stats;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("max_steps"), "Run a single training episode");
+
+    // Enhanced error handling function
+    m.def("validate_brain", [](std::shared_ptr<Brain> brain) {
+        py::dict validation_results;
+        validation_results["valid"] = true;
+        validation_results["warnings"] = py::list();
+        
+        // Check for basic sanity
+        if (brain->getTotalNeuronCount() == 0) {
+            validation_results["valid"] = false;
+            validation_results["warnings"].attr("append")("Brain has no neurons");
+        }
+        
+        if (brain->getTotalSynapseCount() == 0) {
+            validation_results["warnings"].attr("append")("Brain has no synapses");
+        }
+        
+        // Check developmental stage consistency
+        auto dev_stage = brain->getDevelopmentalStage();
+        auto spike_system = brain->getSpikeSystem();
+        if (spike_system && spike_system->getPendingSpikeCount() > 1000) {
+            validation_results["warnings"].attr("append")("High spike backlog detected");
+        }
+        
+        return validation_results;
+    }, py::arg("brain"), "Validate brain state and return validation results");
+
+    m.def("export_data", [](std::shared_ptr<Brain> brain,
+                           std::shared_ptr<AgentBrain> agent,
+                           std::shared_ptr<SimpleWorld> world,
+                           size_t num_samples,
+                           float interval) {
+        py::list time_series;
+        
+        for (size_t i = 0; i < num_samples; ++i) {
+            float current_time = i * interval;
+            
+            world->update(interval);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(i);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            auto data_point = py::dict();
+            data_point["time"] = current_time;
+            data_point["firing_rate"] = brain->getAverageFiringRate();
+            data_point["active_neurons"] = brain->getActiveNeuronCount();
+            data_point["curiosity"] = agent->getCuriosityLevel();
+            data_point["novelty"] = agent->getNoveltyLevel();
+            data_point["prediction_error"] = agent->getPredictionError();
+            data_point["dopamine"] = agent->getNeuromodulationLevel();
+            
+            auto body = world->getAgentBody();
+            data_point["position"] = py::make_tuple(body.x, body.y);
+            data_point["energy"] = body.energy;
+            data_point["age"] = body.age;
+            
+            time_series.append(data_point);
+            
+            agent->updateDevelopment(interval);
+        }
+        
+        return time_series;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_samples"), py::arg("interval"), "Collect time series data for analysis");
+
+    // Constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Module version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    m.attr("__description__") = "Neural Learning Machine (NLM) - Python bindings for neural simulation";
 }
 
 } // namespace nlm

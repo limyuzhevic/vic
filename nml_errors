@@ -1,0 +1,678 @@
+# NLM - Error Handling and Validation
+
+"""
+Comprehensive error handling and validation for NLM (Neural Learning Machine).
+
+This module provides robust error handling, validation, and debugging tools
+to help users identify and fix issues in their NLM simulations.
+"""
+
+import pynlm
+import numpy as np
+from typing import Dict, List, Any, Optional, Callable, Union
+import warnings
+import traceback
+import time
+
+
+class NLMError(Exception):
+    """Base exception class for NLM errors."""
+    def __init__(self, message: str, error_type: str = "NLMError", details: Dict = None):
+        super().__init__(message)
+        self.message = message
+        self.error_type = error_type
+        self.details = details or {}
+        self.timestamp = time.time()
+
+
+class ValidationError(NLMError):
+    """Error raised when validation fails."""
+    def __init__(self, message: str, details: Dict = None):
+        super().__init__(message, "ValidationError", details)
+
+
+class SimulationError(NLMError):
+    """Error raised during simulation."""
+    def __init__(self, message: str, details: Dict = None):
+        super().__init__(message, "SimulationError", details)
+
+
+class ConfigurationError(NLMError):
+    """Error raised when configuration is invalid."""
+    def __init__(self, message: str, details: Dict = None):
+        super().__init__(message, "ConfigurationError", details)
+
+
+class NMLError(Exception):
+    """Legacy alias for backward compatibility."""
+    pass
+
+
+class BrainValidator:
+    """
+    Validates brain state and health.
+    
+    Provides comprehensive validation of brain components,
+    checking for common issues and potential problems.
+    """
+    
+    def __init__(self, brain: pynlm.Brain):
+        self.brain = brain
+        self.validation_results = {
+            'valid': True,
+            'warnings': [],
+            'errors': [],
+            'checks': {}
+        }
+    
+    def validate_all(self) -> Dict:
+        """
+        Run all validation checks.
+        
+        Returns:
+            dict: Validation results containing all check results
+        """
+        self._reset_results()
+        
+        # Run all validation checks
+        self._check_neuron_counts()
+        self._check_synaptic_connectivity()
+        self._check_membrane_potentials()
+        self._check_spike_processing()
+        self._check_memory_systems()
+        self._check_neuromodulation()
+        self._check_development()
+        self._check_plasticity_systems()
+        self._check_integration_state()
+        
+        # Determine overall validity
+        self.validation_results['valid'] = len(self.validation_results['errors']) == 0
+        
+        return self.validation_results.copy()
+    
+    def _reset_results(self):
+        """Reset validation results."""
+        self.validation_results = {
+            'valid': True,
+            'warnings': [],
+            'errors': [],
+            'checks': {}
+        }
+    
+    def _check_neuron_counts(self):
+        """Check neuron counts and distributions."""
+        total_neurons = self.brain.getTotalNeuronCount()
+        self.validation_results['checks']['neuron_counts'] = {
+            'total': total_neurons,
+            'active': self.brain.getActiveNeuronCount(),
+            'firing': self.brain.getFiringNeuronCount(),
+            'avg_firing_rate': self.brain.getAverageFiringRate()
+        }
+        
+        if total_neurons == 0:
+            self.validation_results['errors'].append("Brain has no neurons")
+            self.validation_results['valid'] = False
+        elif total_neurons < 100:
+            self.validation_results['warnings'].append("Very low neuron count may not produce meaningful dynamics")
+        
+        # Check firing rate balance
+        firing_rate = self.brain.getAverageFiringRate()
+        if firing_rate > 10.0:
+            self.validation_results['warnings'].append("High firing rate (>10 Hz) may indicate instability")
+        elif firing_rate < 0.01 and self.brain.getFiringNeuronCount() > 0:
+            self.validation_results['warnings'].append("Low firing rate may indicate insufficient excitation")
+    
+    def _check_synaptic_connectivity(self):
+        """Check synaptic connectivity and weights."""
+        total_synapses = self.brain.getTotalSynapseCount()
+        self.validation_results['checks']['synaptic_connectivity'] = {
+            'total': total_synapses,
+            'e_i_ratio': self.brain.getExcitationInhibitionRatio()
+        }
+        
+        if total_synapses == 0:
+            self.validation_results['warnings'].append("No synapses present - network cannot transmit signals")
+        
+        ei_ratio = self.brain.getExcitationInhibitionRatio()
+        if ei_ratio < 0.1:
+            self.validation_results['warnings'].append("Very low E/I ratio may indicate excessive inhibition")
+        elif ei_ratio > 10.0:
+            self.validation_results['warnings'].append("Very high E/I ratio may indicate excessive excitation")
+    
+    def _check_membrane_potentials(self):
+        """Check membrane potential state (if accessible)."""
+        # This check is conceptual as membrane potentials are internal to neurons
+        self.validation_results['checks']['membrane_potentials'] = {
+            'note': 'Direct membrane potential checking requires internal access'
+        }
+    
+    def _check_spike_processing(self):
+        """Check spike processing and backlog."""
+        pending_count = self.brain.getPendingSpikeEventCount()
+        self.validation_results['checks']['spike_processing'] = {
+            'pending_events': pending_count,
+            'total_spikes': self.brain.getTotalSpikeCount()
+        }
+        
+        if pending_count > 1000:
+            self.validation_results['errors'].append(f"High spike backlog ({pending_count}) may indicate processing bottlenecks")
+            self.validation_results['valid'] = False
+    
+    def _check_memory_systems(self):
+        """Check memory system states."""
+        memory_checks = {}
+        
+        working_memory = self.brain.getWorkingMemory()
+        if working_memory:
+            memory_checks['working_memory_capacity'] = working_memory.getCapacity()
+            memory_checks['working_memory_usage'] = working_memory.getActiveTraces()
+        
+        episodic_memory = self.brain.getEpisodicMemory()
+        if episodic_memory:
+            memory_checks['episodic_memory_episodes'] = episodic_memory.getEpisodeCount()
+            memory_checks['episodic_memory_max_episodes'] = episodic_memory.getMaxEpisodes()
+        
+        associative_memory = self.brain.getAssociativeMemory()
+        if associative_memory:
+            memory_checks['associative_memory_pattern_count'] = associative_memory.getPatternCount()
+        
+        self.validation_results['checks']['memory_systems'] = memory_checks
+        
+        # Check for memory system issues
+        if working_memory and working_memory.getActiveTraces() > working_memory.getCapacity() * 0.9:
+            self.validation_results['warnings'].append("Working memory near capacity - may cause interference")
+        
+        if episodic_memory and episodic_memory.getEpisodeCount() > episodic_memory.getMaxEpisodes() * 0.9:
+            self.validation_results['warnings'].append("Episodic memory near capacity - may cause overwriting")
+    
+    def _check_neuromodulation(self):
+        """Check neuromodulation system state."""
+        neuromodulation_checks = {}
+        
+        dopamine = self.brain.getDopamine()
+        if dopamine:
+            neuromodulation_checks['dopamine_level'] = dopamine.getLevel()
+        
+        curiosity = self.brain.getCuriosity()
+        if curiosity:
+            neuromodulation_checks['curiosity_level'] = curiosity.getLevel()
+        
+        novelty = self.brain.getNovelty()
+        if novelty:
+            neuromodulation_checks['novelty_level'] = novelty.getLevel()
+        
+        prediction_error = self.brain.getPredictionErrorSignal()
+        if prediction_error:
+            neuromodulation_checks['prediction_error'] = prediction_error.getLevel()
+        
+        self.validation_results['checks']['neuromodulation'] = neuromodulation_checks
+        
+        # Check for neuromodulation issues
+        if dopamine and abs(dopamine.getLevel()) > 1.0:
+            self.validation_results['warnings'].append("Dopamine level exceeds expected range (-1 to 1)")
+    
+    def _check_development(self):
+        """Check developmental stage and progression."""
+        dev_stage = self.brain.getDevelopmentalStage()
+        self.validation_results['checks']['development'] = {
+            'stage': dev_stage,
+            'stage_value': int(dev_stage),
+            'stage_name': dev_stage.name
+        }
+        
+        # Check for developmental issues
+        if dev_stage == pynlm.DevelopmentalStage.Aging:
+            self.validation_results['warnings'].append("Brain is in aging stage - high plasticity may indicate problem")
+    
+    def _check_plasticity_systems(self):
+        """Check plasticity system states."""
+        plasticity_checks = {}
+        
+        stdp = self.brain.getSTDP()
+        if stdp:
+            plasticity_checks['stdp_configured'] = True
+        
+        hebbian = self.brain.getHebbian()
+        if hebbian:
+            plasticity_checks['hebbian_configured'] = True
+        
+        structural = self.brain.getStructuralPlasticity()
+        if structural:
+            plasticity_checks['structural_configured'] = True
+        
+        self.validation_results['checks']['plasticity'] = plasticity_checks
+    
+    def _check_integration_state(self):
+        """Check integration of all systems."""
+        integration_checks = {}
+        
+        # Check prediction system
+        prediction_system = self.brain.getPredictionSystem()
+        integration_checks['prediction_system'] = prediction_system is not None
+        
+        # Check cognition systems
+        planner = self.brain.getPlanner()
+        concept_formation = self.brain.getConceptFormation()
+        attention = self.brain.getAttention()
+        integration_checks['cognition_systems'] = {
+            'planner': planner is not None,
+            'concept_formation': concept_formation is not None,
+            'attention': attention is not None
+        }
+        
+        self.validation_results['checks']['integration'] = integration_checks
+        
+        # Check for integration issues
+        if not prediction_system:
+            self.validation_results['warnings'].append("Prediction system not available - may affect learning")
+        
+        missing_cognition = [name for name, present in integration_checks['cognition_systems'].items() if not present]
+        if missing_cognition:
+            self.validation_results['warnings'].append(f"Missing cognition systems: {', '.join(missing_cognition)}")
+
+
+class SimulationMonitor:
+    """
+    Monitor and log simulation data for analysis.
+    
+    Provides real-time monitoring of simulation metrics
+    and logging capabilities for debugging and analysis.
+    """
+    
+    def __init__(self):
+        self.metrics_history = []
+        self.event_log = []
+        self.start_time = time.time()
+    
+    def log_metric(self, name: str, value: Any, unit: str = "", 
+                   timestamp: float = None, tags: Dict = None):
+        """
+        Log a metric value.
+        
+        Args:
+            name: Metric name
+            value: Metric value
+            unit: Unit of measurement
+            timestamp: Optional timestamp (defaults to current time)
+            tags: Optional tags for categorization
+        """
+        if timestamp is None:
+            timestamp = time.time() - self.start_time
+        
+        metric = {
+            'name': name,
+            'value': value,
+            'unit': unit,
+            'timestamp': timestamp,
+            'tags': tags or {}
+        }
+        
+        self.metrics_history.append(metric)
+    
+    def log_event(self, event_type: str, message: str, 
+                  timestamp: float = None, details: Dict = None):
+        """
+        Log an event.
+        
+        Args:
+            event_type: Type of event (error, warning, info, debug)
+            message: Event message
+            timestamp: Optional timestamp
+            details: Optional event details
+        """
+        if timestamp is None:
+            timestamp = time.time() - self.start_time
+        
+        event = {
+            'event_type': event_type,
+            'message': message,
+            'timestamp': timestamp,
+            'details': details or {}
+        }
+        
+        self.event_log.append(event)
+    
+    def get_summary(self) -> Dict:
+        """
+        Get summary statistics for logged metrics.
+        
+        Returns:
+            dict: Summary statistics
+        """
+        if not self.metrics_history:
+            return {}
+        
+        # Group metrics by name
+        metrics_by_name = {}
+        for metric in self.metrics_history:
+            name = metric['name']
+            if name not in metrics_by_name:
+                metrics_by_name[name] = []
+            metrics_by_name[name].append(metric)
+        
+        # Calculate statistics for each metric
+        summary = {}
+        for name, metrics in metrics_by_name.items():
+            values = [m['value'] for m in metrics]
+            
+            # Calculate basic statistics
+            stat_entry = {
+                'count': len(values),
+                'mean': sum(values) / len(values) if values else 0,
+                'min': min(values) if values else 0,
+                'max': max(values) if values else 0
+            }
+            
+            # Calculate additional statistics for numeric values
+            if all(isinstance(v, (int, float)) for v in values):
+                stat_entry['std'] = np.std(values) if len(values) > 1 else 0
+                stat_entry['median'] = np.median(values)
+            
+            summary[name] = stat_entry
+        
+        return {
+            'metrics_summary': summary,
+            'total_metrics': len(self.metrics_history),
+            'total_events': len(self.event_log),
+            'duration': time.time() - self.start_time
+        }
+
+
+class ConfigurationValidator:
+    """
+    Validates NLM configuration for common issues.
+    
+    Provides validation of configuration parameters
+    to ensure they meet NLM requirements.
+    """
+    
+    # Valid parameter ranges
+    VALID_RANGES = {
+        'neuron_count': (100, 100000),
+        'region_count': (1, 10),
+        'connection_probability': (0.0, 1.0),
+        'simulation_timestep': (0.0001, 0.1),
+        'stdp_ltp_weight': (0.0, 1.0),
+        'stdp_ltd_weight': (0.0, 1.0),
+        'stdp_tau': (1.0, 1000.0),
+        'random_seed': (0, 2**31 - 1)
+    }
+    
+    @staticmethod
+    def validate_config(config: pynlm.Config) -> Dict:
+        """
+        Validate configuration parameters.
+        
+        Args:
+            config: Configuration to validate
+            
+        Returns:
+            dict: Validation results
+        """
+        results = {
+            'valid': True,
+            'warnings': [],
+            'errors': [],
+            'validated_params': []
+        }
+        
+        # Get all config keys
+        keys = config.getKeys()
+        results['validated_params'] = keys
+        
+        # Validate each parameter
+        for key in keys:
+            config_error = ConfigurationValidator._validate_single_param(config, key)
+            if 'error' in config_error:
+                results['errors'].append(config_error['error'])
+                results['valid'] = False
+            if 'warning' in config_error:
+                results['warnings'].append(config_error['warning'])
+        
+        return results
+    
+    @staticmethod
+    def _validate_single_param(config: pynlm.Config, key: str) -> Dict:
+        """
+        Validate a single configuration parameter.
+        
+        Args:
+            config: Configuration object
+            key: Parameter key
+            
+        Returns:
+            dict: Validation result
+        """
+        result = {}
+        
+        # Try to get parameter value as float (most common type)
+        value = config.getOr(key, None)
+        if value is None:
+            return {'warning': f"Parameter '{key}' not set (using default)"}
+        
+        # Check against valid ranges
+        if key in ConfigurationValidator.VALID_RANGES:
+            min_val, max_val = ConfigurationValidator.VALID_RANGES[key]
+            
+            if isinstance(value, (int, float)):
+                if value < min_val:
+                    result['warning'] = f"Parameter '{key}' = {value} < minimum {min_val}"
+                elif value > max_val:
+                    result['warning'] = f"Parameter '{key}' = {value} > maximum {max_val}"
+        
+        # Specific parameter validations
+        if key == 'neuron_count' and value is not None:
+            if value < 100:
+                result['warning'] = f"Low neuron count ({value}) may not produce meaningful dynamics"
+        
+        if key == 'connection_probability' and value is not None:
+            if value < 0.001:
+                result['warning'] = f"Very low connection probability ({value}) may result in disconnected network"
+        
+        return result
+
+
+class NMLErrorHandler:
+    """
+    Global error handler for NLM errors.
+    
+    Provides centralized error handling and recovery mechanisms
+    for NLM simulations and configurations.
+    """
+    
+    def __init__(self):
+        self.error_handlers = []
+        self.last_error = None
+        self.error_count = 0
+    
+    def register_handler(self, error_type: str, handler: Callable):
+        """
+        Register an error handler for a specific error type.
+        
+        Args:
+            error_type: Type of error to handle
+            handler: Handler function (receives exception as argument)
+        """
+        self.error_handlers.append((error_type, handler))
+    
+    def handle_error(self, error: Exception) -> bool:
+        """
+        Handle an error using registered handlers.
+        
+        Args:
+            error: Exception to handle
+            
+        Returns:
+            bool: True if error was handled, False otherwise
+        """
+        self.last_error = error
+        self.error_count += 1
+        
+        # Find matching handlers
+        handled = False
+        for error_type, handler in self.error_handlers:
+            if error_type in str(type(error)) or error_type in str(error):
+                try:
+                    handled = handler(error)
+                    if handled:
+                        break
+                except Exception as handler_error:
+                    print(f"Error handler failed: {handler_error}")
+        
+        # Log unhandled errors
+        if not handled:
+            print(f"Unhandled error: {error}")
+        
+        return handled
+
+
+# Global error handler instance
+_global_error_handler = NMLErrorHandler()
+
+# Convenience functions for error handling
+def set_error_handler(error_type: str, handler: Callable):
+    """Register a global error handler."""
+    _global_error_handler.register_handler(error_type, handler)
+
+
+def validate_simulation_setup(brain: pynlm.Brain, 
+                               config: pynlm.Config = None) -> Dict:
+    """
+    Validate simulation setup for common issues.
+    
+    Args:
+        brain: Brain to validate
+        config: Optional configuration to validate
+        
+    Returns:
+        dict: Validation results
+    """
+    results = {
+        'valid': True,
+        'warnings': [],
+        'errors': [],
+        'checks': {}
+    }
+    
+    # Validate brain
+    try:
+        validator = BrainValidator(brain)
+        brain_validation = validator.validate_all()
+        results['checks']['brain'] = brain_validation
+        
+        if not brain_validation['valid']:
+            results['errors'].extend(brain_validation['errors'])
+        results['warnings'].extend(brain_validation['warnings'])
+        
+    except Exception as e:
+        results['errors'].append(f"Brain validation failed: {e}")
+    
+    # Validate configuration
+    if config:
+        try:
+            config_validation = ConfigurationValidator.validate_config(config)
+            results['checks']['config'] = config_validation
+            
+            if not config_validation['valid']:
+                results['errors'].extend(config_validation['errors'])
+            results['warnings'].extend(config_validation['warnings'])
+            
+        except Exception as e:
+            results['errors'].append(f"Configuration validation failed: {e}")
+    
+    # Overall validation
+    results['valid'] = len(results['errors']) == 0
+    
+    return results
+
+
+def create_safe_simulation_wrapper(world, agent, brain, 
+                                   max_steps: int = 1000,
+                                   error_handler: Callable = None) -> Callable:
+    """
+    Create a safe simulation wrapper with error handling.
+    
+    Args:
+        world: World object
+        agent: Agent object
+        brain: Brain object
+        max_steps: Maximum simulation steps
+        error_handler: Optional error handler function
+        
+    Returns:
+        function: Wrapped simulation function
+    """
+    def safe_simulation():
+        try:
+            # Initial validation
+            validation = validate_simulation_setup(brain)
+            if not validation['valid']:
+                warnings = validation['warnings']
+                errors = validation['errors']
+                if errors:
+                    raise ValidationError("Simulation setup validation failed", 
+                                        {'warnings': warnings, 'errors': errors})
+            
+            # Run simulation
+            for step in range(max_steps):
+                try:
+                    world.update(0.1)
+                    
+                    percept = world.getSensoryPercept()
+                    agent.processSensoryInput(percept)
+                    
+                    brain.step(step)
+                    
+                    action = agent.decodeMotorCommand()
+                    world.applyMotorCommand(action, world.getSimulationTime())
+                    
+                    agent.updateDevelopment(0.1)
+                    
+                    # Check for errors
+                    if brain.getPendingSpikeEventCount() > 10000:
+                        raise SimulationError("High spike backlog detected", 
+                                            {'step': step, 'pending': brain.getPendingSpikeEventCount()})
+                
+                except Exception as step_error:
+                    if error_handler:
+                        if error_handler(step_error, step):
+                            continue  # Retry step
+                        else:
+                            raise
+                    else:
+                        raise SimulationError(f"Error at step {step}: {step_error}", 
+                                            {'step': step, 'error': str(step_error)})
+            
+            return {'success': True, 'steps_completed': max_steps}
+            
+        except Exception as e:
+            if isinstance(e, (NLMError, ValidationError, SimulationError)):
+                raise
+            else:
+                raise SimulationError(f"Unexpected simulation error: {e}", 
+                                    {'error': str(e), 'traceback': traceback.format_exc()})
+    
+    return safe_simulation
+
+
+# Export all classes and functions
+__all__ = [
+    'NLMError',
+    'ValidationError', 
+    'SimulationError',
+    'ConfigurationError',
+    'NMLError',
+    'BrainValidator',
+    'SimulationMonitor',
+    'ConfigurationValidator',
+    'NMLErrorHandler',
+    'set_error_handler',
+    'validate_simulation_setup',
+    'create_safe_simulation_wrapper'
+]
+
+# Add helpful aliases
+validator = BrainValidator
+monitor = SimulationMonitor
+config_validator = ConfigurationValidator
+error_handler = NMLErrorHandler
