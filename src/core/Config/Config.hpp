@@ -93,13 +93,40 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Helper functions for enhanced configuration management
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    // Get configuration as specific type with validation
+    template<typename T>
+    T getValidated(const std::string& key, const T& defaultValue) const;
+    
+    // Check if configuration key exists with minimum source priority
+    bool isType(const std::string& key, ConfigSource minSource) const;
+    
+    // Get all configuration values as strings for easier processing
+    std::map<std::string, std::string> getAllAsStrings() const;
+    
+    // Check if configuration was modified from defaults
+    bool isModified(const std::string& key) const;
+    
+    // Get configuration entries with specific source
+    std::vector<std::pair<std::string, ConfigValue>> getBySource(ConfigSource source) const;
+    
+    // Validate critical configuration values
+    bool validateCriticalValues() const;
+    
+    // Additional convenience methods for common use cases
+    
+    // Get configuration as string with default
+    std::string getString(const std::string& key, const std::string& defaultValue = "") const;
+    
+    // Get configuration as integer with default
+    int getInt(const std::string& key, int defaultValue = 0) const;
+    
+    // Get configuration as float with default
+    float getFloat(const std::string& key, float defaultValue = 0.0f) const;
+    
+    // Get configuration as boolean with default
+    bool getBool(const std::string& key, bool defaultValue = false) const;
+    
+    // Enhanced command line argument parsing with validation
+    bool loadFromArgs(int argc, char** argv) override;

@@ -23,10 +23,42 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <iomanip>
 #include <numeric>
 
 using namespace nlm;
+
+// Configuration constants for Phase 2 tests
+namespace ConfigConstants {
+    constexpr int64_t DEFAULT_RANDOM_SEED = 42;
+    constexpr double DEFAULT_SIMULATION_TIMESTEP = 0.001;  // 1ms
+    constexpr int64_t DEFAULT_NEURON_COUNT = 500;
+    constexpr int64_t DEFAULT_REGION_COUNT = 1;
+    constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.15f;
+    
+    // STDP parameters
+    constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.02f;
+    constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.015f;
+    constexpr float DEFAULT_STDP_TAU = 20.0f;
+    
+    // Structural plasticity parameters
+    constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+    constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+    
+    // Test parameters
+    constexpr SimulationStep CONNECTIVITY_TEST_STEPS = 50;
+    constexpr SimulationStep PLASTICITY_TEST_STEPS = 1000;
+    constexpr int32_t CONNECTIVITY_CURRENT_INJECTION = 50;
+    constexpr int32_t PLASTICITY_INPUT_STRENGTH = 30;
+    constexpr int32_t STDP_CORRELATED_INPUT_STRENGTH = 60;
+    constexpr int32_t STDP_PRE_POST_TRIALS = 50;
+    constexpr size_t STDP_SYNAPSES_TO_TEST = 5;
+    constexpr size_t LEARNING_EXPERIMENT_TOP_NEURONS = 10;
+    constexpr float LEARNING_WEIGHT_CHANGE_THRESHOLD = 0.01f;
+    constexpr float LEARNING_MEAN_CHANGE_THRESHOLD = 0.001f;
+    
+    // Logging
+    constexpr const char* DEFAULT_CONFIG_FILE = "configs/default.cfg";
+}
 
 void printBanner() {
     std::cout << R"(

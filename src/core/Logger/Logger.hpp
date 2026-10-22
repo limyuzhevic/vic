@@ -56,6 +56,29 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Enhanced logging configuration options
+    void setLogOptions(const std::string& timestampFormat, bool enableTimestamps, 
+                      bool enableFileInfo, const std::string& messageFormat,
+                      bool enableColors, bool enableAsync, bool enableRotation,
+                      size_t maxFileSize, const std::string& rotationPrefix);
+    
+    void setMinLogLevel(LogLevel level);
+    LogLevel getMinLogLevel() const;
+    
+    void setEnableTimestamps(bool enable);
+    bool getEnableTimestamps() const;
+    
+    void setEnableFileInfo(bool enable);
+    bool getEnableFileInfo() const;
+    
+    void setMessageFormat(const std::string& format);
+    std::string getMessageFormat() const;
+    
+    void setLogRotation(bool enable, size_t maxSize, const std::string& prefix);
+    
+    void setEnableAsyncLogging(bool enable);
+    bool getEnableAsyncLogging() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -103,6 +126,16 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Global logging configuration functions
+    static void configureGlobal(bool enableTimestamps, const std::string& timestampFormat,
+                               bool enableColors, LogLevel minLevel, bool enableAsync);
+    
+    // Performance monitoring
+    uint64_t getTotalLogMessages() const;
+    uint64_t getTotalLogSize() const;
+    std::chrono::system_clock::time_point getStartTime() const;
+    std::string getUptime() const;
 
 private:
     struct Impl;
