@@ -14,51 +14,81 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
+# Core neural system
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
+
+    # Brain components
     ${NLM_SOURCE_DIR}/brain/Neuron.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
     ${NLM_SOURCE_DIR}/brain/Brain.cpp
+
+    # Dynamics and neural computation
     ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
+
+    # Plasticity systems
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
     ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
     ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
+
+    # Development and maturation
     ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
     ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
     ${NLM_SOURCE_DIR}/development/Pruning.cpp
     ${NLM_SOURCE_DIR}/development/Maturation.cpp
+
+    # Neuromodulation (reward, prediction error, novelty, curiosity)
     ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
+
+    # Memory systems
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
+
+    # Cognition and planning
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
     ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
+
+    # Sensory processing
     ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
     ${NLM_SOURCE_DIR}/sensory/Vision.cpp
     ${NLM_SOURCE_DIR}/sensory/Audio.cpp
     ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
+
+    # Prediction and motor control
     ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
+
+    # Environment and observation
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+
+    # Agent systems
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+
+    # World simulation
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+
+    # Experimental framework
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
+
+    # Visualization
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
-)
 
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
