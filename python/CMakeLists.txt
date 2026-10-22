@@ -1,102 +1,57 @@
-cmake_minimum_required(VERSION 3.16)
-project(pynlm_bindings LANGUAGES CXX)
+pybind11_build = "1.13.0"
+pybind11_language_level = 3
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Project metadata
+project_name = "pynlm"
+project_version = "0.1.0"
+project_description = "Python bindings for NLM (Neural Learning Machine) neural simulation framework"
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Configuration for Python-specific enhancements
+
+# Compiler optimization flags for Python bindings
+if MSVC
+    add_compile_options(/W4 /permissive-)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -O2)
 endif()
 
-find_package(Python REQUIRED COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG REQUIRED)
-
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
-
-set(NLM_CORE_SOURCES
-    ${NLM_SOURCE_DIR}/core/Types/Types.cpp
-    ${NLM_SOURCE_DIR}/core/Config/Config.cpp
-    ${NLM_SOURCE_DIR}/core/Random/Random.cpp
-    ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
-    ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
-    ${NLM_SOURCE_DIR}/brain/Neuron.cpp
-    ${NLM_SOURCE_DIR}/brain/Synapse.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
-    ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
-    ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
-    ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
-    ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
-    ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
-    ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
-    ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
-    ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
-    ${NLM_SOURCE_DIR}/development/Pruning.cpp
-    ${NLM_SOURCE_DIR}/development/Maturation.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
-    ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
-    ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
-    ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
-    ${NLM_SOURCE_DIR}/sensory/Vision.cpp
-    ${NLM_SOURCE_DIR}/sensory/Audio.cpp
-    ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
-    ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
-    ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
-    ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
-    ${NLM_SOURCE_DIR}/environment/Environment.cpp
-    ${NLM_SOURCE_DIR}/environment/Observation.cpp
-    ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
-    ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
-    ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
-    ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+# Python binding specific settings
+set_target_properties(pynlm PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    POSITION_INDEPENDENT_CODE ON
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python"
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+# Include directories for Python bindings
+target_include_directories(pynlm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${Python_INCLUDE_DIRS}
+    ${pybind11_INCLUDE_DIR}
 )
 
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
-)
-
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
-    $<INSTALL_INTERFACE:include>
-)
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-)
-
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
-
-pybind11_add_module(pynlm bindings.cpp)
+# Link dependencies
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
-endif()
-
+# Install Python module
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Create Python package structure
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/python/pynlm")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/python/__init__.py.in"
+    "${CMAKE_BINARY_DIR}/python/pynlm/__init__.py"
+    @ONLY
+)
+
+# Add test target for Python bindings
+enable_testing()
+add_test(NAME pynlm_python_test
+    COMMAND ${Python_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_BINARY_DIR}/python'); import pynlm; print('Python bindings test passed')"
 )
