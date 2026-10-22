@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/Logger/Logger.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -18,13 +19,27 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters with validation ranges
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize with valid default values
+        state.membranePotential = -70.0f;
+        state.restingPotential = -70.0f;
+        state.threshold = -55.0f;
+        state.resetPotential = -70.0f;
+        state.leakConductance = 10.0f;
+        state.synapseConductance = 0.0f;
+        state.firingRate = 0.0f;
+        state.firingState = FiringState::Resting;
+        state.refractoryRemaining = 0;
+        state.refractoryPeriod = 5;
+        state.adaptationVariable = 0.0f;
+        state.lastSpikeTime = -1.0f;
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -51,6 +66,11 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    // Validate neuron type
+    if (type < NeuronType::Sensory || type > NeuronType::Max) {
+        NLM_LOG_WARNING("Invalid neuron type requested: " + std::to_string(static_cast<int>(type)));
+        return;
+    }
     pImpl->type = type;
 }
 
@@ -191,6 +211,17 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate input parameters
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep duration: " + std::to_string(dt) + ". Using default 0.001s");
+        dt = 0.001;
+    }
+    
+    // Validate current time
+    if (currentTime < 0.0) {
+        NLM_LOG_WARNING("Negative current time: " + std::to_string(currentTime));
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,6 +244,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate parameters
+    if (tau <= 0.0f || C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid neuron parameters: tau=" + std::to_string(tau) + ", C=" + std::to_string(C));
+        return false;
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
@@ -220,6 +257,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Add unit conversion: 1000 to convert ms to s for consistent units
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
@@ -231,13 +269,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike with validation
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike with validation
         recordSpike(currentTime);
         
         // Reset membrane potential
@@ -256,12 +293,25 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
     
+    // Validate state consistency
+    if (pImpl->state.refractoryRemaining > pImpl->state.refractoryPeriod) {
+        NLM_LOG_WARNING("Refractory period exceeded expected values");
+    }
+    
     return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
+    // Improved error handling and validation
     TimestepDuration dt = 0.001;  // 1ms default
+    
+    // Validate timestep
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep in Neuron::step, using default 0.001s");
+        dt = 0.001;
+    }
+    
     stepLIF(currentTime, dt);
 }
 

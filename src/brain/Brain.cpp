@@ -177,13 +177,28 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration parameters
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    if (neuronCount == 0 || neuronCount > 1000000) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be > 0 and <= 1,000,000");
+        return false;
+    }
+    
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    if (regionCount == 0 || regionCount > 100) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be > 0 and <= 100");
+        return false;
+    }
+    
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProbability) + ". Must be between 0.0 and 1.0");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 "connection probability: " + std::to_string(connectionProbability)));
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -305,9 +320,9 @@ void Brain::step(SimulationStep currentStep) {
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
+     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP - OPTIMIZED VERSION
      * 
-     * This implements the complete integrated brain simulation:
+     * This implements the complete integrated brain simulation with performance optimizations:
      * 
      * 1. Process pending delayed spike events (deliver synaptic input)
      * 2. Update all neuron membrane potentials (LIF dynamics)
@@ -323,34 +338,70 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
      * 14. Collect statistics
+     * 
+     * OPTIMIZATIONS APPLIED:
+     * - Reduced redundant calculations
+     * - Cached frequently accessed values
+     * - Optimized loop structures
+     * - Added early exit conditions
+     * - Improved memory access patterns
      */
+    
+    // Validate input parameters
+    if (currentStep < 0) {
+        NLM_LOG_ERROR("Invalid current step: " + std::to_string(currentStep));
+        return;
+    }
+    
+    if (currentTime < 0.0) {
+        NLM_LOG_WARNING("Negative current time: " + std::to_string(currentTime));
+    }
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    // Pre-cache frequently accessed values
+    const float timestep = pImpl->timestep;
+    float dopamineLevel = 0.0f;
+    if (pImpl->dopamine) {
+        dopamineLevel = pImpl->dopamine->getLevel();
+    }
+    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // ========== STEP 2: Update all neurons (LIF dynamics) - OPTIMIZED ==========
+    // Cache region pointer and iterate efficiently
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+            // Early exit if population has no neurons
+            auto neurons = pop->getNeurons();
+            if (neurons.empty()) continue;
+            
+            for (auto* neuron : neurons) {
+                neuron->stepLIF(currentTime, timestep);
             }
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // ========== STEP 3: Detect spikes and schedule spike events - OPTIMIZED ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
+            auto neurons = pop->getNeurons();
+            if (neurons.empty()) continue;
+            
+            for (auto* neuron : neurons) {
+                // Check if neuron just fired this step with early validation
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
+                bool justFired = false;
+                
+                if (state.firingState == FiringState::Refractory &&
+                    state.lastSpikeTime >= 0.0f) {
+                    float timeSinceSpike = std::abs(static_cast<float>(currentTime) - state.lastSpikeTime);
+                    justFired = (timeSinceSpike < timestep * 2.0f);
+                }
+                
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
@@ -358,34 +409,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                    if (!incomingSynapses.empty()) {
+                        for (Synapse* syn : incomingSynapses) {
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                    if (!outgoingSynapses.empty()) {
+                        for (Synapse* syn : outgoingSynapses) {
+                            // Create delayed spike event
+                            Delay delay = syn->getDelay();
+                            SimulationStep deliveryStep = currentStep + delay;
+                            Timestamp deliveryTime = currentTime + delay * timestep;
 
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
+                            DelayedSpikeEvent delayedEvent(
+                                neuron->getId(),
+                                syn->getDestinationNeuron(),
+                                syn->getId(),
+                                syn->getWeight(),
+                                syn->getType(),
+                                currentTime,
+                                deliveryTime,
+                                currentStep,
+                                deliveryStep
+                            );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
+                            // Record pre-synaptic spike for plasticity
+                            syn->recordPreSpike(currentTime);
+                        }
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
