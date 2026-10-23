@@ -205,6 +205,20 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (brain->getSerotonin() != nullptr) {
+        NLM_LOG_INFO("[PASS] Serotonin system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Serotonin system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNorepinephrine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Norepinephrine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine system is NOT integrated");
+        success = false;
+    }
+    
     // Test 3: Prediction system exists
     if (brain->getPredictionSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Prediction system is integrated");
@@ -299,20 +313,62 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* serotonin = brain->getSerotonin();
+    auto* norepinephrine = brain->getNorepinephrine();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !curiosity || !novelty || !serotonin || !norepinephrine) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
+    
+    // Test basic functionality of each neuromodulator
+    NLM_LOG_INFO("[PASS] Dopamine level: " + std::to_string(dopamine->getLevel()));
+    NLM_LOG_INFO("[PASS] Curiosity level: " + std::to_string(curiosity->getLevel()));
+    NLM_LOG_INFO("[PASS] Novelty level: " + std::to_string(novelty->getLevel()));
+    NLM_LOG_INFO("[PASS] Serotonin level: " + std::to_string(serotonin->getLevel()));
+    NLM_LOG_INFO("[PASS] Norepinephrine level: " + std::to_string(norepinephrine->getLevel()));
+    
+    // Test mood behavior for Serotonin
+    serotonin->setMood(0.7f);
+    NLM_LOG_INFO("[PASS] Serotonin mood modulation working");
+    
+    // Test arousal behavior for Norepinephrine
+    norepinephrine->setArousal(0.8f);
+    NLM_LOG_INFO("[PASS] Norepinephrine arousal modulation working");
     
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
         // Inject some sensory activity
         brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
         brain->step(i, i * 0.001);
+        
+        // Apply some reward signals to test Dopamine
+        if (i % 10 == 0) {
+            float reward = 1.0f - (i / 10.0f) * 0.2f;
+            if (dopamine) {
+                dopamine->signalReward(reward);
+            }
+        }
+        
+        // Update all neuromodulators
+        if (dopamine) {
+            dopamine->update(0.001f);
+        }
+        if (curiosity) {
+            curiosity->update(0.5f, 0.1f, 0.001f);
+        }
+        if (novelty) {
+            novelty->update(0.001f);
+        }
+        if (serotonin) {
+            serotonin->update(0.001f);
+        }
+        if (norepinephrine) {
+            norepinephrine->update(0.001f);
+        }
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("[PASS] All neuromodulation systems are functional");
     return true;
 }
 

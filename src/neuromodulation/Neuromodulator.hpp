@@ -48,6 +48,13 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Getters for internal state
+    float getRewardSum() const;
+    float getPredictionError() const;
+    const std::vector<float>& getRewardHistory() const;
+    const std::vector<float>& getErrorHistory() const;
+    void clearHistory();
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -68,22 +75,62 @@ public:
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal and vigilance control
+    void setArousal(float arousal);
+    void setVigilance(float vigilance);
+    void setStress(float stress);
+    
+    // Getters for internal state
+    float getArousal() const;
+    float getVigilance() const;
+    float getStress() const;
+    const std::vector<float>& getArousalHistory() const;
+    const std::vector<float>& getVigilanceHistory() const;
+    const std::vector<float>& getStressHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood and social behavior control
+    void setMood(float mood);
+    void setSocialBehavior(float socialBehavior);
+    
+    // Getters for internal state
+    float getMood() const;
+    float getSocialBehavior() const;
+    float getImpulsivity() const;
+    const std::vector<float>& getMoodHistory() const;
+    const std::vector<float>& getSocialHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

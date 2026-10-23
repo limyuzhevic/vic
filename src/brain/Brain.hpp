@@ -181,8 +181,11 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin: Mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine: Arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
