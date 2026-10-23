@@ -749,7 +749,7 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    pImpl->spikeSystem.reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -880,7 +880,7 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
                         }
                     }
                     idx++;

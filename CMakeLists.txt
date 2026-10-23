@@ -21,7 +21,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library (includes refactored brain components)
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -29,12 +29,16 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain (refactored)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainRefactored.cpp
+    src/brain/BrainInitialization.cpp
+    src/brain/BrainStateManagement.cpp
+    src/brain/BrainIO.cpp
+    src/brain/BrainRegionManagement.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -119,21 +123,27 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
+# Main executable (still uses original Brain class for backward compatibility)
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Test executable (uses refactored BrainRefactored)
+add_executable(test_refactored
+    test_refactored.cpp
+)
+target_link_libraries(test_refactored PUBLIC nlm_core)
+
+# Phase 3 demo executable (using original Brain class for compatibility)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
+# Phase 4 demo executable (using original Brain class for compatibility)
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
