@@ -12,6 +12,47 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Command-Line Interface
+
+NLM now has an improved command-line interface for easier testing and experimentation:
+
+### Basic Usage
+
+```bash
+# Show help information
+nlm --help
+
+# Run comprehensive integration test
+nlm --mode=demo
+
+# Run specific test (basic connectivity)
+nlm --mode=test1 --verbose
+
+# Run specific test (plasticity learning)
+nlm --mode=test2 --steps=5
+
+# Run all tests in sequence
+nlm --mode=all
+
+# Use custom configuration
+nlm --mode=test1 --config=production.cfg
+```
+
+### Configuration Examples
+
+The command-line interface supports various options for fine-tuned control:
+
+```bash
+# Fast test with custom configuration
+nlm --mode=test1 --config=fast_test.cfg --steps=3
+
+# Detailed integration test
+nlm --mode=demo --verbose
+
+# Production-style run with specific config
+nlm --mode=all --config=production.cfg
+```
+
 ---
 
 ## The 3 Things You Need to Know

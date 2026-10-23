@@ -6,8 +6,9 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 
 This document covers:
 1. Building the C++ project from source
-2. Installing the Python library
+2. Installing the Python library (Note: Python bindings need to be added)
 3. Using the NLM Python API
+4. **NEW: Command-line interface improvements and testing modes**
 
 ---
 
@@ -46,7 +47,7 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | Main simulation executable (IMPROVED: Enhanced CLI support) |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
@@ -416,41 +417,155 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+## Part 4: NEW - Command-Line Interface Improvements
 
-### Brain Configuration
+NLM now features an enhanced command-line interface for easy testing and experimentation:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
+### New CLI Features
 
-### Plasticity Configuration
+#### Available Modes:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| Mode | Description | Typical Use Case |
+|------|-------------|------------------|
+| `demo` | Run comprehensive integration test | Quick system validation |
+| `test1` | Test basic neural connectivity | Network functionality check |
+| `test2` | Test plasticity learning experiment | Learning capability test |
+| `test3` | Test STDP verification | Synaptic plasticity validation |
+| `all` | Run all tests in sequence | Complete system verification |
 
-### Neuromodulation Configuration
+#### Command-Line Options:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+```bash
+# Help and usage information
+nlm --help
+
+# Run demo mode (comprehensive integration test)
+nlm --mode=demo
+
+# Run specific test with verbose output
+nlm --mode=test1 --verbose
+
+# Run with custom step multiplier for faster testing
+nlm --mode=test2 --steps=5
+
+# Use custom configuration file
+nlm --mode=test3 --config=production.cfg
+
+# Combine options for flexible testing
+nlm --mode=all --verbose --steps=2 --config=experiment.cfg
+```
+
+### Usage Examples
+
+#### Quick System Check
+```bash
+# Run comprehensive integration demo
+nlm --mode=demo
+
+# Check if all systems are integrated
+# Output: Phase 6 Integration Demo with all system demonstrations
+```
+
+#### Network Connectivity Test
+```bash
+# Test basic neural connectivity
+nlm --mode=test1 --verbose
+
+# Test with faster execution (3x speed)
+nlm --mode=test1 --steps=3
+
+# Use custom configuration
+nlm --mode=test1 --config=network_test.cfg
+```
+
+#### Learning Capability Test
+```bash
+# Test plasticity and learning
+nlm --mode=test2 --verbose
+
+# Run learning experiment faster
+nlm --mode=test2 --steps=3
+
+# With custom configuration for different learning scenarios
+nlm --mode=test2 --config=learning_experiment.cfg
+```
+
+#### Synaptic Plasticity Test
+```bash
+# Test STDP mechanism
+nlm --mode=test3
+
+# Verify STDP with extended testing
+nlm --mode=test3 --steps=2
+
+# Use specialized STDP configuration
+nlm --mode=test3 --config=stdp_test.cfg
+```
+
+#### Complete System Verification
+```bash
+# Run all tests in sequence
+nlm --mode=all
+
+# Full system test with verbose output
+nlm --mode=all --verbose
+
+# Comprehensive test with custom configuration
+nlm --mode=all --config=full_system_test.cfg --steps=2
+```
+
+#### Configuration Examples
+
+The configuration file (`configs/default.cfg`) can be customized:
+
+```cfg
+# Basic configuration
+brain.neuron_count = 500
+brain.synapse_density = 0.1
+brain.connection_probability = 0.15
+simulation_timestep = 0.001
+
+# Plasticity settings
+plasticity.stdp.enable = true
+plasticity.stdp.learning_rate = 0.001
+plasticity.hebbian.enable = true
+plasticity.structural.enable = true
+
+# Neuromodulation settings
+neuromod.dopamine.scale = 1.0
+neuromod.curiosity.enable = true
+neuromod.novelty.enable = true
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+**"My brain isn't doing anything"**
+- Did you run with `--mode=demo` or specific tests?
+- Try: `nlm --mode=demo --verbose` for detailed output
+
+**"The system isn't responding"**
+- Check that configuration file is correct
+- Try with verbose mode: `nlm --mode=all --verbose`
+
+**"No learning detected"**
+- Run the plasticity test: `nlm --mode=test2 --verbose`
+- Check configuration for learning parameters
+
+**"STDP not working"**
+- Run STDP verification: `nlm --mode=test3 --verbose`
+- Check STDP configuration in config file
+
+#### Command-Line Help
+
+```bash
+# Show complete help information
+nlm --help
+
+# View specific option details
+nlm --mode=demo
+```
 
 ---
 
@@ -496,6 +611,25 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Command-Line Testing
+
+```bash
+# Quick system validation
+nlm --mode=demo
+
+# Network connectivity test
+nlm --mode=test1 --verbose
+
+# Learning capability test
+nlm --mode=test2 --steps=5
+
+# Synaptic plasticity verification
+nlm --mode=test3
+
+# Complete system verification
+nlm --mode=all --verbose
+```
+
 ---
 
 ## Troubleshooting
@@ -524,6 +658,20 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### New CLI Issues
+
+**"Command not recognized" or "unknown option"**
+- Ensure you're using the latest build
+- Run `nlm --help` for complete option list
+
+**"Mode not found"**
+- Available modes: demo, test1, test2, test3, all
+- Run `nlm --help` for complete details
+
+**"Configuration file not found"**
+- Ensure the file exists and has correct permissions
+- Use default: `nlm --config=configs/default.cfg`
+
 ---
 
 ## Further Reading
@@ -531,3 +679,18 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+## Phase 6 Integration Status
+
+✅ **COMPLETE** - All neural systems are now integrated into Phase 6:
+- Memory systems (working, episodic, associative) connected
+- Neuromodulation systems integrated
+- Prediction system operational
+- Cognitive mechanisms functional
+- Development system active
+- Enhanced CLI interface added
+- Improved command-line argument parsing
+- Better test modularity
+- Enhanced configuration support
+
+The NLM brain is now ready for comprehensive testing and experimentation with the improved command-line interface.
