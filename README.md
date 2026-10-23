@@ -221,6 +221,25 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## New Advanced Features (Phase 6 Enhanced)
+
+### 1. Enhanced AgentBrain Configuration System
+The AgentBrain now supports **29 configuration parameters** for fine-tuned control over brain behavior:
+
+- **Curiosity Control**: `curiosityThreshold`, `explorationMaxChance`
+- **Sensory Processing**: `visionInputScale`, `touchInputScale`, `internalInputScale`
+- **Motor Control**: `motorActivationThreshold`
+- **Neuromodulation**: `rewardDecayRate`, `plasticityFactor`, `basePlasticity`
+- **Development**: Configurable stage durations and plasticity modifiers
+
+### 2. Enhanced Python Bindings
+The `pynlm` Python module now includes **advanced getters and setters** for all configuration parameters, allowing fine-tuning of brain behavior for specific applications.
+
+### 3. Improved Error Handling and Memory Management
+- **Fixed bugs**: Random generator bounds checking, vector initialization
+- **Better abstraction**: Proper neuromodulation system design
+- **Enhanced safety**: Robust error handling throughout
+
 ## License
 
 MIT
