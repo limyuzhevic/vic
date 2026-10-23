@@ -22,6 +22,12 @@ endif()
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -29,6 +35,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Performance/PerformanceMonitor.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -133,18 +140,54 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Visualization library
+add_library(nlm_visualization STATIC
+    src/visualization/Visualizer.cpp
+    src/visualization/Visualizer.hpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
+
+# Test framework
+add_library(nlm_test_framework STATIC
+    tests/TestFramework.cpp
+    tests/TestFramework.hpp
+)
+target_include_directories(nlm_test_framework PUBLIC tests)
+target_link_libraries(nlm_test_framework PUBLIC nlm_core)
+
+# Phase 6 demo library
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6Demo.hpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 6 demo executable (moved from nlm_phase6_demo.cpp to NLM.cpp for CLI)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Phase 6 integrated experiment executable
+add_executable(nlm_phase6_integrated_experiment
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_link_libraries(nlm_phase6_integrated_experiment PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Command Line Interface executable
+add_executable(nlm_cli
+    src/cli/NLM.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_visualization nlm_test_framework nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_phase6_integrated_experiment nlm_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

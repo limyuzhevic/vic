@@ -3,8 +3,25 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
 
 namespace nlm {
+
+// Helper function to trim whitespace from both ends
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+// Helper function to convert string to lowercase
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,9 +36,143 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parsing first
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Fall back to simple key=value format for backward compatibility
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Simple JSON parsing - just read and parse basic JSON
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+        // Parse basic JSON - look for key:value pairs
+        size_t pos = 0;
+        while (pos < content.length()) {
+            // Skip whitespace and comments
+            while (pos < content.length() && (std::isspace(content[pos]) || content[pos] == '#')) {
+                if (content[pos] == '#') {
+                    // Skip comment
+                    while (pos < content.length() && content[pos] != '\n') {
+                        pos++;
+                    }
+                } else {
+                    pos++;
+                }
+            }
+            
+            if (pos >= content.length()) break;
+            
+            // Find key (string until ':')
+            size_t keyStart = pos;
+            while (pos < content.length() && content[pos] != ':') {
+                pos++;
+            }
+            
+            if (pos >= content.length()) break;
+            
+            std::string key = trim(content.substr(keyStart, pos - keyStart));
+            pos++; // Skip ':'
+            
+            // Skip whitespace after ':'
+            while (pos < content.length() && std::isspace(content[pos])) {
+                pos++;
+            }
+            
+            // Parse value based on type
+            ConfigValue value;
+            size_t valueStart = pos;
+            
+            if (pos < content.length() && content[pos] == '"') {
+                // String value
+                pos++; // Skip opening quote
+                while (pos < content.length() && content[pos] != '"') {
+                    pos++;
+                }
+                if (pos < content.length()) {
+                    std::string strValue = content.substr(valueStart + 1, pos - valueStart - 1);
+                    value = strValue;
+                    pos++; // Skip closing quote
+                }
+            } else if (pos < content.length() && (std::isdigit(content[pos]) || content[pos] == '-')) {
+                // Numeric value (int or float)
+                while (pos < content.length() && (std::isdigit(content[pos]) || content[pos] == '.' || content[pos] == '-' || content[pos] == 'e' || content[pos] == 'E')) {
+                    pos++;
+                }
+                std::string numStr = trim(content.substr(valueStart, pos - valueStart));
+                
+                // Try to parse as integer first
+                try {
+                    size_t posEnd;
+                    long long intVal = std::stoll(numStr, &posEnd);
+                    if (posEnd == numStr.length()) {
+                        value = intVal;
+                    } else {
+                        // Try float
+                        float floatVal = std::stof(numStr);
+                        value = static_cast<double>(floatVal);
+                    }
+                } catch (...) {
+                    // Try float
+                    try {
+                        float floatVal = std::stof(numStr);
+                        value = static_cast<double>(floatVal);
+                    } catch (...) {
+                        // Try bool
+                        if (toLower(numStr) == "true") {
+                            value = true;
+                        } else if (toLower(numStr) == "false") {
+                            value = false;
+                        } else {
+                            // Default to string
+                            value = numStr;
+                        }
+                    }
+                }
+            } else if (pos < content.length() && (toLower(content.substr(pos, 4)) == "true" || toLower(content.substr(pos, 5)) == "false")) {
+                // Boolean value
+                size_t boolEnd = pos;
+                while (boolEnd < content.length() && !std::isspace(content[boolEnd]) && content[boolEnd] != ',' && content[boolEnd] != '}') {
+                    boolEnd++;
+                }
+                std::string boolStr = trim(content.substr(pos, boolEnd - pos));
+                bool boolValue = (toLower(boolStr) == "true");
+                value = boolValue;
+                pos = boolEnd;
+            } else {
+                // Default to string
+                while (pos < content.length() && content[pos] != ',' && content[pos] != '}') {
+                    pos++;
+                }
+                value = trim(content.substr(valueStart, pos - valueStart));
+            }
+            
+            // Skip comma or closing brace
+            if (pos < content.length() && (content[pos] == ',' || content[pos] == '}')) {
+                pos++;
+            }
+            
+            // Add entry
+            set(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (...) {
+        // JSON parsing failed, fall back to simple format
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +237,22 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                file << arg;
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -186,30 +352,8 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// The instantiations will be automatically generated when this file is compiled
 
 } // namespace nlm
+

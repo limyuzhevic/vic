@@ -9,7 +9,8 @@
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
+#include "core/Logger/EnhancedLogger.hpp"
+#include "core/Logger/ConsoleLogger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
@@ -326,19 +327,13 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    NLM_ENHANCED_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_ENHANCED_LOG_INFO("Implementing:");
+    NLM_ENHANCED_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_ENHANCED_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_ENHANCED_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_ENHANCED_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_ENHANCED_LOG_INFO("");
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -403,7 +398,7 @@ int main(int argc, char** argv) {
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_ENHANCED_LOG_ERROR("Failed to initialize brain!");
         return 1;
     }
     
