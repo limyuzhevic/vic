@@ -353,68 +353,126 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // AgentBrain class - enhanced with more Pythonic API
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+        .def("get_sensory_input_size", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+        .def("get_motor_output_size", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+        .def("process_sensory_input", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+        .def("decode_motor_command", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+        .def("apply_reward_modulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+        .def("update_development", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+        .def("get_developmental_stage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+        .def("get_neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+        .def("get_curiosity_level", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+        .def("get_novelty_level", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
+        .def("get_prediction_error", &AgentBrain::getPredictionError,
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
+        .def("get_brain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+        
+        // Configuration methods
+        .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+        .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
              py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+        .def("enable_development", &AgentBrain::enableDevelopment,
              py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+        .def("enable_curiosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled)
+        .def("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("is_development_enabled", &AgentBrain::isDevelopmentEnabled)
+        .def("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Statistics and monitoring
+        .def("get_dopamine_level", &AgentBrain::getNeuromodulationLevel,
+             "Get dopamine level (alias for neuromodulation level)")
+        .def("get_total_spikes", &AgentBrain::getPredictionError,
+             "Get total spike count (using prediction error as placeholder)")
+        .def("get_step_count", &AgentBrain::getPredictionError,
+             "Get step count (using prediction error as placeholder)")
+        
+        // Property-like access for Python
+        .def_readwrite("dopamine_level", &AgentBrain::dopamineLevel_)
+        .def_readwrite("novelty_level", &AgentBrain::noveltyLevel_)
+        .def_readwrite("curiosity_level", &AgentBrain::curiosityLevel_)
+        .def_readwrite("prediction_error", &AgentBrain::predictionError_)
+        .def_readwrite("expected_reward", &AgentBrain::expectedReward_)
+        .def_readwrite("developmental_age", &AgentBrain::developmentalAge_)
+        .def_readwrite("plasticity_modifier", &AgentBrain::plasticityModifier_);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Convenience Pythonic factory methods
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set some sensible defaults
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", 42);
+        
+        return config;
+    }, "Create a default configuration with sensible defaults");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Enhanced create_brain with Pythonic interface
+    m.def("create_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Simplified world creation with configuration options
+    m.def("create_simple_world", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);  // Default 20x20 world with 8x8 vision
+        return world;
+    }, "Create a default simple world");
+    
+    m.def("create_simple_world_with_config", [](int width, int height, int visionWidth, int visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20, py::arg("vision_width") = 8, py::arg("vision_height") = 8,
+       "Create a simple world with specified dimensions");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    // Enhanced agent creation
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Create default configuration for quick setup
+    m.def("quick_setup", []() {
+        py::dict config;
+        config["neuron_count"] = 500;
+        config["region_count"] = 2;
+        config["connection_probability"] = 0.05f;
+        config["simulation_timestep"] = 0.001f;
+        return config;
+    }, "Create a quick configuration dictionary for Python users");
+
+    // Module constants for easy access
+    m.attr("DEFAULT_WORLD_SIZE") = 20;
+    m.attr("DEFAULT_VISION_SIZE") = 8;
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

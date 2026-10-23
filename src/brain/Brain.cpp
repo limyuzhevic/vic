@@ -726,6 +726,8 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
 }
 
 void Brain::updatePlasticity() {
+// Override for compatibility - now applies plasticity during each step
+void Brain::updatePlasticity() {
     // Plasticity is now applied during each step
     // This method is kept for API compatibility
 }

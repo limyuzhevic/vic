@@ -90,12 +90,11 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get configuration value as string with type conversion
+    std::string getValueAsString(const std::string& key, const std::string& defaultValue = "") const;
+
+    // Check if configuration has any entries
+    bool isEmpty() const;
     
     // Internal helpers
     static std::string trim(const std::string& str);

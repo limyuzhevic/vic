@@ -78,12 +78,70 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValueAsString() {
+    nlm::Config config;
+    
+    // Test getting string values
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    std::string intStr = config.getValueAsString("int_value");
+    assert(intStr == "42");
+    
+    config.set("double_value", 3.14159, nlm::ConfigSource::Runtime);
+    std::string doubleStr = config.getValueAsString("double_value");
+    assert(doubleStr.find("3.14159") != std::string::npos);
+    
+    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
+    std::string stringStr = config.getValueAsString("string_value");
+    assert(stringStr == "hello");
+    
+    config.set("bool_value", true, nlm::ConfigSource::Runtime);
+    std::string boolStr = config.getValueAsString("bool_value");
+    assert(boolStr == "true");
+    
+    // Test missing key
+    std::string missingStr = config.getValueAsString("missing", "default_value");
+    assert(missingStr == "default_value");
+    
+    std::cout << "    testConfigValueAsString passed" << std::endl;
+}
+
+void testConfigIsEmpty() {
+    nlm::Config config1;
+    assert(config1.isEmpty());
+    
+    config1.set("key1", 1, nlm::ConfigSource::Runtime);
+    assert(!config1.isEmpty());
+    
+    config1.clear();
+    assert(config1.isEmpty());
+    
+    std::cout << "    testConfigIsEmpty passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    config.set("brain.neuron_count", 1000, nlm::ConfigSource::Default);
+    config.set("brain.synapse_density", 0.1, nlm::ConfigSource::Runtime);
+    config.set("random.seed", 12345, nlm::ConfigSource::File);
+    
+    std::string summary = config.summary();
+    assert(summary.find("brain.neuron_count") != std::string::npos);
+    assert(summary.find("brain.synapse_density") != std::string::npos);
+    assert(summary.find("random.seed") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValueAsString();
+    testConfigIsEmpty();
+    testConfigSummary();
 }
 
 } // namespace test_config
