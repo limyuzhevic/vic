@@ -66,6 +66,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Basic Build (C++ Core)
+
 ```bash
 mkdir build
 cd build
@@ -73,16 +75,61 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+### Building Python Bindings
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install Python module
+pip install .  # Installs pynlm Python bindings
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Running Tests
 
-## Project Structure
+### Phase 2: Real Neural Computation Tests
+
+The Phase 2 tests have been refactored into a modular test suite with improved error handling and command-line options:
+
+```bash
+# Run all tests (default)
+./nlm_test_refactored
+
+# Run only basic connectivity test
+./nlm_test_refactored --connectivity
+
+# Run only plasticity learning experiment
+./nlm_test_refactored --plasticity
+
+# Run only STDP verification test
+./nlm_test_refactored --stdp
+
+# Run specific test by name
+./nlm_test_refactored --test=connectivity
+
+# Show help
+./nlm_test_refactored --help
+```
+
+### Original Unit Tests
+
+The original unit tests are still available for backward compatibility:
+
+```bash
+# Run unit tests
+./nlm_test
+```
+
+### Original Main Executable
+
+The main executable now uses the TestRunner for Phase 2 tests:
+
+```bash
+# Run main executable (runs all Phase 2 tests by default)
+./nlm
+```
+
+## Project Structure (Updated)
 
 ```
 NLM/
@@ -110,57 +157,111 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
+├── src/tests/          # Modular test suite (NEW)
+│   ├── BrainConnectivityTest.cpp
+│   ├── BrainConnectivityTest.hpp
+│   ├── PlasticityTest.cpp
+│   ├── PlasticityTest.hpp
+│   ├── StdpTest.cpp
+│   ├── StdpTest.hpp
+│   ├── LearningExperiment.hpp
+│   ├── TestRunner.cpp
+│   └── TestRunner.hpp
+├── tests/             # Original unit tests (backward compatibility)
+│   ├── CMakeLists.txt
+│   ├── test_main.cpp
+│   ├── test_types.cpp
+│   ├── test_config.cpp
+│   ├── test_random.cpp
+│   ├── test_clock.cpp
+│   ├── test_neuron.cpp
+│   ├── test_synapse.cpp
+│   ├── test_stdp.cpp
+│   └── test_brain.cpp
 └── configs/
 ```
 
-## Phase Summary
+## Key Improvements
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### 1. Modular Test Structure
+- Each test is now isolated in its own file
+- Better separation of concerns
+- Easier to maintain and extend
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### 2. Enhanced Command-Line Interface
+- Supports `--connectivity`, `--plasticity`, `--stdp` flags
+- Supports `--test=<name>` for specific test selection
+- Includes `--help` and `--version` options
+- Backward compatible with original test sequence
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### 3. Improved Error Handling
+- Comprehensive try-catch blocks
+- Detailed error logging
+- Graceful failure reporting
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+### 4. Better Logging
+- Consistent logging format
+- Progress indicators
+- Detailed status reports
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+## Running Complete Examples
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Full NLM Test Suite
+
+```bash
+# Build and run everything
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Run all tests
+ctest --output-on-failure
+```
+
+### Python Development Installation
+
+```bash
+# Install in development mode
+pip install -e .
+
+# Run Python tests
+pytest tests/
+
+# Import and test Python bindings
+python3 -c "import pynlm; config = pynlm.createDefaultConfig(); brain = pynlm.createBrain(config); brain.initialize(); print('Successfully created brain with', brain.getTotalNeuronCount(), 'neurons')"
+```
+
+## Available Executables After Build
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main test runner (Phase 2 tests) |
+| `nlm_test_refactored` | Executable | Modular Phase 2 test suite |
+| `nlm_test` | Executable | Original unit test suite |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3` | Static Library | Phase 3 experiments |
+| `nlm_phase4` | Static Library | Phase 4 experiments |
+
+## Testing Notes
+
+- The refactored test suite (`nlm_test_refactored`) maintains backward compatibility with the original test sequence
+- Command-line arguments allow selective test execution
+- Both test suites (`nlm_test_refactored` and `nlm_test`) are added to CTest
+- Original functionality is preserved while improving modularity and maintainability
+
+## Next Steps
+
+1. **Build the project** using the instructions above
+2. **Run the tests** to verify functionality
+3. **Explore the Python bindings** for interactive experimentation
+4. **Read documentation** in the `docs/` directory for deeper understanding
+5. **Experiment with configurations** in the `configs/` directory
+
+The NLM project now provides both the original unit tests for comprehensive component testing and a modular, configurable test suite for Phase 2 neural computation verification.
 
 ## Scientific Limitations
 

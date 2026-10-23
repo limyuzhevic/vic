@@ -121,7 +121,7 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (now uses TestRunner)
 add_executable(nlm
     src/main.cpp
 )
@@ -139,8 +139,34 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Tests executable (refactored from original nlm_test)
+add_executable(nlm_test_refactored
+    src/tests/TestRunner.cpp
+    src/tests/BrainConnectivityTest.cpp
+    src/tests/PlasticityTest.cpp
+    src/tests/StdpTest.cpp
+)
+target_link_libraries(nlm_test_refactored PUBLIC nlm_core)
+
+# Original test executable (for backward compatibility)
+add_executable(nlm_test
+    tests/test_main.cpp
+    tests/test_types.cpp
+    tests/test_config.cpp
+    tests/test_random.cpp
+    tests/test_clock.cpp
+    tests/test_neuron.cpp
+    tests/test_synapse.cpp
+    tests/test_stdp.cpp
+    tests/test_brain.cpp
+)
+target_link_libraries(nlm_test PRIVATE nlm_core)
+target_compile_features(nlm_test PRIVATE cxx_std_20)
+
+# Enable testing and add test targets
 enable_testing()
+add_test(NAME nlm_test_refactored COMMAND nlm_test_refactored)
+add_test(NAME nlm_test_original COMMAND nlm_test)
 add_subdirectory(tests)
 
 # Install targets (future)

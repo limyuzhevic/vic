@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Test configuration
+# Test configuration - unit tests (original)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-# Create test executable
+# Create original unit test executable
 add_executable(nlm_test
     test_main.cpp
     test_types.cpp
@@ -21,4 +21,4 @@ target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_test_original COMMAND nlm_test)
