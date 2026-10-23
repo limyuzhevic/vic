@@ -400,13 +400,75 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    m.attr("__description__") = "Neural Learning Machine - Python Bindings";
+    
+    // Configuration helpers
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        
+        // Set sensible defaults for common parameters
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        
+        // Plasticity settings
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        
+        // Neuromodulation settings
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        return config;
+    }, "Create a default configuration with sensible parameters");
+
+    // Configuration validation helper
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        // Get numeric values safely
+        if (auto neuronCount = config->get<size_t>("neuron_count")) {
+            if (*neuronCount < 10) {
+                errors.push_back("neuron_count should be at least 10 for meaningful simulation");
+            }
+        }
+        
+        if (auto connectionProb = config->get<float>("connection_probability")) {
+            if (*connectionProb < 0.0f || *connectionProb > 1.0f) {
+                errors.push_back("connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (auto timestep = config->get<double>("simulation_timestep")) {
+            if (*timestep <= 0.0 || *timestep > 0.1) {
+                errors.push_back("simulation_timestep should be between 0.0 and 0.1 seconds");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrain", [](size_t neuronCount, size_t regionCount = 1) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("regionCount") = 1, 
+       "Create a brain with specified parameters (convenience constructor)");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -416,10 +478,135 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Enhanced sensory input helpers
+    m.def("createVisionInput", [](size_t width, size_t height, size_t channels = 3) -> std::shared_ptr<Vision> {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, 
+       "Create a vision sensory input with specified dimensions");
+
+    m.def("createAudioInput", [](size_t sampleRate, size_t numSamples) -> std::shared_ptr<Audio> {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"), "Create an audio sensory input");
+
+    // Action creation helpers
+    m.def("createAction", [](ActionType type, std::vector<float> parameters = {}) -> std::unique_ptr<Action> {
+        auto action = std::make_unique<Action>(type);
+        if (!parameters.empty()) {
+            action->setParameters(parameters);
+        }
+        return action;
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+       "Create an action with optional parameters");
+
+    m.def("createMoveAction", [](const std::string& direction, float distance = 1.0f) -> std::unique_ptr<Action> {
+        ActionType type;
+        if (direction == "forward" || direction == "north" || direction == "up") type = ActionType::MoveForward;
+        else if (direction == "backward" || direction == "south" || direction == "down") type = ActionType::MoveBackward;
+        else if (direction == "left" || direction == "west") type = ActionType::MoveLeft;
+        else if (direction == "right" || direction == "east") type = ActionType::MoveRight;
+        else type = ActionType::Wait;
+        
+        auto action = std::make_unique<Action>(type);
+        std::vector<float> params = {distance};
+        action->setParameters(params);
+        return action;
+    }, py::arg("direction"), py::arg("distance") = 1.0f,
+       "Create a movement action");
+
+    // Enhanced error handling
+    m.def("safeStep", [](std::shared_ptr<Brain> brain, size_t step, double time) {
+        try {
+            brain->step(static_cast<SimulationStep>(step), time);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error in brain step: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time"), 
+       "Safely perform a brain step with error handling");
+
+    // Statistics and monitoring helpers
+    m.def("getBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["pending_events"] = brain->getPendingSpikeEventCount();
+        
+        if (auto* workingMemory = brain->getWorkingMemory()) {
+            stats["working_memory_traces"] = workingMemory->getActiveTraces();
+        }
+        
+        if (auto* episodicMemory = brain->getEpisodicMemory()) {
+            stats["episodes_stored"] = episodicMemory->getEpisodeCount();
+        }
+        
+        if (auto* dopamine = brain->getDopamine()) {
+            stats["dopamine_level"] = dopamine->getLevel();
+        }
+        
+        if (auto* curiosity = brain->getCuriosity()) {
+            stats["curiosity_level"] = curiosity->getLevel();
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a Python dictionary");
+
+    // Integration helpers
+    m.def("runAgentEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, size_t maxSteps) {
+        agent->initialize(world);
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("maxSteps"),
+       "Run a complete agent episode");
+
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Neuron type aliases for convenience
+    m.def("createExcitatoryNeuronConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_type", static_cast<int>(NeuronType::Excitatory), ConfigSource::Default);
+        return config;
+    }, "Create a configuration for excitatory neurons");
+
+    m.def("createInhibitoryNeuronConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_type", static_cast<int>(NeuronType::Inhibitory), ConfigSource::Default);
+        return config;
+    }, "Create a configuration for inhibitory neurons");
+
+    m.def("createSensoryNeuronConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_type", static_cast<int>(NeuronType::Sensory), ConfigSource::Default);
+        return config;
+    }, "Create a configuration for sensory neurons");
+
+    m.def("createMotorNeuronConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_type", static_cast<int>(NeuronType::Motor), ConfigSource::Default);
+        return config;
+    }, "Create a configuration for motor neurons");
 
 } // namespace nlm

@@ -58,11 +58,23 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON format
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Save to YAML format
+    bool saveToYAML(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,6 +105,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    std::vector<std::string> validate() const;
+    
+    // Save to different formats
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +122,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isNumber(const std::string& str);
+    static ConfigValue stringToValue(const std::string& str);
 };
 
 } // namespace nlm

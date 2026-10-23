@@ -19,9 +19,175 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
+        return false;
+    }
     
+    // Try to detect file format by extension
+    std::string extension;
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    // Convert to lowercase for comparison
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    bool success = false;
+    if (extension == "json") {
+        success = loadFromJSON(filepath);
+    } else if (extension == "yaml" || extension == "yml") {
+        success = loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        success = loadFromSimpleFormat(filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+// Load configuration from JSON format
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // For now, use a simple JSON parser approach
+        // In a real implementation, you'd use a proper JSON library
+        std::string content((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        
+        // Simple JSON parsing - in practice use a proper JSON library
+        // This is a simplified implementation
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find next key (simplified)
+            size_t keyStart = content.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = content.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Find value
+            size_t valueStart = content.find(':', keyEnd);
+            if (valueStart == std::string::npos) break;
+            size_t valueEnd = content.find(',', valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.size() - 1;
+            }
+            
+            std::string valueStr = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            valueStr = trim(valueStr);
+            
+            // Remove surrounding quotes
+            if (valueStr.size() >= 2 && 
+                ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                 (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                valueStr = valueStr.substr(1, valueStr.size() - 2);
+            }
+            
+            // Parse value based on type detection
+            set(key, stringToValue(valueStr), ConfigSource::File);
+            
+            pos = valueEnd + 1;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Load configuration from YAML format
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // For now, treat YAML as similar to JSON (simplified)
+        // In a real implementation, you'd use a proper YAML library like yaml-cpp
+        std::string content((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        
+        // Simple YAML parsing - in practice use a proper YAML library
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find key (YAML can be simpler than JSON)
+            size_t colonPos = content.find(':', pos);
+            if (colonPos == std::string::npos) break;
+            
+            // Find key (everything before colon)
+            size_t keyEnd = content.rfind('\n', colonPos);
+            if (keyEnd == std::string::npos) keyEnd = colonPos;
+            else keyEnd = content.rfind('\t', keyEnd);
+            if (keyEnd == std::string::npos) keyEnd = colonPos;
+            
+            std::string key = content.substr(0, keyEnd);
+            key = trim(key);
+            
+            // Find value (everything after colon)
+            size_t valueStart = colonPos + 1;
+            if (valueStart < content.size() && content[valueStart] == ' ') {
+                valueStart++;
+            }
+            
+            size_t nextLine = content.find('\n', valueStart);
+            std::string valueStr = content.substr(valueStart, nextLine - valueStart);
+            valueStr = trim(valueStr);
+            
+            // Handle YAML lists
+            if (valueStr.find('[') == 0) {
+                // Simple list handling - just store as string for now
+                // In a real implementation, you'd properly parse YAML lists
+                set(key, valueStr, ConfigSource::File);
+            } else {
+                // Parse value based on type detection
+                set(key, stringToValue(valueStr), ConfigSource::File);
+            }
+            
+            pos = nextLine + 1;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Load configuration from simple key=value format (legacy support)
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,45 +214,72 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, stringToValue(value), ConfigSource::File);
         }
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
+// Save configuration to JSON format
+bool Config::saveToJSON(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    file << "}\n";
+    
+    return true;
+}
+
+// Save configuration to YAML format
+bool Config::saveToYAML(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration\n";
+    file << "# Generated: " << __DATE__ << " " << __TIME__ << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << ": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -186,6 +379,135 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Validate configuration and return list of errors
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    // Check required keys
+    if (!has("neuron_count")) {
+        errors.push_back("Missing required key: neuron_count");
+    }
+    
+    if (!has("region_count")) {
+        errors.push_back("Missing required key: region_count");
+    }
+    
+    // Get and validate numeric values
+    auto neuronCount = get<size_t>("neuron_count");
+    if (neuronCount.has_value()) {
+        if (*neuronCount < 10) {
+            errors.push_back("neuron_count should be at least 10");
+        } else if (*neuronCount > 10000) {
+            errors.push_back("neuron_count should be less than or equal to 10000");
+        }
+    }
+    
+    auto regionCount = get<size_t>("region_count");
+    if (regionCount.has_value()) {
+        if (*regionCount < 1) {
+            errors.push_back("region_count should be at least 1");
+        }
+    }
+    
+    auto connectionProb = get<float>("connection_probability");
+    if (connectionProb.has_value()) {
+        if (*connectionProb < 0.0f || *connectionProb > 1.0f) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    auto timestep = get<double>("simulation_timestep");
+    if (timestep.has_value()) {
+        if (*timestep <= 0.0 || *timestep > 0.1) {
+            errors.push_back("simulation_timestep should be between 0.0 and 0.1 seconds");
+        }
+    }
+    
+    return errors;
+}
+
+// Save configuration to JSON format
+bool Config::saveToJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    file << "}\n";
+    
+    return true;
+}
+
+// Save configuration to YAML format
+bool Config::saveToYAML(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration\n";
+    file << "# Generated: " << __DATE__ << " " << __TIME__ << "\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << entry.key << ": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
+    }
+    
+    return true;
+}
+
+// File format detection
+std::string Config::detectFileFormat(const std::string& filepath) {
+    std::string extension;
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    }
+    
+    if (extension == "json") {
+        return "json";
+    } else if (extension == "yaml" || extension == "yml") {
+        return "yaml";
+    } else {
+        return "simple";
+    }
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -199,17 +521,69 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Helper function to check if a string is a number
+bool Config::isNumber(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') {
+        start = 1;
+    }
+    
+    bool hasDecimal = false;
+    for (size_t i = start; i < str.size(); ++i) {
+        if (isdigit(str[i])) continue;
+        if (str[i] == '.' && !hasDecimal) {
+            hasDecimal = true;
+            continue;
+        }
+        return false;
+    }
+    
+    return true;
+}
 
-} // namespace nlm
+// Helper function to convert string to appropriate type
+ConfigValue Config::stringToValue(const std::string& str) {
+    if (str.empty()) {
+        return std::string("");
+    }
+    
+    // Try to parse as integer
+    if (isNumber(str)) {
+        try {
+            if (str.find('.') != std::string::npos) {
+                // Has decimal point - try double
+                size_t pos;
+                double val = std::stod(str, &pos);
+                if (pos == str.size()) {
+                    return val;
+                }
+            } else {
+                // Try int64_t
+                size_t pos;
+                int64_t val = std::stoll(str, &pos);
+                if (pos == str.size()) {
+                    return val;
+                }
+            }
+        } catch (...) {
+            // Fall through to string
+        }
+    }
+    
+    // Try to parse as boolean
+    std::string lowerStr = toLower(str);
+    if (lowerStr == "true" || lowerStr == "false") {
+        return lowerStr == "true";
+    }
+    
+    // Fall back to string
+    return str;
+}

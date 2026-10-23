@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.16)
-
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
@@ -8,6 +6,8 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_advanced.cpp
+    test_bindings_enhanced.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
