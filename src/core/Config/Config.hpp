@@ -90,8 +90,24 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Load configuration from file with optional format specification
+    bool loadFromFileWithFormat(const std::string& filepath, const std::string& format);
+    
+    // Validate configuration values for consistency and reasonable ranges
+    bool validate() const;
+    
+    // Get configuration validation errors (returns empty if valid)
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Merge configuration from another config source
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Reset configuration to defaults
+    void resetToDefaults();
+    
+    // Get default value for a key without looking in entries
+    template<typename T>
+    static T getDefault(const std::string& key, const T& defaultValue = T());
     
 private:
     struct Impl;

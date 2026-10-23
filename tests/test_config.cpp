@@ -78,12 +78,42 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test valid configuration
+    config.set("neuron_count", 1000, nlm::ConfigSource::Runtime);
+    config.set("region_count", 1, nlm::ConfigSource::Runtime);
+    config.set("connection_probability", 0.1f, nlm::ConfigSource::Runtime);
+    config.set("simulation_timestep", 0.001, nlm::ConfigSource::Runtime);
+    config.set("random_seed", 42, nlm::ConfigSource::Runtime);
+    
+    assert(config.validate());
+    
+    // Test invalid connection probability
+    config.set("connection_probability", 1.5f, nlm::ConfigSource::Runtime);
+    assert(!config.validate());
+    
+    // Test invalid neuron count (too low)
+    config.set("neuron_count", 5, nlm::ConfigSource::Runtime);
+    assert(!config.validate());
+    
+    // Reset and test invalid timestep
+    config.clear();
+    config.set("neuron_count", 1000, nlm::ConfigSource::Runtime);
+    config.set("region_count", 1, nlm::ConfigSource::Runtime);
+    config.set("connection_probability", 0.1f, nlm::ConfigSource::Runtime);
+    config.set("simulation_timestep", -0.001, nlm::ConfigSource::Runtime);
+    assert(!config.validate());
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
 }
-
-} // namespace test_config

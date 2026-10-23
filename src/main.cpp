@@ -48,6 +48,95 @@ void printBanner() {
     )" << std::endl;
 }
 
+// Configuration validation functions
+bool validateConfiguration(const std::shared_ptr<Config>& config) {
+    bool isValid = true;
+    
+    // Check essential parameters
+    if (!config->has("neuron_count")) {
+        NLM_LOG_WARNING("Missing essential parameter: neuron_count");
+        isValid = false;
+    }
+    
+    if (!config->has("region_count")) {
+        NLM_LOG_WARNING("Missing essential parameter: region_count");
+        isValid = false;
+    }
+    
+    if (!config->has("connection_probability")) {
+        NLM_LOG_WARNING("Missing essential parameter: connection_probability");
+        isValid = false;
+    } else {
+        float prob = config->getOr<float>("connection_probability", 0.1f);
+        if (prob < 0.0f || prob > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(prob) + ". Must be in [0.0, 1.0]");
+            isValid = false;
+        }
+    }
+    
+    // Check for reasonable values
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+    if (neuronCount < 10) {
+        NLM_LOG_ERROR("Too few neurons specified: " + std::to_string(neuronCount) + ". Minimum is 10");
+        isValid = false;
+    } else if (neuronCount > 1000000) {
+        NLM_LOG_WARNING("High neuron count specified: " + std::to_string(neuronCount) + ". May impact performance");
+    }
+    
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be >= 1");
+        isValid = false;
+    }
+    
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be > 0");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+void printConfigurationSummary(const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== NLM Configuration Summary ===");
+    
+    // Essential parameters
+    NLM_LOG_INFO("Essential Parameters:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    
+    // Plasticity parameters
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Plasticity Parameters:");
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.01f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.012f)));
+    NLM_LOG_INFO("  stdp_time_constant: " + std::to_string(config->getOr<float>("stdp_time_constant", 20.0f)));
+    
+    // Development parameters
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Development Parameters:");
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.0001f)));
+    
+    // Neuromodulation parameters
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Neuromodulation Parameters:");
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
+    
+    // Simulation parameters
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Simulation Parameters:");
+    NLM_LOG_INFO("  max_steps: " + std::to_string(config->getOr<int64_t>("max_steps", 10000)));
+    NLM_LOG_INFO("  simulation_time_limit: " + std::to_string(config->getOr<double>("simulation_time_limit", 0.0)) + "s");
+    
+    NLM_LOG_INFO("");
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -381,6 +470,15 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Validate configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== VALIDATING CONFIGURATION ===");
+    if (!validateConfiguration(config)) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return 1;
+    }
+    NLM_LOG_INFO("Configuration validation passed!");
     
     // Log configuration summary
     NLM_LOG_INFO("");

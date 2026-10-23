@@ -193,11 +193,85 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
+// Validate configuration values for consistency and reasonable ranges
+    bool Config::validate() const {
+        bool valid = true;
+        
+        // Check for duplicate keys
+        std::vector<std::string> keys;
+        for (const auto& entry : pImpl->entries) {
+            auto it = std::find(keys.begin(), keys.end(), entry.key);
+            if (it != keys.end()) {
+                std::cerr << "Config error: Duplicate key \"" << entry.key << "\"" << std::endl;
+                valid = false;
+            }
+            keys.push_back(entry.key);
+        }
+        
+        // Validate specific configuration parameters with sensible ranges
+        if (has("neuron_count")) {
+            auto neuronCount = getOr<size_t>("neuron_count", 1000);
+            if (neuronCount < 10 || neuronCount > 1000000) {
+                std::cerr << "Config warning: neuron_count " << neuronCount 
+                         << " is outside recommended range [10, 1000000]" << std::endl;
+            }
+        }
+        
+        if (has("region_count")) {
+            auto regionCount = getOr<size_t>("region_count", 1);
+            if (regionCount < 1 || regionCount > 1000) {
+                std::cerr << "Config warning: region_count " << regionCount 
+                         << " is outside recommended range [1, 1000]" << std::endl;
+            }
+        }
+        
+        if (has("connection_probability")) {
+            auto prob = getOr<float>("connection_probability", 0.1f);
+            if (prob < 0.0f || prob > 1.0f) {
+                std::cerr << "Config error: connection_probability " << prob 
+                         << " is outside valid range [0.0, 1.0]" << std::endl;
+                valid = false;
+            }
+        }
+        
+        if (has("simulation_timestep")) {
+            auto timestep = getOr<double>("simulation_timestep", 0.001);
+            if (timestep <= 0.0 || timestep > 1.0) {
+                std::cerr << "Config warning: simulation_timestep " << timestep 
+                         << " is outside recommended range (0.0, 1.0]" << std::endl;
+            }
+        }
+        
+        if (has("random_seed")) {
+            auto seed = getOr<int64_t>("random_seed", 42);
+            if (seed < 0) {
+                std::cerr << "Config warning: random_seed " << seed 
+                         << " is negative - consider using a positive value" << std::endl;
+            }
+        }
+        
+        return valid;
+    }
+    
+    // Load configuration from JSON/YAML file if available
+    bool Config::loadFromFileWithFormat(const std::string& filepath, const std::string& format) {
+        std::string ext = "";
+        size_t dotPos = filepath.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            ext = filepath.substr(dotPos + 1);
+        }
+        
+        if (ext == "json" || format == "json") {
+            // TODO PHASE 2: Implement JSON parser
+            return false;
+        } else if (ext == "yaml" || ext == "yml" || format == "yaml") {
+            // TODO PHASE 2: Implement YAML parser
+            return false;
+        } else {
+            // Fall back to simple key=value format
+            return loadFromFile(filepath);
+        }
+    }
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
