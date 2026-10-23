@@ -159,6 +159,70 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Apply neural planning to action selection
+    // NeuralPlanner uses concepts and predictions to plan multi-step actions
+    if (brain_->getPlanner()) {
+        // Convert current brain state to planning context
+        std::vector<float> currentState;
+        
+        // Use sensory neurons to represent current state
+        if (!brain_->getWorkingMemory()) {
+            // If working memory is not available, use sensory neurons as fallback
+            for (Neuron* neuron : sensoryVision_) {
+                if (neuron) {
+                    const auto& state = neuron->getState();
+                    float value = (state.membranePotential - state.restingPotential) / 10.0f;
+                    currentState.push_back(value);
+                }
+            }
+        } else {
+            // Get working memory representation
+            currentState = brain_->getWorkingMemory()->retrieve();
+        }
+        
+        // If we have a concept formation system and concepts, use them for planning
+        if (brain_->getConceptFormation() && !currentState.empty()) {
+            size_t conceptId = brain_->getConceptFormation()->getMatchingConcept(currentState);
+            if (conceptId > 0) {
+                const auto* concept = brain_->getConceptFormation()->getConcept(conceptId);
+                if (concept) {
+                    // Use concept to guide action selection
+                    // For now, just boost the planning confidence
+                    NLM_LOG_INFO("AgentBrain: Planning using concept " + std::to_string(conceptId));
+                }
+            }
+        }
+        
+        // Get planned action from neural planner
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+        
+        // Convert planned action to motor command
+        // This represents the planned sequence of motor actions
+        MotorCommand plannedCommand = MotorCommand::Wait;
+        switch (plannedAction) {
+            case ActionType::MoveForward: plannedCommand = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: plannedCommand = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: plannedCommand = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: plannedCommand = MotorCommand::TurnRight; break;
+            case ActionType::LookLeft: plannedCommand = MotorCommand::LookLeft; break;
+            case ActionType::LookRight: plannedCommand = MotorCommand::LookRight; break;
+            case ActionType::Interact: plannedCommand = MotorCommand::Interact; break;
+            case ActionType::Wait: plannedCommand = MotorCommand::Wait; break;
+        }
+        
+        // Update planning confidence based on concept stability
+        if (brain_->getConceptFormation() && !currentState.empty()) {
+            size_t conceptId = brain_->getConceptFormation()->getMatchingConcept(currentState);
+            if (conceptId > 0) {
+                float conceptStability = brain_->getConceptFormation()->getConceptStability(conceptId);
+                if (conceptStability > 0.5f) {
+                    // High confidence - keep planned action
+                    decoded = plannedCommand;
+                }
+            }
+        }
+    }
+    
     return decoded;
 }
 
