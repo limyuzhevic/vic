@@ -92,80 +92,37 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
     auto startTime = std::chrono::high_resolution_clock::now();
     uint64_t currentStep = 0;
     
-    // Phase 1: Early Development
-    {
-        NLM_LOG_INFO("Phase 1: Early Development");
-        uint64_t phaseEnd = currentStep + config.synapseFormationSteps;
+    // Define phase durations mapping
+    const std::map<std::string, uint64_t> phaseDurations = {
+        {"synapseFormationSteps", config.synapseFormationSteps},
+        {"sensoryDevelopmentSteps", config.sensoryDevelopmentSteps},
+        {"motorDevelopmentSteps", config.motorDevelopmentSteps},
+        {"associativeDevelopmentSteps", config.associativeDevelopmentSteps},
+        {"memoryConsolidationSteps", config.memoryConsolidationSteps},
+        {"socialDevelopmentSteps", config.socialDevelopmentSteps}
+    };
+    
+    const std::vector<std::pair<std::string, std::string>> phases = {
+        {"Early Development", "synapseFormationSteps"},
+        {"Sensory Development", "sensoryDevelopmentSteps"},
+        {"Motor Development", "motorDevelopmentSteps"},
+        {"Associative Development", "associativeDevelopmentSteps"},
+        {"Memory Consolidation", "memoryConsolidationSteps"},
+        {"Social Development", "socialDevelopmentSteps"}
+    };
+    
+    for (const auto& phase : phases) {
         auto phaseResult = runPhase(
-            brain.get(), "Early Development", currentStep, phaseEnd,
-            [](uint64_t step) {
-                if (step % 1000 == 0) {
+            brain.get(), phase.first, currentStep, 
+            currentStep + phaseDurations.at(phase.second),
+            [phase = phase.first](uint64_t step) {
+                if (phase == "Early Development" && step % 1000 == 0) {
                     NLM_LOG_DEBUG("  Step " + std::to_string(step));
                 }
             }
         );
         result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
-    }
-    
-    // Phase 2: Sensory Development
-    {
-        NLM_LOG_INFO("Phase 2: Sensory Development");
-        uint64_t phaseEnd = currentStep + config.sensoryDevelopmentSteps;
-        auto phaseResult = runPhase(
-            brain.get(), "Sensory Development", currentStep, phaseEnd,
-            [](uint64_t step) {}
-        );
-        result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
-    }
-    
-    // Phase 3: Motor Development
-    {
-        NLM_LOG_INFO("Phase 3: Motor Development");
-        uint64_t phaseEnd = currentStep + config.motorDevelopmentSteps;
-        auto phaseResult = runPhase(
-            brain.get(), "Motor Development", currentStep, phaseEnd,
-            [](uint64_t step) {}
-        );
-        result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
-    }
-    
-    // Phase 4: Associative Development
-    {
-        NLM_LOG_INFO("Phase 4: Associative Development");
-        uint64_t phaseEnd = currentStep + config.associativeDevelopmentSteps;
-        auto phaseResult = runPhase(
-            brain.get(), "Associative Development", currentStep, phaseEnd,
-            [](uint64_t step) {}
-        );
-        result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
-    }
-    
-    // Phase 5: Memory Consolidation
-    {
-        NLM_LOG_INFO("Phase 5: Memory Consolidation");
-        uint64_t phaseEnd = currentStep + config.memoryConsolidationSteps;
-        auto phaseResult = runPhase(
-            brain.get(), "Memory Consolidation", currentStep, phaseEnd,
-            [](uint64_t step) {}
-        );
-        result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
-    }
-    
-    // Phase 6: Social Development
-    {
-        NLM_LOG_INFO("Phase 6: Social Development");
-        uint64_t phaseEnd = currentStep + config.socialDevelopmentSteps;
-        auto phaseResult = runPhase(
-            brain.get(), "Social Development", currentStep, phaseEnd,
-            [](uint64_t step) {}
-        );
-        result.phaseResults.push_back(phaseResult);
-        currentStep = phaseEnd;
+        currentStep += phaseDurations.at(phase.second);
     }
     
     auto endTime = std::chrono::high_resolution_clock::now();
@@ -327,43 +284,42 @@ LifetimeExperimentResult Phase5IntegratedExperiment::initializeResult(
 LifetimePhaseResult Phase5IntegratedExperiment::runPhase(
     Brain* brain,
     const std::string& phaseName,
-    uint64_t startStep,
-    uint64_t endStep,
-    const std::function<void(uint64_t step)>& progressCallback
+    uint64_t currentStep,
+    const std::string& phaseDurationConfig,
+    const std::map<std::string, uint64_t>& phaseDurations
 ) {
-    LifetimePhaseResult result;
-    result.phaseName = phaseName;
-    result.startStep = startStep;
-    result.endStep = endStep;
+    NLM_LOG_INFO(phaseName);
     
-    auto phaseStart = std::chrono::high_resolution_clock::now();
-    
-    // Simulate the phase
-    for (uint64_t step = startStep; step < endStep; ++step) {
-        brain->step(step, step * 0.001);  // 1ms timestep
-        
-        progressCallback(step);
-        
-        if (step % 1000 == 0) {
-            // Collect basic metrics
-            result.totalReward += brain->getAverageFiringRate() * 0.01f;
-            result.avgFiringRate = brain->getAverageFiringRate();
-        }
-    }
-    
-    auto phaseEnd = std::chrono::high_resolution_clock::now();
-    result.duration = std::chrono::duration<double>(phaseEnd - phaseStart).count();
-    
-    return result;
+    uint64_t phaseEnd = currentStep + phaseDurations.at(phaseDurationConfig);
+    return runPhase(brain, phaseName, currentStep, phaseEnd,
+                   [phaseName](uint64_t step) {
+                       if (phaseName == "Early Development" && step % 1000 == 0) {
+                           NLM_LOG_DEBUG("  Step " + std::to_string(step));
+                       }
+                   });
 }
 
-LifetimePhaseResult Phase5IntegratedExperiment::collectPhaseResults(
-    Brain* brain,
-    const std::string& phaseName,
-    uint64_t startStep,
-    uint64_t endStep
-) {
-    return runPhase(brain, phaseName, startStep, endStep, [](uint64_t) {});
+// Helper function to get phase durations mapping
+std::map<std::string, uint64_t> Phase5IntegratedExperiment::getPhaseDurations(const LifetimeExperimentConfig& config) {
+    return {
+        {"synapseFormationSteps", config.synapseFormationSteps},
+        {"sensoryDevelopmentSteps", config.sensoryDevelopmentSteps},
+        {"motorDevelopmentSteps", config.motorDevelopmentSteps},
+        {"associativeDevelopmentSteps", config.associativeDevelopmentSteps},
+        {"memoryConsolidationSteps", config.memoryConsolidationSteps},
+        {"socialDevelopmentSteps", config.socialDevelopmentSteps}
+    };
+}
+
+std::vector<std::pair<std::string, std::string>> Phase5IntegratedExperiment::getPhases() {
+    return {
+        {"Early Development", "synapseFormationSteps"},
+        {"Sensory Development", "sensoryDevelopmentSteps"},
+        {"Motor Development", "motorDevelopmentSteps"},
+        {"Associative Development", "associativeDevelopmentSteps"},
+        {"Memory Consolidation", "memoryConsolidationSteps"},
+        {"Social Development", "socialDevelopmentSteps"}
+    };
 }
 
 void Phase5IntegratedExperiment::generateVisualizations(

@@ -207,15 +207,25 @@ public:
     );
     
     /**
-     * Run a single phase
+     * Run a phase using a config-driven approach with reduced boilerplate
      */
     LifetimePhaseResult runPhase(
         class Brain* brain,
         const std::string& phaseName,
-        uint64_t startStep,
-        uint64_t endStep,
-        const std::function<void(uint64_t step)>& progressCallback
+        uint64_t currentStep,
+        const std::string& phaseDurationConfig,
+        const std::map<std::string, uint64_t>& phaseDurations
     );
+    
+    /**
+     * Get phase configuration mapping for experiment
+     */
+    static std::map<std::string, uint64_t> getPhaseDurations(const LifetimeExperimentConfig& config);
+    
+    /**
+     * Get phase name and duration config pairs for iteration
+     */
+    static std::vector<std::pair<std::string, std::string>> getPhases();
     
     /**
      * Run continual learning experiment with task switching

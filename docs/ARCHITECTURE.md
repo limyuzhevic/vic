@@ -12,19 +12,14 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
 │  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
 │  │   Input    │    │   Core      │    │    Output   │          │
+│  │           │    │             │    │             │          │
 │  └─────────────┘    └─────────────┘    └─────────────┘          │
-│         │                  │                  │                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │  Sensory    │    │  Memory     │    │   Action    │          │
-│  │  Processing │    │  Systems   │    │  Selection  │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │  Prediction │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
+│         │                  │                  │             │
+│         ▼                  ▼                  ▼             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐       │
+│  │  Working    │    │  Prediction │    │   Action    │       │
+│  │  Memory     │    │   System    │    │  Selection  │       │
+│  └─────────────┘    └─────────────┘    └─────────────┘       │
 │                            │                                    │
 │                            ▼                                    │
 │                    ┌─────────────┐                              │
@@ -39,14 +34,19 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │                    └─────────────┘                              │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │              PHASE 6: INTEGRATION (Current Focus)              ││
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
+│  │  │Working  │  │Episodic  │  │Memory  │  │Social   │       ││
+│  │  │Storage  │  │Memory   │  │System  │  │Learning │       ││
+│  │  │          │  │         │  │        │  │         │       ││
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Phase 6 Status: Focused on Integration** 
+
+While Phase 5 established the neural foundation, Phase 6 addresses the critical challenge of **connecting existing systems** to create a coherent artificial brain. This document has been updated to reflect Phase 6 integration priorities rather than additional feature development.
 
 ## Core Components
 

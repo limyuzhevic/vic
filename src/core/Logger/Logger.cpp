@@ -176,6 +176,11 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
+Logger& Logger::getInstance() {
+    static Logger instance;
+    return instance;
+}
+
 Logger& Logger::getGlobal() {
     static Logger globalLogger;
     return globalLogger;
@@ -185,13 +190,14 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
 }
-
-// LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    // Only log if there's actually content in the stream
+    if (!oss_.str().empty()) {
+        Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    }
 }
 
 } // namespace nlm
