@@ -1,21 +1,22 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "cmake>=3.16"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework - Phase 6 Integration"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,39 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "typing-extensions>=4.0; python_version < '3.11'",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-asyncio>=0.21",
     "numpy>=1.20",
+    "numpy-stl>=3.1",
+    "matplotlib>=3.5; extra == 'plotting'",
+    "jupyter>=1.0; extra == 'notebook'",
+]
+
+plotting = [
+    "matplotlib>=3.5",
+    "numpy-stl>=3.1",
+]
+
+notebook = [
+    "jupyter>=1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Documentation" = "https://nlm.readthedocs.io"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +67,437 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DENABLE_PYTHON_BINDINGS=ON",
 ]
+cmake.define = { USE_PYTHON_BINDINGS = true }
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
 
+[tool.scikit-build.cmake.function]
+find_package = "Python3 REQUIRED COMPONENTS Interpreter Development"
+
+# Python package structure
+[tool.setuptools]
+packages = ["nlm", "nlm.core", "nlm.brain", "nlm.memory", "nlm.plasticity", "nlm.neuromodulation", "nlm.cognition", "nlm.sensory", "nlm.motor", "nlm.environment", "nlm.experiments"]
+
+# Python binding modules
+[tool.scikit-build.extra.files]
+"*.so" = "nlm.*"
+"*.pyd" = "nlm.*"
+
+# Type stubs for better IDE support
+[project.scripts]
+pynlm-demo = "pynlm.cli:main"
+pynlm-explore = "pynlm.explore:main"
+pynlm-visualize = "pynlm.visualization:main"
+
+# PyPI metadata
+[metadata]
+name = "pynlm"
+version = "0.1.0"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework - Phase 6 Integration"
+long_description = """
+# NLM Python Bindings (Phase 6 Integration)
+
+Python interface to the NLM (Neural Learning Machine) Phase 6 integrated brain simulation framework.
+
+## Features
+
+- Real spiking neural computation with LIF neurons
+- Integrated memory systems (working, episodic, associative)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Synaptic plasticity (STDP, Hebbian, structural)
+- Developmental stages and brain maturation
+- Checkpoint save/load and replay systems
+- Prediction and cognition modules
+- Complete integrated brain loop
+
+## Quick Start
+
+```python
+import nlm
+
+# Create brain with Phase 6 configuration
+brain = nlm.Brain(neuron_count=1000, development_stage=3)
+
+# Run integration demo
+result = brain.run_demo(steps=2000)
+
+# Access brain systems
+memory = brain.get_working_memory()
+ neuromod = brain.get_dopamine()
+ plasticity = brain.get_stdp()
+```
+
+## Advanced Features
+
+- Checkpoint saving/loading for persistence
+- Replay and consolidation for memory stability
+- Real-time interaction with environment
+- Comprehensive logging and monitoring
+- Experimental framework for testing integration
+"""
+long_description_content_type = "text/markdown"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--import-mode=importlib",
+    "-v",
+    "--tb=short",
+]
+
+# Performance optimizations
+[build.warnings]
+ignore = ["W0612", "W0613"]  # Ignore unused variables for C++ bindings
+
+# Documentation configuration
+[tool.pydocstyle]
+ignore = "D100,D101,D102,D103,D104,D105,D106,D107,D203,D204,D213"
+
+# Web API server
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "websockets>=12.0",
+    "asyncio>=3.4.0; python_version < '3.11'",
+    "httpx>=0.24.0",
+]
+
+# Advanced plotting
+plotting = [
+    "matplotlib>=3.5",
+    "numpy-stl>=3.1",
+    "plotly>=5.17.0",
+    "seaborn>=0.12.0",
+]
+
+notebook = [
+    "jupyter>=1.0",
+    "jupyterlab>=4.0",
+    "ipywidgets>=8.0",
+]
+
+[project.scripts]
+pynlm-demo = "pynlm.cli:main"
+pynlm-explore = "pynlm.explore:main"
+pynlm-visualize = "pynlm.visualization:main"
+pynlm-web = "pynlm.web_api:main"
+pynlm-simulation = "pynlm.simulation:main"
+
+# Web API server configuration
+[tool.pynlm]
+web_host = "0.0.0.0"
+web_port = 8000
+web_workers = 1
+enable_websocket = true
+enable_webhooks = true
+max_connections = 1000
+log_level = "info"
+
+[tool.pynlm.websocket]
+max_message_size = 1048576
+ping_interval = 30
+pong_timeout = 10
+
+[tool.pynlm.webhooks]
+max_webhooks = 100
+webhook_timeout = 300
+
+# Performance monitoring
+[tool.pynlm.metrics]
+collect_system_metrics = true
+collect_brain_metrics = true
+metrics_interval = 1
+export_format = ["json", "prometheus"]
+
+# Configuration schema
+[tool.pynlm.config]
+max_neuron_count = 100000
+max_simulation_steps = 1000000
+checkpoint_interval = 10000
+replay_interval = 1000
+
+[tool.pynlm.config.defaults]
+neuron_count = 1000
+region_count = 1
+development_stage = 3
+plasticity_enabled = true
+neuromodulation_enabled = true
+memory_enabled = true
+prediction_enabled = true
+checkpoint_enabled = true
+replay_enabled = true
+
+# API documentation
+[tool.pynlm.api_docs]
+title = "NLM Python API"
+description = "Python bindings for NLM (Neural Learning Machine) Phase 6 integration"
+version = "0.1.0"
+contact_name = "NLM Team"
+contact_email = "info@nlm-project.org"
+license = "MIT"
+
+[tool.pynlm.api_docs.servers]
+local = "http://localhost:8000/v1"
+production = "https://api.nlm-project.org/v1"
+
+[tool.pynlm.api_docs.paths]
+"/health" = "health check endpoint"
+"/status" = "system status endpoint"
+"/brain/{id}/step" = "simulate brain step"
+"/brain/{id}/reset" = "reset brain state"
+"/brain/{id}/save" = "save brain checkpoint"
+"/brain/{id}/load" = "load brain checkpoint"
+"/brain/{id}/metrics" = "get brain metrics"
+"/brain/{id}/neurons" = "manage neurons"
+"/brain/{id}/synapses" = "manage synapses"
+"/brain/{id}/memory" = "access memory systems"
+"/brain/{id}/neuromodulation" = "control neuromodulators"
+"/brain/{id}/development" = "manage development stages"
+
+[tool.pynlm.api_docs.tags]
+brain = "Brain simulation control"
+memory = "Memory system management"
+plasticity = "Synaptic plasticity control"
+neuromodulation = "Neuromodulator control"
+development = "Development stage management"
+metrics = "Performance metrics"
+webhooks = "Webhook notifications"
+
+# Advanced visualization
+[tool.pynlm.visualization]
+export_formats = ["png", "svg", "pdf", "html"]
+interactive = true
+export_path = "./exports"
+template = "dashboard"
+
+[tool.pynlm.visualization.charts]
+activity = "line"
+spikes = "histogram"
+weights = "heatmap"
+memory = "heatmap"
+neuromodulation = "line"
+development = "line"
+
+[tool.pynlm.visualization.interactive]
+dashboard = true
+real_time = true
+export_sessions = true
+sharing_enabled = true
+
+# Advanced visualization
+[tool.pynlm.visualization]
+export_formats = ["png", "svg", "pdf", "html", "json", "parquet", "hdf5"]
+interactive = true
+export_path = "./exports"
+template = "dashboard"
+theme = "neural"
+animation_enabled = true
+animation_fps = 30
+
+[tool.pynlm.visualization.charts]
+activity = "line"
+spikes = "histogram"
+weights = "heatmap"
+memory = "heatmap"
+neuromodulation = "line"
+development = "line"
+plasticity = "heatmap"
+prediction = "radar"
+cognition = "scatter"
+environment = "heatmap"
+
+[tool.pynlm.visualization.interactive]
+dashboard = true
+real_time = true
+export_sessions = true
+sharing_enabled = true
+collaboration = false
+webgl = true
+three_d_enabled = true
+
+# Export configurations
+[tool.pynlm.visualization.exports]
+neurons = {format = ["csv", "json", "parquet"], scale = "detailed"}
+synapses = {format = ["csv", "json", "hdf5"], connections = "full"}
+memories = {format = ["json", "hdf5"], compression = "lz4"}
+brain_states = {format = ["json", "hdf5", "npy"], timestamp = true}
+metrics = {format = ["csv", "json", "parquet"], aggregation = "time_series"}
+audit_logs = {format = ["json", "csv"], retention_days = 365}
+
+# Visualization templates
+[tool.pynlm.visualization.templates]
+academic = {theme = "latex", style = "minimal", export = ["pdf", "png"]}
+interactive = {theme = "dark", style = "modern", export = ["html", "js"]}
+dashboard = {theme = "neural", style = "dashboard", export = ["png", "html"]}
+scientific = {theme = "scientific", style = "publication", export = ["pdf", "png"]}
+
+# Time series visualization
+[tool.pynlm.visualization.time_series]
+window_size = 3600
+sampling_rate = "auto"
+interpolation = "cubic"
+smoothing = true
+smoothing_factor = 0.3
+
+# Network visualization
+[tool.pynlm.visualization.network]
+layout = "force_directed"
+node_size = "degree"
+edge_width = "weight"
+community_detection = true
+interactive_graph = true
+zoom_level = 1.5
+
+# 3D visualization
+[tool.pynlm.visualization.three_d]
+enabled = true
+renderer = "webgl"
+quality = "high"
+ambient_light = 0.3
+point_light_intensity = 1.0
+background_color = "#000000"
+
+# Export quality presets
+[tool.pynlm.visualization.quality]
+low = {resolution = [800, 600], compression = "medium", frames_per_second = 15}
+medium = {resolution = [1920, 1080], compression = "high", frames_per_second = 30}
+high = {resolution = [3840, 2160], compression = "lossless", frames_per_second = 60}
+ultra = {resolution = [7680, 4320], compression = "lossless", frames_per_second = 120}
+
+# Session management
+[tool.pynlm.sessions]
+max_session_duration = 86400
+session_timeout = 3600
+concurrent_sessions = 100
+save_sessions = true
+auto_cleanup = true
+session_backup = true
+backup_interval = 3600
+
+# Collaboration
+[tool.pynlm.collaboration]
+enabled = false
+shared_sessions = false
+real_time_collaboration = false
+shared_annotations = false
+version_control = true
+conflict_resolution = "manual"
+
+# Performance optimization
+[tool.pynlm.performance]
+parallel_export = true
+background_rendering = true
+cache_exports = true
+cache_size = 1024
+use_gpu_acceleration = true
+
+# Audio integration (experimental)
+[tool.pynlm.audio]
+enabled = false
+export_audio = false
+spatial_audio = false
+audio_format = "wav"
+
+# VR/AR integration (experimental)
+[tool.pynlm.vr_ar]
+enabled = false
+vr_mode = false
+ar_overlay = false
+hmd_support = false
+
+# Multi-modal visualization
+[tool.pynlm.multimodal]
+enable_audio_visual = false
+enable_tactile_feedback = false
+enable_haptic_feedback = false
+
+# Real-time visualization
+[tool.pynlm.realtime]
+update_interval = 100
+max_fps = 60
+decimation = false
+compression = "lossless"
+streaming = true
+
+# Batch processing
+[tool.pynlm.batch]
+parallel_jobs = 8
+queue_size = 100
+priority = "high"
+schedule = "interval"
+
+# Data processing pipeline
+[tool.pynlm.pipeline]
+stages = ["preprocessing", "analysis", "visualization", "export"]
+parallel_execution = true
+error_handling = "retry"
+retry_count = 3
+
+# Metrics and monitoring
+[tool.pynlm.metrics]
+collection_interval = 1
+cpu_usage = true
+memory_usage = true
+gpu_usage = true
+network_usage = true
+export_frequency = "auto"
+
+# Alerting
+[tool.pynlm.alerts]
+enabled = false
+webhook_url = ""
+thresholds = {
+    cpu_usage = 90,
+    memory_usage = 85,
+    gpu_usage = 95,
+    export_time = 300,
+}
+channels = ["email", "slack", "webhook"]
+
+# Security
+[tool.pynlm.security]
+api_key_required = false
+rate_limit = 1000
+allowed_origins = ["*"]
+ssl_enabled = false
+ssl_cert = ""
+ssl_key = ""
+
+# Monitoring and observability
+[tool.pynlm.monitoring]
+metrics_endpoint = "/metrics"
+tracing_endpoint = "/traces"
+logging_level = "info"
+structured_logging = true
+log_format = "json"
+
+[tool.pynlm.monitoring.alerts]
+enabled = false
+endpoints = []
+thresholds = {}
+
+# Community and collaboration
+[tool.pynlm.community]
+enable_collaboration = false
+shared_sessions = false
+api_rate_limit = 100
+enable_analytics = true
+
+# Documentation and examples
+[tool.pynlm.docs]
+examples_path = "examples"
+tutorials_path = "tutorials"
+api_reference = true
+example_count = 50
+
+[tool.pynlm.docs.syntax_highlighting]
+language = "python"
+theme = "default"
+line_numbers = true
