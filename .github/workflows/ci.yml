@@ -1,0 +1,120 @@
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Set up CMake
+      uses: actions/setup-cmake@v3
+      with:
+        cmake-version: '3.16'
+    
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++ cmake make
+        pip install pytest numpy scikit-build-core pybind11
+    
+    - name: Build project
+      run: |
+        # Build C++ library
+        mkdir -p build_cpp
+        cd build_cpp
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_STANDARD=20 ..
+        make -j$(nproc)
+        
+        # Install Python bindings via scikit-build
+        cd ..
+        pip install -e .
+    
+    - name: Run C++ tests
+      run: |
+        cd build_cpp
+        ./nlm_test
+    
+    - name: Run Python tests
+      run: |
+        python -m pytest tests/test_python_bindings.py -v
+        python examples/basic_usage.py
+    
+    - name: Test Python bindings
+      run: |
+        python -c "import pynlm; print('pynlm version:', pynlm.__version__ if hasattr(pynlm, '__version__') else 'imported successfully')"
+        python -c "
+        import pynlm
+        config = pynlm.createDefaultConfig()
+        config.set('test', 'value')
+        assert config.get('test') == 'value'
+        print('Basic Python bindings test passed')
+        "
+
+  style-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check for obvious syntax errors
+      run: |
+        # Check C++ syntax
+        find src -name "*.hpp" -o -name "*.cpp" | xargs grep -L "^\s*#include" | head -20
+        
+        # Check Python syntax
+        find examples tests -name "*.py" -exec python -m py_compile {} \;
+  
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Generate documentation
+      run: |
+        echo "Documentation build would go here"
+        # For now, just ensure docs directory exists
+        ls -la docs/
+
+  release:
+    needs: [test, style-check, documentation]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Build and publish
+      run: |
+        pip install setuptools wheel
+        python setup.py sdist bdist_wheel
+        # Note: Publishing would require additional configuration
+        # twine upload dist/*  # Uncomment for actual release

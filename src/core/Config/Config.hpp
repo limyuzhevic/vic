@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
@@ -41,6 +43,37 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Custom exceptions for configuration
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) 
+        : std::runtime_error(message) {}
+};
+
+class ConfigKeyNotFoundException : public ConfigException {
+public:
+    explicit ConfigKeyNotFoundException(const std::string& key)
+        : ConfigException("Configuration key not found: " + key) {}
+};
+
+class ConfigInvalidValueException : public ConfigException {
+public:
+    explicit ConfigInvalidValueException(const std::string& key, const std::string& expectedType)
+        : ConfigException("Invalid configuration value for key " + key + ": expected " + expectedType) {}
+};
+
+class ConfigFileErrorException : public ConfigException {
+public:
+    explicit ConfigFileErrorException(const std::string& filepath, const std::string& reason)
+        : ConfigException("Configuration file error for " + filepath + ": " + reason) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& message)
+        : ConfigException("Configuration validation error: " + message) {}
 };
 
 // Main configuration class
@@ -93,6 +126,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    void validate(const std::string& key) const;
+    bool validateAll() const;
+    
+    // Configuration constants for validation
+    static constexpr double MIN_CONNECTION_PROBABILITY = 0.0;
+    static constexpr double MAX_CONNECTION_PROBABILITY = 1.0;
+    static constexpr int MIN_NEURON_COUNT = 1;
+    static constexpr int MAX_NEURON_COUNT = 100000;
+    static constexpr int MIN_REGION_COUNT = 1;
+    static constexpr double MIN_SIMULATION_TIMESTEP = 0.0;
+    static constexpr double MAX_SIMULATION_TIMESTEP = 1.0;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +146,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidProbability(double value);
+    static bool isValidNeuronCount(int value);
+    static bool isValidRegionCount(int value);
+    static bool isValidTimestep(double value);
 };
 
 } // namespace nlm

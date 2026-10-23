@@ -27,6 +27,14 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<nlm::ConfigException>(m, "ConfigException");
+    py::register_exception<nlm::ConfigKeyNotFoundException>(m, "ConfigKeyNotFoundException");
+    py::register_exception<nlm::ConfigInvalidValueException>(m, "ConfigInvalidValueException");
+    py::register_exception<nlm::ConfigFileErrorException>(m, "ConfigFileErrorException");
+    py::register_exception<nlm::ConfigValidationException>(m, "ConfigValidationException");
+    
+    // Keep std::runtime_error for backward compatibility
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")

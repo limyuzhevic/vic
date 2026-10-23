@@ -81,12 +81,23 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileErrorException(filepath, "Cannot open file for writing");
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -199,17 +210,87 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Forward declaration for validate function
+static void validateConfigKey(const std::string& key, const nlm::ConfigValue& value);
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Validation implementation
+void Config::validate(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        validateConfigKey(key, it->value);
+    }
+}
 
-} // namespace nlm
+bool Config::validateAll() const {
+    for (const auto& entry : pImpl->entries) {
+        try {
+            validateConfigKey(entry.key, entry.value);
+        } catch (const ConfigValidationException& e) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Static validation helpers
+bool Config::isValidProbability(double value) {
+    return value >= MIN_CONNECTION_PROBABILITY && value <= MAX_CONNECTION_PROBABILITY;
+}
+
+bool Config::isValidNeuronCount(int value) {
+    return value >= MIN_NEURON_COUNT && value <= MAX_NEURON_COUNT;
+}
+
+bool Config::isValidRegionCount(int value) {
+    return value >= MIN_REGION_COUNT && value <= MAX_NEURON_COUNT; // regions <= neurons
+}
+
+bool Config::isValidTimestep(double value) {
+    return value >= MIN_SIMULATION_TIMESTEP && value <= MAX_SIMULATION_TIMESTEP;
+}
+
+// Key-specific validation
+static void validateConfigKey(const std::string& key, const nlm::ConfigValue& value) {
+    // Convert key to lowercase for case-insensitive comparison
+    std::string lowerKey = nlm::Config::toLower(key);
+    
+    if (lowerKey == "neuron_count") {
+        if (!std::holds_alternative<int>(value)) {
+            throw nlm::ConfigInvalidValueException(key, "int");
+        }
+        int neurons = std::get<int>(value);
+        if (!nlm::Config::isValidNeuronCount(neurons)) {
+            throw nlm::ConfigValidationException("Neuron count must be between 1 and " + std::to_string(nlm::Config::MAX_NEURON_COUNT));
+        }
+    }
+    else if (lowerKey == "region_count") {
+        if (!std::holds_alternative<int>(value)) {
+            throw nlm::ConfigInvalidValueException(key, "int");
+        }
+        int regions = std::get<int>(value);
+        if (!nlm::Config::isValidRegionCount(regions)) {
+            throw nlm::ConfigValidationException("Region count must be between 1 and " + std::to_string(nlm::Config::MAX_NEURON_COUNT));
+        }
+    }
+    else if (lowerKey == "connection_probability") {
+        if (!std::holds_alternative<double>(value)) {
+            throw nlm::ConfigInvalidValueException(key, "double");
+        }
+        double prob = std::get<double>(value);
+        if (!nlm::Config::isValidProbability(prob)) {
+            throw nlm::ConfigValidationException("Connection probability must be between 0.0 and 1.0");
+        }
+    }
+    else if (lowerKey == "simulation_timestep") {
+        if (!std::holds_alternative<double>(value)) {
+            throw nlm::ConfigInvalidValueException(key, "double");
+        }
+        double timestep = std::get<double>(value);
+        if (!nlm::Config::isValidTimestep(timestep)) {
+            throw nlm::ConfigValidationException("Simulation timestep must be between 0.0 and 1.0");
+        }
+    }
+    // Add more validation rules as needed
+}
