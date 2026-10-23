@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""
+NLM Configuration Tool
+
+A user-friendly command-line interface for managing NLM configuration files
+and experiments. This tool provides simplified commands for common tasks.
+"""
+
+import json
+import os
+import sys
+import argparse
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+# Add the src directory to the path so we can import NLM modules
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+try:
+    from core.Config.Config import Config
+    from experiments.ExperimentRunner import ExperimentRunner
+except ImportError as e:
+    print(f"Error importing NLM modules: {e}")
+    print("Make sure you're running this from the NLM project root directory")
+    sys.exit(1)
+
+class NLMConfigTool:
+    def __init__(self):
+        self.results_dir = Path("experiment_results")
+        self.results_dir.mkdir(exist_ok=True)
+    
+    def create_config_file(self, filename: str, template: Optional[str] = None):
+        """Create a new configuration file with common settings."""
+        config = Config()
+        
+        if template == "phase6":
+            # Phase 6 integration experiment settings
+            config.set("neuron_count", 1000)
+            config.set("region_count", 1)
+            config.set("connection_probability", 0.1f)
+            config.set("stdp_ltp_weight", 0.01f)
+            config.set("stdp_ltd_weight", 0.012f)
+            config.set("synaptogenesis_rate", 0.0001f)
+            config.set("pruning_rate", 0.00001f)
+            config.set("simulation_timestep", 0.001)
+            config.set("random_seed", 42)
+            
+            # Add parameter descriptions
+            config.setParameterDescription("neuron_count", "Number of neurons in the brain")
+            config.setParameterDescription("region_count", "Number of brain regions")
+            config.setParameterDescription("connection_probability", "Probability of synaptic connections")
+            config.setParameterDescription("stdp_ltp_weight", "STDP long-term potentiation weight")
+            config.setParameterDescription("stdp_ltd_weight", "STDP long-term depression weight")
+            
+        elif template == "phase3":
+            # Phase 3 experiment settings
+            config.set("neuron_count", 500)
+            config.set("region_count", 2)
+            config.set("connection_probability", 0.15f)
+            config.set("plasticity_learning_rate", 0.01f)
+            config.set("simulation_timestep", 0.001)
+            config.set("random_seed", 123)
+            
+        elif template == "minimal":
+            # Minimal working configuration
+            config.set("neuron_count", 100)
+            config.set("region_count", 1)
+            config.set("connection_probability", 0.05f)
+            config.set("random_seed", 1)
+            
+        else:
+            # Empty config file
+            config.set("random_seed", 42)
+            config.set("simulation_timestep", 0.001)
+        
+        # Validate configuration
+        if config.validateAll():
+            config.saveToFile(filename)
+            print(f"✓ Configuration saved to {filename}")
+            print("Configuration summary:")
+            print(config.summary())
+        else:
+            print("✗ Configuration validation failed")
+            print(config.summary())
+            return False
+        
+        return True
+    
+    def view_config_file(self, filename: str):
+        """Display a configuration file in a user-friendly format."""
+        config = Config()
+        
+        if not config.loadFromFile(filename):
+            print(f"✗ Failed to load configuration file: {filename}")
+            return False
+        
+        print(f"Configuration file: {filename}")
+        print("=" * 50)
+        print(config.summary())
+        
+        # Show key validation info
+        if config.isValidationEnabled():
+            print(f"\nValidation: ENABLED")
+        else:
+            print(f"\nValidation: DISABLED")
+        
+        print(f"Total parameters: {len(config.getKeys())}")
+        
+        return True
+    
+    def set_config_value(self, filename: str, key: str, value: str):
+        """Update a single configuration value in a file."""
+        config = Config()
+        
+        if not config.loadFromFile(filename):
+            print(f"✗ Failed to load configuration file: {filename}")
+            return False
+        
+        # Try to parse value as appropriate type
+        try:
+            # Try integer
+            int_val = int(value)
+            config.set(key, int_val, ConfigSource::Runtime)
+            print(f"✓ Set {key} = {int_val} (integer)")
+        except ValueError:
+            try:
+                # Try float
+                float_val = float(value)
+                config.set(key, float_val, ConfigSource::Runtime)
+                print(f"✓ Set {key} = {float_val} (float)")
+            except ValueError:
+                try:
+                    # Try boolean
+                    if value.lower() in ["true", "yes", "1", "on"]:
+                        bool_val = True
+                        config.set(key, bool_val, ConfigSource::Runtime)
+                        print(f"✓ Set {key} = true (boolean)")
+                    elif value.lower() in ["false", "no", "0", "off"]:
+                        bool_val = False
+                        config.set(key, bool_val, ConfigSource::Runtime)
+                        print(f"✓ Set {key} = false (boolean)")
+                    else:
+                        # Treat as string
+                        config.set(key, value, ConfigSource::Runtime)
+                        print(f"✓ Set {key} = \"{value}\" (string)")
+                except Exception as e:
+                    print(f"✗ Failed to parse value '{value}' as appropriate type: {e}")
+                    return False
+        
+        # Save back to file
+        if config.saveToFile(filename):
+            print(f"✓ Configuration saved to {filename}")
+            return True
+        else:
+            print(f"✗ Failed to save configuration to {filename}")
+            return False
+    
+    def create_experiment(self, name: str, config_file: Optional[str] = None):
+        """Create a new experiment with the given name."""
+        runner = ExperimentRunner()
+        exp = runner.createExperiment(name)
+        
+        if config_file:
+            # Load config and apply to experiment
+            config = Config()
+            if config.loadFromFile(config_file):
+                for key in config.getKeys():
+                    exp.setConfigValue(key, str(config.getOr<std::string>(key, "")))
+                print(f"✓ Applied configuration from {config_file} to experiment {name}")
+            else:
+                print(f"⚠ Warning: Could not load configuration from {config_file}")
+        
+        return exp
+    
+    def list_experiments(self):
+        """List all saved experiments."""
+        runner = ExperimentRunner()
+        experiments = runner.getExperiments()
+        
+        if experiments.empty():
+            print("No experiments found")
+            return
+        
+        print(f"Found {len(experiments)} experiments:")
+        print("-" * 40)
+        
+        for exp in experiments:
+            print(f"Name: {exp.getName()}")
+            print(f"  Seed: {exp.getSeed()}")
+            print(f"  Steps: {exp.getStartStep()} - {exp.getEndStep()}")
+            print(f"  Total reward: {exp.getMetric('total_reward')}")
+            print()
+    
+    def save_experiment(self, exp, filename: Optional[str] = None):
+        """Save an experiment to a file."""
+        runner = ExperimentRunner()
+        
+        if filename:
+            if runner.saveResults(filename):
+                print(f"✓ Experiment saved to {filename}")
+                return True
+            else:
+                print(f"✗ Failed to save experiment to {filename}")
+                return False
+        else:
+            # Auto-generate filename
+            timestamp = str(int(os.time()))
+            filename = f"experiment_{exp.getName()}_{timestamp}.json"
+            return save_experiment(exp, filename)
+    
+    def run_single_experiment(self, exp_name: str, config_file: str, 
+                              max_steps: int = 1000, result_dir: Optional[str] = None):
+        """Run a single experiment."""
+        print(f"Running experiment: {exp_name}")
+        
+        # Create experiment
+        runner = ExperimentRunner()
+        exp = create_experiment(exp_name, config_file)
+        
+        # For now, this is a placeholder - actual experiment running
+        # would require Brain and Environment objects
+        print(f"⚠ Note: Actual experiment running requires Brain and Environment objects")
+        print(f"  Experiment configured with {exp_name}")
+        print(f"  Max steps: {max_steps}")
+        
+        if result_dir:
+            # Save results
+            result_path = Path(result_dir) / f"{exp_name}_results.json"
+            return save_experiment(exp, str(result_path))
+        
+        return True
+
+def main():
+    tool = NLMConfigTool()
+    
+    parser = argparse.ArgumentParser(
+        description="NLM Configuration Tool - User-friendly config and experiment management",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Create a Phase 6 integration experiment config
+  nlm-config create --template phase6 --output phase6_config.json
+  
+  # View a configuration file
+  nlm-config view my_config.json
+  
+  # Update a configuration value
+  nlm-config set my_config.json neuron_count 2000
+  
+  # Create an experiment
+  nlm-config experiment create --name "TestExperiment" --config my_config.json
+  
+  # List all experiments
+  nlm-config experiment list
+  
+  # Run an experiment
+  nlm-config run --name "TestExperiment" --config my_config.json --steps 5000
+        ""
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Create config file command
+    create_parser = subparsers.add_parser("create", help="Create a configuration file")
+    create_parser.add_argument("--output", "-o", required=True, help="Output filename")
+    create_parser.add_argument("--template", choices=["phase6", "phase3", "minimal", "empty"], 
+                              default="empty", help="Configuration template to use")
+    
+    # View config file command
+    view_parser = subparsers.add_parser("view", help="View a configuration file")
+    view_parser.add_argument("filename", help="Configuration file to view")
+    
+    # Set config value command
+    set_parser = subparsers.add_parser("set", help="Set a configuration value in a file")
+    set_parser.add_argument("filename", help="Configuration file to modify")
+    set_parser.add_argument("key", help="Configuration key to set")
+    set_parser.add_argument("value", help="New value")
+    
+    # Experiment commands
+    exp_parser = subparsers.add_parser("experiment", help="Experiment management")
+    exp_subparsers = exp_parser.add_subparsers(dest="exp_command", help="Experiment commands")
+    
+    # Create experiment command
+    exp_create_parser = exp_subparsers.add_parser("create", help="Create an experiment")
+    exp_create_parser.add_argument("--name", required=True, help="Experiment name")
+    exp_create_parser.add_argument("--config", help="Configuration file to apply")
+    
+    # List experiments command
+    exp_list_parser = exp_subparsers.add_parser("list", help="List all experiments")
+    
+    # Run experiment command
+    run_parser = subparsers.add_parser("run", help="Run an experiment")
+    run_parser.add_argument("--name", required=True, help="Experiment name")
+    run_parser.add_argument("--config", required=True, help="Configuration file")
+    run_parser.add_argument("--steps", type=int, default=1000, help="Maximum simulation steps")
+    run_parser.add_argument("--results-dir", help="Directory to save results")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return
+    
+    # Execute commands
+    try:
+        if args.command == "create":
+            success = tool.create_config_file(args.output, args.template)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "view":
+            success = tool.view_config_file(args.filename)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "set":
+            success = tool.set_config_value(args.filename, args.key, args.value)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "experiment":
+            if args.exp_command == "create":
+                exp = tool.create_experiment(args.name, args.config)
+                print(f"✓ Created experiment: {exp.getName()}")
+                sys.exit(0)
+                
+            elif args.exp_command == "list":
+                tool.list_experiments()
+                sys.exit(0)
+                
+        elif args.command == "run":
+            success = tool.run_single_experiment(args.name, args.config, args.steps, args.results_dir)
+            sys.exit(0 if success else 1)
+            
+    except Exception as e:
+        print(f"✗ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

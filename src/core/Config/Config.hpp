@@ -55,8 +55,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or legacy format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON data
+    bool loadFromJSON(const nlohmann::json& jsonData);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -87,11 +90,37 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
     // Clear all
     void clear();
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Parameter validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    bool validateAll() const;
+    
+    // Set parameter description for better error messages
+    void setParameterDescription(const std::string& key, const std::string& description);
+    std::string getParameterDescription(const std::string& key) const;
+    
+    // Validation configuration
+    void enableValidation(bool enable);
+    bool isValidationEnabled() const;
+    
+    // Set validation function for a parameter
+    void setValidator(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    
+    // Set validation constraints (value range, allowed values, etc.)
+    void setRangeValidation(const std::string& key, double min, double max);
+    void setAllowedValuesValidation(const std::string& key, const std::vector<double>& allowedValues);
+    void setIntRangeValidation(const std::string& key, int64_t min, int64_t max);
+    void setStringLengthValidation(const std::string& key, size_t minLength, size_t maxLength);
     
 private:
     struct Impl;
@@ -99,7 +128,6 @@ private:
     
     // Internal helpers
     static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

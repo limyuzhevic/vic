@@ -25,6 +25,7 @@ public:
     // Configuration
     void setConfigValue(const std::string& key, const std::string& value);
     std::string getConfigValue(const std::string& key) const;
+    const std::vector<std::pair<std::string, std::string>>& getConfig() const;
     
     // Metrics
     void recordMetric(const std::string& name, double value);

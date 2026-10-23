@@ -58,6 +58,10 @@ std::string Experiment::getConfigValue(const std::string& key) const {
     return "";
 }
 
+std::vector<std::pair<std::string, std::string>> Experiment::getConfig() const {
+    return pImpl->config;
+}
+
 void Experiment::recordMetric(const std::string& name, double value) {
     for (auto& pair : pImpl->metrics) {
         if (pair.first == name) {

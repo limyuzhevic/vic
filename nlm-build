@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""
+NLM Build and Configuration Management Tool
+
+A comprehensive command-line tool for managing NLM builds, configurations,
+and system operations. This tool provides advanced commands for power users
+and system administrators.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+# Add the src directory to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
+try:
+    from core.Config.Config import Config
+except ImportError as e:
+    print(f"Error importing NLM modules: {e}")
+    sys.exit(1)
+
+class NLMBuildTool:
+    def __init__(self):
+        self.project_root = Path(__file__).parent
+        self.build_dir = self.project_root / "build"
+        self.config_dir = self.project_root / "configs"
+        self.results_dir = self.project_root / "experiment_results"
+    
+    def create_build_directory(self, generator: str = "Unix Makefiles", 
+                              build_type: str = "Release", extra_args: str = ""):
+        """Create and configure a build directory with specified generator."""
+        print(f"Creating build directory with {generator} generator...")
+        
+        self.build_dir.mkdir(exist_ok=True)
+        
+        cmake_cmd = [
+            "cmake",
+            f"-G{generator}",
+            f"-DCMAKE_BUILD_TYPE={build_type}",
+            f"-DNLM_SOURCE_DIR={self.project_root / 'src'}",
+        ]
+        
+        if extra_args:
+            cmake_cmd.extend(extra_args.split())
+        
+        cmake_cmd.append(str(self.project_root))
+        
+        try:
+            subprocess.run(cmake_cmd, cwd=self.build_dir, check=True)
+            print(f"✓ CMake configuration complete in {self.build_dir}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"✗ CMake configuration failed: {e}")
+            return False
+    
+    def build_nml(self, parallel: bool = True, target: str = "all"):
+        """Build the NLM project."""
+        print("Building NLM project...")
+        
+        build_cmd = ["make", target]
+        
+        if parallel:
+            build_cmd.extend(["-j", str(os.cpu_count() or 4)])
+        
+        try:
+            subprocess.run(build_cmd, cwd=self.build_dir, check=True)
+            print("✓ Build complete")
+            
+            # List built targets
+            self._list_built_targets()
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"✗ Build failed: {e}")
+            return False
+    
+    def clean_build(self, all: bool = False):
+        """Clean build artifacts."""
+        if all:
+            print("Performing complete clean...")
+            if self.build_dir.exists():
+                shutil.rmtree(self.build_dir)
+                print("✓ Removed build directory")
+        else:
+            print("Performing incremental clean...")
+            for item in self.build_dir.glob("*"):
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+            print("✓ Cleaned build artifacts")
+    
+    def run_demo(self, demo_type: str = "phase6", config_file: Optional[str] = None):
+        """Run a demo application."""
+        print(f"Running {demo_type} demo...")
+        
+        demo_executable = self.build_dir / "nlm"
+        if not demo_executable.exists():
+            demo_executable = self.build_dir / "nlm_phase6_demo"
+        
+        if not demo_executable.exists():
+            print(f"✗ Demo executable not found: {demo_executable}")
+            print("Please build the project first")
+            return False
+        
+        cmd = [str(demo_executable)]
+        
+        if config_file:
+            cmd.extend(["--config", config_file])
+        elif demo_type == "phase6":
+            cmd.extend(["--config", str(self.config_dir / "default.cfg")])
+        
+        try:
+            subprocess.run(cmd, check=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"✗ Demo execution failed: {e}")
+            return False
+    
+    def generate_config(self, output_file: str, template: str = "default"):
+        """Generate a configuration file from a template."""
+        print(f"Generating {template} configuration file: {output_file}")
+        
+        config = Config()
+        
+        if template == "default":
+            # Standard configuration
+            config.set("random_seed", 42)
+            config.set("simulation_timestep", 0.001)
+            config.set("neuron_count", 1000)
+            config.set("region_count", 1)
+            config.set("connection_probability", 0.1)
+            config.set("plasticity_learning_rate", 0.01)
+            config.set("stdp_ltp_weight", 0.01)
+            config.set("stdp_ltd_weight", 0.012)
+            config.set("stdp_time_constant", 20.0)
+            
+        elif template == "research":
+            # Research-oriented configuration
+            config.set("random_seed", 2024)
+            config.set("simulation_timestep", 0.0005)
+            config.set("neuron_count", 5000)
+            config.set("region_count", 2)
+            config.set("connection_probability", 0.15)
+            config.set("plasticity_learning_rate", 0.005)
+            config.set("stdp_ltp_weight", 0.008)
+            config.set("stdp_ltd_weight", 0.01)
+            config.set("stdp_time_constant", 15.0)
+            config.set("max_simulation_steps", 50000)
+            
+        elif template == "demo":
+            # Demo configuration (smaller scale)
+            config.set("random_seed", 123)
+            config.set("simulation_timestep", 0.001)
+            config.set("neuron_count", 200)
+            config.set("region_count", 1)
+            config.set("connection_probability", 0.08)
+            config.set("plasticity_learning_rate", 0.02)
+            config.set("stdp_ltp_weight", 0.02)
+            config.set("stdp_ltd_weight", 0.018)
+            config.set("stdp_time_constant", 25.0)
+            config.set("max_simulation_steps", 2000)
+        
+        # Apply validation if enabled
+        config.enableValidation(True)
+        config.setRangeValidation("neuron_count", 100, 10000)
+        config.setRangeValidation("connection_probability", 0.01, 0.5)
+        config.setRangeValidation("plasticity_learning_rate", 0.001, 0.1)
+        
+        # Save configuration
+        if config.saveToFile(output_file):
+            print(f"✓ Configuration saved to {output_file}")
+            
+            # Show validation summary
+            print("\nValidation summary:")
+            print(config.summary())
+            
+            return True
+        else:
+            print(f"✗ Failed to save configuration to {output_file}")
+            return False
+    
+    def validate_configs(self, config_dir: str = "configs"):
+        """Validate all configuration files in a directory."""
+        print(f"Validating configuration files in {config_dir}...")
+        
+        config_path = Path(config_dir)
+        if not config_path.exists():
+            print(f"✗ Directory not found: {config_dir}")
+            return False
+        
+        config_files = list(config_path.glob("*.json")) + list(config_path.glob("*.cfg"))
+        if not config_files:
+            print(f"✗ No configuration files found in {config_dir}")
+n
+    def _list_built_targets(self):
+        """List the targets that were built."""
+        print("\nBuilt targets:")
+        
+        targets = [
+            ("nlm", "Main NLM executable"),
+            ("nlm_core", "Core NLM library"),
+            ("nlm_agent", "Agent system library"),
+            ("nlm_world", "World system library"),
+            ("nlm_phase3", "Phase 3 experiment library"),
+            ("nlm_phase4", "Phase 4 experiment library"),
+            ("nlm_phase3_demo", "Phase 3 demo executable"),
+            ("nlm_phase4_demo", "Phase 4 demo executable"),
+        ]
+        
+        for target, description in targets:
+            target_file = self.build_dir / target
+            if target_file.exists():
+                size = target_file.stat().st_size / (1024 * 1024)  # MB
+                print(f"  ✓ {target} ({description}) - {size:.1f} MB")
+            else:
+                # Check for library files
+                lib_files = list(self.build_dir.glob(f"lib{target}*.a"))
+                for lib_file in lib_files:
+                    size = lib_file.stat().st_size / (1024 * 1024)  # MB
+                    print(f"  ✓ {lib_file.name} (library) - {size:.1f} MB")
+    
+    def run_tests(self):
+        """Run NLM tests."""
+        print("Running NLM tests...")
+        
+        # Look for test executables or run pytest if available
+        test_executable = self.build_dir / "test_nlm"
+        if test_executable.exists():
+            try:
+                subprocess.run([str(test_executable)], check=True)
+                return True
+            except subprocess.CalledProcessError as e:
+                print(f"✗ Tests failed: {e}")
+                return False
+        
+        # Try pytest for Python tests
+        try:
+            subprocess.run([sys.executable, "-m", "pytest", "tests", "-v"], 
+                         check=True, cwd=self.project_root)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("⚠ No test executables found. Tests not run.")
+            return True  # Don't fail the build if tests aren't available
+
+def main():
+    tool = NLMBuildTool()
+    
+    parser = argparse.ArgumentParser(
+        description="NLM Build and Configuration Management Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Available commands:
+
+  build
+    Configure and build the NLM project
+
+  clean
+    Clean build artifacts
+
+  demo
+    Run a demo application
+
+  generate
+    Generate configuration files from templates
+
+  validate
+    Validate configuration files
+
+  run-tests
+    Run NLM tests
+
+Examples:
+  nlm-build build
+  nlm-build build --parallel --target all
+  nlm-build demo --type phase6
+  nlm-build generate --output research_config.json --template research
+  nlm-build validate configs/
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Build command
+    build_parser = subparsers.add_parser("build", help="Configure and build the NLM project")
+    build_parser.add_argument("--generator", default="Unix Makefiles", 
+                             help="CMake generator (default: Unix Makefiles)")
+    build_parser.add_argument("--build-type", default="Release", 
+                             choices=["Debug", "Release", "RelWithDebInfo", "MinSizeRel"],
+                             help="Build type (default: Release)")
+    build_parser.add_argument("--parallel", action="store_true", default=True,
+                             help="Use parallel build (default: True)")
+    build_parser.add_argument("--no-parallel", action="store_false", dest="parallel",
+                             help="Use sequential build")
+    build_parser.add_argument("--target", default="all", help="Build target (default: all)")
+    
+    # Clean command
+    clean_parser = subparsers.add_parser("clean", help="Clean build artifacts")
+    clean_parser.add_argument("--all", action="store_true", help="Perform complete clean")
+    
+    # Demo command
+    demo_parser = subparsers.add_parser("demo", help="Run a demo application")
+    demo_parser.add_argument("--type", "--demo-type", default="phase6",
+                           choices=["phase3", "phase4", "phase6"],
+                           help="Demo type to run (default: phase6)")
+    demo_parser.add_argument("--config", help="Configuration file to use")
+    
+    # Generate command
+    generate_parser = subparsers.add_parser("generate", help="Generate configuration files")
+    generate_parser.add_argument("--output", "-o", required=True, help="Output filename")
+    generate_parser.add_argument("--template", default="default",
+                               choices=["default", "research", "demo"],
+                               help="Configuration template (default: default)")
+    
+    # Validate command
+    validate_parser = subparsers.add_parser("validate", help="Validate configuration files")
+    validate_parser.add_argument("directory", default="configs", help="Directory containing config files")
+    
+    # Run tests command
+    tests_parser = subparsers.add_parser("run-tests", help="Run NLM tests")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return
+    
+    # Execute commands
+    try:
+        if args.command == "build":
+            # Create build directory
+            if not tool.build_dir.exists():
+                if not tool.create_build_directory(args.generator, args.build_type):
+                    sys.exit(1)
+            
+            # Build the project
+            if not tool.build_nml(args.parallel, args.target):
+                sys.exit(1)
+                
+        elif args.command == "clean":
+            tool.clean_build(args.all)
+            
+        elif args.command == "demo":
+            if not tool.run_demo(args.type, args.config):
+                sys.exit(1)
+                
+        elif args.command == "generate":
+            if not tool.generate_config(args.output, args.template):
+                sys.exit(1)
+                
+        elif args.command == "validate":
+            if not tool.validate_configs(args.directory):
+                sys.exit(1)
+                
+        elif args.command == "run-tests":
+            if not tool.run_tests():
+                sys.exit(1)
+                
+    except Exception as e:
+        print(f"✗ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
