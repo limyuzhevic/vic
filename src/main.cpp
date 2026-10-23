@@ -324,13 +324,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
+    // Initialize logger with error checking
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    if (!logger) {
+        std::cerr << "ERROR: Failed to initialize logger!" << std::endl;
+        return 1;
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -342,6 +345,11 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
+    
+    if (!config) {
+        NLM_LOG_ERROR("Failed to create configuration object!");
+        return 1;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -357,7 +365,7 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    if (!config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
@@ -401,6 +409,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");

@@ -84,9 +84,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Set default description if not present
+    file << "# NLM Configuration File\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Use entry.description if available, otherwise add a comment
+        std::string desc = !entry.description.empty() ? "# " + entry.description + "\n" : "# Unknown\n";
+        
+        file << desc;
+        file << entry.key << " = ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;  // int, int64_t, double
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;

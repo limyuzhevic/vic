@@ -166,26 +166,36 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
 }
 
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
 }
 
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {

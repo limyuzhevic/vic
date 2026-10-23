@@ -177,17 +177,48 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Validate configuration exists
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is not available!");
+        return false;
+    }
+    
+    // Get configuration values with error checking
+    auto neuronCountOpt = pImpl->config->get<size_t>("neuron_count");
+    auto regionCountOpt = pImpl->config->get<size_t>("region_count");
+    auto connectionProbOpt = pImpl->config->get<float>("connection_probability");
+    
+    // Use validated values with sensible defaults
+    size_t neuronCount = neuronCountOpt.has_value() ? neuronCountOpt.value() : 1000;
+    size_t regionCount = regionCountOpt.has_value() ? regionCountOpt.value() : 1;
+    float connectionProbability = connectionProbOpt.has_value() ? connectionProbOpt.value() : 0.1f;
+    
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount));
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
+    // Create regions with error checking
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+        if (!regionId.isValid()) {
+            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+            return false;
+        }
     }
     
     // Create neurons across regions
@@ -991,7 +1022,15 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    // This method returns the number of neurons currently firing (not total spikes)
+    // Fixed from returning spike count to actual firing neuron count
+    size_t firingNeurons = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            firingNeurons += pop->getFiringCount();
+        }
+    }
+    return firingNeurons;
 }
 
 float Brain::getAverageFiringRate() const {
