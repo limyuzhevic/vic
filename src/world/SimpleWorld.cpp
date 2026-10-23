@@ -299,6 +299,37 @@ void SimpleWorld::removeObject(float x, float y) {
 }
 
 void SimpleWorld::generateVision() {
+    /**
+     * @brief Generate complete sensory percept for the agent
+     * 
+     * @details Implements a multi-modal sensory system using raycasting and proximity sensors:
+     * 
+     * Vision: 16-ray cone casting with 90-degree FOV
+     * - Ray angle distributed across agent's field of view
+     * - Ray length up to max range (8 units)
+     * - Obstacle detection: distance normalized to 0-1 range
+     * - Object type encoding: Resource (bright), Hazard (dark), Other (medium)
+     * 
+     * Touch: 8-direction proximity sensors (360° spaced)
+     * - Detects obstacles within 1.5 units
+     * - Closer proximity = stronger signal
+     * 
+     * Internal: 4 state variables
+     * - Energy level (normalized)
+     * - Health status
+     * - Movement state
+     * - Turning state
+     * 
+     * Proprioception: 6 body state variables
+     * - Normalized position (x, y)
+     * - Normalized orientation (-180 to 180°)
+     * - Normalized velocity components (x, y)
+     * - Normalized angular velocity
+     * 
+     * Audio: Currently not implemented (empty vector)
+     * 
+     * Note: Uses fixed timestep (0.1) for ray marching and simple Euclidean math
+     */
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     

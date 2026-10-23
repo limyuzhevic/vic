@@ -183,10 +183,59 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Simulation constants
+constexpr TimestepDuration SIMULATION_TIMESTEP = 0.001;          // 1 ms timestep
+constexpr TimestepDuration PRECISION_THRESHOLD = 0.001f;          // Precision threshold for comparisons
+constexpr Timestamp MAX_SIMULATION_TIME = 3600.0;                  // Maximum simulation time (1 hour)
 
-} // namespace nlm
+// Neural constants
+constexpr SynapticWeight DEFAULT_CURRENT_INJECTION = 50.0f;       // Default current for activation (60.0f in some places)
+constexpr SynapticWeight STRONG_CURRENT_INJECTION = 60.0f;        // Strong current injection for spikes
+constexpr SynapticWeight WEAK_CURRENT_INJECTION = 30.0f;          // Weak current injection for sub-threshold activation
+constexpr SynapticWeight REWARD_WEIGHT = 0.5f;                     // Reward modulation weight
+constexpr SynapticWeight NEUROMODULATION_GAIN = 1.0f;              // Neuromodulation gain factor
+
+// Plasticity constants
+constexpr SynapticWeight STDP_LTP_WEIGHT = 0.02f;                  // STDP long-term potentiation weight
+constexpr SynapticWeight STDP_LTD_WEIGHT = 0.015f;                 // STDP long-term depression weight
+constexpr SynapticWeight STDP_TIME_CONSTANT = 20.0f;               // STDP time constant (tau)
+constexpr SynapticWeight HEBBIAN_LEARNING_RATE = 0.01f;             // Hebbian learning rate
+constexpr SynapticWeight STRUCTURE_PRUNING_THRESHOLD = 0.05f;       // Structural pruning threshold
+constexpr SynapticWeight ACTIVITY_THRESHOLD = 0.001f;              // Activity threshold for plasticity
+
+// Development constants
+constexpr float DEVELOPMENT_SYNAPTOGENESIS_RATE = 0.001f;         // Synaptogenesis rate
+constexpr float DEVELOPMENT_PRUNING_RATE = 0.0001f;               // Pruning rate
+constexpr float DEVELOPMENT_CRITICAL_PERIOD = 0.01f;              // Critical period coefficient
+
+// Environment constants
+constexpr uint32_t DEFAULT_ENVIRONMENT_WIDTH = 10;                 // Default world width
+constexpr uint32_t DEFAULT_ENVIRONMENT_HEIGHT = 10;                // Default world height
+
+// Sensory constants
+constexpr NeuronIndex VISION_INPUT_SIZE = 256;                     // Vision input neurons (16x16 grid)
+constexpr NeuronIndex TOUCH_INPUT_SIZE = 8;                       // Touch input neurons
+constexpr NeuronIndex INTERNAL_INPUT_SIZE = 4;                    // Internal state neurons
+constexpr NeuronIndex PROPRIOCEPTION_INPUT_SIZE = 6;               // Proprioception neurons
+constexpr NeuronIndex TOTAL_SENSORY_INPUT_SIZE = VISION_INPUT_SIZE + TOUCH_INPUT_SIZE + 
+                                                 INTERNAL_INPUT_SIZE + PROPRIOCEPTION_INPUT_SIZE;
+
+// Motor constants
+constexpr NeuronIndex MOTOR_OUTPUT_SIZE = 6;                       // Motor output neurons (forward, backward, turn left, turn right, interact, wait)
+
+// Scaling constants
+constexpr float VISION_SCALE_FACTOR = 5.0f;                        // Vision signal scaling
+constexpr float TOUCH_SCALE_FACTOR = 8.0f;                        // Touch signal scaling
+constexpr float INTERNAL_SCALE_FACTOR = 5.0f;                     // Internal signal scaling
+constexpr float PROPRIOCEPTION_SCALE_FACTOR = 3.0f;                // Proprioception signal scaling
+
+// Curiosity and novelty constants
+constexpr float NOVELTY_DECAY_RATE = 0.99f;                        // Novelty decay rate
+constexpr float CURIOSITY_WEIGHT_NOVELTY = 2.0f;                   // Curiosity weight for novelty
+constexpr float CURIOSITY_WEIGHT_PREDICTION_ERROR = 0.5f;          // Curiosity weight for prediction error
+constexpr float MAX_CURIOUSITY_LEVEL = 1.0f;                        // Maximum curiosity level
+
+// Reward and motivation constants
+constexpr float REWARD_DISCOUNT_FACTOR = 0.99f;                    // Reward discount factor
+constexpr SynapticWeight DOSE_BASELINE = 0.1f;                      // Baseline dopamine level
+constexpr float REWARD_THRESHOLD = 0.01f;                          // Reward threshold for learning

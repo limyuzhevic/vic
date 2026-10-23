@@ -1,5 +1,5 @@
-#include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -61,7 +61,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up neuron pointers in all vectors
+    // The vectors store raw pointers that were allocated by the brain,
+    // but AgentBrain holds references to them, so we should clear the vectors
+    // to avoid dangling pointers and ensure proper cleanup
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    previousVision_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -90,9 +106,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        if (sensoryVision_[i] && !sensoryVision_[i]->isRefractory()) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * VISION_SCALE_FACTOR;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -100,8 +116,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+        if (sensoryTouch_[i] && !sensoryTouch_[i]->isRefractory()) {
+            float current = touch[i] * TOUCH_SCALE_FACTOR;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -109,8 +125,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+        if (sensoryInternal_[i] && !sensoryInternal_[i]->isRefractory()) {
+            float current = (intern[i] * 2.0f - 1.0f) * INTERNAL_SCALE_FACTOR;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -118,8 +134,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+        if (sensoryProprioception_[i] && !sensoryProprioception_[i]->isRefractory()) {
+            float current = (proprio[i] * 2.0f - 1.0f) * PROPRIOCEPTION_SCALE_FACTOR;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
