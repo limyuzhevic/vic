@@ -37,12 +37,26 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_cli_enhanced {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Enhanced CLI Interface Tests ===" << std::endl;
+    std::cout << "  - Command-line argument parsing" << std::endl;
+    std::cout << "  - Option handling and validation" << std::endl;
+    std::cout << "  - Output formatting and display" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +127,33 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running CLI tests..." << std::endl;
+    try {
+        test_cli::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced CLI tests..." << std::endl;
+    try {
+        test_cli_enhanced::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

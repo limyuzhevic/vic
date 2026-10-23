@@ -92,6 +92,13 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Configuration manager
+add_library(nlm_config_manager STATIC
+    src/core/Config/ConfigurationManager.cpp
+)
+target_include_directories(nlm_config_manager PUBLIC src/core/Config)
+target_link_libraries(nlm_config_manager PUBLIC nlm_core)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -125,7 +132,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli nlm_config_manager)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
