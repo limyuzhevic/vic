@@ -511,8 +511,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // Convert brain state to sensory representation for prediction
+        std::vector<float> brainState;
+        
+        // Collect current neural activity for prediction input
+        float totalActivity = 0.0f;
+        size_t activeNeurons = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activeNeurons++;
+                    }
+                }
+            }
+        }
+        
+        if (activeNeurons > 0) {
+            brainState.push_back(totalActivity / activeNeurons); // Mean activation level
+            brainState.push_back(static_cast<float>(activeNeurons)); // Number of active neurons
+            brainState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f); // Reward signal
+            brainState.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f); // Curiosity level
+            brainState.push_back(pImpl->novelty ? pImpl->novelty->getNoveltyLevel() : 0.0f); // Novelty level
+            
+            // Feed brain state to prediction system for temporal prediction
+            pImpl->predictionSystem->train(brainState);
+            
+            // Get prediction for next step
+            auto predictedState = pImpl->predictionSystem->predictNextState(brainState);
+            
+            // Store prediction in working memory for action selection
+            if (predictedState && pImpl->workingMemory) {
+                size_t predictedPattern = 0;
+                if (!predictedState->empty()) {
+                    predictedPattern = static_cast<size_t>(predictedState->at(0) * 100.0f); // Scale to memory index
+                }
+                pImpl->workingMemory->storeToNeuron(predictedPattern, 1.0f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +562,185 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Get currently attended regions
+            std::vector<RegionId> attendedRegions = pImpl->attention->getAttendedRegions();
+            if (!attendedRegions.empty()) {
+                // Boost prediction accuracy for attended regions
+                if (pImpl->predictionSystem) {
+                    std::vector<float> attentionState;
+                    attentionState.push_back(static_cast<float>(attendedRegions[0])); // Attend to first region
+                    attentionState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+                    pImpl->predictionSystem->train(attentionState);
+                }
+                
+                // Boost concept formation for attended regions
+                if (pImpl->conceptFormation) {
+                    // Create concept pattern from attended regions
+                    std::vector<float> conceptPattern;
+                    for (RegionId regionId : attendedRegions) {
+                        auto* region = brain_->getRegion(regionId);
+                        if (region) {
+                            for (auto* pop : region->getPopulations()) {
+                                for (auto* neuron : pop->getNeurons()) {
+                                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                                    conceptPattern.push_back(activation);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!conceptPattern.empty()) {
+                        std::vector<float> features;
+                        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                        pImpl->conceptFormation->presentExperience(conceptPattern, features, reward, currentStep);
+                    }
+                }
+                
+                // Boost neural planning for attended regions
+                if (pImpl->planner) {
+                    // Create planning state from attended regions
+                    std::vector<float> planningState;
+                    planningState.push_back(static_cast<float>(attendedRegions[0])); // Current focus region
+                    planningState.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f); // Exploration level
+                    planningState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f); // Reward value
+                    
+                    // Use attended region as current goal for planning
+                    pImpl->planner->setCurrentGoal(planningState);
+                    
+                    // Plan action based on attended region
+                    ActionType plannedAction = pImpl->planner->planAction(planningState);
+                    
+                    // Store planned action in working memory
+                    if (pImpl->workingMemory) {
+                        pImpl->workingMemory->storeToNeuron(
+                            static_cast<NeuronId>(plannedAction), 
+                            1.0f);
+                    }
+                }
+        }
+    }
+    
+    // ========== STEP 8.5: Update neural planner ==========
+    if (pImpl->planner) {
+        // Create planning state from current brain dynamics
+        std::vector<float> planningState;
+        
+        // Collect current neural activity for planning
+        float totalActivation = 0.0f;
+        size_t activeNeurons = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        totalActivation += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activeNeurons++;
+                    }
+                }
+            }
+        }
+        
+        if (activeNeurons > 0) {
+            planningState.push_back(totalActivation / activeNeurons); // Mean activation level
+            planningState.push_back(static_cast<float>(activeNeurons)); // Number of active neurons
+            planningState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f); // Reward signal
+            planningState.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f); // Curiosity level
+            planningState.push_back(pImpl->novelty ? pImpl->novelty->getNoveltyLevel() : 0.0f); // Novelty level
+            planningState.push_back(pImpl->developmentSystem ? pImpl->developmentSystem->getCurrentStage() : 0); // Development stage
+            
+            // Update planner with current brain state
+            pImpl->planner->setCurrentGoal(planningState);
+            
+            // Plan action based on current state and goals
+            ActionType plannedAction = pImpl->planner->planAction(planningState);
+            
+            // Store planned action in working memory for action selection
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(
+                    static_cast<NeuronId>(plannedAction), 
+                    1.0f);
+            }
+            
+            // Update planner based on prediction error
+            if (pImpl->predictionSystem) {
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (predictionError > 0.1f) {  // Only update if prediction is significantly wrong
+                    // Get the action that was actually planned
+                    std::vector<ActionType> plannedActions;
+                    plannedActions.push_back(plannedAction);
+                    
+                    // Update planner with prediction error
+                    pImpl->planner->updatePlanQuality(
+                        plannedActions,
+                        std::vector<ActionType>(), // We don't know actual actions yet
+                        predictionError);
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->dopamine) {
+        // Convert current brain state to pattern for concept formation
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        // Collect current neural activity pattern
+        float maxActivation = 0.0f;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    currentPattern.push_back(activation);
+                    
+                    if (activation > maxActivation) maxActivation = activation;
+                    
+                    // Add features based on neuron type and firing state
+                    if (neuron->isFiring()) {
+                        currentFeatures.push_back(1.0f); // Active feature
+                    } else {
+                        currentFeatures.push_back(0.0f); // Inactive feature
+                    }
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Normalize pattern
+            float scale = maxActivation > 0.0f ? 1.0f / maxActivation : 1.0f;
+            for (auto& activation : currentPattern) {
+                activation *= scale;
+            }
+            
+            // Convert features to normalized values
+            if (!currentFeatures.empty()) {
+                float featureSum = std::accumulate(currentFeatures.begin(), currentFeatures.end(), 0.0f);
+                if (featureSum > 0.0f) {
+                    float featureScale = 1.0f / featureSum;
+                    for (auto& feature : currentFeatures) {
+                        feature *= featureScale;
+                    }
+                }
+            }
+            
+            // Calculate reward from dopamine level
+            float reward = pImpl->dopamine->getLevel();
+            
+            // Present experience to concept formation system
+            pImpl->conceptFormation->presentExperience(currentPattern, currentFeatures, reward, currentStep);
+            
+            // Update concept formation based on attention
+            if (pImpl->attention) {
+                auto attentionNeurons = pImpl->attention->getCurrentAttendedNeuron();
+                if (attentionNeurons) {
+                    // Boost learning for attended concepts
+                    pImpl->conceptFormation->updateConcept(
+                        pImpl->conceptFormation->findConceptForPattern(currentPattern),
+                        currentPattern, currentFeatures, reward * 1.5f);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
