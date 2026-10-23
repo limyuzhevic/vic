@@ -473,6 +473,219 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
+### Network Analysis
+
+```python
+# Network analysis
+network_metrics = pynlm.analyzeNetworkTopology(brain)
+print(f"Total neurons: {network_metrics['total_neurons']}")
+print(f"Firing rate: {network_metrics['firing_rate']}")
+print(f"E/I balance: {network_metrics['excitatory_inhibitory_ratio']}")
+
+# Debug state synchronization
+pynlm.debugSynchronizeStates([brain1, brain2, brain3])
+```
+
+## Part 7: Advanced Usage Examples
+
+### Performance Monitoring
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createAdvancedConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Measure performance
+steps_per_second = pynlm.measurePerformance(brain, "simulation", 1000)
+print(f"Performance: {steps_per_second:.1f} steps per second")
+```
+
+### Serialization and Checkpointing
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run some simulation
+for i in range(1000):
+    brain.step(i)
+
+# Serialize brain state
+pynlm.serializeBrain(brain, "brain_checkpoint.bin")
+
+# Later, load from checkpoint
+restored_brain = pynlm.deserializeBrain("brain_checkpoint.bin")
+if restored_brain:
+    restored_brain.initialize()
+    print("Brain state successfully restored")
+```
+
+### Memory Pool for Multiple Simulations
+
+```python
+import pynlm
+
+# Create brain pool
+pool = pynlm.BrainPool()
+
+# Create multiple brains
+config = pynlm.createDefaultConfig()
+for i in range(5):
+    brain = pool.createBrain(config)
+    brain.initialize()
+    print(f"Created brain {i+1} with {brain.getTotalNeuronCount()} neurons")
+
+# Run parallel simulations
+for brain in pool.getBrains():
+    for step in range(100):
+        brain.step(step)
+
+print(f"Pool size: {pool.size()}")
+```
+
+### Context Manager for Resource Management
+
+```python
+import pynlm
+
+# Use context manager for automatic resource management
+config = pynlm.createDefaultConfig()
+with pynlm.createBrainContext(config) as context:
+    # Initialize brain automatically
+    brain = context.getBrain()
+    
+    # Run simulation
+    context.run(500)
+    
+    # Cleanup happens automatically when exiting the context
+print("Context manager handled resource cleanup")
+```
+
+### Experimental Configuration Presets
+
+```python
+import pynlm
+
+# Get experimental presets
+configs = {
+    "developmental": pynlm.getExperimentPreset("developmental"),
+    "social": pynlm.getExperimentPreset("social"),
+    "sensorimotor": pynlm.getExperimentPreset("sensorimotor")
+}
+
+# Use developmental config for studying maturation
+brain = pynlm.createBrain(configs["developmental"])
+brain.initialize()
+print("Developmental brain initialized with:", brain.getTotalNeuronCount(), "neurons")
+```
+
+### Complete Advanced Agent Simulation
+
+```python
+import pynlm
+
+def advanced_agent_simulation(num_episodes=10):
+    """Advanced simulation with multiple features enabled."""
+    
+    # Create advanced configuration
+    config = pynlm.createAdvancedConfig()
+    config.set("brain.neuron_count", 3000)
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.structural.enable", True)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    config.set("development.enable", True)
+    
+    results = []
+    
+    for episode in range(num_episodes):
+        print(f"\n=== Episode {episode + 1}/{num_episodes} ===")
+        
+        # Create fresh brain and agent for each episode
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        # Initialize agent
+        agent.initialize(world)
+        
+        # Enable all subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # Run episode
+        episode_reward = 0.0
+        for step in range(200):
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            
+            # Run brain
+            brain.step(step)
+            
+            # Get action
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            episode_reward += reward
+            
+            # Log progress
+            if step % 50 == 0:
+                print(f"  Step {step}: Reward={reward:.2f}, "
+                      f"Firing={brain.getFiringNeuronCount()}, "
+                      f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                      f"DevStage={brain.getDevelopmentalStage()}")
+        
+        # Collect episode results
+        results.append({
+            "episode": episode + 1,
+            "total_reward": episode_reward,
+            "avg_firing_rate": brain.getAverageFiringRate(),
+            "final_curiosity": agent.getCuriosityLevel(),
+            "final_novelty": agent.getNoveltyLevel(),
+            "final_dev_stage": brain.getDevelopmentalStage()
+        })
+        
+        print(f"Episode complete - Total Reward: {episode_reward:.2f}")
+    
+    return results
+
+# Run advanced simulation
+results = advanced_agent_simulation(5)
+print("\n=== Simulation Summary ===")
+for result in results:
+    print(f"Episode {result['episode']}: "
+          f"Reward={result['total_reward']:.2f}, "
+          f"Firing={result['avg_firing_rate']:.3f}, "
+          f"Curiosity={result['final_curiosity']:.3f}")
+```
+
 ### Environment Interaction
 
 ```python
@@ -498,7 +711,7 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+# Command-line interface
 
 ### Build Issues
 

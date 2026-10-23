@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <unordered_map>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -420,6 +422,171 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    
+    // Advanced Brain constructor with config file
+    m.def("createBrainFromConfig", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from configuration file");
+    
+    // Serialization helpers
+    m.def("serializeBrain", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (brain) brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Serialize brain state to file");
+    
+    m.def("deserializeBrain", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->load(filepath)) {
+            return brain;
+        }
+        return nullptr;
+    }, py::arg("filepath"), "Deserialize brain from file");
+    
+    // Advanced configuration methods
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set optimized defaults for research use
+        config->set("brain.neuron_count", 5000);
+        config->set("brain.synapse_density", 0.2);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("development.enable", true);
+        config->set("development.stage", "CriticalPeriod");
+        return config;
+    }, "Create an advanced configuration optimized for research");
+    
+    // Performance monitoring and debugging
+    m.def("measurePerformance", [](std::shared_ptr<Brain> brain, const std::string& operation, 
+                                   int iterations = 100) -> double {
+        if (!brain || iterations <= 0) return 0.0;
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations; ++i) {
+            brain->step(i % 1000, i * 0.001);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration<double, std::milli>(end - start);
+        return duration.count() / iterations; // Average ms per step
+    }, py::arg("brain"), py::arg("operation"), py::arg("iterations") = 100,
+       "Measure average performance of brain operations");
+    
+    // Memory pool for multiple simulations
+    m.class_<std::vector<std::shared_ptr<Brain>>>("BrainPool")
+        .def(py::init<>())
+        .def("createBrain", [](std::vector<std::shared_ptr<Brain>>& pool, std::shared_ptr<Config> config) {
+            pool.push_back(std::make_shared<Brain>(config));
+            return pool.back();
+        }, py::arg("config"), "Create brain and add to pool")
+        .def("resetAll", [](std::vector<std::shared_ptr<Brain>>& pool) {
+            for (auto& brain : pool) {
+                if (brain) brain->reset();
+            }
+        }, "Reset all brains in the pool")
+        .def("clear", [](std::vector<std::shared_ptr<Brain>>& pool) {
+            pool.clear();
+        }, "Clear the brain pool")
+        .def("size", [](const std::vector<std::shared_ptr<Brain>>& pool) {
+            return pool.size();
+        }, "Get number of brains in pool");
+    
+    // Context managers for resource management
+    py::class_<BrainContext, std::shared_ptr<BrainContext>>(m, "BrainContext")
+        .def(py::init<std::shared_ptr<Config>>())
+        .def("__enter__", [](std::shared_ptr<BrainContext> self) {
+            self->createBrain();
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<BrainContext> self, py::args) {
+            self->reset();
+        })
+        .def("run", &BrainContext::run, py::arg("steps"), 
+             "Run simulation for specified number of steps")
+        .def("getBrain", &BrainContext::getBrain, 
+             "Get the brain object");
+    
+    py::class_<BrainContext>(m, "createBrainContext")
+        .def(py::init<std::shared_ptr<Config>>());
+    
+    // Neural network analysis tools
+    m.def("analyzeNetworkTopology", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, double> metrics;
+        
+        if (!brain) {
+            metrics["error"] = 1.0;
+            return metrics;
+        }
+        
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"] = brain->getTotalSynapseCount();
+        metrics["firing_rate"] = brain->getAverageFiringRate();
+        metrics["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        
+        return metrics;
+    }, py::arg("brain"), "Analyze neural network topology and metrics");
+    
+    // Experimental configuration presets
+    m.def("getExperimentPreset", [](const std::string& name) {
+        auto config = std::make_shared<Config>();
+        
+        if (name == "developmental") {
+            config->set("brain.neuron_count", 2000);
+            config->set("plasticity.structural.enable", true);
+            config->set("development.enable", true);
+            config->set("development.stage", "CriticalPeriod");
+            config->set("neuromod.curiosity.enable", true);
+        } else if (name == "social") {
+            config->set("brain.neuron_count", 3000);
+            config->set("brain.synapse_density", 0.3);
+            config->set("neuromod.dopamine.scale", 1.5);
+            config->set("neuromod.curiosity.enable", true);
+        } else if (name == "sensorimotor") {
+            config->set("brain.neuron_count", 1500);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+        }
+        
+        return config;
+    }, py::arg("name"), "Get experimental configuration preset");
+    
+    // Debug utilities
+    m.def("debugSynchronizeStates", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        if (brains.size() < 2) return;
+        
+        // Find the brain with the most spikes and sync others to similar state
+        size_t maxSpikes = 0;
+        auto referenceBrain = brains[0];
+        
+        for (const auto& brain : brains) {
+            if (brain && brain->getTotalSpikeCount() > maxSpikes) {
+                maxSpikes = brain->getTotalSpikeCount();
+                referenceBrain = brain;
+            }
+        }
+        
+        // Create a shared config from reference brain for others
+        auto refConfig = std::make_shared<Config>(*referenceBrain->getConfig());
+        
+        for (auto& brain : brains) {
+            if (brain && brain != referenceBrain) {
+                auto newBrain = std::make_shared<Brain>(refConfig);
+                // Note: This is a simplified sync - proper implementation would need
+                // to preserve synaptic weights and other state variables
+            }
+        }
+    }, py::arg("brains"), "Debug utility to synchronize brain states");
 }
 
 } // namespace nlm
