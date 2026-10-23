@@ -82,6 +82,7 @@ add_library(nlm_core STATIC
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
+    src/experiments/LearningExperiment.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp

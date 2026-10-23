@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <cassert>
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
 
 // Forward declarations of test functions
 namespace test_types {
@@ -35,6 +37,18 @@ namespace test_stdp {
 
 namespace test_brain {
     void runAll();
+}
+
+namespace test_basic_connectivity {
+    void runTest(std::shared_ptr<nlm::Brain> brain);
+}
+
+namespace test_plasticity_experiment {
+    void runTest(std::shared_ptr<nlm::Brain> brain);
+}
+
+namespace test_stdp_verification {
+    void runTest(std::shared_ptr<nlm::Brain> brain);
 }
 
 int main() {
@@ -113,6 +127,45 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Basic Connectivity Test..." << std::endl;
+    try {
+        // Create brain for this test
+        auto config = std::make_shared<nlm::Config>();
+        auto brain = std::make_shared<nlm::Brain>(config);
+        brain->initialize();
+        test_basic_connectivity::runTest(brain);
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity Experiment Test..." << std::endl;
+    try {
+        // Create brain for this test
+        auto config = std::make_shared<nlm::Config>();
+        auto brain = std::make_shared<nlm::Brain>(config);
+        brain->initialize();
+        test_plasticity_experiment::runTest(brain);
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running STDP Verification Test..." << std::endl;
+    try {
+        // Create brain for this test
+        auto config = std::make_shared<nlm::Config>();
+        auto brain = std::make_shared<nlm::Brain>(config);
+        brain->initialize();
+        test_stdp_verification::runTest(brain);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
