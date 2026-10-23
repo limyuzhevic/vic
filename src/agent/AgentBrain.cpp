@@ -85,7 +85,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: brain_ is null, cannot process sensory input");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -168,10 +171,11 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) continue; // Skip null neurons
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
-        return sum / neurons.size();
+        return neurons.empty() ? 0.0f : sum / neurons.size();
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -210,6 +214,11 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: brain_ is null, cannot select with curiosity");
+        return defaultCmd;
+    }
+    
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
@@ -236,7 +245,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) {
+            NLM_LOG_WARNING("AgentBrain: brain_ is null, cannot apply reward modulation");
+        }
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -253,6 +267,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue; // Skip null synapses
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -280,7 +295,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        if (!brain_) {
+            NLM_LOG_WARNING("AgentBrain: brain_ is null, cannot update development");
+        }
+        return;
+    }
     
     developmentalAge_ += timestep;
     
