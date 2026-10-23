@@ -16,18 +16,31 @@ namespace nlm {
 
 class Phase3Demo {
 public:
-    Phase3Demo() {}
+    Phase3Demo() : verbose(false), debug(false), profile(false) {}
     ~Phase3Demo() {}
     
+    void setVerbose(bool v) { verbose = v; }
+    void setDebug(bool d) { debug = d; verbose = d; }
+    void setProfile(bool p) { profile = p; verbose = p; }
+    
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
+        
+        if (profile) {
+            std::cout << "Performance profiling enabled...\n";
+        }
         
         // Create configuration
         auto config = std::make_shared<Config>();
         configureEnvironment(config);
         configureBrain(config);
+        
+        // Initialize logging
+        initializeLogging();
         
         // Create world
         SimpleWorld world;
@@ -36,7 +49,10 @@ public:
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return;
+        }
         
         // Create agent brain interface
         AgentBrain agentBrain(brain);
@@ -191,9 +207,30 @@ public:
         std::cout << "\nPhase 3 demonstration complete.\n";
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
+        
+        // Performance timing
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        std::cout << "\n=== PERFORMANCE ===\n";
+        std::cout << "Total execution time: " << duration.count() / 1000.0 << "s" << std::endl;
+        std::cout << "Total steps: " << numEpisodes * stepsPerEpisode << std::endl;
+        std::cout << "Steps per second: " << ((numEpisodes * stepsPerEpisode) * 1000.0 / duration.count()) << " steps/s" << std::endl;
+        
+        if (verbose) {
+            std::cout << "\n=== DETAILED METRICS ===\n";
+            std::cout << "Synapse growth: " << (allMetrics.back().totalSynapses - allMetrics.front().totalSynapses) << " synapses\n";
+            std::cout << "Average firing rate: " << allMetrics.back().averageFiringRate << " Hz\n";
+            std::cout << "Average novelty: " << (allMetrics.back().finalNovelty + allMetrics.front().finalNovelty) / 2.0f << "\n";
+            std::cout << "Average curiosity: " << (allMetrics.back().finalCuriosity + allMetrics.front().finalCuriosity) / 2.0f << "\n";
+        }
     }
     
 private:
+    bool verbose;
+    bool debug;
+    bool profile;
+    
     void configureEnvironment(std::shared_ptr<Config> config) {
         config->set("environment_width", 20);
         config->set("environment_height", 20);
@@ -238,23 +275,79 @@ private:
             default: return "Unknown";
         }
     }
+    
+    void initializeLogging() {
+        try {
+            auto& logger = Logger::getInstance();
+            
+            if (debug) {
+                logger.setLevel(Logger::Level::Debug);
+                auto debugLogger = std::make_shared<DebugLogger>(Logger::Level::Debug);
+                logger.addLogger(debugLogger);
+            } else if (verbose) {
+                logger.setLevel(Logger::Level::Info);
+                auto consoleLogger = std::make_shared<ConsoleLogger>(Logger::Level::Info);
+                logger.addLogger(consoleLogger);
+            } else {
+                logger.setLevel(Logger::Level::Warning);
+                auto consoleLogger = std::make_shared<ConsoleLogger>(Logger::Level::Warning);
+                logger.addLogger(consoleLogger);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Failed to initialize logging: " << e.what() << std::endl;
+        }
+    }
 };
 
-} // namespace nlm
-
-// Main entry point for Phase 3 demo
+// Phase 3 demonstration entry point
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool verbose = false;
+    bool debug = false;
+    bool profile = false;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: ./nlm_phase3_demo [EPISODES] [STEPS_PER_EPISODE] [OPTIONS]" << std::endl;
+            std::cout << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  --help, -h                Show this help message" << std::endl;
+            std::cout << "  --verbose, -v             Enable verbose output" << std::endl;
+            std::cout << "  --debug, -d               Enable debug logging (implies verbose)" << std::endl;
+            std::cout << "  --profile, -p             Enable performance profiling (implies verbose)" << std::endl;
+            std::cout << std::endl;
+            std::cout << "Arguments:" << std::endl;
+            std::cout << "  [EPISODES]               Number of episodes (default: 5)" << std::endl;
+            std::cout << "  [STEPS_PER_EPISODE]       Steps per episode (default: 200)" << std::endl;
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            debug = true;
+            verbose = true;
+        } else if (arg == "--profile" || arg == "-p") {
+            profile = true;
+            verbose = true;
+        } else if (i < argc - 2) {
+            // Try to parse numeric arguments
+            try {
+                numEpisodes = std::atoi(argv[i]);
+                stepsPerEpisode = std::atoi(argv[i + 1]);
+                i++; // Skip the steps argument as well
+            } catch (...) {
+                // Not numeric arguments, continue
+            }
+        }
     }
     
     nlm::Phase3Demo demo;
+    demo.setVerbose(verbose);
+    demo.setDebug(debug);
+    demo.setProfile(profile);
     demo.run(numEpisodes, stepsPerEpisode);
     
     return 0;
