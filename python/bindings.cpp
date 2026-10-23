@@ -10,11 +10,60 @@
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/world/SimpleWorld.hpp"
+#include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/motor/Action.hpp"
+#include "../src/motor/MotorSystem.hpp"
+#include "../src/brain/Brain.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/core/Random/Random.hpp"
+#include "../src/core/Logger/Logger.hpp"
+#include "../src/core/SimulationClock/SimulationClock.hpp"
+#include "../src/core/Types/Types.hpp"
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/EpisodicMemory.hpp"
+#include "../src/memory/AssociativeMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/environment/Environment.hpp"
+#include "../src/environment/Observation.hpp"
+#include "../src/environment/Action.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
+#include "../src/world/WorldObject.hpp"
+#include "../src/agent/SelfModel.hpp"
+#include "../src/agent/SocialLearning.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -263,31 +312,292 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    // Phase 6 Memory Systems
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory system with persistent activity)pbdoc")
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("update", &NeuralWorkingMemory::update, py::arg("timestep"),
+             "Update working memory over timestep")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron,
+             py::arg("neuronId"), py::arg("activation"),
+             "Store activation to neuron in working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity,
+             "Get working memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("capacity"),
+             "Set working memory capacity")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear all working memory traces");
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory system for experience storage)pbdoc")
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize episodic memory with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episodic memory item")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay,
+             py::arg("maxEpisodes"), "Get episodes for replay")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episodic memory")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar,
+             py::arg("sensoryState"), py::arg("maxResults"),
+             "Retrieve similar episodes to given sensory state")
+        .def("getMaxEpisodes", &NeuralEpisodicMemory::getMaxEpisodes,
+             "Get maximum number of episodes")
+        .def("setMaxEpisodes", &NeuralEpisodicMemory::setMaxEpisodes, py::arg("max"),
+             "Set maximum number of episodes")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("threshold"),
+             "Consolidate important memories, remove weak ones")
+        .def("clear", &NeuralEpisodicMemory::clear,
+             "Clear all episodic memory");
+
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Associative memory system for pattern associations)pbdoc")
+        .def("initialize", &NeuralAssociativeMemory::initialize, py::arg("brain"),
+             "Initialize associative memory with brain reference")
+        .def("storeAssociation", &NeuralAssociativeMemory::storeAssociation,
+             py::arg("pattern1"), py::arg("pattern2"), py::arg("strength"),
+             "Store an associative memory link")
+        .def("recall", &NeuralAssociativeMemory::recall, py::arg("pattern"),
+             "Recall associated pattern");
+
+    // Phase 6 Neuromodulation Systems
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward prediction error)pbdoc")
+        .def("initialize", &Dopamine::initialize, py::arg("brain"),
+             "Initialize dopamine system with brain reference")
+        .def("update", &Dopamine::update, py::arg("timestep"),
+             "Update dopamine level over timestep")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get dopamine effect on plasticity");
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detector for surprise and curiosity)pbdoc")
+        .def("initialize", &Novelty::initialize, py::arg("brain"),
+             "Initialize novelty detector with brain reference")
+        .def("update", &Novelty::update, py::arg("timestep"),
+             "Update novelty detection over timestep")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("setThreshold", &Novelty::setThreshold, py::arg("threshold"),
+             "Set novelty detection threshold");
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity system for exploration behavior)pbdoc")
+        .def("initialize", &Curiosity::initialize, py::arg("brain"),
+             "Initialize curiosity system with brain reference")
+        .def("update", &Curiosity::update, py::arg("timestep"),
+             "Update curiosity level over timestep")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get current curiosity level")
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive,
+             "Get current exploration drive")
+        .def("enableExploration", &Curiosity::enableExploration, py::arg("enable"),
+             "Enable or disable exploration behavior");
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signal for learning)pbdoc")
+        .def("initialize", &PredictionError::initialize, py::arg("brain"),
+             "Initialize prediction error system with brain reference")
+        .def("update", &PredictionError::update, py::arg("timestep"),
+             "Update prediction error over timestep")
+        .def("getLevel", &PredictionError::getLevel,
+             "Get current prediction error level")
+        .def("setPredictor", &PredictionError::setPredictor, py::arg("predictor"),
+             "Set prediction system reference");
+
+    // Phase 6 Cognition Systems
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planning system for action sequences)pbdoc")
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"),
+             "Initialize planner with brain reference")
+        .def("planAction", &NeuralPlanner::planAction,
+             py::arg("state"), py::arg("confidence"),
+             "Plan action based on current state")
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality,
+             py::arg("planned"), py::arg("actual"), py::arg("outcome"),
+             "Update plan quality based on outcome")
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence,
+             "Get planning confidence level")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"),
+             "Set planning depth (number of steps ahead)")
+        .def("getLastPlannedAction", &NeuralPlanner::getLastPlannedAction,
+             "Get last planned action");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation from experience patterns)pbdoc")
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"),
+             "Initialize concept formation with brain reference")
+        .def("presentExperience", &ConceptFormation::presentExperience,
+             py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("timestamp"),
+             "Present experience to concept formation system")
+        .def("getConceptCount", &ConceptFormation::getConceptCount,
+             "Get number of formed concepts")
+        .def("getConcepts", &ConceptFormation::getConcepts,
+             "Get all formed concepts")
+        .def("getConceptStability", &ConceptFormation::getConceptStability,
+             py::arg("conceptId"), "Get stability of a specific concept")
+        .def("getMatchingConcept", &ConceptFormation::getMatchingConcept,
+             py::arg("pattern"), "Find concept matching given pattern")
+        .def("getGeneralizationAbility", &ConceptFormation::getGeneralizationAbility,
+             py::arg("conceptId"), "Get generalization ability of concept");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attention system with competitive selection)pbdoc")
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attention system with brain reference")
+        .def("update", &AttentionalSelection::update, py::arg("timestep"),
+             "Update attention dynamics over timestep")
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience,
+             py::arg("neuronId"), py::arg("salience"),
+             "Apply bottom-up salience to neuron")
+        .def("applyTopDownAttention", &AttentionalSelection::applyTopDownAttention,
+             py::arg("neuronId"), py::arg("attention"),
+             "Apply top-down attention to neuron")
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"), "Process competitive attention")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"),
+             "Set inhibition strength between competitors")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"),
+             "Set excitation strength between competitors")
+        .def("getSelectedNeuron", &AttentionalSelection::getSelectedNeuron,
+             "Get currently selected neuron")
+        .def("reset", &AttentionalSelection::reset,
+             "Reset attention system");
+
+    // Phase 6 Development System
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Developmental system affecting plasticity)pbdoc")
+        .def("initialize", &DevelopmentSystem::initialize, py::arg("brain"),
+             "Initialize development system with brain reference")
+        .def("update", &DevelopmentSystem::update, py::arg("brain"), py::arg("rng"), py::arg("dt"),
+             "Update developmental state over time")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &DevelopmentSystem::setDevelopmentalStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("getAge", &DevelopmentSystem::getAge,
+             "Get current developmental age")
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate,
+             "Get current plasticity rate")
+        .def("isInCriticalPeriod", &DevelopmentSystem::isInCriticalPeriod,
+             "Check if in critical developmental period");
+
+    // Phase 6 Prediction System
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for forward modeling)pbdoc")
+        .def("initialize", &PredictionSystem::initialize, py::arg("brain"),
+             "Initialize prediction system with brain reference")
+        .def("recordSensoryState", &PredictionSystem::recordSensoryState,
+             py::arg("state"), py::arg("timestamp"),
+             "Record sensory state for prediction")
+        .def("generatePrediction", &PredictionSystem::generatePrediction,
+             py::arg("timestamp"), "Generate prediction for future state")
+        .def("updateWithObservation", &PredictionSystem::updateWithObservation,
+             py::arg("observedState"), py::arg("timestamp"),
+             "Update prediction with observed state")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get current prediction error")
+        .def("getPredictionConfidence", &PredictionSystem::getPredictionConfidence,
+             "Get prediction confidence level")
+        .def("setPredictionHorizon", &PredictionSystem::setPredictionHorizon, py::arg("horizon"),
+             "Set prediction horizon (number of steps ahead)");
+
+    // Phase 6 Experiment System
+    py::class_<Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment", R"pbdoc(Phase 6 integration experiment runner)pbdoc")
         .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("run", &Phase6IntegratedExperiment::run, py::arg("config"),
+             "Run complete Phase 6 integration experiment")
+        .def("verifyIntegration", &Phase6IntegratedExperiment::verifyIntegration,
+             "Verify that all systems are properly integrated")
+        .def("testMemoryIntegration", &Phase6IntegratedExperiment::testMemoryIntegration,
+             "Test memory system integration")
+        .def("testNeuromodulationIntegration", &Phase6IntegratedExperiment::testNeuromodulationIntegration,
+             "Test neuromodulation system integration")
+        .def("testCheckpointing", &Phase6IntegratedExperiment::testCheckpointing,
+             "Test checkpoint save/load functionality")
+        .def("testReplay", &Phase6IntegratedExperiment::testReplay,
+             "Test memory replay functionality");
+
+    // Phase 6 Experiment Configuration
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Configuration for Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath);
+
+    // Phase 6 Integration Result
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Result from Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readwrite("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readwrite("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readwrite("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readwrite("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readwrite("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readwrite("replayWorks", &Phase6IntegrationResult::replayWorks)
+        .def_readwrite("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readwrite("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readwrite("avgSynapticWeight", &Phase6IntegrationResult::avgSynapticWeight)
+        .def_readwrite("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readwrite("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readwrite("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readwrite("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readwrite("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime);
+
+    // Factory functions for Phase 6 systems
+    m.def("createNeuralWorkingMemory", []() -> std::unique_ptr<NeuralWorkingMemory> {
+        return std::make_unique<NeuralWorkingMemory>();
+    }, "Create a new neural working memory system");
+
+    m.def("createNeuralEpisodicMemory", []() -> std::unique_ptr<NeuralEpisodicMemory> {
+        return std::make_unique<NeuralEpisodicMemory>();
+    }, "Create a new neural episodic memory system");
+
+    m.def("createNeuralAssociativeMemory", []() -> std::unique_ptr<NeuralAssociativeMemory> {
+        return std::make_unique<NeuralAssociativeMemory>();
+    }, "Create a new neural associative memory system");
+
+    m.def("createDopamine", []() -> std::unique_ptr<Dopamine> {
+        return std::make_unique<Dopamine>();
+    }, "Create a new dopamine neuromodulator");
+
+    m.def("createNovelty", []() -> std::unique_ptr<Novelty> {
+        return std::make_unique<Novelty>();
+    }, "Create a new novelty detector");
+
+    m.def("createCuriosity", []() -> std::unique_ptr<Curiosity> {
+        return std::make_unique<Curiosity>();
+    }, "Create a new curiosity system");
+
+    m.def("createPredictionError", []() -> std::unique_ptr<PredictionError> {
+        return std::make_unique<PredictionError>();
+    }, "Create a new prediction error system");
+
+    m.def("createNeuralPlanner", []() -> std::unique_ptr<NeuralPlanner> {
+        return std::make_unique<NeuralPlanner>();
+    }, "Create a new neural planner");
+
+    m.def("createConceptFormation", []() -> std::unique_ptr<ConceptFormation> {
+        return std::make_unique<ConceptFormation>();
+    }, "Create a new concept formation system");
+
+    m.def("createAttentionalSelection", []() -> std::unique_ptr<AttentionalSelection> {
+        return std::make_unique<AttentionalSelection>();
+    }, "Create a new attentional selection system");
+
+    m.def("createDevelopmentSystem", []() -> std::unique_ptr<DevelopmentSystem> {
+        return std::make_unique<DevelopmentSystem>();
+    }, "Create a new development system");
+
+    m.def("createPredictionSystem", []() -> std::unique_ptr<PredictionSystem> {
+        return std::make_unique<PredictionSystem>();
+    }, "Create a new prediction system");
+
+    m.def("createPhase6Experiment", []() -> std::unique_ptr<Phase6IntegratedExperiment> {
+        return std::make_unique<Phase6IntegratedExperiment>();
+    }, "Create a new Phase 6 integration experiment runner");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
