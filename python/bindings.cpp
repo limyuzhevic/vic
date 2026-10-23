@@ -134,6 +134,90 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Semantic action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getParameters", &Action::getParameters)
+        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("getName", &Action::getName)
+        .def("getNameStr", &Action::getName, "Get action name as string")
+        .def("getParameterCount", &Action::getParameters)
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& self) {
+            return "<Action: " + std::string(self.getName()) + ">";
+        });
+
+    // Performance monitoring utilities
+    m.def("getPerformanceStats", []() {
+        std::map<std::string, double> stats;
+        stats["timestamp"] = std::time(nullptr);
+        stats["version"] = "1.0.0";
+        return stats;
+    }, "Get current performance statistics");
+    
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain, uint64_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start).count();
+        
+        std::map<std::string, double> results;
+        results["total_time_seconds"] = duration;
+        results["steps_per_second"] = steps / duration;
+        results["final_firing_rate"] = brain->getAverageFiringRate();
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"),
+        "Run simulation with timing and return performance statistics");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, const std::vector<uint64_t>& stepCounts) {
+        std::map<uint64_t, std::map<std::string, double>> results;
+        
+        for (uint64_t steps : stepCounts) {
+            auto start = std::chrono::high_resolution_clock::now();
+            for (uint64_t i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double>(end - start).count();
+            
+            std::map<std::string, double> stats;
+            stats["duration_seconds"] = duration;
+            stats["steps_per_second"] = steps / duration;
+            stats["avg_firing_rate"] = brain->getAverageFiringRate();
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            
+            results[steps] = stats;
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("stepCounts"),
+        "Run benchmark with different step counts and return performance metrics");
+
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
@@ -162,7 +246,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("__str__", [](const Config& cfg) {
+            return cfg.summary();
+        })
+        // Python-friendly convenience methods
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set float configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set string configuration value")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer configuration value")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get float configuration value")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get string configuration value")
+        .def("loadFromDict", [](Config& self, const py::dict& config_dict) {
+            for (auto item : config_dict) {
+                std::string key = py::str(item.first);
+                // Try to detect type
+                py::object value = item.second;
+                if (value.is(py::int_())) {
+                    self.set(key, value.cast<int64_t>(), ConfigSource::User);
+                } else if (value.is(py::float_())) {
+                    self.set(key, value.cast<float>(), ConfigSource::User);
+                } else if (value.is(py::str())) {
+                    self.set(key, value.cast<std::string>(), ConfigSource::User);
+                } else {
+                    throw std::runtime_error("Unsupported configuration value type");
+                }
+            }
+        }, py::arg("config_dict"), "Load configuration from Python dictionary");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
