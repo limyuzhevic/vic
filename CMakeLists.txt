@@ -29,6 +29,10 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Error handling and utilities
+    src/core/Utilities/ErrorHandling.cpp
+    src/core/Utilities/ErrorHandler.cpp
+    src/core/Utilities/Validator.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -138,6 +142,11 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 2 tests (experimental verification)
+add_executable(nlm_phase2_test tests/Phase2Tests.cpp)
+target_include_directories(nlm_phase2_test PUBLIC src)
+target_link_libraries(nlm_phase2_test PUBLIC nlm_core)
 
 # Testing
 enable_testing()
