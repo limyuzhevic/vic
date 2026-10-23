@@ -85,11 +85,17 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Enhanced Core
+    src/core/ErrorHandling/EnhancedErrorHandling.cpp
+    src/core/Config/EnhancedConfig.cpp
+    src/core/Config/JSONConfig.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    src/core/ErrorHandling
+    src/core/Config
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
@@ -138,6 +144,14 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# NLM CLI application
+add_executable(nlm_cli
+    src/cli/NLMCli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+target_include_directories(nlm_cli PUBLIC src)
 
 # Testing
 enable_testing()
