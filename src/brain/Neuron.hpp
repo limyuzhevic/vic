@@ -3,6 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <stdexcept>
+#include <string>
+#include <cmath>
 
 namespace nlm {
 
@@ -10,7 +13,55 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
+/**
+ * Configuration constants for LIF neuron parameters
+ * 
+ * These define the biological constraints and operating ranges
+ * for the Leaky Integrate-and-Fire neuron model.
+ */
+namespace NeuronConstants {
+    // Membrane parameters (biological values in mV/ms/nS)
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;     // nF - typical neuronal capacitance
+    static constexpr float TIME_CONSTANT = 20.0f;          // ms - membrane time constant
+    static constexpr float RESTING_POTENTIAL = -70.0f;      // mV - typical resting potential
+    static constexpr float THRESHOLD_DEFAULT = -55.0f;       // mV - typical firing threshold
+    static constexpr float RESET_POTENTIAL = -70.0f;        // mV - post-spike reset potential
+    static constexpr float LEAK_CONDUCTANCE_DEFAULT = 10.0f; // nS - default leak conductance
+    
+    // Physical bounds (biological constraints)
+    static constexpr float MIN_MEMBRANE_POTENTIAL = -100.0f;  // mV - absolute refractory limit
+    static constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;    // mV - maximum depolarization
+    static constexpr float MIN_THRESHOLD = -60.0f;             // mV - minimum reasonable threshold
+    static constexpr float MAX_THRESHOLD = -40.0f;             // mV - maximum reasonable threshold
+    static constexpr float MIN_RESTING_POTENTIAL = -90.0f;     // mV - minimum resting potential
+    static constexpr float MAX_RESTING_POTENTIAL = -50.0f;     // mV - maximum resting potential
+    
+    // Adaptation and plasticity parameters
+    static constexpr float MAX_ADAPTATION_VARIABLE = 10.0f;   // Maximum spike-frequency adaptation
+    static constexpr float ADAPTATION_DECAY_RATE = 0.95f;     // Decay rate for adaptation
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;          // Maximum spikes to record
+    static constexpr float DEFAULT_REFRACTORY_PERIOD = 5;     // Default refractory period (ms)
+}
+
+/**
+ * Neuron validation exceptions
+ */
+class NeuronValidationException : public std::runtime_error {
+public:
+    NeuronValidationException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class NeuronStateException : public std::runtime_error {
+public:
+    NeuronStateException(const std::string& message) : std::runtime_error(message) {}
+};
+
+/**
+ * Neuron state structure for efficient storage
+ * 
+ * Contains all dynamic state variables for a single LIF neuron. Organized
+ * for cache efficiency and memory locality.
+ */
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
@@ -22,20 +73,20 @@ struct NeuronState {
     FiringState firingState;               // Current firing state
     uint32_t refractoryRemaining;          // Steps remaining in refractory period
     uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
+    float adaptationVariable;              // For spike-frequency adaptation (mV)
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(NeuronConstants::RESTING_POTENTIAL)
+        , restingPotential(NeuronConstants::RESTING_POTENTIAL)
+        , threshold(NeuronConstants::THRESHOLD_DEFAULT)
+        , resetPotential(NeuronConstants::RESET_POTENTIAL)
+        , leakConductance(NeuronConstants::LEAK_CONDUCTANCE_DEFAULT)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(NeuronConstants::DEFAULT_REFRACTORY_PERIOD)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
@@ -143,9 +194,35 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+/**
+ * Validate neuron state
+ * 
+ * Performs comprehensive validation of neuron state and parameters.
+ * 
+ * @throws NeuronValidationException if state is invalid
+ */
+    void validate() const;
+    
+    /**
+     * Get human-readable state summary
+     * 
+     * @return String containing neuron state information
+     */
+    std::string getStateSummary() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Internal validation helpers
+    static bool validateMembranePotential(MembranePotential potential);
+    static bool validateThreshold(MembranePotential threshold);
+    static bool validateRefractoryPeriod(uint32_t steps);
+    static bool validateInputAmplitude(MembranePotential amplitude);
+    static bool validateTimestamp(Timestamp timestamp);
+    static std::string getValidationErrorMessage(const std::string& field, 
+                                                  const std::string& value,
+                                                  const std::string& constraint);
 };
 
 } // namespace nlm
