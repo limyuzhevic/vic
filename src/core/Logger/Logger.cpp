@@ -194,4 +194,32 @@ LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
+// Static helper function implementations
+LogLevel Logger::stringToLogLevel(const std::string& levelStr) {
+    std::string upperLevel = levelStr;
+    for (char& c : upperLevel) {
+        c = std::toupper(c);
+    }
+    
+    if (upperLevel == "DEBUG") return LogLevel::Debug;
+    if (upperLevel == "INFO") return LogLevel::Info;
+    if (upperLevel == "WARN" || upperLevel == "WARNING") return LogLevel::Warning;
+    if (upperLevel == "ERROR") return LogLevel::Error;
+    if (upperLevel == "CRIT" || upperLevel == "CRITICAL") return LogLevel::Critical;
+    
+    // Default to Info if unknown level
+    return LogLevel::Info;
+}
+
+std::string Logger::logLevelToString(LogLevel level) {
+    switch (level) {
+        case LogLevel::Debug: return "DEBUG";
+        case LogLevel::Info: return "INFO";
+        case LogLevel::Warning: return "WARN";
+        case LogLevel::Error: return "ERROR";
+        case LogLevel::Critical: return "CRIT";
+        default: return "UNKNOWN";
+    }
+}
+
 } // namespace nlm

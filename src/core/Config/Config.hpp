@@ -90,16 +90,27 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Enhanced error reporting
+    std::string getLastError() const;
+    bool hasError() const;
+    void clearError();
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Type-safe configuration access with better error messages
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue, const std::string& errorContext = "") const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    // Configuration validation
+    bool validateConfig() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration export with multiple formats
+    std::string exportToString(const std::string& format = "json") const;
+    
+    // Safe configuration operations
+    bool setSafe(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    bool removeSafe(const std::string& key);
+    
+    // Configuration statistics and diagnostics
+    size_t getEntryCount() const;
+    size_t getEntryCountBySource(ConfigSource source) const;
+    double getMemoryUsage() const;  // Estimate memory usage

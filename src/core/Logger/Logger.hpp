@@ -83,7 +83,7 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
+// Global logging functions
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
@@ -103,6 +103,12 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Static helper function to convert string to LogLevel
+    static LogLevel stringToLogLevel(const std::string& levelStr);
+    
+    // Static helper function to convert LogLevel to string
+    static std::string logLevelToString(LogLevel level);
 
 private:
     struct Impl;
@@ -137,5 +143,32 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Global logging functions
+inline void log(LogLevel level, const std::string& message, 
+               const std::string& file = "", int line = 0, 
+               const std::string& function = "") {
+    Logger::getGlobal().log(level, message, file, line, function);
+}
+
+inline void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "") {
+    Logger::getGlobal().debug(message, file, line, function);
+}
+
+inline void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "") {
+    Logger::getGlobal().info(message, file, line, function);
+}
+
+inline void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "") {
+    Logger::getGlobal().warning(message, file, line, function);
+}
+
+inline void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "") {
+    Logger::getGlobal().error(message, file, line, function);
+}
+
+inline void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "") {
+    Logger::getGlobal().critical(message, file, line, function);
+}
 
 } // namespace nlm

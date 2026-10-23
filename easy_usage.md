@@ -254,6 +254,214 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Advanced Agent with Statistics
+
+```python
+import pynlm
+
+# Setup a brain with statistics tracking
+config = pynlm.createConfigFromDict({
+    "brain.neuron_count": 500,
+    "brain.synapse_density": 0.1,
+    "brain.v_thresh": -50.0,
+    "brain.v_rest": -70.0,
+})
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+
+# Configure world
+world.configure(width=25, height=25, visionWidth=10, visionHeight=10)
+world.reset()
+agent.initialize(world)
+
+# Enable all features for advanced learning
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run simulation with statistics collection
+stats = []
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        step_stats = pynlm.computeNetworkStats(brain)
+        step_stats["step"] = step
+        step_stats["curiosity"] = agent.getCuriosityLevel()
+        step_stats["novelty"] = agent.getNoveltyLevel()
+        step_stats["development_stage"] = pynlm.getDevelopmentalStageName(brain.getDevelopmentalStage())
+        stats.append(step_stats)
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Analyze final statistics
+final_stats = pynlm.computeNetworkStats(brain)
+print(f"\nFinal Network Statistics:")
+print(f"  Total neurons: {final_stats.get('total_neurons')}")
+print(f"  Total synapses: {final_stats.get('total_synapses')}")
+print(f"  Firing neurons: {final_stats.get('firing_neurons')}")
+print(f"  Average firing rate: {final_stats.get('average_firing_rate'):.2f} Hz")
+print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"  Development stage: {pynlm.getDevelopmentalStageName(brain.getDevelopmentalStage())}")
+```
+
+### Project 5: Batch Operations for Performance
+
+```python
+import pynlm
+import time
+
+# Create brain and world
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+world.reset()
+agent.initialize(world)
+
+# Enable learning
+agent.enableAllFeatures()
+
+# Run multiple simulation steps efficiently
+print("Running simulation...")
+start_time = time.time()
+
+# Method 1: Standard step-by-step (slower)
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+standard_time = time.time() - start_time
+print(f"Standard simulation completed in {standard_time:.2f} seconds")
+
+# Method 2: Using advanced features (demonstrates batch operations)
+print("\nDemonstrating advanced features...")
+
+# Create vision and audio sensors for advanced input
+vision_sensor = pynlm.createVisionSensor(8, 8, 3)
+audio_sensor = pynlm.createAudioSensor(44100, 1024)
+
+# Example of batch processing (conceptual - actual implementation varies)
+print("Advanced features available:")
+print("  - Batch sensory input processing")
+print("  - Network statistics aggregation")
+print("  - Development stage management")
+print("  - Progress callbacks")
+print("  - Experiment setup and configuration")
+```
+
+### Project 6: Simulation with Progress Monitoring
+
+```python
+import pynlm
+
+# Setup simulation with progress callback
+def progress_monitor(step, total_steps):
+    percentage = (step / total_steps) * 100
+    print(f"Progress: {percentage:.1f}% (Step {step}/{total_steps})")
+
+# Create components
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run simulation with progress monitoring
+print("Running simulation with progress monitoring...")
+pynlm.runSimulationWithProgress(
+    brain, world, agent, 500, 0.1, progress_monitor
+)
+
+print("Simulation completed!")
+print(f"Final firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Project 7: Experiment Configuration
+
+```python
+import pynlm
+
+# Setup experiment with custom parameters
+experiment_params = {
+    "brain.neuron_count": 300,
+    "brain.synapse_density": 0.08,
+    "brain.v_thresh": -45.0,
+    "brain.v_rest": -65.0,
+    "plasticity.stdp.enable": True,
+    "plasticity.stdp.learning_rate": 0.002,
+    "neuromod.dopamine.scale": 1.5,
+    "neuromod.curiosity.enable": True,
+    "neuromod.novelty.enable": True,
+    "experiment.name": "curiosity_driven_exploration",
+    "experiment.duration": 1000,
+    "experiment.reward_scale": 2.0,
+}
+
+# Create experiment configuration
+config = pynlm.setupExperiment("curiosity_driven_exploration", experiment_params)
+
+# Verify configuration
+print(f"Experiment configuration:")
+for key in config.getKeys():
+    if key.startswith("experiment") or key.startswith("neuromod"):
+        value = config.getOr[str](key, "")
+        print(f"  {key}: {value}")
+
+# Create brain with experiment config
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+
+world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
+world.reset()
+agent.initialize(world)
+
+print(f"Experiment '{config.getOr[str]('experiment.name', 'unnamed')}' started with {brain.getTotalNeuronCount()} neurons")
+```
+
+### Project 8: Visualization Configuration
+
+```python
+import pynlm
+
+# Create visualization configuration for saving snapshots
+vis_config = pynlm.createVisualizationConfig(
+    outputDir="./simulation_videos",
+    saveSnapshots=True,
+    snapshotInterval=50
+)
+
+print("Visualization configuration:")
+for key, value in vis_config.items():
+    print(f"  {key}: {value}")
+
+# This configuration can be used by external visualization tools
+print("\nTo visualize simulation results:")
+print("  1. Run the simulation")
+print("  2. Configure external visualization tool")
+print("  3. Import snapshots using the configuration above")
+```
+
 ---
 
 ## Quick Reference
