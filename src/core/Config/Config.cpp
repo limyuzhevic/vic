@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
 
 namespace nlm {
 
@@ -18,15 +20,260 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper function to trim whitespace and quotes from a string
+static std::string trimString(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+// Helper function to parse JSON values
+static std::string parseJSONValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
     
+    if (pos >= jsonStr.size()) {
+        return "";
+    }
+    
+    char ch = jsonStr[pos];
+    
+    if (ch == '"') {
+        // String value
+        return parseJSONString(jsonStr, pos);
+    } else if (ch == '{') {
+        // Object value - for now, treat as string representation
+        return parseJSONObject(jsonStr, pos);
+    } else if (ch == '[') {
+        // Array value - for now, treat as string representation
+        return parseJSONArray(jsonStr, pos);
+    } else if (ch == 't' || ch == 'f') {
+        // Boolean value
+        return parseJSONBoolean(jsonStr, pos);
+    } else if (ch == 'n') {
+        // Null value
+        return parseJSONNull(jsonStr, pos);
+    } else {
+        // Number value
+        return parseJSONNumber(jsonStr, pos);
+    }
+}
+
+// Helper function to skip whitespace
+static void skipWhitespace(const std::string& str, size_t& pos) {
+    while (pos < str.size() && std::isspace(str[pos])) {
+        pos++;
+    }
+}
+
+// Helper function to parse JSON string
+static std::string parseJSONString(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr[pos] != '"') {
+        return "";
+    }
+    
+    pos++; // Skip opening quote
+    std::string result;
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != '"') {
+        if (jsonStr[pos] == '\\' && pos + 1 < jsonStr.size()) {
+            // Escape sequence
+            pos++;
+            if (pos < jsonStr.size()) {
+                result += jsonStr[pos];
+            }
+        } else {
+            result += jsonStr[pos];
+        }
+        pos++;
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == '"') {
+        pos++; // Skip closing quote
+    }
+    
+    return result;
+}
+
+// Helper function to parse JSON object
+static std::string parseJSONObject(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr[pos] != '{') {
+        return "";
+    }
+    
+    pos++; // Skip opening brace
+    std::string result = "{";
+    bool first = true;
+    
+    skipWhitespace(jsonStr, pos);
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != '}') {
+        if (!first) {
+            result += ",";
+        }
+        first = false;
+        
+        // Parse key
+        skipWhitespace(jsonStr, pos);
+        std::string key = parseJSONString(jsonStr, pos);
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ':') {
+            pos++; // Skip colon
+        }
+        
+        // Parse value
+        std::string value = parseJSONValue(jsonStr, pos);
+        result += "\"" + key + "\":\"" + value + "\"";
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++; // Skip comma
+        }
+        
+        skipWhitespace(jsonStr, pos);
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == '}') {
+        pos++; // Skip closing brace
+    }
+    
+    result += "}";
+    return result;
+}
+
+// Helper function to parse JSON array
+static std::string parseJSONArray(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr[pos] != '[') {
+        return "";
+    }
+    
+    pos++; // Skip opening bracket
+    std::string result = "[";
+    bool first = true;
+    
+    skipWhitespace(jsonStr, pos);
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != ']') {
+        if (!first) {
+            result += ",";
+        }
+        first = false;
+        
+        // Parse array element
+        std::string element = parseJSONValue(jsonStr, pos);
+        result += "\"" + element + "\"";
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++; // Skip comma
+        }
+        
+        skipWhitespace(jsonStr, pos);
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == ']') {
+        pos++; // Skip closing bracket
+    }
+    
+    result += "]";
+    return result;
+}
+
+// Helper function to parse JSON boolean
+static std::string parseJSONBoolean(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr.substr(pos, 4) == "true") {
+        pos += 4;
+        return "true";
+    } else if (jsonStr.substr(pos, 5) == "false") {
+        pos += 5;
+        return "false";
+    }
+    return "";
+}
+
+// Helper function to parse JSON null
+static std::string parseJSONNull(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr.substr(pos, 4) == "null") {
+        pos += 4;
+        return "null";
+    }
+    return "";
+}
+
+// Helper function to parse JSON number
+static std::string parseJSONNumber(const std::string& jsonStr, size_t& pos) {
+    size_t start = pos;
+    bool isFloat = false;
+    
+    while (pos < jsonStr.size() && (std::isdigit(jsonStr[pos]) || 
+                                   jsonStr[pos] == '-' || 
+                                   jsonStr[pos] == '+' || 
+                                   jsonStr[pos] == '.' || 
+                                   jsonStr[pos] == 'e' || 
+                                   jsonStr[pos] == 'E')) {
+        if (jsonStr[pos] == '.' || jsonStr[pos] == 'e' || jsonStr[pos] == 'E') {
+            isFloat = true;
+        }
+        pos++;
+    }
+    
+    return jsonStr.substr(start, pos - start);
+}
+
+// Helper function to parse JSON string value
+static std::string parseJSONStringValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
+    if (pos >= jsonStr.size() || jsonStr[pos] != '"') {
+        return "";
+    }
+    return parseJSONString(jsonStr, pos);
+}
+
+// Helper function to parse JSON number value
+static double parseJSONNumberValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
+    std::string numStr = parseJSONNumber(jsonStr, pos);
+    try {
+        return std::stod(numStr);
+    } catch (...) {
+        return 0.0;
+    }
+}
+
+// Helper function to parse JSON boolean value
+static bool parseJSONBooleanValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
+    std::string boolStr = parseJSONBoolean(jsonStr, pos);
+    return boolStr == "true";
+}
+
+// Helper function to parse JSON null value
+static bool parseJSONNullValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
+    std::string nullStr = parseJSONNull(jsonStr, pos);
+    return nullStr == "null";
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first
+    try {
+        if (parseJSON(content)) {
+            return true;
+        }
+    } catch (...) {
+        // If JSON parsing fails, fall back to key=value format
+    }
+    
+    // Fallback to simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -50,6 +297,62 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::parseJSON(const std::string& jsonStr) {
+    size_t pos = 0;
+    skipWhitespace(jsonStr, pos);
+    
+    if (jsonStr[pos] != '{') {
+        return false;
+    }
+    
+    pos++; // Skip opening brace
+    skipWhitespace(jsonStr, pos);
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != '}') {
+        // Parse key
+        skipWhitespace(jsonStr, pos);
+        std::string key = parseJSONString(jsonStr, pos);
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+            return false;
+        }
+        
+        pos++; // Skip colon
+        skipWhitespace(jsonStr, pos);
+        
+        // Parse value based on content
+        std::string value;
+        
+        if (pos < jsonStr.size() && jsonStr[pos] == '"') {
+            value = parseJSONString(jsonStr, pos);
+        } else if (pos < jsonStr.size() && (std::isdigit(jsonStr[pos]) || jsonStr[pos] == '-' || jsonStr[pos] == '+')) {
+            value = parseJSONNumber(jsonStr, pos);
+        } else if (pos < jsonStr.size() && jsonStr[pos] == 't') {
+            value = parseJSONBoolean(jsonStr, pos);
+        } else if (pos < jsonStr.size() && jsonStr[pos] == 'n') {
+            value = parseJSONNull(jsonStr, pos);
+        } else if (pos < jsonStr.size() && jsonStr[pos] == '[') {
+            value = parseJSONArray(jsonStr, pos);
+        } else if (pos < jsonStr.size() && jsonStr[pos] == '{') {
+            value = parseJSONObject(jsonStr, pos);
+        }
+        
+        if (!key.empty() && !value.empty()) {
+            set(key, value, ConfigSource::File);
+        }
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++; // Skip comma
+        }
+        
+        skipWhitespace(jsonStr, pos);
     }
     
     return true;
@@ -84,12 +387,63 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Write in JSON format for better readability
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": \"" << entryToString(entry) << "\"";
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
     }
     
+    file << "}\n";
+    
     return true;
+}
+
+std::string Config::entryToString(const ConfigEntry& entry) const {
+    std::ostringstream oss;
+    
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        }
+    }, entry.value);
+    
+    return oss.str();
 }
 
 template<typename T>

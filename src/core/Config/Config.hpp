@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
 
 namespace nlm {
 
@@ -42,6 +43,63 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// JSON parsing helper functions
+namespace json {
+    // Parse JSON file
+    bool parseJSONFile(const std::string& filepath);
+    
+    // Parse JSON string
+    bool parseJSONString(const std::string& jsonStr);
+    
+    // Skip whitespace in JSON
+    void skipWhitespace(const std::string& str, size_t& pos);
+    
+    // Parse JSON string value
+    std::string parseJSONStringValue(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON number value
+    double parseJSONNumberValue(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON boolean value
+    bool parseJSONBooleanValue(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON null value
+    bool parseJSONNullValue(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON object
+    bool parseJSONObject(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON array
+    bool parseJSONArray(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON value
+    std::string parseJSONValue(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON number
+    std::string parseJSONNumber(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON string
+    std::string parseJSONString(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON boolean
+    std::string parseJSONBoolean(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON null
+    std::string parseJSONNull(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON object
+    std::string parseJSONObject(const std::string& jsonStr, size_t& pos);
+    
+    // Parse JSON array
+    std::string parseJSONArray(const std::string& jsonStr, size_t& pos);
+    
+    // Helper function to trim whitespace and quotes
+    std::string trimString(const std::string& str);
+    
+    // Helper function to convert ConfigEntry to string
+    std::string entryToString(const ConfigEntry& entry);
+}
 
 // Main configuration class
 class Config {
@@ -93,6 +151,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON parsing methods
+    bool parseJSON(const std::string& jsonStr);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +161,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string entryToString(const ConfigEntry& entry);
 };
 
 } // namespace nlm

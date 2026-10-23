@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +16,10 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/AdvancedConfig.hpp"
+
+// Forward declaration for advanced configuration bindings
+void bindAdvancedConfig(py::module_ &m);
 
 namespace py = pybind11;
 namespace nlm {
@@ -28,6 +33,12 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::domain_error>(m, "KeyError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+
+    // Include advanced configuration bindings
+    bindAdvancedConfig(m);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())

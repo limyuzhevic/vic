@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +80,79 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigSaveToFile() {
+    nlm::Config config;
+    
+    config.set("brain.neuron_count", 1000, nlm::ConfigSource::Runtime);
+    config.set("brain.synapse_density", 0.1f, nlm::ConfigSource::Runtime);
+    config.set("plasticity.stdp.enable", true, nlm::ConfigSource::Runtime);
+    config.set("development.critical_period_start", 10.0, nlm::ConfigSource::Runtime);
+    config.set("development.critical_period_end", 50.0, nlm::ConfigSource::Runtime);
+    
+    // Save to file
+    assert(config.saveToFile("test_config.json"));
+    
+    // Load from file
+    nlm::Config config2;
+    assert(config2.loadFromFile("test_config.json"));
+    
+    // Verify values
+    assert(config2.get<int>("brain.neuron_count").value_or(0) == 1000);
+    assert(config2.get<double>("brain.synapse_density").value_or(0.0) == 0.1);
+    assert(config2.get<bool>("plasticity.stdp.enable").value_or(false) == true);
+    assert(config2.get<double>("development.critical_period_start").value_or(0.0) == 10.0);
+    assert(config2.get<double>("development.critical_period_end").value_or(0.0) == 50.0);
+    
+    // Clean up
+    std::remove("test_config.json");
+    
+    std::cout << "    testConfigSaveToFile passed" << std::endl;
+}
+
+void testConfigJSONParsing() {
+    nlm::Config config;
+    
+    // Test JSON parsing with nested keys
+    config.set("brain.neuron_count", 2000, nlm::ConfigSource::Runtime);
+    config.set("brain.synapse_density", 0.15, nlm::ConfigSource::Runtime);
+    config.set("plasticity.stdp.enable", true, nlm::ConfigSource::Runtime);
+    config.set("plasticity.stdp.learning_rate", 0.01, nlm::ConfigSource::Runtime);
+    config.set("plasticity.hebbian.enable", true, nlm::ConfigSource::Runtime);
+    config.set("neuromod.dopamine.scale", 2.0, nlm::ConfigSource::Runtime);
+    config.set("development.critical_period_start", 20.0, nlm::ConfigSource::Runtime);
+    config.set("development.critical_period_end", 100.0, nlm::ConfigSource::Runtime);
+    
+    // Save to JSON file
+    assert(config.saveToFile("advanced_config.json"));
+    
+    // Load from JSON file
+    nlm::Config config2;
+    assert(config2.loadFromFile("advanced_config.json"));
+    
+    // Verify nested structure
+    assert(config2.get<int>("brain.neuron_count").value_or(0) == 2000);
+    assert(config2.get<double>("brain.synapse_density").value_or(0.0) == 0.15);
+    assert(config2.get<bool>("plasticity.stdp.enable").value_or(false) == true);
+    assert(config2.get<double>("plasticity.stdp.learning_rate").value_or(0.0) == 0.01);
+    assert(config2.get<bool>("plasticity.hebbian.enable").value_or(false) == true);
+    assert(config2.get<double>("neuromod.dopamine.scale").value_or(0.0) == 2.0);
+    assert(config2.get<double>("development.critical_period_start").value_or(0.0) == 20.0);
+    assert(config2.get<double>("development.critical_period_end").value_or(0.0) == 100.0);
+    
+    // Clean up
+    std::remove("advanced_config.json");
+    
+    std::cout << "    testConfigJSONParsing passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigSaveToFile();
+    testConfigJSONParsing();
 }
 
 } // namespace test_config
