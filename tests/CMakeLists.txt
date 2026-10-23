@@ -8,6 +8,8 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_comprehensive.cpp
+    test_command_line.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
