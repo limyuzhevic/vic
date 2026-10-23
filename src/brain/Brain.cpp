@@ -1,8 +1,27 @@
+// NLM (熙然) - Neural Learning Machine
+// Phase 6: Final Integration - Complete Artificial Brain
+//
+// This file implements the Phase 6 integrated artificial brain architecture that combines:
+// - All previous phase achievements into a coherent system
+// - Memory systems (working, episodic, associative)
+// - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+// - Prediction and cognition systems
+// - Development system for plasticity modulation
+// - Advanced spike dynamics with event-driven processing
+// - Checkpoint system for persistence
+//
+// Architecture follows the closed-loop brain model:
+// WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE →
+// MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION →
+// MOTOR OUTPUT → WORLD CONSEQUENCE → REWARD/SURPRISE/ERROR →
+// PLASTICITY → MEMORY/DEVELOPMENT → CHANGED BRAIN → CHANGED FUTURE BEHAVIOR
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Utilities/CoreUtils.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -78,6 +97,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Neuron lookup table for O(1) spike delivery
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -145,18 +167,22 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
+                // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize neuron lookup table (will be populated when neurons are created)
+        neuronLookup.reserve(neuronCount);
     }
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
 
+// Implementation of the integrated artificial brain
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
@@ -187,32 +213,52 @@ bool Brain::initialize() {
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+        auto* region = getRegion(regionId);
+        if (!region) {
+            NLM_LOG_ERROR("Failed to create or retrieve region " + std::to_string(i + 1));
+            return false;
+        }
     }
     
     // Create neurons across regions
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Cannot create neurons with zero regions");
+        return false;
+    }
+    
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0 && neuronCount > 0) {
+        NLM_LOG_WARNING("Neuron count too small for specified regions, using minimum neurons per region");
+        neuronsPerRegion = 1;
+    }
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        if (!region) {
+            NLM_LOG_ERROR("Failed to retrieve region " + std::to_string(i + 1));
+            return false;
+        }
+        // Add populations with error checking
+        auto sensoryPopId = region->addPopulation(std::max<size_t>(1, neuronsPerRegion / 4), NeuronType::Sensory);
+        auto internalPopId = region->addPopulation(std::max<size_t>(1, neuronsPerRegion / 2), NeuronType::Internal);
+        auto motorPopId = region->addPopulation(std::max<size_t>(1, neuronsPerRegion / 4), NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
+        // Collect sensory and motor neurons for I/O
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                pImpl->sensoryNeurons.push_back(neuron);
+                pImpl->neuronLookup[neuron->getId()] = neuron;
             }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
+        }
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                pImpl->motorNeurons.push_back(neuron);
+                pImpl->neuronLookup[neuron->getId()] = neuron;
             }
+        }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
@@ -268,20 +314,17 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // Look up destination neuron using lookup table for O(1) access
+        auto it = pImpl->neuronLookup.find(event.destination_neuron);
+        if (it != pImpl->neuronLookup.end()) {
+            auto* neuron = it->second;
+            
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -589,14 +632,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
+    // Validate input
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Empty sensory input received");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("No sensory neurons available for input processing");
+        return;
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -604,6 +651,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        }
+        
+        // Validate neuron pointer before use
+        if (!pImpl->sensoryNeurons[i]) {
+            NLM_LOG_ERROR("Null sensory neuron pointer at index " + std::to_string(i));
+            continue;
         }
         
         // Inject current into this sensory neuron
@@ -617,26 +670,49 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    bool neuronFound = false;
+    
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
+                if (!n) {
+                    NLM_LOG_ERROR("Null neuron pointer found for ID " + std::to_string(neuron.index()));
+                    continue;
+                }
                 n->injectCurrent(current);
-                return;
+                neuronFound = true;
+                break;
             }
         }
+        if (neuronFound) break;
+    }
+    
+    if (!neuronFound) {
+        NLM_LOG_WARNING("Neuron not found for ID " + std::to_string(neuron.index()));
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    bool neuronsFound = false;
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
+                neuronsFound = true;
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Null neuron pointer found in population");
+                        continue;
+                    }
                     neuron->injectCurrent(current);
                 }
             }
         }
+    }
+    
+    if (!neuronsFound) {
+        NLM_LOG_WARNING("No neurons of type " + std::to_string(static_cast<int>(type)) + " found");
     }
 }
 

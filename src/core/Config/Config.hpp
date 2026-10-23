@@ -31,7 +31,7 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration entry with validation support
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
@@ -41,9 +41,26 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Type checking utilities
+    template<typename T>
+    bool isType() const {
+        return std::holds_alternative<T>(value);
+    }
+    
+    template<typename T>
+    std::optional<T> getValue() const {
+        if (isType<T>()) {
+            return std::get<T>(value);
+        }
+        return std::nullopt;
+    }
 };
 
-// Main configuration class
+// Validation callback type
+using ValidationCallback = std::function<bool(const std::string&, const ConfigValue&)>;
+
+// Main configuration class with enhanced features
 class Config {
 public:
     Config();
@@ -55,7 +72,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -64,30 +81,45 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with type safety
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Type-specific getters with default values
+    int getInt(const std::string& key, int defaultValue = 0) const;
+    int64_t getInt64(const std::string& key, int64_t defaultValue = 0) const;
+    double getDouble(const std::string& key, double defaultValue = 0.0) const;
+    bool getBool(const std::string& key, bool defaultValue = false) const;
+    std::string getString(const std::string& key, const std::string& defaultValue = "") const;
+    
+    // Set values with type safety
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Type-specific setters
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setInt64(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void setDouble(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Add validation callback
+    void addValidation(const std::string& key, ValidationCallback validator);
+    
+    // Check existence and operations
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
-    
-    // Get all keys
     std::vector<std::string> getKeys() const;
-    
-    // Clear all
     void clear();
     
     // Get configuration summary
@@ -100,6 +132,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    std::string getValueAsString(const ConfigValue& value) const;
+    bool validateEntry(const ConfigEntry& entry) const;
 };
 
 } // namespace nlm

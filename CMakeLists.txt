@@ -6,10 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Utilities
+add_subdirectory(src/core/Utilities)
 
 # Enable warnings
 if(MSVC)
@@ -87,10 +85,8 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Utilities
+add_subdirectory(src/core/Utilities)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
