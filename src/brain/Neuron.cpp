@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -17,11 +18,6 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -210,8 +206,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = constants::LIF_TIME_CONSTANT;  // ms
+    float C = constants::LIF_MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -274,19 +270,19 @@ void Neuron::reset() {
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-constants::NEURON_POTENTIAL_VARIATION, constants::NEURON_POTENTIAL_VARIATION);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = -55.0f + rng.uniformReal(-constants::NEURON_THRESHOLD_VARIATION, constants::NEURON_THRESHOLD_VARIATION);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-constants::NEURON_RESTING_VARIATION, constants::NEURON_RESTING_VARIATION);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, constants::NEURON_RESET_VARIATION);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(constants::REFRACTORY_PERIOD_MIN, constants::REFRACTORY_PERIOD_MAX));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

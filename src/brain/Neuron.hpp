@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Constants.hpp"
 #include <vector>
 #include <array>
 
@@ -15,7 +16,7 @@ struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
     MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
+    MembranePotential resetPotential;      // Post-spike reset value (mV)
     MembranePotential leakConductance;      // Leak conductance (nS)
     MembranePotential synapseConductance;   // Synaptic conductance (nS)
     FiringRate firingRate;                 // Current firing rate (Hz)
@@ -26,16 +27,16 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
+        : membranePotential(constants::LIF_RESTING_POTENTIAL)
+        , restingPotential(constants::LIF_RESTING_POTENTIAL)
+        , threshold(constants::LIF_THRESHOLD)
+        , resetPotential(constants::LIF_RESET_POTENTIAL)
         , leakConductance(10.0f)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(constants::REFRACTORY_PERIOD_MIN) // Default to min
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
